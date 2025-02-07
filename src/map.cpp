@@ -11,12 +11,14 @@
 #include "debug.h"
 #include "core/alloc_func.hpp"
 #include "water_map.h"
+#include "error_func.h"
 #include "string_func.h"
 #include "rail_map.h"
 #include "tunnelbridge_map.h"
 #include "pathfinder/water_regions.h"
-#include "3rdparty/cpp-btree/btree_map.h"
 #include "core/ring_buffer.hpp"
+#include "3rdparty/cpp-btree/btree_map.h"
+#include "3rdparty/robin_hood/robin_hood.h"
 #include <array>
 #include <memory>
 
@@ -32,6 +34,8 @@ uint _map_size_x;    ///< Size of the map along the X
 uint _map_size_y;    ///< Size of the map along the Y
 uint _map_size;      ///< The number of tiles on the map
 uint _map_tile_mask; ///< _map_size - 1 (to mask the mapsize)
+uint _map_digits_x;  ///< Number of base-10 digits for _map_size_x
+uint _map_digits_y;  ///< Number of base-10 digits for _map_size_y
 
 Tile *_m = nullptr;          ///< Tiles of the map
 TileExtended *_me = nullptr; ///< Extended Tiles of the map
@@ -67,11 +71,11 @@ bool ValidateMapSize(uint size_x, uint size_y)
  */
 void AllocateMap(uint size_x, uint size_y)
 {
-	DEBUG(map, 2, "Min/max map size %d/%d, max map tiles %d", MIN_MAP_SIZE, MAX_MAP_SIZE, MAX_MAP_TILES);
-	DEBUG(map, 1, "Allocating map of size %dx%d", size_x, size_y);
+	Debug(map, 2, "Min/max map size {}/{}, max map tiles {}", MIN_MAP_SIZE, MAX_MAP_SIZE, MAX_MAP_TILES);
+	Debug(map, 1, "Allocating map of size {}x{}", size_x, size_y);
 
 	if (!ValidateMapSize(size_x, size_y)) {
-		error("Invalid map size");
+		FatalError("Invalid map size");
 	}
 
 	_map_log_x = FindFirstBit(size_x);
@@ -80,6 +84,8 @@ void AllocateMap(uint size_x, uint size_y)
 	_map_size_y = size_y;
 	_map_size = size_x * size_y;
 	_map_tile_mask = _map_size - 1;
+	_map_digits_x = GetBase10DigitsRequired(_map_size_x);
+	_map_digits_y = GetBase10DigitsRequired(_map_size_y);
 
 #if defined(__linux__) && defined(MADV_HUGEPAGE)
 	if (_munmap_size != 0) {
@@ -93,7 +99,7 @@ void AllocateMap(uint size_x, uint size_y)
 
 	const size_t total_size = (sizeof(Tile) + sizeof(TileExtended)) * _map_size;
 
-	byte *buf = nullptr;
+	uint8_t *buf = nullptr;
 #if defined(__linux__) && defined(MADV_HUGEPAGE)
 	const size_t alignment = 2 * 1024 * 1024;
 	/* First try mmap with a 2MB alignment, if that fails, just use calloc */
@@ -106,7 +112,7 @@ void AllocateMap(uint size_x, uint size_y)
 
 			/* target is now aligned, allocated has been adjusted accordingly */
 
-			const size_t remove_front = static_cast<byte *>(target) - static_cast<byte *>(ret);
+			const size_t remove_front = static_cast<uint8_t *>(target) - static_cast<uint8_t *>(ret);
 			if (remove_front != 0) {
 				munmap(ret, remove_front);
 			}
@@ -117,15 +123,15 @@ void AllocateMap(uint size_x, uint size_y)
 			}
 
 			madvise(target, total_size, MADV_HUGEPAGE);
-			DEBUG(map, 2, "Using mmap for map allocation");
+			Debug(map, 2, "Using mmap for map allocation");
 
-			buf = static_cast<byte *>(target);
+			buf = static_cast<uint8_t *>(target);
 			_munmap_size = total_size;
 		}
 	}
 #endif
 
-	if (buf == nullptr) buf = CallocT<byte>(total_size);
+	if (buf == nullptr) buf = CallocT<uint8_t>(total_size);
 
 	_m = reinterpret_cast<Tile *>(buf);
 	_me = reinterpret_cast<TileExtended *>(buf + (_map_size * sizeof(Tile)));
@@ -199,6 +205,12 @@ TileIndex TileAddSaturating(TileIndex tile, int addx, int addy)
 	return TileXY(clamp(x,  MapMaxX()), clamp(y,  MapMaxY()));
 }
 
+/** 'Lookup table' for tile offsets given an Axis */
+extern const TileIndexDiffC _tileoffs_by_axis[] = {
+	{ 1,  0}, ///< AXIS_X
+	{ 0,  1}, ///< AXIS_Y
+};
+
 /** 'Lookup table' for tile offsets given a DiagDirection */
 extern const TileIndexDiffC _tileoffs_by_diagdir[] = {
 	{-1,  0}, ///< DIAGDIR_NE
@@ -245,10 +257,10 @@ uint DistanceManhattan(TileIndex t0, TileIndex t1)
  * @param t1 the end tile
  * @return the distance
  */
-uint DistanceSquare(TileIndex t0, TileIndex t1)
+uint64_t DistanceSquare64(TileIndex t0, TileIndex t1)
 {
-	const int dx = TileX(t0) - TileX(t1);
-	const int dy = TileY(t0) - TileY(t1);
+	const int64_t dx = (int)TileX(t0) - (int)TileX(t1);
+	const int64_t dy = (int)TileY(t0) - (int)TileY(t1);
 	return dx * dx + dy * dy;
 }
 
@@ -423,15 +435,14 @@ bool EnoughContiguousTilesMatchingCondition(TileIndex tile, uint threshold, Test
 
 	static_assert(MAX_MAP_TILES_BITS <= 30);
 
-	btree::btree_set<uint32_t> processed_tiles;
+	robin_hood::unordered_flat_set<uint32_t> processed_tiles;
 	ring_buffer<uint32_t> candidates;
 	uint matching_count = 0;
 
 	auto process_tile = [&](TileIndex t, DiagDirection exclude_onward_dir) {
-		auto iter = processed_tiles.lower_bound(t);
-		if (iter != processed_tiles.end() && *iter == t) {
-			/* done this tile already */
-		} else {
+		auto res = processed_tiles.insert(t);
+		if (res.second) {
+			/* Tile not done/inserted already */
 			if (proc(t, user_data)) {
 				matching_count++;
 				for (DiagDirection dir = DIAGDIR_BEGIN; dir < DIAGDIR_END; dir++) {
@@ -442,7 +453,6 @@ bool EnoughContiguousTilesMatchingCondition(TileIndex tile, uint threshold, Test
 					}
 				}
 			}
-			processed_tiles.insert(iter, t);
 		}
 	};
 	process_tile(tile, INVALID_DIAGDIR);
@@ -564,28 +574,27 @@ static const char *tile_type_names[16] = {
 	"INVALID_F",
 };
 
-char *DumpTileInfo(char *b, const char *last, TileIndex tile)
+void DumpTileInfo(format_target &buffer, TileIndex tile)
 {
 	if (tile == INVALID_TILE) {
-		b += seprintf(b, last, "tile: %X (INVALID_TILE)", tile);
+		buffer.format("tile: {:X} (INVALID_TILE)", tile);
 	} else {
-		b += seprintf(b, last, "tile: %X (%u x %u)", tile, TileX(tile), TileY(tile));
+		buffer.format("tile: {:X} ({} x {})", tile, TileX(tile), TileY(tile));
 	}
 	if (!_m || !_me) {
-		b += seprintf(b, last, ", NO MAP ALLOCATED");
+		buffer.append(", NO MAP ALLOCATED");
 	} else {
 		if (tile >= MapSize()) {
-			b += seprintf(b, last, ", TILE OUTSIDE MAP");
+			buffer.format(", TILE OUTSIDE MAP (map size: 0x{:X})", MapSize());
 		} else {
-			b += seprintf(b, last, ", type: %02X (%s), height: %02X, data: %02X %04X %02X %02X %02X %02X %02X %04X",
+			buffer.format(", type: {:02X} ({}), height: {:02X}, data: {:02X} {:04X} {:02X} {:02X} {:02X} {:02X} {:02X} {:04X}",
 					_m[tile].type, tile_type_names[GB(_m[tile].type, 4, 4)], _m[tile].height,
 					_m[tile].m1, _m[tile].m2, _m[tile].m3, _m[tile].m4, _m[tile].m5, _me[tile].m6, _me[tile].m7, _me[tile].m8);
 		}
 	}
-	return b;
 }
 
-void DumpMapStats(char *b, const char *last)
+void DumpMapStats(format_target &buffer)
 {
 	std::array<uint, 16> tile_types;
 	uint restricted_signals = 0;
@@ -654,26 +663,26 @@ void DumpMapStats(char *b, const char *last)
 	}
 
 	for (uint type = 0; type < 16; type++) {
-		if (tile_types[type]) b += seprintf(b, last, "%-20s %20u\n", tile_type_names[type], tile_types[type]);
+		if (tile_types[type]) buffer.format("{:<20} {:20}\n", tile_type_names[type], tile_types[type]);
 	}
 
-	b += seprintf(b, last, "\n");
+	buffer.push_back('\n');
 
-	if (restricted_signals) b += seprintf(b, last, "restricted signals   %20u\n", restricted_signals);
-	if (prog_signals)       b += seprintf(b, last, "prog signals         %20u\n", prog_signals);
-	if (dual_rail_type)     b += seprintf(b, last, "dual rail type       %20u\n", dual_rail_type);
-	if (road_works)         b += seprintf(b, last, "road works           %20u\n", road_works);
+	if (restricted_signals) buffer.format("restricted signals   {:20}\n", restricted_signals);
+	if (prog_signals)       buffer.format("prog signals         {:20}\n", prog_signals);
+	if (dual_rail_type)     buffer.format("dual rail type       {:20}\n", dual_rail_type);
+	if (road_works)         buffer.format("road works           {:20}\n", road_works);
 
 	for (auto it : tunnel_bridge_stats) {
-		b = strecpy(b, it.first & TBB_BRIDGE ? "bridge" : "tunnel", last, true);
-		if (it.first & TBB_ROAD) b = strecpy(b, ", road", last, true);
-		if (it.first & TBB_TRAM) b = strecpy(b, ", tram", last, true);
-		if (it.first & TBB_RAIL) b = strecpy(b, ", rail", last, true);
-		if (it.first & TBB_WATER) b = strecpy(b, ", water", last, true);
-		if (it.first & TBB_CUSTOM_HEAD) b = strecpy(b, ", custom head", last, true);
-		if (it.first & TBB_DUAL_RT) b = strecpy(b, ", dual rail type", last, true);
-		if (it.first & TBB_SIGNALLED) b = strecpy(b, ", signalled", last, true);
-		if (it.first & TBB_SIGNALLED_BIDI) b = strecpy(b, ", bidi", last, true);
-		b += seprintf(b, last, ": %u\n", it.second);
+		buffer.append(it.first & TBB_BRIDGE ? "bridge" : "tunnel");
+		if (it.first & TBB_ROAD) buffer.append(", road");
+		if (it.first & TBB_TRAM) buffer.append(", tram");
+		if (it.first & TBB_RAIL) buffer.append(", rail");
+		if (it.first & TBB_WATER) buffer.append(", water");
+		if (it.first & TBB_CUSTOM_HEAD) buffer.append(", custom head");
+		if (it.first & TBB_DUAL_RT) buffer.append(", dual rail type");
+		if (it.first & TBB_SIGNALLED) buffer.append(", signalled");
+		if (it.first & TBB_SIGNALLED_BIDI) buffer.append(", bidi");
+		buffer.format(": {}\n", it.second);
 	}
 }

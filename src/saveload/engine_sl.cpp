@@ -13,6 +13,7 @@
 #include "compat/engine_sl_compat.h"
 
 #include "../engine_base.h"
+#include "../engine_override.h"
 #include "../string_func.h"
 #include <vector>
 
@@ -97,7 +98,7 @@ struct EIDSChunkHandler : ChunkHandler {
 		SlTableHeader(_engine_id_mapping_desc);
 
 		uint index = 0;
-		for (EngineIDMapping &eid : _engine_mngr) {
+		for (EngineIDMapping &eid : _engine_mngr.mappings) {
 			SlSetArrayIndex(index);
 			SlObject(&eid, _engine_id_mapping_desc);
 			index++;
@@ -108,12 +109,14 @@ struct EIDSChunkHandler : ChunkHandler {
 	{
 		const std::vector<SaveLoad> slt = SlCompatTableHeader(_engine_id_mapping_desc, _engine_id_mapping_sl_compat);
 
-		_engine_mngr.clear();
+		_engine_mngr.mappings.clear();
 
 		while (SlIterateArray() != -1) {
-			EngineIDMapping *eid = &_engine_mngr.emplace_back();
+			EngineIDMapping *eid = &_engine_mngr.mappings.emplace_back();
 			SlObject(eid, slt);
 		}
+
+		_engine_mngr.ReIndex();
 	}
 };
 

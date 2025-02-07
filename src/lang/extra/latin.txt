@@ -21,8 +21,6 @@ STR_TRANSPARENT_LOADING_TOOLTIP                                 :{BLACK}Mutare p
 
 # Programmable Pre-Signals
 
-#House construction window (for SE only)
-
 #Town select window (for SE only)
 
 STR_MAPGEN_SNOW_LINE_HEIGHT                                     :{BLACK}Altitudo nivis lineae:
@@ -43,8 +41,8 @@ STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_SERVICE_VEL_END            :{LTBLUE}Iens mi
 
 STR_ORDERS_GO_TO_TOOLTIP_EXTRA                                  :{BLACK}Inserere novum iussum ante iussum electum, aut ad finem indicis. Ctrl pressa, iussa stationum sunt 'plene quidquam onerare', iussa interlocorum 'continue', et iussa receptaculorum 'ministrare'. 'Iussa communicare' sive Ctrl facit ut iussa communicentur inter hoc ac electum vehiculum. Pressio in aliud vehiculum transcribit iussa ex illo vehiculo. Si adest iussum receptaculi, vehiculum non automatice ministratur
 
-STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :A:
-STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :E:
+STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :A:{SPACE}{SPACE}
+STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :E:{SPACE}{SPACE}
 
 # Cargo type orders Window
 
@@ -78,3 +76,16 @@ STR_ERROR_CAN_T_SELL_25_SHARE_IN                                :{WHITE}Non lice
 STR_ERROR_PROTECTED                                             :{WHITE}Nondum licet sortes societatis mercari...
 
 STR_CONFIG_SETTING_CYCLE_SIGNAL_PBS                             :Modo signalia itineris
+
+STR_NETWORK_NEED_COMPANY_PASSWORD_CAPTION                       :{WHITE}Societas tuta est. Tesseram inscribe
+
+# Network set password
+STR_COMPANY_PASSWORD_CANCEL                                     :{BLACK}Relinquere tesseram inscriptam
+STR_COMPANY_PASSWORD_OK                                         :{BLACK}Dare novam tesseram societati
+STR_COMPANY_PASSWORD_CAPTION                                    :{WHITE}Tessera societatis
+STR_COMPANY_PASSWORD_MAKE_DEFAULT                               :{BLACK}Tessera societatis solita
+STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}Fac ut haec tessera societatis solita sit novis societatibus
+
+STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}Tessera
+STR_COMPANY_VIEW_PASSWORD_TOOLTIP                               :{BLACK}Custodire tessera societatem tuam ut clientes inauctorati iungere non possint
+STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}Eligere tesseram societatis

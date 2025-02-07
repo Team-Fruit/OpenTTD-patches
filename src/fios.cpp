@@ -21,6 +21,7 @@
 #include "strings_func.h"
 #include "tar_type.h"
 #include "core/container_func.hpp"
+#include "core/format.hpp"
 #include <sys/stat.h>
 #include <functional>
 #include <optional>
@@ -38,8 +39,8 @@ static std::string *_fios_path = nullptr;
 SortingBits _savegame_sort_order = SORT_BY_DATE | SORT_DESCENDING;
 
 /* OS-specific functions are taken from their respective files (win32/unix .c) */
-extern bool FiosIsRoot(const char *path);
-extern bool FiosIsValidFile(const char *path, const struct dirent *ent, struct stat *sb);
+extern bool FiosIsRoot(std::string_view path);
+extern bool FiosIsValidFile(const fs_char *fspath, const struct dirent *ent, struct stat *sb);
 extern bool FiosIsHiddenFile(const struct dirent *ent);
 extern void FiosGetDrives(FileList &file_list);
 
@@ -89,6 +90,10 @@ void FileList::BuildFileList(AbstractFileType abstract_filetype, SaveLoadOperati
 
 		case FT_HEIGHTMAP:
 			FiosGetHeightmapList(fop, show_dirs, *this);
+			break;
+
+		case FT_TOWN_DATA:
+			FiosGetTownDataList(fop, show_dirs, *this);
 			break;
 
 		default:
@@ -166,6 +171,8 @@ bool FiosBrowseTo(const FiosItem *item)
 			s = _fios_path->find_last_of(PATHSEPCHAR);
 			if (s != std::string::npos) {
 				_fios_path->erase(s + 1); // go up a directory
+			} else {
+				*_fios_path += PATHSEP; // Add trailing path separator if there isn't one
 			}
 			break;
 		}
@@ -187,6 +194,7 @@ bool FiosBrowseTo(const FiosItem *item)
 		case FIOS_TYPE_OLD_SCENARIO:
 		case FIOS_TYPE_PNG:
 		case FIOS_TYPE_BMP:
+		case FIOS_TYPE_JSON:
 			return false;
 	}
 
@@ -251,8 +259,7 @@ std::string FiosMakeHeightmapName(const char *name)
  */
 bool FiosDelete(const char *name)
 {
-	std::string filename = FiosMakeSavegameName(name);
-	return unlink(filename.c_str()) == 0;
+	return FioRemove(FiosMakeSavegameName(name));
 }
 
 typedef FiosType fios_getlist_callback_proc(SaveLoadOperation fop, const std::string &filename, const char *ext, char *title, const char *last);
@@ -357,7 +364,7 @@ static void FiosGetFileList(SaveLoadOperation fop, bool show_dirs, fios_getlist_
 	struct dirent *dirent;
 	DIR *dir;
 	FiosItem *fios;
-	size_t sort_start;
+	size_t sort_start = 0;
 
 	file_list.clear();
 
@@ -371,15 +378,17 @@ static void FiosGetFileList(SaveLoadOperation fop, bool show_dirs, fios_getlist_
 		fios->name = "..";
 		SetDParamStr(0, "..");
 		fios->title = GetString(STR_SAVELOAD_PARENT_DIRECTORY);
+		sort_start = file_list.size();
 	}
 
 	/* Show subdirectories */
-	if (show_dirs && (dir = ttd_opendir(_fios_path->c_str())) != nullptr) {
+	auto fspath = OTTD2FS(*_fios_path);
+	if (show_dirs && (dir = opendir(fspath.c_str())) != nullptr) {
 		while ((dirent = readdir(dir)) != nullptr) {
 			std::string d_name = FS2OTTD(dirent->d_name);
 
 			/* found file must be directory, but not '.' or '..' */
-			if (FiosIsValidFile(_fios_path->c_str(), dirent, &sb) && S_ISDIR(sb.st_mode) &&
+			if (FiosIsValidFile(fspath.c_str(), dirent, &sb) && S_ISDIR(sb.st_mode) &&
 					(!FiosIsHiddenFile(dirent) || StrStartsWithIgnoreCase(PERSONAL_DIR, d_name)) &&
 					d_name != "." && d_name != "..") {
 				fios = &file_list.emplace_back();
@@ -397,7 +406,7 @@ static void FiosGetFileList(SaveLoadOperation fop, bool show_dirs, fios_getlist_
 	if (show_dirs) {
 		SortingBits order = _savegame_sort_order;
 		_savegame_sort_order = SORT_BY_NAME | SORT_ASCENDING;
-		std::sort(file_list.begin(), file_list.end());
+		std::sort(file_list.begin() + sort_start, file_list.end());
 		_savegame_sort_order = order;
 	}
 
@@ -416,8 +425,6 @@ static void FiosGetFileList(SaveLoadOperation fop, bool show_dirs, fios_getlist_
 
 	/* Show drives */
 	FiosGetDrives(file_list);
-
-	file_list.shrink_to_fit();
 }
 
 /**
@@ -430,17 +437,13 @@ static void FiosGetFileList(SaveLoadOperation fop, bool show_dirs, fios_getlist_
  */
 static void GetFileTitle(const std::string &file, char *title, const char *last, Subdirectory subdir)
 {
-	std::string buf = file;
-	buf += ".title";
+	auto f = FioFOpenFile(file + ".title", "r", subdir);
+	if (!f.has_value()) return;
 
-	FILE *f = FioFOpenFile(buf, "r", subdir);
-	if (f == nullptr) return;
-
-	size_t read = fread(title, 1, last - title, f);
+	size_t read = fread(title, 1, last - title, *f);
 	assert(title + read <= last);
 	title[read] = '\0';
 	StrMakeValidInPlace(title, last);
-	FioFCloseFile(f);
 }
 
 /**
@@ -614,6 +617,43 @@ void FiosGetHeightmapList(SaveLoadOperation fop, bool show_dirs, FileList &file_
 }
 
 /**
+ * Callback for FiosGetTownDataList.
+ * @param fop Purpose of collecting the list.
+ * @param file Name of the file to check.
+ * @return a FIOS_TYPE_JSON type of the found file, FIOS_TYPE_INVALID if not a valid JSON file, and the title of the file (if any).
+ */
+static FiosType FiosGetTownDataListCallback(SaveLoadOperation fop, const std::string &file, const char *ext, char *title, const char *last)
+{
+	if (fop == SLO_LOAD) {
+		if (StrEqualsIgnoreCase(ext, ".json")) {
+			GetFileTitle(file, title, last, SAVE_DIR);
+			return FIOS_TYPE_JSON;
+		}
+	}
+
+	return FIOS_TYPE_INVALID;
+}
+
+/**
+ * Get a list of town data files.
+ * @param fop Purpose of collecting the list.
+ * @param show_dirs Whether to show directories.
+ * @param file_list Destination of the found files.
+ */
+void FiosGetTownDataList(SaveLoadOperation fop, bool show_dirs, FileList &file_list)
+{
+	static std::optional<std::string> fios_town_data_path;
+
+	if (!fios_town_data_path) fios_town_data_path = FioFindDirectory(HEIGHTMAP_DIR);
+
+	_fios_path = &(*fios_town_data_path);
+
+	std::string base_path = FioFindDirectory(HEIGHTMAP_DIR);
+	Subdirectory subdir = base_path == *_fios_path ? HEIGHTMAP_DIR : NO_DIRECTORY;
+	FiosGetFileList(fop, show_dirs, &FiosGetTownDataListCallback, subdir, file_list);
+}
+
+/**
  * Get the directory for screenshots.
  * @return path to screenshots
  */
@@ -666,12 +706,11 @@ public:
 
 	bool AddFile(const std::string &filename, size_t, const std::string &) override
 	{
-		FILE *f = FioFOpenFile(filename, "r", SCENARIO_DIR);
-		if (f == nullptr) return false;
+		auto f = FioFOpenFile(filename, "r", SCENARIO_DIR);
+		if (!f.has_value()) return false;
 
 		ScenarioIdentifier id;
-		int fret = fscanf(f, "%u", &id.scenid);
-		FioFCloseFile(f);
+		int fret = fscanf(*f, "%u", &id.scenid);
 		if (fret != 1) return false;
 		id.filename = filename;
 
@@ -683,16 +722,14 @@ public:
 		 * This is safe as we check on extension which
 		 * must always exist. */
 		f = FioFOpenFile(filename.substr(0, filename.rfind('.')), "rb", SCENARIO_DIR, &size);
-		if (f == nullptr) return false;
+		if (!f.has_value()) return false;
 
 		/* calculate md5sum */
-		while ((len = fread(buffer, 1, (size > sizeof(buffer)) ? sizeof(buffer) : size, f)) != 0 && size != 0) {
+		while ((len = fread(buffer, 1, (size > sizeof(buffer)) ? sizeof(buffer) : size, *f)) != 0 && size != 0) {
 			size -= len;
 			checksum.Append(buffer, len);
 		}
 		checksum.Finish(id.md5sum);
-
-		FioFCloseFile(f);
 
 		include(*this, id);
 		return true;
@@ -745,10 +782,12 @@ void ScanScenarios()
  * Constructs FiosNumberedSaveName. Initial number is the most recent save, or -1 if not found.
  * @param prefix The prefix to use to generate a filename.
  */
-FiosNumberedSaveName::FiosNumberedSaveName(const std::string &prefix) : prefix(prefix), number(-1)
+FiosNumberedSaveName::FiosNumberedSaveName(std::string_view prefix) : prefix(prefix), number(-1)
 {
 	static std::optional<std::string> _autosave_path;
 	if (!_autosave_path) _autosave_path = FioFindDirectory(AUTOSAVE_DIR);
+
+	this->save_path = *_autosave_path;
 
 	static std::string _prefix; ///< Static as the lambda needs access to it.
 
@@ -764,7 +803,7 @@ FiosNumberedSaveName::FiosNumberedSaveName(const std::string &prefix) : prefix(p
 	/* Get the save list. */
 	FileList list;
 	FiosFileScanner scanner(SLO_SAVE, proc, list);
-	scanner.Scan(".sav", _autosave_path->c_str(), false);
+	scanner.Scan(".sav", *_autosave_path, false);
 
 	/* Find the number for the most recent save, if any. */
 	if (list.begin() != list.end()) {
@@ -794,12 +833,12 @@ std::string FiosNumberedSaveName::Filename()
 std::string FiosNumberedSaveName::FilenameUsingMaxSaves(int max_saves)
 {
 	if (++this->number >= max_saves) this->number = 0;
-	return this->FilenameUsingNumber(this->number, "");
+	return fmt::format("{}{}.sav", this->prefix, this->number);
 }
 
-std::string FiosNumberedSaveName::FilenameUsingNumber(int num, const char *suffix) const
+void FiosNumberedSaveName::FilenameUsingNumber(format_target &buffer, int num, const char *suffix) const
 {
-	return stdstr_fmt("%s%u%s.sav", this->prefix.c_str(), num, suffix);
+	buffer.format("{}{}{}.sav", this->prefix, num, suffix);
 }
 
 /**
@@ -808,5 +847,5 @@ std::string FiosNumberedSaveName::FilenameUsingNumber(int num, const char *suffi
  */
 std::string FiosNumberedSaveName::Extension()
 {
-	return stdstr_fmt("-%s.sav", this->prefix.c_str());
+	return fmt::format("-{}.sav", this->prefix);
 }

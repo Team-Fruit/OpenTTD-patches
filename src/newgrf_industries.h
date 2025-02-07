@@ -11,8 +11,10 @@
 #define NEWGRF_INDUSTRIES_H
 
 #include "newgrf_town.h"
+#include <bitset>
 
 struct IndustryLocationDistanceCache {
+	std::bitset<NUM_INDUSTRYTYPES> valid;
 	uint16_t distances[NUM_INDUSTRYTYPES];
 };
 
@@ -45,22 +47,21 @@ struct IndustriesScopeResolver : public ScopeResolver {
 	}
 
 	uint32_t GetRandomBits() const override;
-	uint32_t GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra *extra) const override;
+	uint32_t GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra &extra) const override;
 	uint32_t GetTriggers() const override;
 	void StorePSA(uint pos, int32_t value) override;
 
-	uint32_t GetCountAndDistanceOfClosestInstance(byte param_setID, byte layout_filter, bool town_filter, uint32_t mask) const;
+	uint32_t GetCountAndDistanceOfClosestInstance(uint8_t param_setID, uint8_t layout_filter, bool town_filter, uint32_t mask) const;
 	uint32_t GetClosestIndustry(IndustryType type) const;
 };
 
 /** Resolver for industries. */
 struct IndustriesResolverObject : public ResolverObject {
 	IndustriesScopeResolver industries_scope; ///< Scope resolver for the industry.
-	TownScopeResolver *town_scope;            ///< Scope resolver for the associated town (if needed and available, else \c nullptr).
+	std::optional<TownScopeResolver> town_scope = std::nullopt; ///< Scope resolver for the associated town (if needed and available, else \c std::nullopt).
 
 	IndustriesResolverObject(TileIndex tile, Industry *indus, IndustryType type, uint32_t random_bits = 0,
 			CallbackID callback = CBID_NO_CALLBACK, uint32_t callback_param1 = 0, uint32_t callback_param2 = 0);
-	~IndustriesResolverObject();
 
 	TownScopeResolver *GetTown();
 
@@ -112,6 +113,6 @@ bool IndustryTemporarilyRefusesCargo(Industry *ind, CargoID cargo_type);
 IndustryType MapNewGRFIndustryType(IndustryType grf_type, uint32_t grf_id);
 
 /* in newgrf_industrytiles.cpp*/
-uint32_t GetNearbyIndustryTileInformation(byte parameter, TileIndex tile, IndustryID index, bool signed_offsets, bool grf_version8, uint32_t mask);
+uint32_t GetNearbyIndustryTileInformation(uint8_t parameter, TileIndex tile, IndustryID index, bool signed_offsets, bool grf_version8, uint32_t mask);
 
 #endif /* NEWGRF_INDUSTRIES_H */

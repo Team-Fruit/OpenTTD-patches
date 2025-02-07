@@ -13,6 +13,10 @@
 #include "window_func.h"
 #include "viewport_func.h"
 #include "command_func.h"
+#include "dropdown_type.h"
+#include "dropdown_func.h"
+#include "dropdown_common_type.h"
+#include "house.h"
 #include "vehicle_gui.h"
 #include "rail_gui.h"
 #include "road.h"
@@ -101,17 +105,23 @@ static CallBackFunction _last_started_action = CBF_NONE; ///< Last started user 
  */
 class DropDownListCompanyItem : public DropDownIcon<DropDownIcon<DropDownString<DropDownListItem>, true>> {
 public:
-	DropDownListCompanyItem(CompanyID company, bool shaded) : DropDownIcon<DropDownIcon<DropDownString<DropDownListItem>, true>>(SPR_COMPANY_ICON, COMPANY_SPRITE_COLOUR(company), NetworkCompanyIsPassworded(company) ? SPR_LOCK : SPR_EMPTY, PAL_NONE, STR_NULL, company, false, shaded)
+	bool selectable;
+
+	DropDownListCompanyItem(CompanyID company, bool shaded, bool selectable = true) :
+			DropDownIcon<DropDownIcon<DropDownString<DropDownListItem>, true>>(SPR_COMPANY_ICON, COMPANY_SPRITE_COLOUR(company), NetworkCompanyIsPassworded(company) ? SPR_LOCK : SPR_EMPTY, PAL_NONE, STR_NULL, company, false, shaded),
+			selectable(selectable)
 	{
 		SetDParam(0, company);
 		SetDParam(1, company);
 		this->SetString(GetString(STR_COMPANY_NAME_COMPANY_NUM));
 	}
+
+	bool Selectable() const override { return this->selectable; }
 };
 
-DropDownListItem *MakeCompanyDropDownListItem(CompanyID cid)
+std::unique_ptr<DropDownListItem> MakeCompanyDropDownListItem(CompanyID cid, bool selectable)
 {
-	return new DropDownListCompanyItem(cid, false);
+	return std::make_unique<DropDownListCompanyItem>(cid, false, selectable);
 }
 
 /**
@@ -139,9 +149,9 @@ static void PopupMainToolbarMenu(Window *w, WidgetID widget, const std::initiali
 	int i = 0;
 	for (StringID string : strings) {
 		if (string == STR_NULL) {
-			list.push_back(std::make_unique<DropDownListDividerItem>(-1, false));
+			list.push_back(MakeDropDownListDividerItem());
 		} else {
-			list.push_back(std::make_unique<DropDownListStringItem>(string, i, false));
+			list.push_back(MakeDropDownListStringItem(string, i));
 			i++;
 		}
 	}
@@ -168,18 +178,18 @@ static void PopupMainCompanyToolbMenu(Window *w, WidgetID widget, CompanyMask gr
 			if (!_networking) break;
 
 			/* Add the client list button for the companies menu */
-			list.push_back(std::make_unique<DropDownListStringItem>(STR_NETWORK_COMPANY_LIST_CLIENT_LIST, CTMN_CLIENT_LIST, false));
+			list.push_back(MakeDropDownListStringItem(STR_NETWORK_COMPANY_LIST_CLIENT_LIST, CTMN_CLIENT_LIST));
 
 			if (_local_company != COMPANY_SPECTATOR) {
-				list.push_back(std::make_unique<DropDownListStringItem>(STR_NETWORK_COMPANY_LIST_SPECTATE, CTMN_SPECTATE, false));
+				list.push_back(MakeDropDownListStringItem(STR_NETWORK_COMPANY_LIST_SPECTATE, CTMN_SPECTATE));
 			}
 			break;
 		case WID_TN_STORY:
-			list.push_back(std::make_unique<DropDownListStringItem>(STR_STORY_BOOK_SPECTATOR, CTMN_SPECTATOR, false));
+			list.push_back(MakeDropDownListStringItem(STR_STORY_BOOK_SPECTATOR, CTMN_SPECTATOR));
 			break;
 
 		case WID_TN_GOAL:
-			list.push_back(std::make_unique<DropDownListStringItem>(STR_GOALS_SPECTATOR, CTMN_SPECTATOR, false));
+			list.push_back(MakeDropDownListStringItem(STR_GOALS_SPECTATOR, CTMN_SPECTATOR));
 			break;
 	}
 
@@ -265,35 +275,35 @@ enum OptionMenuEntries {
 static CallBackFunction ToolbarOptionsClick(Window *w)
 {
 	DropDownList list;
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_SETTINGS_MENU_GAME_OPTIONS,             OME_GAMEOPTIONS, false));
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_SETTINGS_MENU_CONFIG_SETTINGS_TREE,     OME_SETTINGS, false));
+	list.push_back(MakeDropDownListStringItem(STR_SETTINGS_MENU_GAME_OPTIONS,             OME_GAMEOPTIONS));
+	list.push_back(MakeDropDownListStringItem(STR_SETTINGS_MENU_CONFIG_SETTINGS_TREE,     OME_SETTINGS));
 	/* Changes to the per-AI settings don't get send from the server to the clients. Clients get
 	 * the settings once they join but never update it. As such don't show the window at all
 	 * to network clients. */
 	if (!_networking || _network_server) {
-		list.push_back(std::make_unique<DropDownListStringItem>(STR_SETTINGS_MENU_AI_SETTINGS,          OME_AI_SETTINGS, false));
-		list.push_back(std::make_unique<DropDownListStringItem>(STR_SETTINGS_MENU_GAMESCRIPT_SETTINGS,  OME_GAMESCRIPT_SETTINGS, false));
+		list.push_back(MakeDropDownListStringItem(STR_SETTINGS_MENU_AI_SETTINGS,          OME_AI_SETTINGS));
+		list.push_back(MakeDropDownListStringItem(STR_SETTINGS_MENU_GAMESCRIPT_SETTINGS,  OME_GAMESCRIPT_SETTINGS));
 	}
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_SETTINGS_MENU_NEWGRF_SETTINGS,          OME_NEWGRFSETTINGS, false));
+	list.push_back(MakeDropDownListStringItem(STR_SETTINGS_MENU_NEWGRF_SETTINGS,          OME_NEWGRFSETTINGS, false));
 	if (CheatWindowMayBeShown()) {
-		list.push_back(std::make_unique<DropDownListStringItem>(STR_SETTINGS_MENU_SANDBOX_OPTIONS,      OME_SANDBOX, false));
+		list.push_back(MakeDropDownListStringItem(STR_SETTINGS_MENU_SANDBOX_OPTIONS,      OME_SANDBOX, false));
 	}
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_SETTINGS_MENU_ZONING,                   OME_ZONING, false));
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_SETTINGS_MENU_TRANSPARENCY_OPTIONS,     OME_TRANSPARENCIES, false));
-	list.push_back(std::make_unique<DropDownListDividerItem>(-1, false));
-	list.push_back(std::make_unique<DropDownListCheckedItem>(HasBit(_display_opt, DO_SHOW_TOWN_NAMES),       STR_SETTINGS_MENU_TOWN_NAMES_DISPLAYED,    OME_SHOW_TOWNNAMES, false));
-	list.push_back(std::make_unique<DropDownListCheckedItem>(HasBit(_display_opt, DO_SHOW_STATION_NAMES),    STR_SETTINGS_MENU_STATION_NAMES_DISPLAYED, OME_SHOW_STATIONNAMES, false));
-	list.push_back(std::make_unique<DropDownListCheckedItem>(HasBit(_display_opt, DO_SHOW_WAYPOINT_NAMES),   STR_SETTINGS_MENU_WAYPOINTS_DISPLAYED,     OME_SHOW_WAYPOINTNAMES, false));
-	list.push_back(std::make_unique<DropDownListCheckedItem>(HasBit(_display_opt, DO_SHOW_SIGNS),            STR_SETTINGS_MENU_SIGNS_DISPLAYED,         OME_SHOW_SIGNS, false));
-	list.push_back(std::make_unique<DropDownListCheckedItem>(HasBit(_display_opt, DO_SHOW_COMPETITOR_SIGNS), STR_SETTINGS_MENU_SHOW_COMPETITOR_SIGNS,   OME_SHOW_COMPETITOR_SIGNS, false));
+	list.push_back(MakeDropDownListStringItem(STR_SETTINGS_MENU_ZONING,                   OME_ZONING, false));
+	list.push_back(MakeDropDownListStringItem(STR_SETTINGS_MENU_TRANSPARENCY_OPTIONS,     OME_TRANSPARENCIES, false));
+	list.push_back(MakeDropDownListDividerItem());
+	list.push_back(MakeDropDownListCheckedItem(HasBit(_display_opt, DO_SHOW_TOWN_NAMES),       STR_SETTINGS_MENU_TOWN_NAMES_DISPLAYED,    OME_SHOW_TOWNNAMES, false));
+	list.push_back(MakeDropDownListCheckedItem(HasBit(_display_opt, DO_SHOW_STATION_NAMES),    STR_SETTINGS_MENU_STATION_NAMES_DISPLAYED, OME_SHOW_STATIONNAMES, false));
+	list.push_back(MakeDropDownListCheckedItem(HasBit(_display_opt, DO_SHOW_WAYPOINT_NAMES),   STR_SETTINGS_MENU_WAYPOINTS_DISPLAYED,     OME_SHOW_WAYPOINTNAMES, false));
+	list.push_back(MakeDropDownListCheckedItem(HasBit(_display_opt, DO_SHOW_SIGNS),            STR_SETTINGS_MENU_SIGNS_DISPLAYED,         OME_SHOW_SIGNS, false));
+	list.push_back(MakeDropDownListCheckedItem(HasBit(_display_opt, DO_SHOW_COMPETITOR_SIGNS), STR_SETTINGS_MENU_SHOW_COMPETITOR_SIGNS,   OME_SHOW_COMPETITOR_SIGNS, false));
 	if (_settings_client.gui.allow_hiding_waypoint_labels) {
-		list.push_back(std::make_unique<DropDownListCheckedItem>(HasBit(_extra_display_opt, XDO_SHOW_HIDDEN_SIGNS), STR_SETTINGS_MENU_SHOW_HIDDEN_SIGNS, OME_SHOW_HIDDEN_SIGNS, false));
+		list.push_back(MakeDropDownListCheckedItem(HasBit(_extra_display_opt, XDO_SHOW_HIDDEN_SIGNS), STR_SETTINGS_MENU_SHOW_HIDDEN_SIGNS, OME_SHOW_HIDDEN_SIGNS, false));
 	}
-	list.push_back(std::make_unique<DropDownListCheckedItem>(HasBit(_display_opt, DO_FULL_ANIMATION),        STR_SETTINGS_MENU_FULL_ANIMATION,          OME_FULL_ANIMATION, false));
-	list.push_back(std::make_unique<DropDownListCheckedItem>(HasBit(_display_opt, DO_FULL_DETAIL),           STR_SETTINGS_MENU_FULL_DETAIL,             OME_FULL_DETAILS, false));
-	list.push_back(std::make_unique<DropDownListCheckedItem>(IsTransparencySet(TO_HOUSES),                   STR_SETTINGS_MENU_TRANSPARENT_BUILDINGS,   OME_TRANSPARENTBUILDINGS, false));
-	list.push_back(std::make_unique<DropDownListCheckedItem>(IsTransparencySet(TO_SIGNS),                    STR_SETTINGS_MENU_TRANSPARENT_SIGNS,       OME_SHOW_STATIONSIGNS, false));
-	list.push_back(std::make_unique<DropDownListCheckedItem>(HasBit(_extra_display_opt, XDO_SHOW_MONEY_TEXT_EFFECTS), STR_SETTINGS_MENU_MONEY_TEXT_EFFECTS, OME_SHOW_MONEYTEXT, false));
+	list.push_back(MakeDropDownListCheckedItem(HasBit(_display_opt, DO_FULL_ANIMATION),        STR_SETTINGS_MENU_FULL_ANIMATION,          OME_FULL_ANIMATION, false));
+	list.push_back(MakeDropDownListCheckedItem(HasBit(_display_opt, DO_FULL_DETAIL),           STR_SETTINGS_MENU_FULL_DETAIL,             OME_FULL_DETAILS, false));
+	list.push_back(MakeDropDownListCheckedItem(IsTransparencySet(TO_HOUSES),                   STR_SETTINGS_MENU_TRANSPARENT_BUILDINGS,   OME_TRANSPARENTBUILDINGS, false));
+	list.push_back(MakeDropDownListCheckedItem(IsTransparencySet(TO_SIGNS),                    STR_SETTINGS_MENU_TRANSPARENT_SIGNS,       OME_SHOW_STATIONSIGNS, false));
+	list.push_back(MakeDropDownListCheckedItem(HasBit(_extra_display_opt, XDO_SHOW_MONEY_TEXT_EFFECTS), STR_SETTINGS_MENU_MONEY_TEXT_EFFECTS, OME_SHOW_MONEYTEXT, false));
 
 	ShowDropDownList(w, std::move(list), 0, WID_TN_SETTINGS, 140, DDMF_INSTANT_CLOSE);
 	if (_settings_client.sound.click_beep) SndPlayFx(SND_15_BEEP);
@@ -429,11 +439,11 @@ enum MapMenuEntries {
 static CallBackFunction ToolbarMapClick(Window *w)
 {
 	DropDownList list;
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_MAP_MENU_MAP_OF_WORLD,            MME_SHOW_SMALLMAP,          false));
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_MAP_MENU_EXTRA_VIEWPORT,          MME_SHOW_EXTRAVIEWPORTS,    false));
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_MAP_MENU_LINGRAPH_LEGEND,         MME_SHOW_LINKGRAPH,         false));
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_MAP_MENU_SIGN_LIST,               MME_SHOW_SIGNLISTS,         false));
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_MAP_MENU_PLAN_LIST,               MME_SHOW_PLANS,             false));
+	list.push_back(MakeDropDownListStringItem(STR_MAP_MENU_MAP_OF_WORLD,            MME_SHOW_SMALLMAP,          false));
+	list.push_back(MakeDropDownListStringItem(STR_MAP_MENU_EXTRA_VIEWPORT,          MME_SHOW_EXTRAVIEWPORTS,    false));
+	list.push_back(MakeDropDownListStringItem(STR_MAP_MENU_LINGRAPH_LEGEND,         MME_SHOW_LINKGRAPH,         false));
+	list.push_back(MakeDropDownListStringItem(STR_MAP_MENU_SIGN_LIST,               MME_SHOW_SIGNLISTS,         false));
+	list.push_back(MakeDropDownListStringItem(STR_MAP_MENU_PLAN_LIST,               MME_SHOW_PLANS,             false));
 	PopupMainToolbarMenu(w, WID_TN_SMALL_MAP, std::move(list), 0);
 	return CBF_NONE;
 }
@@ -441,12 +451,12 @@ static CallBackFunction ToolbarMapClick(Window *w)
 static CallBackFunction ToolbarScenMapTownDir(Window *w)
 {
 	DropDownList list;
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_MAP_MENU_MAP_OF_WORLD,            MME_SHOW_SMALLMAP,          false));
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_MAP_MENU_EXTRA_VIEWPORT,          MME_SHOW_EXTRAVIEWPORTS,    false));
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_MAP_MENU_SIGN_LIST,               MME_SHOW_SIGNLISTS,         false));
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_MAP_MENU_PLAN_LIST,               MME_SHOW_PLANS,             false));
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_TOWN_MENU_TOWN_DIRECTORY,         MME_SHOW_TOWNDIRECTORY,     false));
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_INDUSTRY_MENU_INDUSTRY_DIRECTORY, MME_SHOW_INDUSTRYDIRECTORY, false));
+	list.push_back(MakeDropDownListStringItem(STR_MAP_MENU_MAP_OF_WORLD,            MME_SHOW_SMALLMAP,          false));
+	list.push_back(MakeDropDownListStringItem(STR_MAP_MENU_EXTRA_VIEWPORT,          MME_SHOW_EXTRAVIEWPORTS,    false));
+	list.push_back(MakeDropDownListStringItem(STR_MAP_MENU_SIGN_LIST,               MME_SHOW_SIGNLISTS,         false));
+	list.push_back(MakeDropDownListStringItem(STR_MAP_MENU_PLAN_LIST,               MME_SHOW_PLANS,             false));
+	list.push_back(MakeDropDownListStringItem(STR_TOWN_MENU_TOWN_DIRECTORY,         MME_SHOW_TOWNDIRECTORY,     false));
+	list.push_back(MakeDropDownListStringItem(STR_INDUSTRY_MENU_INDUSTRY_DIRECTORY, MME_SHOW_INDUSTRYDIRECTORY, false));
 	PopupMainToolbarMenu(w, WID_TE_SMALL_MAP, std::move(list), 0);
 	return CBF_NONE;
 }
@@ -655,13 +665,13 @@ static void AddDropDownLeagueTableOptions(DropDownList &list)
 {
 	if (LeagueTable::GetNumItems() > 0) {
 		for (LeagueTable *lt : LeagueTable::Iterate()) {
-			list.push_back(std::make_unique<DropDownListStringItem>(lt->title, lt->index, false));
+			list.push_back(MakeDropDownListStringItem(lt->title, lt->index));
 		}
 	} else {
-		list.push_back(std::make_unique<DropDownListStringItem>(STR_GRAPH_MENU_COMPANY_LEAGUE_TABLE, LTMN_PERFORMANCE_LEAGUE, false));
-		list.push_back(std::make_unique<DropDownListStringItem>(STR_GRAPH_MENU_DETAILED_PERFORMANCE_RATING, LTMN_PERFORMANCE_RATING, false));
+		list.push_back(MakeDropDownListStringItem(STR_GRAPH_MENU_COMPANY_LEAGUE_TABLE, LTMN_PERFORMANCE_LEAGUE));
+		list.push_back(MakeDropDownListStringItem(STR_GRAPH_MENU_DETAILED_PERFORMANCE_RATING, LTMN_PERFORMANCE_RATING));
 		if (!_networking) {
-			list.push_back(std::make_unique<DropDownListStringItem>(STR_GRAPH_MENU_HIGHSCORE, LTMN_HIGHSCORE, false));
+			list.push_back(MakeDropDownListStringItem(STR_GRAPH_MENU_HIGHSCORE, LTMN_HIGHSCORE));
 		}
 	}
 }
@@ -670,12 +680,12 @@ static CallBackFunction ToolbarGraphsClick(Window *w)
 {
 	DropDownList list;
 
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_GRAPH_MENU_OPERATING_PROFIT_GRAPH, GRMN_OPERATING_PROFIT_GRAPH, false));
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_GRAPH_MENU_INCOME_GRAPH, GRMN_INCOME_GRAPH, false));
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_GRAPH_MENU_DELIVERED_CARGO_GRAPH, GRMN_DELIVERED_CARGO_GRAPH, false));
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_GRAPH_MENU_PERFORMANCE_HISTORY_GRAPH, GRMN_PERFORMANCE_HISTORY_GRAPH, false));
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_GRAPH_MENU_COMPANY_VALUE_GRAPH, GRMN_COMPANY_VALUE_GRAPH, false));
-	list.push_back(std::make_unique<DropDownListStringItem>(STR_GRAPH_MENU_CARGO_PAYMENT_RATES, GRMN_CARGO_PAYMENT_RATES, false));
+	list.push_back(MakeDropDownListStringItem(STR_GRAPH_MENU_OPERATING_PROFIT_GRAPH, GRMN_OPERATING_PROFIT_GRAPH));
+	list.push_back(MakeDropDownListStringItem(STR_GRAPH_MENU_INCOME_GRAPH, GRMN_INCOME_GRAPH));
+	list.push_back(MakeDropDownListStringItem(STR_GRAPH_MENU_DELIVERED_CARGO_GRAPH, GRMN_DELIVERED_CARGO_GRAPH));
+	list.push_back(MakeDropDownListStringItem(STR_GRAPH_MENU_PERFORMANCE_HISTORY_GRAPH, GRMN_PERFORMANCE_HISTORY_GRAPH));
+	list.push_back(MakeDropDownListStringItem(STR_GRAPH_MENU_COMPANY_VALUE_GRAPH, GRMN_COMPANY_VALUE_GRAPH));
+	list.push_back(MakeDropDownListStringItem(STR_GRAPH_MENU_CARGO_PAYMENT_RATES, GRMN_CARGO_PAYMENT_RATES));
 
 	if (_toolbar_mode != TB_NORMAL) AddDropDownLeagueTableOptions(list);
 
@@ -940,7 +950,7 @@ static CallBackFunction MenuClickBuildTram(int index)
 static CallBackFunction ToolbarBuildWaterClick(Window *w)
 {
 	DropDownList list;
-	list.push_back(std::make_unique<DropDownListIconItem>(SPR_IMG_BUILD_CANAL, PAL_NONE, STR_WATERWAYS_MENU_WATERWAYS_CONSTRUCTION, 0, false));
+	list.push_back(MakeDropDownListIconItem(SPR_IMG_BUILD_CANAL, PAL_NONE, STR_WATERWAYS_MENU_WATERWAYS_CONSTRUCTION, 0, false));
 	ShowDropDownList(w, std::move(list), 0, WID_TN_WATER, 140, DDMF_INSTANT_CLOSE);
 	if (_settings_client.sound.click_beep) SndPlayFx(SND_15_BEEP);
 	return CBF_NONE;
@@ -962,7 +972,7 @@ static CallBackFunction MenuClickBuildWater(int)
 static CallBackFunction ToolbarBuildAirClick(Window *w)
 {
 	DropDownList list;
-	list.push_back(std::make_unique<DropDownListIconItem>(SPR_IMG_AIRPORT, PAL_NONE, STR_AIRCRAFT_MENU_AIRPORT_CONSTRUCTION, 0, false));
+	list.push_back(MakeDropDownListIconItem(SPR_IMG_AIRPORT, PAL_NONE, STR_AIRCRAFT_MENU_AIRPORT_CONSTRUCTION, 0, false));
 	ShowDropDownList(w, std::move(list), 0, WID_TN_AIR, 140, DDMF_INSTANT_CLOSE);
 	if (_settings_client.sound.click_beep) SndPlayFx(SND_15_BEEP);
 	return CBF_NONE;
@@ -984,9 +994,9 @@ static CallBackFunction MenuClickBuildAir(int)
 static CallBackFunction ToolbarForestClick(Window *w)
 {
 	DropDownList list;
-	list.push_back(std::make_unique<DropDownListIconItem>(SPR_IMG_LANDSCAPING, PAL_NONE, STR_LANDSCAPING_MENU_LANDSCAPING, 0, false));
-	list.push_back(std::make_unique<DropDownListIconItem>(SPR_IMG_PLANTTREES, PAL_NONE, STR_LANDSCAPING_MENU_PLANT_TREES, 1, false));
-	list.push_back(std::make_unique<DropDownListIconItem>(SPR_IMG_SIGN, PAL_NONE, STR_LANDSCAPING_MENU_PLACE_SIGN, 2, false));
+	list.push_back(MakeDropDownListIconItem(SPR_IMG_LANDSCAPING, PAL_NONE, STR_LANDSCAPING_MENU_LANDSCAPING, 0, false));
+	list.push_back(MakeDropDownListIconItem(SPR_IMG_PLANTTREES, PAL_NONE, STR_LANDSCAPING_MENU_PLANT_TREES, 1, false));
+	list.push_back(MakeDropDownListIconItem(SPR_IMG_SIGN, PAL_NONE, STR_LANDSCAPING_MENU_PLACE_SIGN, 2, false));
 	ShowDropDownList(w, std::move(list), 0, WID_TN_LANDSCAPE, 100, DDMF_INSTANT_CLOSE);
 	if (_settings_client.sound.click_beep) SndPlayFx(SND_15_BEEP);
 	return CBF_NONE;
@@ -1182,21 +1192,21 @@ static CallBackFunction ToolbarHelpClick(Window *w)
 	WidgetID widget = (_game_mode == GM_EDITOR) ? (WidgetID)WID_TE_HELP : (WidgetID)WID_TN_HELP;
 
 	DropDownList list;
-	list.emplace_back(new DropDownListStringItem(STR_ABOUT_MENU_LAND_BLOCK_INFO,           HME_LANDINFO,      false));
-	list.emplace_back(new DropDownListStringItem(STR_ABOUT_MENU_SHOW_PICKER_TOOL,          HME_PICKER,        _local_company == COMPANY_SPECTATOR));
-	list.emplace_back(new DropDownListItem(-1, false));
-	list.emplace_back(new DropDownListStringItem(STR_ABOUT_MENU_HELP,                      HME_HELP,          false));
-	list.emplace_back(new DropDownListStringItem(STR_ABOUT_MENU_TOGGLE_CONSOLE,            HME_CONSOLE,       false));
-	list.emplace_back(new DropDownListStringItem(STR_ABOUT_MENU_AI_DEBUG,                  HME_SCRIPT_DEBUG,  false));
-	list.emplace_back(new DropDownListStringItem(STR_ABOUT_MENU_SCREENSHOT,                HME_SCREENSHOT,    false));
-	list.emplace_back(new DropDownListStringItem(STR_ABOUT_MENU_SHOW_FRAMERATE,            HME_FRAMERATE,     false));
-	list.emplace_back(new DropDownListStringItem(STR_ABOUT_MENU_SHOW_TOGGLE_MODIFIER_KEYS, HME_MODIFIER_KEYS, false));
-	list.emplace_back(new DropDownListStringItem(STR_ABOUT_MENU_ABOUT_OPENTTD,             HME_ABOUT,         false));
+	list.push_back(MakeDropDownListStringItem(STR_ABOUT_MENU_LAND_BLOCK_INFO,           HME_LANDINFO,      false));
+	list.push_back(MakeDropDownListStringItem(STR_ABOUT_MENU_SHOW_PICKER_TOOL,          HME_PICKER,        _local_company == COMPANY_SPECTATOR));
+	list.push_back(MakeDropDownListDividerItem());
+	list.push_back(MakeDropDownListStringItem(STR_ABOUT_MENU_HELP,                      HME_HELP,          false));
+	list.push_back(MakeDropDownListStringItem(STR_ABOUT_MENU_TOGGLE_CONSOLE,            HME_CONSOLE,       false));
+	list.push_back(MakeDropDownListStringItem(STR_ABOUT_MENU_AI_DEBUG,                  HME_SCRIPT_DEBUG,  false));
+	list.push_back(MakeDropDownListStringItem(STR_ABOUT_MENU_SCREENSHOT,                HME_SCREENSHOT,    false));
+	list.push_back(MakeDropDownListStringItem(STR_ABOUT_MENU_SHOW_FRAMERATE,            HME_FRAMERATE,     false));
+	list.push_back(MakeDropDownListStringItem(STR_ABOUT_MENU_SHOW_TOGGLE_MODIFIER_KEYS, HME_MODIFIER_KEYS, false));
+	list.push_back(MakeDropDownListStringItem(STR_ABOUT_MENU_ABOUT_OPENTTD,             HME_ABOUT,         false));
 	if (_settings_client.gui.newgrf_developer_tools) {
-		list.emplace_back(new DropDownListStringItem(STR_ABOUT_MENU_SPRITE_ALIGNER,         HME_SPRITE_ALIGNER,       false));
-		list.emplace_back(new DropDownListStringItem(STR_ABOUT_MENU_TOGGLE_BOUNDING_BOXES,  HME_BOUNDING_BOXES,       false));
-		list.emplace_back(new DropDownListStringItem(STR_ABOUT_MENU_TOGGLE_DIRTY_BLOCKS,    HME_DIRTY_BLOCKS,         false));
-		list.emplace_back(new DropDownListStringItem(STR_ABOUT_MENU_TOGGLE_WIDGET_OUTLINES, HME_WIDGET_OUTLINES,      false));
+		list.push_back(MakeDropDownListStringItem(STR_ABOUT_MENU_SPRITE_ALIGNER,         HME_SPRITE_ALIGNER,       false));
+		list.push_back(MakeDropDownListStringItem(STR_ABOUT_MENU_TOGGLE_BOUNDING_BOXES,  HME_BOUNDING_BOXES,       false));
+		list.push_back(MakeDropDownListStringItem(STR_ABOUT_MENU_TOGGLE_DIRTY_BLOCKS,    HME_DIRTY_BLOCKS,         false));
+		list.push_back(MakeDropDownListStringItem(STR_ABOUT_MENU_TOGGLE_WIDGET_OUTLINES, HME_WIDGET_OUTLINES,      false));
 	}
 	PopupMainToolbarMenu(w, widget, std::move(list), 0);
 
@@ -1261,12 +1271,12 @@ void SetStartingYear(CalTime::Year year)
 	CalTime::Date new_date = CalTime::ConvertYMDToDate(_settings_game.game_creation.starting_year, 0, 1);
 
 	if (EconTime::UsingWallclockUnits()) {
-		EconTime::Date new_economy_date = new_date.base();
+		EconTime::Date new_economy_date{new_date.base()};
 
 		/* If you open a savegame as scenario there may already be link graphs.*/
 		LinkGraphSchedule::instance.ShiftDates(new_economy_date - EconTime::CurDate());
 		ShiftVehicleDates(new_economy_date - EconTime::CurDate());
-		EconTime::Detail::period_display_offset -= (year.base() - EconTime::CurYear().base());
+		EconTime::Detail::period_display_offset -= YearDelta{year.base() - EconTime::CurYear().base()};
 
 		EconTime::Detail::SetDate(new_economy_date, 0);
 	}
@@ -1356,21 +1366,33 @@ static CallBackFunction ToolbarScenDateForward(Window *w)
 	return CBF_NONE;
 }
 
-static CallBackFunction ToolbarScenGenLand(Window *w)
+static CallBackFunction ToolbarScenGenLandClick(Window *w)
 {
-	w->HandleButtonClick(WID_TE_LAND_GENERATE);
-	if (_settings_client.sound.click_beep) SndPlayFx(SND_15_BEEP);
-
-	ShowEditorTerraformToolbar();
+	PopupMainToolbarMenu(w, WID_TE_LAND_GENERATE, {STR_SCENEDIT_LANDSCAPE_MENU_LAND_GENERATION, STR_SCENEDIT_LANDSCAPE_MENU_PUBLIC_ROADS});
 	return CBF_NONE;
 }
 
-
-static CallBackFunction ToolbarScenGenTown(Window *w)
+static CallBackFunction ToolbarScenGenLand(int index)
 {
-	w->HandleButtonClick(WID_TE_TOWN_GENERATE);
-	if (_settings_client.sound.click_beep) SndPlayFx(SND_15_BEEP);
-	ShowFoundTownWindow();
+	switch (index) {
+		case 0: ShowEditorTerraformToolbar(); break;
+		case 1: ShowEditorPublicRoadsWindow(); break;
+	}
+	return CBF_NONE;
+}
+
+static CallBackFunction ToolbarScenGenTownClick(Window *w)
+{
+	PopupMainToolbarMenu(w, WID_TE_TOWN_GENERATE, {STR_SCENEDIT_TOWN_MENU_BUILD_TOWN, STR_SCENEDIT_TOWN_MENU_PACE_HOUSE});
+	return CBF_NONE;
+}
+
+static CallBackFunction ToolbarScenGenTown(int index)
+{
+	switch (index) {
+		case 0: ShowFoundTownWindow(); break;
+		case 1: ShowBuildHousePicker(nullptr); break;
+	}
 	return CBF_NONE;
 }
 
@@ -1567,7 +1589,7 @@ public:
 		uint spacer_i = 0;
 		uint button_i = 0;
 
-		/* Index into the arrangement indices. The macro lastof cannot be used here! */
+		/* Index into the arrangement indices. */
 		const WidgetID *slotp = rtl ? &arrangement[arrangable_count - 1] : arrangement;
 		for (uint i = 0; i < arrangable_count; i++) {
 			uint slot = lookup[*slotp];
@@ -2104,7 +2126,7 @@ static ToolbarButtonProc * const _toolbar_button_procs[] = {
 struct MainToolbarWindow : Window {
 	GUITimer timer;
 
-	MainToolbarWindow(WindowDesc *desc) : Window(desc)
+	MainToolbarWindow(WindowDesc &desc) : Window(desc)
 	{
 		MainToolbarScaleAdjuster scale_adjust;
 
@@ -2329,14 +2351,13 @@ static Hotkey maintoolbar_hotkeys[] = {
 	Hotkey((uint16_t)0, "client_list", MTHK_CLIENT_LIST),
 	Hotkey((uint16_t)0, "sign_list", MTHK_SIGN_LIST),
 	Hotkey((uint16_t)0, "land_info", MTHK_LANDINFO),
-	Hotkey((uint16_t)0, "picker_tool", MTHK_PICKER),
+	Hotkey(WKC_SLASH, "picker_tool", MTHK_PICKER),
 	Hotkey('P', "plan_list", MTHK_PLAN_LIST),
 	Hotkey('Y', "link_graph_legend", MTHK_LINK_GRAPH_LEGEND),
 	Hotkey((uint16_t)0, "message_history", MTHK_MESSAGE_HISTORY),
 	Hotkey((uint16_t)0, "template_replacement", MTHK_TEMPLATE_REPLACEMENT),
 	Hotkey((uint16_t)0, "train_slots", MTHK_TRAIN_SLOTS),
 	Hotkey((uint16_t)0, "train_counters", MTHK_TRAIN_COUNTERS),
-	HOTKEY_LIST_END
 };
 HotkeyList MainToolbarWindow::hotkeys("maintoolbar", maintoolbar_hotkeys);
 
@@ -2405,7 +2426,7 @@ static WindowDesc _toolb_normal_desc(__FILE__, __LINE__,
 	WDP_MANUAL, nullptr, 0, 0,
 	WC_MAIN_TOOLBAR, WC_NONE,
 	WDF_NO_FOCUS | WDF_NO_CLOSE,
-	std::begin(_nested_toolbar_normal_widgets), std::end(_nested_toolbar_normal_widgets),
+	_nested_toolbar_normal_widgets,
 	&MainToolbarWindow::hotkeys
 );
 
@@ -2424,8 +2445,8 @@ static MenuClickedProc * const _scen_toolbar_dropdown_procs[] = {
 	MenuClickMap,         // 8
 	nullptr,              // 9
 	nullptr,              // 10
-	nullptr,              // 11
-	nullptr,              // 12
+	ToolbarScenGenLand,   // 11
+	ToolbarScenGenTown,   // 12
 	nullptr,              // 13
 	ToolbarScenBuildRoad, // 14
 	ToolbarScenBuildTram, // 15
@@ -2450,8 +2471,8 @@ static ToolbarButtonProc * const _scen_toolbar_button_procs[] = {
 	ToolbarScenMapTownDir,
 	ToolbarZoomInClick,
 	ToolbarZoomOutClick,
-	ToolbarScenGenLand,
-	ToolbarScenGenTown,
+	ToolbarScenGenLandClick,
+	ToolbarScenGenTownClick,
 	ToolbarScenGenIndustry,
 	ToolbarScenBuildRoadClick,
 	ToolbarScenBuildTramClick,
@@ -2495,7 +2516,7 @@ enum MainToolbarEditorHotkeys {
 struct ScenarioEditorToolbarWindow : Window {
 	GUITimer timer;
 
-	ScenarioEditorToolbarWindow(WindowDesc *desc) : Window(desc)
+	ScenarioEditorToolbarWindow(WindowDesc &desc) : Window(desc)
 	{
 		MainToolbarScaleAdjuster scale_adjust;
 
@@ -2553,16 +2574,16 @@ struct ScenarioEditorToolbarWindow : Window {
 		}
 	}
 
-	void UpdateWidgetSize(WidgetID widget, Dimension *size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension *fill, [[maybe_unused]] Dimension *resize) override
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
 	{
 		switch (widget) {
 			case WID_TE_SPACER:
-				size->width = std::max(GetStringBoundingBox(STR_SCENEDIT_TOOLBAR_OPENTTD).width, GetStringBoundingBox(STR_SCENEDIT_TOOLBAR_SCENARIO_EDITOR).width) + padding.width;
+				size.width = std::max(GetStringBoundingBox(STR_SCENEDIT_TOOLBAR_OPENTTD).width, GetStringBoundingBox(STR_SCENEDIT_TOOLBAR_SCENARIO_EDITOR).width) + padding.width;
 				break;
 
 			case WID_TE_DATE:
 				SetDParam(0, CalTime::ConvertYMDToDate(CalTime::MAX_YEAR, 0, 1));
-				*size = GetStringBoundingBox(STR_JUST_DATE_LONG);
+				size = GetStringBoundingBox(STR_JUST_DATE_LONG);
 				break;
 		}
 	}
@@ -2589,8 +2610,8 @@ struct ScenarioEditorToolbarWindow : Window {
 			case MTEHK_FASTFORWARD:            ToolbarFastForwardClick(this); break;
 			case MTEHK_SETTINGS:               ShowGameOptions(); break;
 			case MTEHK_SAVEGAME:               MenuClickSaveLoad(); break;
-			case MTEHK_GENLAND:                ToolbarScenGenLand(this); break;
-			case MTEHK_GENTOWN:                ToolbarScenGenTown(this); break;
+			case MTEHK_GENLAND:                ToolbarScenGenLandClick(this); break;
+			case MTEHK_GENTOWN:                ToolbarScenGenTownClick(this); break;
 			case MTEHK_GENINDUSTRY:            ToolbarScenGenIndustry(this); break;
 			case MTEHK_BUILD_ROAD:             ToolbarScenBuildRoadClick(this); break;
 			case MTEHK_BUILD_TRAM:             ToolbarScenBuildTramClick(this); break;
@@ -2675,14 +2696,14 @@ struct ScenarioEditorToolbarWindow : Window {
 		if (w != nullptr) HandleZoomMessage(this, w->viewport, WID_TE_ZOOM_IN, WID_TE_ZOOM_OUT);
 	}
 
-	void OnQueryTextFinished(char *str) override
+	void OnQueryTextFinished(std::optional<std::string> str) override
 	{
 		/* Was 'cancel' pressed? */
-		if (str == nullptr) return;
+		if (!str.has_value()) return;
 
 		CalTime::Year value;
-		if (!StrEmpty(str)) {
-			value = atoi(str);
+		if (!str->empty()) {
+			value = CalTime::Year{atoi(str->c_str())};
 		} else {
 			/* An empty string means revert to the default */
 			value = CalTime::DEF_START_YEAR;
@@ -2710,7 +2731,7 @@ static Hotkey scenedit_maintoolbar_hotkeys[] = {
 	Hotkey(WKC_F10, "build_sign", MTEHK_SIGN),
 	Hotkey(WKC_F11, "music", MTEHK_MUSIC),
 	Hotkey(WKC_F12, "land_info", MTEHK_LANDINFO),
-	Hotkey((uint16_t)0, "picker_tool", MTEHK_PICKER),
+	Hotkey(WKC_SLASH, "picker_tool", MTEHK_PICKER),
 	Hotkey('P', "plan_list", MTEHK_PLAN_LIST),
 	Hotkey(WKC_CTRL  | 'S', "small_screenshot", MTEHK_SMALL_SCREENSHOT),
 	Hotkey(WKC_CTRL  | 'P', "zoomedin_screenshot", MTEHK_ZOOMEDIN_SCREENSHOT),
@@ -2721,7 +2742,6 @@ static Hotkey scenedit_maintoolbar_hotkeys[] = {
 	Hotkey('L', "terraform", MTEHK_TERRAFORM),
 	Hotkey('M', "smallmap", MTEHK_SMALLMAP),
 	Hotkey('V', "extra_viewport", MTEHK_EXTRA_VIEWPORT),
-	HOTKEY_LIST_END
 };
 HotkeyList ScenarioEditorToolbarWindow::hotkeys("scenedit_maintoolbar", scenedit_maintoolbar_hotkeys);
 
@@ -2729,31 +2749,31 @@ static constexpr NWidgetPart _nested_toolb_scen_inner_widgets[] = {
 	NWidget(WWT_IMGBTN, COLOUR_GREY, WID_TE_PAUSE), SetDataTip(SPR_IMG_PAUSE, STR_TOOLBAR_TOOLTIP_PAUSE_GAME),
 	NWidget(WWT_IMGBTN, COLOUR_GREY, WID_TE_FAST_FORWARD), SetDataTip(SPR_IMG_FASTFORWARD, STR_TOOLBAR_TOOLTIP_FORWARD),
 	NWidget(WWT_IMGBTN, COLOUR_GREY, WID_TE_SETTINGS), SetDataTip(SPR_IMG_SETTINGS, STR_TOOLBAR_TOOLTIP_OPTIONS),
-	NWidget(WWT_IMGBTN_2, COLOUR_GREY, WID_TE_SAVE), SetDataTip(SPR_IMG_SAVE, STR_SCENEDIT_TOOLBAR_TOOLTIP_SAVE_SCENARIO_LOAD_SCENARIO),
+	NWidget(WWT_IMGBTN_2, COLOUR_GREY, WID_TE_SAVE), SetDataTip(SPR_IMG_SAVE, STR_SCENEDIT_TOOLBAR_SAVE_SCENARIO_LOAD_SCENARIO_TOOLTIP),
 	NWidget(NWID_SPACER),
 	NWidget(WWT_PANEL, COLOUR_GREY, WID_TE_SPACER), EndContainer(),
 	NWidget(NWID_SPACER),
 	NWidget(WWT_PANEL, COLOUR_GREY, WID_TE_DATE_PANEL),
 		NWidget(NWID_HORIZONTAL), SetPIP(2, 2, 2), SetPadding(1),
-			NWidget(WWT_IMGBTN, COLOUR_GREY, WID_TE_DATE_BACKWARD), SetDataTip(SPR_ARROW_DOWN, STR_SCENEDIT_TOOLBAR_TOOLTIP_MOVE_THE_STARTING_DATE_BACKWARD), SetFill(0, 1),
-			NWidget(WWT_TEXT, COLOUR_GREY, WID_TE_DATE), SetDataTip(STR_JUST_DATE_LONG, STR_SCENEDIT_TOOLBAR_TOOLTIP_SET_DATE), SetTextStyle(TC_WHITE), SetAlignment(SA_CENTER), SetFill(0, 1),
-			NWidget(WWT_IMGBTN, COLOUR_GREY, WID_TE_DATE_FORWARD), SetDataTip(SPR_ARROW_UP, STR_SCENEDIT_TOOLBAR_TOOLTIP_MOVE_THE_STARTING_DATE_FORWARD), SetFill(0, 1),
+			NWidget(WWT_IMGBTN, COLOUR_GREY, WID_TE_DATE_BACKWARD), SetDataTip(SPR_ARROW_DOWN, STR_SCENEDIT_TOOLBAR_MOVE_THE_STARTING_DATE_BACKWARD_TOOLTIP), SetFill(0, 1),
+			NWidget(WWT_TEXT, INVALID_COLOUR, WID_TE_DATE), SetDataTip(STR_JUST_DATE_LONG, STR_SCENEDIT_TOOLBAR_SET_DATE_TOOLTIP), SetTextStyle(TC_WHITE), SetAlignment(SA_CENTER), SetFill(0, 1),
+			NWidget(WWT_IMGBTN, COLOUR_GREY, WID_TE_DATE_FORWARD), SetDataTip(SPR_ARROW_UP, STR_SCENEDIT_TOOLBAR_MOVE_THE_STARTING_DATE_FORWARD_TOOLTIP), SetFill(0, 1),
 		EndContainer(),
 	EndContainer(),
 	NWidget(NWID_SPACER),
-	NWidget(WWT_IMGBTN, COLOUR_GREY, WID_TE_SMALL_MAP), SetDataTip(SPR_IMG_SMALLMAP, STR_SCENEDIT_TOOLBAR_TOOLTIP_DISPLAY_MAP_TOWN_DIRECTORY),
+	NWidget(WWT_IMGBTN, COLOUR_GREY, WID_TE_SMALL_MAP), SetDataTip(SPR_IMG_SMALLMAP, STR_SCENEDIT_TOOLBAR_DISPLAY_MAP_TOWN_DIRECTORY_TOOLTIP),
 	NWidget(NWID_SPACER),
 	NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_TE_ZOOM_IN), SetDataTip(SPR_IMG_ZOOMIN, STR_TOOLBAR_TOOLTIP_ZOOM_THE_VIEW_IN),
 	NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_TE_ZOOM_OUT), SetDataTip(SPR_IMG_ZOOMOUT, STR_TOOLBAR_TOOLTIP_ZOOM_THE_VIEW_OUT),
 	NWidget(NWID_SPACER),
-	NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_TE_LAND_GENERATE), SetDataTip(SPR_IMG_LANDSCAPING, STR_SCENEDIT_TOOLBAR_LANDSCAPE_GENERATION),
-	NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_TE_TOWN_GENERATE), SetDataTip(SPR_IMG_TOWN, STR_SCENEDIT_TOOLBAR_TOWN_GENERATION),
-	NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_TE_INDUSTRY), SetDataTip(SPR_IMG_INDUSTRY, STR_SCENEDIT_TOOLBAR_INDUSTRY_GENERATION),
-	NWidget(WWT_IMGBTN, COLOUR_GREY, WID_TE_ROADS), SetDataTip(SPR_IMG_BUILDROAD, STR_SCENEDIT_TOOLBAR_ROAD_CONSTRUCTION),
-	NWidget(WWT_IMGBTN, COLOUR_GREY, WID_TE_TRAMS), SetDataTip(SPR_IMG_BUILDTRAMS, STR_SCENEDIT_TOOLBAR_TRAM_CONSTRUCTION),
+	NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_TE_LAND_GENERATE), SetDataTip(SPR_IMG_LANDSCAPING, STR_SCENEDIT_TOOLBAR_LANDSCAPE_GENERATION_TOOLTIP),
+	NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_TE_TOWN_GENERATE), SetDataTip(SPR_IMG_TOWN, STR_SCENEDIT_TOOLBAR_TOWN_GENERATION_TOOLTIP),
+	NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_TE_INDUSTRY), SetDataTip(SPR_IMG_INDUSTRY, STR_SCENEDIT_TOOLBAR_INDUSTRY_GENERATION_TOOLTIP),
+	NWidget(WWT_IMGBTN, COLOUR_GREY, WID_TE_ROADS), SetDataTip(SPR_IMG_BUILDROAD, STR_SCENEDIT_TOOLBAR_ROAD_CONSTRUCTION_TOOLTIP),
+	NWidget(WWT_IMGBTN, COLOUR_GREY, WID_TE_TRAMS), SetDataTip(SPR_IMG_BUILDTRAMS, STR_SCENEDIT_TOOLBAR_TRAM_CONSTRUCTION_TOOLTIP),
 	NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_TE_WATER), SetDataTip(SPR_IMG_BUILDWATER, STR_TOOLBAR_TOOLTIP_BUILD_SHIP_DOCKS),
-	NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_TE_TREES), SetDataTip(SPR_IMG_PLANTTREES, STR_SCENEDIT_TOOLBAR_PLANT_TREES),
-	NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_TE_SIGNS), SetDataTip(SPR_IMG_SIGN, STR_SCENEDIT_TOOLBAR_PLACE_SIGN),
+	NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_TE_TREES), SetDataTip(SPR_IMG_PLANTTREES, STR_SCENEDIT_TOOLBAR_PLANT_TREES_TOOLTIP),
+	NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_TE_SIGNS), SetDataTip(SPR_IMG_SIGN, STR_SCENEDIT_TOOLBAR_PLACE_SIGN_TOOLTIP),
 	NWidget(NWID_SPACER),
 	NWidget(WWT_IMGBTN, COLOUR_GREY, WID_TE_MUSIC_SOUND), SetDataTip(SPR_IMG_MUSIC, STR_TOOLBAR_TOOLTIP_SHOW_SOUND_MUSIC_WINDOW),
 	NWidget(WWT_IMGBTN, COLOUR_GREY, WID_TE_HELP), SetDataTip(SPR_IMG_QUERY, STR_TOOLBAR_TOOLTIP_LAND_BLOCK_INFORMATION),
@@ -2762,7 +2782,7 @@ static constexpr NWidgetPart _nested_toolb_scen_inner_widgets[] = {
 
 static std::unique_ptr<NWidgetBase> MakeScenarioToolbar()
 {
-	return MakeNWidgets(std::begin(_nested_toolb_scen_inner_widgets), std::end(_nested_toolb_scen_inner_widgets), std::make_unique<NWidgetScenarioToolbarContainer>());
+	return MakeNWidgets(_nested_toolb_scen_inner_widgets, std::make_unique<NWidgetScenarioToolbarContainer>());
 }
 
 static constexpr NWidgetPart _nested_toolb_scen_widgets[] = {
@@ -2773,7 +2793,7 @@ static WindowDesc _toolb_scen_desc(__FILE__, __LINE__,
 	WDP_MANUAL, nullptr, 0, 0,
 	WC_MAIN_TOOLBAR, WC_NONE,
 	WDF_NO_FOCUS | WDF_NO_CLOSE,
-	std::begin(_nested_toolb_scen_widgets), std::end(_nested_toolb_scen_widgets),
+	_nested_toolb_scen_widgets,
 	&ScenarioEditorToolbarWindow::hotkeys
 );
 
@@ -2781,9 +2801,9 @@ static WindowDesc _toolb_scen_desc(__FILE__, __LINE__,
 void AllocateToolbar()
 {
 	if (_game_mode == GM_EDITOR) {
-		new ScenarioEditorToolbarWindow(&_toolb_scen_desc);
+		new ScenarioEditorToolbarWindow(_toolb_scen_desc);
 	} else {
-		new MainToolbarWindow(&_toolb_normal_desc);
+		new MainToolbarWindow(_toolb_normal_desc);
 	}
 }
 
@@ -2798,7 +2818,7 @@ MainToolbarScaleAdjuster::MainToolbarScaleAdjuster()
 		/* Bump scale to next integer multiple */
 		_gui_scale = Clamp(100 * ((_gui_scale / 100) + 1), MIN_INTERFACE_SCALE, MAX_INTERFACE_SCALE);
 
-		int8_t new_zoom = ScaleGUITrad(1) <= 1 ? ZOOM_LVL_OUT_4X : ScaleGUITrad(1) >= 4 ? ZOOM_LVL_MIN : ZOOM_LVL_OUT_2X;
+		int8_t new_zoom = ScaleGUITrad(1) <= 1 ? ZOOM_LVL_NORMAL : ScaleGUITrad(1) >= 4 ? ZOOM_LVL_MIN : ZOOM_LVL_IN_2X;
 		_gui_zoom = static_cast<ZoomLevel>(Clamp(new_zoom, _settings_client.gui.zoom_min, _settings_client.gui.zoom_max));
 		SetupWidgetDimensions();
 	}

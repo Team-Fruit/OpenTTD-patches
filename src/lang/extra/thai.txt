@@ -18,8 +18,6 @@ STR_TRANSPARENT_LOADING_TOOLTIP                                 :{BLACK}เป�
 
 # Programmable Pre-Signals
 
-#House construction window (for SE only)
-
 #Town select window (for SE only)
 
 STR_MAPGEN_SNOW_LINE_HEIGHT                                     :{BLACK}เส้นความสูงเขตหิมะ:
@@ -43,8 +41,8 @@ STR_VEHICLE_STATUS_CANNOT_REACH_DEPOT_SERVICE_VEL_END           :{LTBLUE}ไม�
 
 STR_ORDERS_GO_TO_TOOLTIP_EXTRA                                  :{BLACK}เพิ่มรายการที่ต้องทำก่อนหน้ารายการที่เลือก หรือเพิ่มในท้ายรายการที่มีอยู่แล้ว
 
-STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :ถึง:
-STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :ออก:
+STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :ถึง:{SPACE}{SPACE}
+STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :ออก:{SPACE}{SPACE}
 
 # Cargo type orders Window
 
@@ -78,3 +76,17 @@ STR_ERROR_CAN_T_SELL_25_SHARE_IN                                :{WHITE}ไม�
 STR_ERROR_PROTECTED                                             :{WHITE}บริษัทนี้ยังไม่เก่าแก่พอที่จะซื้อหุ้นหรือซื้อกิจการได้...
 
 STR_CONFIG_SETTING_CYCLE_SIGNAL_PBS                             :เสาอาณัติสัญญาณตอนอัตโนมัติ แบบทางเดียว
+
+STR_NETWORK_NEED_COMPANY_PASSWORD_CAPTION                       :{WHITE}บริษัทมีการป้องกัน. กรุณากรอกพาสเวิร์ด
+STR_NETWORK_CLIENT_LIST_ADMIN_COMPANY_UNLOCK                    :ปลดล็อครหัสผ่าน
+
+# Network set password
+STR_COMPANY_PASSWORD_CANCEL                                     :{BLACK}ไม่ทำการเก็บพาสเวิร์ดที่กรอกไว้แล้ว
+STR_COMPANY_PASSWORD_OK                                         :{BLACK}ตั้งพาสเวิร์ดของบริษัทใหม่
+STR_COMPANY_PASSWORD_CAPTION                                    :{WHITE}พาสเวิร์ดของบริษัท
+STR_COMPANY_PASSWORD_MAKE_DEFAULT                               :{BLACK}พาสเวิร์ดตั้งต้นของบริษัท
+STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}ใช้พาสเวิร์ดของบริษัทนี้เป็นพาสเวิร์ดตั้งต้นของบริษัทใหม่
+
+STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}พาสเวิร์ด
+STR_COMPANY_VIEW_PASSWORD_TOOLTIP                               :{BLACK}รหัสผ่านป้องกันบริษัทของคุณจากผู้เล่นที่ไม่ได้รับอนุญาตให้เข้าร่วม
+STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}ตั้งพาสเวิร์ดของบริษัท

@@ -32,9 +32,9 @@ ScriptStationList_Vehicle::ScriptStationList_Vehicle(VehicleID vehicle_id)
 {
 	if (!ScriptVehicle::IsPrimaryVehicle(vehicle_id)) return;
 
-	Vehicle *v = ::Vehicle::Get(vehicle_id);
+	const Vehicle *v = ::Vehicle::Get(vehicle_id);
 
-	for (Order *o = v->GetFirstOrder(); o != nullptr; o = o->next) {
+	for (const Order *o : v->Orders()) {
 		if (o->IsType(OT_GOTO_STATION)) this->AddItem(o->GetDestination());
 	}
 }

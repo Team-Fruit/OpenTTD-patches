@@ -28,11 +28,10 @@ ScriptCargoList_IndustryAccepting::ScriptCargoList_IndustryAccepting(IndustryID 
 {
 	if (!ScriptIndustry::IsValidIndustry(industry_id)) return;
 
-	Industry *ind = ::Industry::Get(industry_id);
-	for (size_t i = 0; i < ind->accepts_cargo.size(); i++) {
-		CargoID cargo_id = ind->accepts_cargo[i];
-		if (cargo_id != INVALID_CARGO) {
-			this->AddItem(cargo_id);
+	const Industry *ind = ::Industry::Get(industry_id);
+	for (const auto &a : ind->Accepted()) {
+		if (::IsValidCargoID(a.cargo)) {
+			this->AddItem(a.cargo);
 		}
 	}
 }
@@ -41,11 +40,10 @@ ScriptCargoList_IndustryProducing::ScriptCargoList_IndustryProducing(IndustryID 
 {
 	if (!ScriptIndustry::IsValidIndustry(industry_id)) return;
 
-	Industry *ind = ::Industry::Get(industry_id);
-	for (size_t i = 0; i < ind->produced_cargo.size(); i++) {
-		CargoID cargo_id = ind->produced_cargo[i];
-		if (cargo_id != INVALID_CARGO) {
-			this->AddItem(cargo_id);
+	const Industry *ind = ::Industry::Get(industry_id);
+	for (const auto &p : ind->Produced()) {
+		if (::IsValidCargoID(p.cargo)) {
+			this->AddItem(p.cargo);
 		}
 	}
 }
@@ -54,7 +52,7 @@ ScriptCargoList_StationAccepting::ScriptCargoList_StationAccepting(StationID sta
 {
 	if (!ScriptStation::IsValidStation(station_id)) return;
 
-	Station *st = ::Station::Get(station_id);
+	const Station *st = ::Station::Get(station_id);
 	for (CargoID i = 0; i < NUM_CARGO; i++) {
 		if (HasBit(st->goods[i].status, GoodsEntry::GES_ACCEPTANCE)) this->AddItem(i);
 	}

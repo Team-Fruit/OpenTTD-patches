@@ -49,7 +49,7 @@ CommandCost CmdIncreaseLoan(TileIndex tile, DoCommandFlag flags, uint32_t p1, ui
 	Money max_loan = c->GetMaxLoan();
 	if (c->current_loan >= max_loan) {
 		SetDParam(0, max_loan);
-		return_cmd_error(STR_ERROR_MAXIMUM_PERMITTED_LOAN);
+		return CommandCost(STR_ERROR_MAXIMUM_PERMITTED_LOAN);
 	}
 
 	Money loan;
@@ -97,7 +97,7 @@ CommandCost CmdDecreaseLoan(TileIndex tile, DoCommandFlag flags, uint32_t p1, ui
 {
 	Company *c = Company::Get(_current_company);
 
-	if (c->current_loan == 0) return_cmd_error(STR_ERROR_LOAN_ALREADY_REPAYED);
+	if (c->current_loan == 0) return CommandCost(STR_ERROR_LOAN_ALREADY_REPAYED);
 
 	Money loan;
 	switch (p2 & 3) {
@@ -117,7 +117,7 @@ CommandCost CmdDecreaseLoan(TileIndex tile, DoCommandFlag flags, uint32_t p1, ui
 
 	if (GetAvailableMoneyForCommand() < loan) {
 		SetDParam(0, loan);
-		return_cmd_error(STR_ERROR_CURRENCY_REQUIRED);
+		return CommandCost(STR_ERROR_CURRENCY_REQUIRED);
 	}
 
 	if (flags & DC_EXEC) {
@@ -213,7 +213,7 @@ CommandCost CmdPause(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint32_t 
 			PauseMode prev_mode = _pause_mode;
 
 			if ((p2 & 1) == 0) {
-				_pause_mode = static_cast<PauseMode>(_pause_mode & (byte)~p1);
+				_pause_mode = static_cast<PauseMode>(_pause_mode & (uint8_t)~p1);
 				_pause_countdown = (p2 >> 1);
 
 				/* If the only remaining reason to be paused is that we saw a command during pause, unpause. */
@@ -221,7 +221,7 @@ CommandCost CmdPause(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint32_t 
 					_pause_mode = PM_UNPAUSED;
 				}
 			} else {
-				_pause_mode = static_cast<PauseMode>(_pause_mode | (byte)p1);
+				_pause_mode = static_cast<PauseMode>(_pause_mode | (uint8_t)p1);
 			}
 
 			NetworkHandlePauseChange(prev_mode, (PauseMode)p1);
@@ -410,7 +410,7 @@ CommandCost CmdGiveMoney(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint3
 	CompanyID dest_company = (CompanyID)p1;
 
 	/* You can only transfer funds that is in excess of your loan */
-	if (c->money - c->current_loan < amount.GetCost() || amount.GetCost() < 0) return_cmd_error(STR_ERROR_INSUFFICIENT_FUNDS);
+	if (c->money - c->current_loan < amount.GetCost() || amount.GetCost() < 0) return CommandCost(STR_ERROR_INSUFFICIENT_FUNDS);
 	if (!Company::IsValidID(dest_company)) return CMD_ERROR;
 
 	if (flags & DC_EXEC) {

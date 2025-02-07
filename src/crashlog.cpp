@@ -91,62 +91,56 @@
 #include "safeguards.h"
 
 /* static */ const char *CrashLog::message = nullptr;
-/* static */ char *CrashLog::gamelog_buffer = nullptr;
-/* static */ const char *CrashLog::gamelog_last = nullptr;
 /* static */ bool CrashLog::have_crashed = false;
 
-char *CrashLog::LogCompiler(char *buffer, const char *last) const
+void CrashLog::LogCompiler(format_target &buffer) const
 {
-			buffer += seprintf(buffer, last, " Compiler: "
+			buffer.format(" Compiler: "
 #if defined(_MSC_VER)
-			"MSVC %d", _MSC_VER
+			"MSVC {}", _MSC_VER
 #elif defined(__clang__)
-			"clang %s", __clang_version__
+			"clang {}", __clang_version__
 #elif defined(__ICC) && defined(__GNUC__)
-			"ICC %d (GCC %d.%d.%d mode)", __ICC,  __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__
+			"ICC {} (GCC {}.{}.{} mode)", __ICC,  __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__
 #elif defined(__ICC)
-			"ICC %d", __ICC
+			"ICC {}", __ICC
 #elif defined(__GNUC__)
-			"GCC %d.%d.%d", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__
+			"GCC {}.{}.{}", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__
 #else
 			"<unknown>"
 #endif
 			);
 #if defined(__VERSION__)
-			return buffer + seprintf(buffer, last,  " \"" __VERSION__ "\"\n\n");
+			buffer.append(" \"" __VERSION__ "\"\n\n");
 #else
-			return buffer + seprintf(buffer, last,  "\n\n");
+			buffer.append("\n\n");
 #endif
 }
 
-/* virtual */ char *CrashLog::LogOSVersionDetail(char *buffer, const char *last) const
+/* virtual */ void CrashLog::LogOSVersionDetail(format_target &buffer) const
 {
 	/* Stub implementation; not all OSes support this. */
-	return buffer;
 }
 
-/* virtual */ char *CrashLog::LogDebugExtra(char *buffer, const char *last) const
+/* virtual */ void CrashLog::LogDebugExtra(format_target &buffer) const
 {
 	/* Stub implementation; not all OSes support this. */
-	return buffer;
 }
 
-/* virtual */ char *CrashLog::LogRegisters(char *buffer, const char *last) const
+/* virtual */ void CrashLog::LogRegisters(format_target &buffer) const
 {
 	/* Stub implementation; not all OSes support this. */
-	return buffer;
 }
 
-/* virtual */ char *CrashLog::LogCrashTrailer(char *buffer, const char *last) const
+/* virtual */ void CrashLog::LogCrashTrailer(format_target &buffer) const
 {
 	/* Stub implementation; not all OSes have anything to output for this section. */
-	return buffer;
 }
 
-#ifdef USE_SCOPE_INFO
-/* virtual */ char *CrashLog::LogScopeInfo(char *buffer, const char *last) const
+#if !defined(DISABLE_SCOPE_INFO)
+/* virtual */ void CrashLog::LogScopeInfo(format_target &buffer) const
 {
-	return buffer + WriteScopeLog(buffer, last);
+	WriteScopeLog(buffer);
 }
 #endif
 
@@ -163,34 +157,34 @@ char *CrashLog::LogCompiler(char *buffer, const char *last) const
 /* virtual */ char *CrashLog::TryCrashLogFaultSection(char *buffer, const char *last, const char *section_name, CrashLogSectionWriter writer)
 {
 	/* Stub implementation; not all OSes support internal fault handling. */
-	this->FlushCrashLogBuffer();
-	return writer(this, buffer, last);
+	this->FlushCrashLogBuffer(buffer);
+	format_to_fixed buf(buffer, last - buffer);
+	writer(this, buf);
+	return buffer + buf.size();
 }
 
-/* virtual */ void CrashLog::CrashLogFaultSectionCheckpoint(char *buffer) const
+/* virtual */ void CrashLog::CrashLogFaultSectionCheckpoint(format_target &buffer) const
 {
 	/* Stub implementation; not all OSes support this. */
-	const_cast<CrashLog *>(this)->FlushCrashLogBuffer();
+	const_cast<CrashLog *>(this)->FlushCrashLogBuffer(buffer.end());
 }
 
 /**
  * Writes OpenTTD's version to the buffer.
- * @param buffer The begin where to write at.
- * @param last   The last position in the buffer to write to.
- * @return the position of the \c '\0' character after the buffer.
+ * @param buffer The output buffer.
  */
-char *CrashLog::LogOpenTTDVersion(char *buffer, const char *last) const
+void CrashLog::LogOpenTTDVersion(format_target &buffer) const
 {
-	return buffer + seprintf(buffer, last,
+	buffer.format(
 			"OpenTTD version:\n"
-			" Version:     %s (%d)\n"
-			" Release ver: %s\n"
-			" NewGRF ver:  %08x\n"
-			" Bits:        %d\n"
-			" Endian:      %s\n"
-			" Dedicated:   %s\n"
-			" Build date:  %s\n"
-			" Defines:     %s\n\n",
+			" Version:     {} ({})\n"
+			" Release ver: {}\n"
+			" NewGRF ver:  {:08x}\n"
+			" Bits:        {}\n"
+			" Endian:      {}\n"
+			" Dedicated:   {}\n"
+			" Build date:  {}\n"
+			" Defines:     {}\n\n",
 			_openttd_revision,
 			_openttd_revision_modified,
 			_openttd_release_version,
@@ -218,19 +212,10 @@ char *CrashLog::LogOpenTTDVersion(char *buffer, const char *last) const
 /**
  * Writes the (important) configuration settings to the buffer.
  * E.g. graphics set, sound set, blitter and AIs.
- * @param buffer The begin where to write at.
- * @param last   The last position in the buffer to write to.
- * @return the position of the \c '\0' character after the buffer.
+ * @param buffer The output buffer.
  */
-char *CrashLog::LogConfiguration(char *buffer, const char *last) const
+void CrashLog::LogConfiguration(format_target &buffer) const
 {
-	auto pathfinder_name = [](uint8_t pf) -> const char * {
-		switch (pf) {
-			case VPF_NPF: return "NPF";
-			case VPF_YAPF: return "YAPF";
-			default: return "-";
-		};
-	};
 	auto mode_name = []() -> const char * {
 		switch (_game_mode) {
 			case GM_MENU: return "MENU";
@@ -240,36 +225,34 @@ char *CrashLog::LogConfiguration(char *buffer, const char *last) const
 			default: return "-";
 		};
 	};
-	buffer += seprintf(buffer, last,
+	buffer.format(
 			"Configuration:\n"
-			" Blitter:      %s\n"
-			" Graphics set: %s (%u)\n"
-			" Language:     %s\n"
-			" Music driver: %s\n"
-			" Music set:    %s (%u)\n"
-			" Network:      %s\n"
-			" Sound driver: %s\n"
-			" Sound set:    %s (%u)\n"
-			" Video driver: %s\n"
-			" Pathfinder:   %s %s %s\n",
-			BlitterFactory::GetCurrentBlitter() == nullptr ? "none" : BlitterFactory::GetCurrentBlitter()->GetName(),
-			BaseGraphics::GetUsedSet() == nullptr ? "none" : BaseGraphics::GetUsedSet()->name.c_str(),
+			" Blitter:      {}\n"
+			" Graphics set: {} ({})\n"
+			" Language:     {}\n"
+			" Music driver: {}\n"
+			" Music set:    {} ({})\n"
+			" Network:      {}\n"
+			" Sound driver: {}\n"
+			" Sound set:    {} ({})\n"
+			" Video driver: {}\n",
+			BlitterFactory::GetCurrentBlitter() == nullptr ? (std::string_view)"none" : BlitterFactory::GetCurrentBlitter()->GetName(),
+			BaseGraphics::GetUsedSet() == nullptr ? (std::string_view)"none" : BaseGraphics::GetUsedSet()->name,
 			BaseGraphics::GetUsedSet() == nullptr ? UINT32_MAX : BaseGraphics::GetUsedSet()->version,
-			_current_language == nullptr ? "none" : _current_language->file.c_str(),
+			_current_language == nullptr ? (std::string_view)"none" : StrLastPathSegment(_current_language->file.c_str()),
 			MusicDriver::GetInstance() == nullptr ? "none" : MusicDriver::GetInstance()->GetName(),
-			BaseMusic::GetUsedSet() == nullptr ? "none" : BaseMusic::GetUsedSet()->name.c_str(),
+			BaseMusic::GetUsedSet() == nullptr ? (std::string_view)"none" : BaseMusic::GetUsedSet()->name,
 			BaseMusic::GetUsedSet() == nullptr ? UINT32_MAX : BaseMusic::GetUsedSet()->version,
 			_networking ? (_network_server ? "server" : "client") : "no",
 			SoundDriver::GetInstance() == nullptr ? "none" : SoundDriver::GetInstance()->GetName(),
-			BaseSounds::GetUsedSet() == nullptr ? "none" : BaseSounds::GetUsedSet()->name.c_str(),
+			BaseSounds::GetUsedSet() == nullptr ? (std::string_view)"none" : BaseSounds::GetUsedSet()->name,
 			BaseSounds::GetUsedSet() == nullptr ? UINT32_MAX : BaseSounds::GetUsedSet()->version,
-			VideoDriver::GetInstance() == nullptr ? "none" : VideoDriver::GetInstance()->GetInfoString(),
-			pathfinder_name(_settings_game.pf.pathfinder_for_trains), pathfinder_name(_settings_game.pf.pathfinder_for_roadvehs), pathfinder_name(_settings_game.pf.pathfinder_for_ships)
+			VideoDriver::GetInstance() == nullptr ? "none" : VideoDriver::GetInstance()->GetInfoString()
 	);
-	buffer += seprintf(buffer, last, " Game mode:    %s", mode_name());
-	if (_switch_mode != SM_NONE) buffer += seprintf(buffer, last, ", SM: %u", _switch_mode);
-	if (HasModalProgress()) buffer += seprintf(buffer, last, ", HMP");
-	buffer += seprintf(buffer, last, "\n\n");
+	buffer.format(" Game mode:    {}", mode_name());
+	if (_switch_mode != SM_NONE) buffer.format(", SM: {}", _switch_mode);
+	if (HasModalProgress()) buffer.append(", HMP");
+	buffer.append("\n\n");
 
 	this->CrashLogFaultSectionCheckpoint(buffer);
 
@@ -282,86 +265,83 @@ char *CrashLog::LogConfiguration(char *buffer, const char *last) const
 		}
 	};
 
-	buffer += seprintf(buffer, last,
+	buffer.format(
 			"Fonts:\n"
-			" Small:  %s\n"
-			" Medium: %s\n"
-			" Large:  %s\n"
-			" Mono:   %s\n\n",
-			log_font(FS_SMALL).c_str(),
-			log_font(FS_NORMAL).c_str(),
-			log_font(FS_LARGE).c_str(),
-			log_font(FS_MONO).c_str()
+			" Small:  {}\n"
+			" Medium: {}\n"
+			" Large:  {}\n"
+			" Mono:   {}\n\n",
+			log_font(FS_SMALL),
+			log_font(FS_NORMAL),
+			log_font(FS_LARGE),
+			log_font(FS_MONO)
 	);
 
 	this->CrashLogFaultSectionCheckpoint(buffer);
 
-	buffer += seprintf(buffer, last, "Map size: 0x%X (%u x %u)%s\n\n", MapSize(), MapSizeX(), MapSizeY(), (!_m || !_me) ? ", NO MAP ALLOCATED" : "");
+	buffer.format("Map size: 0x{:X} ({} x {}){}\n\n", MapSize(), MapSizeX(), MapSizeY(), (!_m || !_me) ? ", NO MAP ALLOCATED" : "");
 
 	if (_settings_game.debug.chicken_bits != 0) {
-		buffer += seprintf(buffer, last, "Chicken bits: 0x%08X\n\n", _settings_game.debug.chicken_bits);
+		buffer.format("Chicken bits: 0x{:08X}\n\n", _settings_game.debug.chicken_bits);
 	}
 	if (_settings_game.debug.newgrf_optimiser_flags != 0) {
-		buffer += seprintf(buffer, last, "NewGRF optimiser flags: 0x%08X\n\n", _settings_game.debug.newgrf_optimiser_flags);
+		buffer.format("NewGRF optimiser flags: 0x{:08X}\n\n", _settings_game.debug.newgrf_optimiser_flags);
 	}
 
 	this->CrashLogFaultSectionCheckpoint(buffer);
 
-	buffer += seprintf(buffer, last, "AI Configuration (local: %i) (current: %i):\n", (int)_local_company, (int)_current_company);
+	buffer.format("AI Configuration (local: {}) (current: {}):\n", (int)_local_company, (int)_current_company);
 	for (const Company *c : Company::Iterate()) {
 		if (c->ai_info == nullptr) {
-			buffer += seprintf(buffer, last, " %2i: Human\n", (int)c->index);
+			buffer.format(" {:2}: Human\n", (int)c->index);
 		} else {
-			buffer += seprintf(buffer, last, " %2i: %s (v%d)\n", (int)c->index, c->ai_info->GetName().c_str(), c->ai_info->GetVersion());
+			buffer.format(" {:2}: {} (v{})\n", (int)c->index, c->ai_info->GetName().c_str(), c->ai_info->GetVersion());
 		}
 	}
 
 	if (Game::GetInfo() != nullptr) {
-		buffer += seprintf(buffer, last, " GS: %s (v%d)\n", Game::GetInfo()->GetName().c_str(), Game::GetInfo()->GetVersion());
+		buffer.format(" GS: {} (v{})\n", Game::GetInfo()->GetName(), Game::GetInfo()->GetVersion());
 	}
-	buffer += seprintf(buffer, last, "\n");
+	buffer.push_back('\n');
 
 	this->CrashLogFaultSectionCheckpoint(buffer);
 
 	if (_grfconfig_static != nullptr) {
-		buffer += seprintf(buffer, last, "Static NewGRFs present:\n");
+		buffer.append("Static NewGRFs present:\n");
 		for (GRFConfig *c = _grfconfig_static; c != nullptr; c = c->next) {
-			char md5sum[33];
-			md5sumToString(md5sum, lastof(md5sum), c->ident.md5sum);
-			buffer += seprintf(buffer, last, " GRF ID: %08X, checksum %s, %s, '%s'\n", BSWAP32(c->ident.grfid), md5sum, c->GetDisplayPath(), GetDefaultLangGRFStringFromGRFText(c->name));
+			buffer.format(" GRF ID: {:08X}, checksum {}, {}", BSWAP32(c->ident.grfid), c->ident.md5sum, c->GetDisplayPath());
+			const char *name = GetDefaultLangGRFStringFromGRFText(c->name);
+			if (name != nullptr) buffer.format(", '{}'", name);
+			buffer.push_back('\n');
 		}
-		buffer += seprintf(buffer, last, "\n");
+		buffer.push_back('\n');
 	}
 
 	this->CrashLogFaultSectionCheckpoint(buffer);
 
 	if (_network_server) {
-		extern char *NetworkServerDumpClients(char *buffer, const char *last);
-		buffer += seprintf(buffer, last, "Clients:\n");
-		buffer = NetworkServerDumpClients(buffer, last);
-		buffer += seprintf(buffer, last, "\n");
+		extern void NetworkServerDumpClients(format_target &buffer);
+		buffer.append("Clients:\n");
+		NetworkServerDumpClients(buffer);
+		buffer.append("\n");
 	}
-
-	return buffer;
 }
 
 /**
  * Writes information (versions) of the used libraries.
- * @param buffer The begin where to write at.
- * @param last   The last position in the buffer to write to.
- * @return the position of the \c '\0' character after the buffer.
+ * @param buffer The output buffer.
  */
-char *CrashLog::LogLibraries(char *buffer, const char *last) const
+void CrashLog::LogLibraries(format_target &buffer) const
 {
-	buffer += seprintf(buffer, last, "Libraries:\n");
+	buffer.append("Libraries:\n");
 
 #ifdef WITH_ALLEGRO
-	buffer += seprintf(buffer, last, " Allegro:    %s\n", allegro_id);
+	buffer.format(" Allegro:    {}\n", allegro_id);
 #endif /* WITH_ALLEGRO */
 
 #ifdef WITH_FONTCONFIG
 	int version = FcGetVersion();
-	buffer += seprintf(buffer, last, " FontConfig: %d.%d.%d\n", version / 10000, (version / 100) % 100, version % 100);
+	buffer.format(" FontConfig: {}.{}.{}\n", version / 10000, (version / 100) % 100, version % 100);
 #endif /* WITH_FONTCONFIG */
 
 #ifdef WITH_FREETYPE
@@ -370,11 +350,11 @@ char *CrashLog::LogLibraries(char *buffer, const char *last) const
 	FT_Init_FreeType(&library);
 	FT_Library_Version(library, &major, &minor, &patch);
 	FT_Done_FreeType(library);
-	buffer += seprintf(buffer, last, " FreeType:   %d.%d.%d\n", major, minor, patch);
+	buffer.format(" FreeType:   {}.{}.{}\n", major, minor, patch);
 #endif /* WITH_FREETYPE */
 
 #if defined(WITH_HARFBUZZ)
-	buffer += seprintf(buffer, last, " HarfBuzz:   %s\n", hb_version_string());
+	buffer.format(" HarfBuzz:   {}\n", hb_version_string());
 #endif /* WITH_HARFBUZZ */
 
 #if defined(WITH_ICU_I18N)
@@ -383,163 +363,137 @@ char *CrashLog::LogLibraries(char *buffer, const char *last) const
 	UVersionInfo ver;
 	u_getVersion(ver);
 	u_versionToString(ver, buf);
-	buffer += seprintf(buffer, last, " ICU i18n:   %s\n", buf);
+	buffer.format(" ICU i18n:   {}\n", buf);
 #endif /* WITH_ICU_I18N */
 
 #ifdef WITH_LIBLZMA
-	buffer += seprintf(buffer, last, " LZMA:       %s\n", lzma_version_string());
+	buffer.format(" LZMA:       {}\n", lzma_version_string());
 #endif
 
 #ifdef WITH_ZSTD
-	buffer += seprintf(buffer, last, " ZSTD:       %s\n", ZSTD_versionString());
+	buffer.format(" ZSTD:       {}\n", ZSTD_versionString());
 #endif
 
 #ifdef WITH_LZO
-	buffer += seprintf(buffer, last, " LZO:        %s\n", lzo_version_string());
+	buffer.format(" LZO:        {}\n", lzo_version_string());
 #endif
 
 #ifdef WITH_PNG
-	buffer += seprintf(buffer, last, " PNG:        %s\n", png_get_libpng_ver(nullptr));
+	buffer.format(" PNG:        {}\n", png_get_libpng_ver(nullptr));
 #endif /* WITH_PNG */
 
 #ifdef WITH_SDL
 	const SDL_version *sdl_v = SDL_Linked_Version();
-	buffer += seprintf(buffer, last, " SDL1:       %d.%d.%d\n", sdl_v->major, sdl_v->minor, sdl_v->patch);
+	buffer.format(" SDL1:       {}.{}.{}\n", sdl_v->major, sdl_v->minor, sdl_v->patch);
 #elif defined(WITH_SDL2)
 	SDL_version sdl2_v;
 	SDL_GetVersion(&sdl2_v);
-	buffer += seprintf(buffer, last, " SDL2:       %d.%d.%d", sdl2_v.major, sdl2_v.minor, sdl2_v.patch);
+	buffer.format(" SDL2:       {}.{}.{}", sdl2_v.major, sdl2_v.minor, sdl2_v.patch);
 #if defined(SDL_USE_IME)
-	buffer += seprintf(buffer, last, " IME?");
+	buffer.append(" IME?");
 #endif
 #if defined(HAVE_FCITX_FRONTEND_H)
-	buffer += seprintf(buffer, last, " FCITX?");
+	buffer.append(" FCITX?");
 #endif
 #if defined(HAVE_IBUS_IBUS_H)
-	buffer += seprintf(buffer, last, " IBUS?");
+	buffer.append(" IBUS?");
 #endif
 #if !(defined(_WIN32) || defined(__APPLE__))
 	const char *sdl_im_module = getenv("SDL_IM_MODULE");
-	if (sdl_im_module != nullptr) buffer += seprintf(buffer, last, " (SDL_IM_MODULE=%s)", sdl_im_module);
+	if (sdl_im_module != nullptr) buffer.append(" (SDL_IM_MODULE={})", sdl_im_module);
 	const char *xmod = getenv("XMODIFIERS");
-	if (xmod != nullptr && strstr(xmod, "@im=fcitx") != nullptr) buffer += seprintf(buffer, last, " (XMODIFIERS has @im=fcitx)");
+	if (xmod != nullptr && strstr(xmod, "@im=fcitx") != nullptr) buffer.append(" (XMODIFIERS has @im=fcitx)");
 #endif
-	buffer += seprintf(buffer, last, "\n");
+	buffer.push_back('\n');
 #endif
 
 #ifdef WITH_ZLIB
-	buffer += seprintf(buffer, last, " Zlib:       %s\n", zlibVersion());
+	buffer.format(" Zlib:       {}\n", zlibVersion());
 #endif
 
 #ifdef WITH_CURL
 	auto *curl_v = curl_version_info(CURLVERSION_NOW);
-	buffer += seprintf(buffer, last, " Curl:       %s\n", curl_v->version);
+	buffer.format(" Curl:       {}\n", curl_v->version);
 	if (curl_v->ssl_version != nullptr) {
-		buffer += seprintf(buffer, last, " Curl SSL:   %s\n", curl_v->ssl_version);
+		buffer.format(" Curl SSL:   {}\n", curl_v->ssl_version);
 	} else {
-		buffer += seprintf(buffer, last, " Curl SSL:   none\n");
+		buffer.append(" Curl SSL:   none\n");
 	}
 #endif
 
-	buffer += seprintf(buffer, last, "\n");
-	return buffer;
+	buffer.push_back('\n');
 }
 
 /**
  * Writes information (versions) of the used plugins.
- * @param buffer The begin where to write at.
- * @param last   The last position in the buffer to write to.
- * @return the position of the \c '\0' character after the buffer.
+ * @param buffer The output buffer.
  */
-char *CrashLog::LogPlugins(char *buffer, const char *last) const
+void CrashLog::LogPlugins(format_target &buffer) const
 {
-	if (SocialIntegration::GetPluginCount() == 0) return buffer;
+	if (SocialIntegration::GetPluginCount() == 0) return;
 
-	buffer += seprintf(buffer, last, "Plugins:\n");
-	return SocialIntegration::LogPluginSummary(buffer, last);
-}
-
-/**
- * Helper function for printing the gamelog.
- * @param s the string to print.
- */
-/* static */ void CrashLog::GamelogFillCrashLog(const char *s)
-{
-	CrashLog::gamelog_buffer += seprintf(CrashLog::gamelog_buffer, CrashLog::gamelog_last, "%s\n", s);
+	buffer.append("Plugins:\n");
+	SocialIntegration::LogPluginSummary(buffer);
 }
 
 /**
  * Writes the gamelog data to the buffer.
- * @param buffer The begin where to write at.
- * @param last   The last position in the buffer to write to.
- * @return the position of the \c '\0' character after the buffer.
+ * @param buffer The output buffer.
  */
-char *CrashLog::LogGamelog(char *buffer, const char *last) const
+void CrashLog::LogGamelog(format_target &buffer) const
 {
 	if (_game_events_since_load || _game_events_overall) {
-		buffer += seprintf(buffer, last, "Events: ");
-		buffer = DumpGameEventFlags(_game_events_since_load, buffer, last);
-		buffer += seprintf(buffer, last, ", ");
-		buffer = DumpGameEventFlags(_game_events_overall, buffer, last);
-		buffer += seprintf(buffer, last, "\n\n");
+		buffer.append("Events: ");
+		DumpGameEventFlags(_game_events_since_load, buffer);
+		buffer.append(", ");
+		DumpGameEventFlags(_game_events_overall, buffer);
+		buffer.append("\n\n");
 	}
 
-	CrashLog::gamelog_buffer = buffer;
-	CrashLog::gamelog_last = last;
-	GamelogPrint(&CrashLog::GamelogFillCrashLog);
-	return CrashLog::gamelog_buffer + seprintf(CrashLog::gamelog_buffer, last, "\n");
+	GamelogPrint(buffer);
+	buffer.push_back('\n');
 }
 
 /**
  * Writes up to 32 recent news messages to the buffer, with the most recent first.
- * @param buffer The begin where to write at.
- * @param last   The last position in the buffer to write to.
- * @return the position of the \c '\0' character after the buffer.
+ * @param buffer The output buffer.
  */
-char *CrashLog::LogRecentNews(char *buffer, const char *last) const
+void CrashLog::LogRecentNews(format_target &buffer) const
 {
-	uint total = 0;
-	for (NewsItem *news = _latest_news; news != nullptr; news = news->prev) {
-		total++;
-	}
+	uint total = static_cast<uint>(GetNews().size());
 	uint show = std::min<uint>(total, 32);
-	buffer += seprintf(buffer, last, "Recent news messages (%u of %u):\n", show, total);
+	buffer.format("Recent news messages ({} of {}):\n", show, total);
 
 	int i = 0;
-	for (NewsItem *news = _latest_news; i < 32 && news != nullptr; news = news->prev, i++) {
-		CalTime::YearMonthDay ymd = CalTime::ConvertDateToYMD(news->date);
-		buffer += seprintf(buffer, last, "(%i-%02i-%02i) StringID: %u, Type: %u, Ref1: %u, %u, Ref2: %u, %u\n",
-		                   ymd.year.base(), ymd.month + 1, ymd.day, news->string_id, news->type,
-		                   news->reftype1, news->ref1, news->reftype2, news->ref2);
+	for (const auto &news : GetNews()) {
+		CalTime::YearMonthDay ymd = CalTime::ConvertDateToYMD(news.date);
+		buffer.format("({}-{:02}-{:02}) StringID: {}, Type: {}, Ref1: {}, {}, Ref2: {}, {}\n",
+			   ymd.year, ymd.month + 1, ymd.day, news.string_id, news.type,
+			   news.reftype1, news.ref1, news.reftype2, news.ref2);
+		if (++i > 32) break;
 	}
-	buffer += seprintf(buffer, last, "\n");
-	return buffer;
+	buffer.push_back('\n');
 }
 
 /**
  * Writes the command log data to the buffer.
- * @param buffer The begin where to write at.
- * @param last   The last position in the buffer to write to.
- * @return the position of the \c '\0' character after the buffer.
+ * @param buffer The output buffer.
  */
-char *CrashLog::LogCommandLog(char *buffer, const char *last) const
+void CrashLog::LogCommandLog(format_target &buffer) const
 {
-	buffer = DumpCommandLog(buffer, last, nullptr);
-	buffer += seprintf(buffer, last, "\n");
-	buffer = DumpSpecialEventsLog(buffer, last);
-	buffer += seprintf(buffer, last, "\n");
-	return buffer;
+	DumpCommandLog(buffer);
+	buffer.push_back('\n');
+	DumpSpecialEventsLog(buffer);
+	buffer.push_back('\n');
 }
 
 /**
  * Writes the non-default settings to the buffer.
- * @param buffer The begin where to write at.
- * @param last   The last position in the buffer to write to.
- * @return the position of the \c '\0' character after the buffer.
+ * @param buffer The output buffer.
  */
-char *CrashLog::LogSettings(char *buffer, const char *last) const
+void CrashLog::LogSettings(format_target &buffer) const
 {
-	buffer += seprintf(buffer, last, "Non-default settings:");
+	buffer.append("Non-default settings:");
 
 	IterateSettingsTables([&](const SettingTable &table, void *object) {
 		for (auto &sd : table) {
@@ -547,13 +501,12 @@ char *CrashLog::LogSettings(char *buffer, const char *last) const
 			if (!SlIsObjectCurrentlyValid(sd->save.version_from, sd->save.version_to, sd->save.ext_feature_test)) continue;
 
 			if (sd->IsDefaultValue(object)) continue;
-			buffer += seprintf(buffer, last, "\n  %s: ", sd->name);
-			buffer = sd->FormatValue(buffer, last, object);
+			buffer.format("\n  {}: ", sd->name);
+			sd->FormatValue(buffer, object);
 		}
 	});
 
-	buffer += seprintf(buffer, last, "\n\n");
-	return buffer;
+	buffer.append("\n\n");
 }
 
 /**
@@ -565,44 +518,41 @@ char *CrashLog::LogSettings(char *buffer, const char *last) const
 char *CrashLog::FillCrashLog(char *buffer, const char *last)
 {
 	this->StartCrashLogFaultHandler();
-	buffer += seprintf(buffer, last, "*** OpenTTD Crash Report ***\n\n");
+	buffer = format_to_fixed_z::format_to(buffer, last, "*** OpenTTD Crash Report ***\n\n");
 
-	buffer = this->TryCrashLogFaultSection(buffer, last, "emergency test", [](CrashLog *self, char *buffer, const char *last) -> char * {
+	buffer = this->TryCrashLogFaultSection(buffer, last, "emergency test", [](CrashLog *self, format_target &buffer) {
 		if (GamelogTestEmergency()) {
-			buffer += seprintf(buffer, last, "-=-=- As you loaded an emergency savegame no crash information would ordinarily be generated. -=-=-\n\n");
+			buffer.append("-=-=- As you loaded an emergency savegame no crash information would ordinarily be generated. -=-=-\n\n");
 		}
 		if (SaveloadCrashWithMissingNewGRFs()) {
-			buffer += seprintf(buffer, last, "-=-=- As you loaded a savegame for which you do not have the required NewGRFs no crash information would ordinarily be generated. -=-=-\n\n");
+			buffer.append("-=-=- As you loaded a savegame for which you do not have the required NewGRFs no crash information would ordinarily be generated. -=-=-\n\n");
 		}
-		return buffer;
 	});
 
-	buffer = this->TryCrashLogFaultSection(buffer, last, "times", [](CrashLog *self, char *buffer, const char *last) -> char * {
-		buffer += UTCTime::Format(buffer, last, "Crash at: %Y-%m-%d %H:%M:%S (UTC)\n");
+	buffer = this->TryCrashLogFaultSection(buffer, last, "times", [](CrashLog *self, format_target &buffer) {
+		UTCTime::FormatTo(buffer, "Crash at: %Y-%m-%d %H:%M:%S (UTC)\n");
 
-		buffer += seprintf(buffer, last, "In game date: %i-%02i-%02i (%i, %i) (DL: %u)\n", EconTime::CurYear().base(), EconTime::CurMonth() + 1, EconTime::CurDay(), EconTime::CurDateFract(), TickSkipCounter(), DayLengthFactor());
-		buffer += seprintf(buffer, last, "Calendar date: %i-%02i-%02i (%i, %i)\n", CalTime::CurYear().base(), CalTime::CurMonth() + 1, CalTime::CurDay(), CalTime::CurDateFract(), CalTime::CurSubDateFract());
-		LogGameLoadDateTimes(buffer, last);
-		return buffer;
+		buffer.format("In game date: {}-{:02}-{:02} ({}, {}) (DL: {})\n", EconTime::CurYear().base(), EconTime::CurMonth() + 1, EconTime::CurDay(), EconTime::CurDateFract(), TickSkipCounter(), DayLengthFactor());
+		buffer.format("Calendar date: {}-{:02}-{:02} ({}, {})\n", CalTime::CurYear().base(), CalTime::CurMonth() + 1, CalTime::CurDay(), CalTime::CurDateFract(), CalTime::CurSubDateFract());
+		LogGameLoadDateTimes(buffer);
 	});
 
-	buffer += seprintf(buffer, last, "\n");
+	buffer = format_to_fixed_z::format_to(buffer, last, "\n");
 
-	buffer = this->TryCrashLogFaultSection(buffer, last, "message", [](CrashLog *self, char *buffer, const char *last) -> char * {
-		return self->LogError(buffer, last, CrashLog::message);
+	buffer = this->TryCrashLogFaultSection(buffer, last, "message", [](CrashLog *self, format_target &buffer) {
+		self->LogError(buffer, CrashLog::message);
 	});
 
-#ifdef USE_SCOPE_INFO
-	buffer = this->TryCrashLogFaultSection(buffer, last, "scope", [](CrashLog *self, char *buffer, const char *last) -> char * {
+#if !defined(DISABLE_SCOPE_INFO)
+	buffer = this->TryCrashLogFaultSection(buffer, last, "scope", [](CrashLog *self, format_target &buffer) {
 		if (IsGameThread()) {
-			buffer += WriteScopeLog(buffer, last);
+			WriteScopeLog(buffer);
 		}
-		return buffer;
 	});
 #endif
 
 	if (_networking) {
-		buffer = this->TryCrashLogFaultSection(buffer, last, "network sync", [](CrashLog *self, char *buffer, const char *last) -> char * {
+		buffer = this->TryCrashLogFaultSection(buffer, last, "network sync", [](CrashLog *self, format_target &buffer) {
 			if (IsGameThread() && _record_sync_records && !_network_sync_records.empty()) {
 				uint total = 0;
 				for (uint32_t count : _network_sync_record_counts) {
@@ -612,80 +562,79 @@ char *CrashLog::FillCrashLog(char *buffer, const char *last)
 				if (_network_sync_records.size() > total + 1) {
 					event = (NetworkSyncRecordEvents)(_network_sync_records.back().frame);
 				}
-				buffer += seprintf(buffer, last, "Last sync record type: %s\n\n", GetSyncRecordEventName(event));
+				buffer.format("Last sync record type: {}\n\n", GetSyncRecordEventName(event));
 			}
-			return buffer;
 		});
 	}
 
-	buffer = this->TryCrashLogFaultSection(buffer, last, "thread", [](CrashLog *self, char *buffer, const char *last) -> char * {
+	buffer = this->TryCrashLogFaultSection(buffer, last, "thread", [](CrashLog *self, format_target &buffer) {
 		if (IsNonMainThread()) {
-			buffer += seprintf(buffer, last, "Non-main thread (");
-			buffer += GetCurrentThreadName(buffer, last);
-			buffer += seprintf(buffer, last, ")\n\n");
+			buffer.append("Non-main thread (");
+			GetCurrentThreadName(buffer);
+			buffer.append(")\n\n");
 		}
-		return buffer;
 	});
 
-	buffer = this->TryCrashLogFaultSection(buffer, last, "OpenTTD version", [](CrashLog *self, char *buffer, const char *last) -> char * {
-		return self->LogOpenTTDVersion(buffer, last);
+	buffer = this->TryCrashLogFaultSection(buffer, last, "OpenTTD version", [](CrashLog *self, format_target &buffer) {
+		self->LogOpenTTDVersion(buffer);
 	});
-	buffer = this->TryCrashLogFaultSection(buffer, last, "stacktrace", [](CrashLog *self, char *buffer, const char *last) -> char * {
-		return self->LogStacktrace(buffer, last);
+	buffer = this->TryCrashLogFaultSection(buffer, last, "stacktrace", [](CrashLog *self, format_target &buffer) {
+		self->LogStacktrace(buffer);
 	});
-	buffer = this->TryCrashLogFaultSection(buffer, last, "debug extra", [](CrashLog *self, char *buffer, const char *last) -> char * {
-		return self->LogDebugExtra(buffer, last);
+	buffer = this->TryCrashLogFaultSection(buffer, last, "debug extra", [](CrashLog *self, format_target &buffer) {
+		self->LogDebugExtra(buffer);
 	});
-	buffer = this->TryCrashLogFaultSection(buffer, last, "registers", [](CrashLog *self, char *buffer, const char *last) -> char * {
-		return self->LogRegisters(buffer, last);
+	buffer = this->TryCrashLogFaultSection(buffer, last, "registers", [](CrashLog *self, format_target &buffer) {
+		self->LogRegisters(buffer);
 	});
-	buffer = this->TryCrashLogFaultSection(buffer, last, "OS version", [](CrashLog *self, char *buffer, const char *last) -> char * {
-		return self->LogOSVersion(buffer, last);
+	buffer = this->TryCrashLogFaultSection(buffer, last, "OS version", [](CrashLog *self, format_target &buffer) {
+		self->LogOSVersion(buffer);
 	});
-	buffer = this->TryCrashLogFaultSection(buffer, last, "compiler", [](CrashLog *self, char *buffer, const char *last) -> char * {
-		return self->LogCompiler(buffer, last);
+	buffer = this->TryCrashLogFaultSection(buffer, last, "compiler", [](CrashLog *self, format_target &buffer) {
+		self->LogCompiler(buffer);
 	});
-	buffer = this->TryCrashLogFaultSection(buffer, last, "OS version detail", [](CrashLog *self, char *buffer, const char *last) -> char * {
-		return self->LogOSVersionDetail(buffer, last);
+	buffer = this->TryCrashLogFaultSection(buffer, last, "OS version detail", [](CrashLog *self, format_target &buffer) {
+		self->LogOSVersionDetail(buffer);
 	});
-	buffer = this->TryCrashLogFaultSection(buffer, last, "config", [](CrashLog *self, char *buffer, const char *last) -> char * {
-		return self->LogConfiguration(buffer, last);
+	buffer = this->TryCrashLogFaultSection(buffer, last, "config", [](CrashLog *self, format_target &buffer) {
+		self->LogConfiguration(buffer);
 	});
-	buffer = this->TryCrashLogFaultSection(buffer, last, "libraries", [](CrashLog *self, char *buffer, const char *last) -> char * {
-		return self->LogLibraries(buffer, last);
+	buffer = this->TryCrashLogFaultSection(buffer, last, "libraries", [](CrashLog *self, format_target &buffer) {
+		self->LogLibraries(buffer);
 	});
-	buffer = this->TryCrashLogFaultSection(buffer, last, "plugins", [](CrashLog *self, char *buffer, const char *last) -> char * {
-		return self->LogPlugins(buffer, last);
+	buffer = this->TryCrashLogFaultSection(buffer, last, "plugins", [](CrashLog *self, format_target &buffer) {
+		self->LogPlugins(buffer);
 	});
-	buffer = this->TryCrashLogFaultSection(buffer, last, "settings", [](CrashLog *self, char *buffer, const char *last) -> char * {
-		return self->LogSettings(buffer, last);
+	buffer = this->TryCrashLogFaultSection(buffer, last, "settings", [](CrashLog *self, format_target &buffer) {
+		self->LogSettings(buffer);
 	});
-	buffer = this->TryCrashLogFaultSection(buffer, last, "command log", [](CrashLog *self, char *buffer, const char *last) -> char * {
-		return self->LogCommandLog(buffer, last);
+	buffer = this->TryCrashLogFaultSection(buffer, last, "command log", [](CrashLog *self, format_target &buffer) {
+		self->LogCommandLog(buffer);
 	});
-	buffer = this->TryCrashLogFaultSection(buffer, last, "gamelog", [](CrashLog *self, char *buffer, const char *last) -> char * {
-		return self->LogGamelog(buffer, last);
+	buffer = this->TryCrashLogFaultSection(buffer, last, "gamelog", [](CrashLog *self, format_target &buffer) {
+		self->LogGamelog(buffer);
 	});
-	buffer = this->TryCrashLogFaultSection(buffer, last, "news", [](CrashLog *self, char *buffer, const char *last) -> char * {
-		return self->LogRecentNews(buffer, last);
+	buffer = this->TryCrashLogFaultSection(buffer, last, "news", [](CrashLog *self, format_target &buffer) {
+		self->LogRecentNews(buffer);
 	});
-	buffer = this->TryCrashLogFaultSection(buffer, last, "trailer", [](CrashLog *self, char *buffer, const char *last) -> char * {
-		return self->LogCrashTrailer(buffer, last);
+	buffer = this->TryCrashLogFaultSection(buffer, last, "trailer", [](CrashLog *self, format_target &buffer) {
+		self->LogCrashTrailer(buffer);
 	});
 
-	buffer += seprintf(buffer, last, "*** End of OpenTTD Crash Report ***\n");
+	buffer = format_to_fixed_z::format_to(buffer, last, "*** End of OpenTTD Crash Report ***\n");
+	*buffer = '\0';
 	this->StopCrashLogFaultHandler();
 	return buffer;
 }
 
-static char *LogDesyncDateHeader(char *buffer, const char *last)
+static void LogDesyncDateHeader(format_target &buffer)
 {
 	extern uint32_t _frame_counter;
 
-	buffer += seprintf(buffer, last, "In game date: %i-%02i-%02i (%i, %i) (DL: %u), %08X\n",
+	buffer.format("In game date: {}-{:02}-{:02} ({}, {}) (DL: {}), {:08X}\n",
 			EconTime::CurYear().base(), EconTime::CurMonth() + 1, EconTime::CurDay(), EconTime::CurDateFract(), TickSkipCounter(), DayLengthFactor(), _frame_counter);
-	buffer += seprintf(buffer, last, "Calendar date: %i-%02i-%02i (%i, %i)\n", CalTime::CurYear().base(), CalTime::CurMonth() + 1, CalTime::CurDay(), CalTime::CurDateFract(), CalTime::CurSubDateFract());
-	LogGameLoadDateTimes(buffer, last);
+	buffer.format("Calendar date: {}-{:02}-{:02} ({}, {})\n", CalTime::CurYear().base(), CalTime::CurMonth() + 1, CalTime::CurDay(), CalTime::CurDateFract(), CalTime::CurSubDateFract());
+	LogGameLoadDateTimes(buffer);
 	if (_networking && !_network_server) {
 		extern EconTime::Date _last_sync_date;
 		extern EconTime::DateFract _last_sync_date_fract;
@@ -693,183 +642,177 @@ static char *LogDesyncDateHeader(char *buffer, const char *last)
 		extern uint32_t _last_sync_frame_counter;
 
 		EconTime::YearMonthDay ymd = EconTime::ConvertDateToYMD(_last_sync_date);
-		buffer += seprintf(buffer, last, "Last sync at: %i-%02i-%02i (%i, %i), %08X\n",
+		buffer.format("Last sync at: {}-{:02}-{:02} ({}, {}), {:08X}\n",
 				ymd.year.base(), ymd.month + 1, ymd.day, _last_sync_date_fract, _last_sync_tick_skip_counter, _last_sync_frame_counter);
 	}
-	return buffer;
 }
 
 /**
  * Fill the crash log buffer with all data of a desync event.
- * @param buffer The begin where to write at.
- * @param last   The last position in the buffer to write to.
- * @return the position of the \c '\0' character after the buffer.
+ * @param buffer The output buffer.
  */
-char *CrashLog::FillDesyncCrashLog(char *buffer, const char *last, const DesyncExtraInfo &info) const
+void CrashLog::FillDesyncCrashLog(format_target &buffer, const DesyncExtraInfo &info) const
 {
-	buffer += seprintf(buffer, last, "*** OpenTTD Multiplayer %s Desync Report ***\n\n", _network_server ? "Server" : "Client");
+	buffer.format("*** OpenTTD Multiplayer {} Desync Report ***\n\n", _network_server ? "Server" : "Client");
 
-	buffer += UTCTime::Format(buffer, last, "Desync at: %Y-%m-%d %H:%M:%S (UTC)\n");
+	UTCTime::FormatTo(buffer, "Desync at: %Y-%m-%d %H:%M:%S (UTC)\n");
 
 	if (!_network_server && info.flags) {
 		auto flag_check = [&](DesyncExtraInfo::Flags flag, const char *str) {
 			return info.flags & flag ? str : "";
 		};
-		buffer += seprintf(buffer, last, "Flags: %s%s\n",
+		buffer.format("Flags: {}{}\n",
 				flag_check(DesyncExtraInfo::DEIF_RAND, "R"),
 				flag_check(DesyncExtraInfo::DEIF_STATE, "S"));
 	}
 	if (_network_server && !info.desync_frame_info.empty()) {
-		buffer += seprintf(buffer, last, "%s\n", info.desync_frame_info.c_str());
+		buffer.format("{}\n", info.desync_frame_info);
 	}
-	buffer = LogDesyncDateHeader(buffer, last);
+	LogDesyncDateHeader(buffer);
 
 	if (info.client_id >= 0) {
-		buffer += seprintf(buffer, last, "Client #%d, \"%s\"\n", info.client_id, info.client_name != nullptr ? info.client_name : "");
+		buffer.format("Client #{}, \"{}\"\n", info.client_id, info.client_name != nullptr ? info.client_name : "");
 	}
-	buffer += seprintf(buffer, last, "\n");
+	buffer.push_back('\n');
 
-	buffer = this->LogOpenTTDVersion(buffer, last);
-	buffer = this->LogOSVersion(buffer, last);
-	buffer = this->LogCompiler(buffer, last);
-	buffer = this->LogOSVersionDetail(buffer, last);
-	buffer = this->LogConfiguration(buffer, last);
-	buffer = this->LogLibraries(buffer, last);
-	buffer = this->LogSettings(buffer, last);
-	buffer = this->LogCommandLog(buffer, last);
-	buffer = this->LogGamelog(buffer, last);
-	buffer = this->LogRecentNews(buffer, last);
-	buffer = DumpDesyncMsgLog(buffer, last);
+	this->LogOpenTTDVersion(buffer);
+	this->LogOSVersion(buffer);
+	this->LogCompiler(buffer);
+	this->LogOSVersionDetail(buffer);
+	this->LogConfiguration(buffer);
+	this->LogLibraries(buffer);
+	this->LogSettings(buffer);
+	this->LogCommandLog(buffer);
+	this->LogGamelog(buffer);
+	this->LogRecentNews(buffer);
+
+	DumpDesyncMsgLog(buffer);
 
 	bool have_cache_log = false;
-	CheckCaches(true, [&](const char *str) {
-		if (!have_cache_log) buffer += seprintf(buffer, last, "CheckCaches:\n");
-		buffer += seprintf(buffer, last, "  %s\n", str);
+	CheckCaches(true, [&](std::string_view str) {
+		if (!have_cache_log) buffer.append("CheckCaches:\n");
+		buffer.format("  {}\n", str);
 		have_cache_log = true;
-		LogDesyncMsg(stdstr_fmt("[prev desync]: %s", str));
+		LogDesyncMsg(fmt::format("[prev desync]: {}", str));
 	});
-	if (have_cache_log) buffer += seprintf(buffer, last, "\n");
+	if (have_cache_log) buffer.push_back('\n');
 
-	buffer += seprintf(buffer, last, "*** End of OpenTTD Multiplayer %s Desync Report ***\n", _network_server ? "Server" : "Client");
-	return buffer;
+	buffer.format("*** End of OpenTTD Multiplayer {} Desync Report ***\n", _network_server ? "Server" : "Client");
 }
 
 /**
  * Fill the crash log buffer with all data of an inconsistency event.
- * @param buffer The begin where to write at.
- * @param last   The last position in the buffer to write to.
- * @return the position of the \c '\0' character after the buffer.
+ * @param buffer The output buffer.
  */
-char *CrashLog::FillInconsistencyLog(char *buffer, const char *last, const InconsistencyExtraInfo &info) const
+void CrashLog::FillInconsistencyLog(format_target &buffer, const InconsistencyExtraInfo &info) const
 {
-	buffer += seprintf(buffer, last, "*** OpenTTD Inconsistency Report ***\n\n");
+	buffer.append("*** OpenTTD Inconsistency Report ***\n\n");
 
-	buffer += UTCTime::Format(buffer, last, "Inconsistency at: %Y-%m-%d %H:%M:%S (UTC)\n");
+	UTCTime::FormatTo(buffer, "Inconsistency at: %Y-%m-%d %H:%M:%S (UTC)\n");
 
-#ifdef USE_SCOPE_INFO
-	buffer += WriteScopeLog(buffer, last);
+#if !defined(DISABLE_SCOPE_INFO)
+	WriteScopeLog(buffer);
 #endif
 
-	buffer = LogDesyncDateHeader(buffer, last);
-	buffer += seprintf(buffer, last, "\n");
+	LogDesyncDateHeader(buffer);
+	buffer.push_back('\n');
 
-	buffer = this->LogOpenTTDVersion(buffer, last);
-	buffer = this->LogOSVersion(buffer, last);
-	buffer = this->LogCompiler(buffer, last);
-	buffer = this->LogOSVersionDetail(buffer, last);
-	buffer = this->LogConfiguration(buffer, last);
-	buffer = this->LogLibraries(buffer, last);
-	buffer = this->LogSettings(buffer, last);
-	buffer = this->LogCommandLog(buffer, last);
-	buffer = this->LogGamelog(buffer, last);
-	buffer = this->LogRecentNews(buffer, last);
-	buffer = DumpDesyncMsgLog(buffer, last);
+	this->LogOpenTTDVersion(buffer);
+	this->LogOSVersion(buffer);
+	this->LogCompiler(buffer);
+	this->LogOSVersionDetail(buffer);
+	this->LogConfiguration(buffer);
+	this->LogLibraries(buffer);
+	this->LogSettings(buffer);
+	this->LogCommandLog(buffer);
+	this->LogGamelog(buffer);
+	this->LogRecentNews(buffer);
+
+	DumpDesyncMsgLog(buffer);
 
 	if (!info.check_caches_result.empty()) {
-		buffer += seprintf(buffer, last, "CheckCaches:\n");
+		buffer.append("CheckCaches:\n");
 		for (const std::string &str : info.check_caches_result) {
-			buffer += seprintf(buffer, last, "  %s\n", str.c_str());
+			buffer.format("  {}\n", str);
 		}
 	}
 
-	buffer += seprintf(buffer, last, "*** End of OpenTTD Inconsistency Report ***\n");
-	return buffer;
+	buffer.append("*** End of OpenTTD Inconsistency Report ***\n");
 }
 
 /**
  * Fill the version info log buffer.
- * @param buffer The begin where to write at.
- * @param last   The last position in the buffer to write to.
- * @return the position of the \c '\0' character after the buffer.
+ * @param buffer The output buffer.
  */
-char *CrashLog::FillVersionInfoLog(char *buffer, const char *last) const
+void CrashLog::FillVersionInfoLog(format_target &buffer) const
 {
-	buffer += seprintf(buffer, last, "*** OpenTTD Version Info Report ***\n\n");
+	buffer.append("*** OpenTTD Version Info Report ***\n\n");
 
-	buffer = this->LogOpenTTDVersion(buffer, last);
-	buffer = this->LogOSVersion(buffer, last);
-	buffer = this->LogCompiler(buffer, last);
-	buffer = this->LogOSVersionDetail(buffer, last);
-	buffer = this->LogLibraries(buffer, last);
-	buffer = this->LogPlugins(buffer, last);
+	this->LogOpenTTDVersion(buffer);
+	this->LogOSVersion(buffer);
+	this->LogCompiler(buffer);
+	this->LogOSVersionDetail(buffer);
+	this->LogLibraries(buffer);
+	this->LogPlugins(buffer);
 
-	buffer += seprintf(buffer, last, "*** End of OpenTTD Version Info Report ***\n");
-	return buffer;
+	buffer.append("*** End of OpenTTD Version Info Report ***\n");
+}
+
+/**
+ * Prepare the log file name.
+ * @param data          The data to write to the disk.
+ * @param filename      Output for the filename of the written file.
+ * @param filename_last The last position in the filename buffer.
+ */
+void CrashLog::PrepareLogFileName(char *filename, const char *filename_last, const char *name) const
+{
+	format_to_fixed_z::format_to(filename, filename_last, "{}{}.log", _personal_dir, name);
 }
 
 /**
  * Write the crash log to a file.
  * @note On success the filename will be filled with the full path of the
  *       crash log file. Make sure filename is at least \c MAX_PATH big.
- * @param buffer The begin of the buffer to write to the disk.
+ * @param data          The data to write to the disk.
  * @param filename      Output for the filename of the written file.
  * @param filename_last The last position in the filename buffer.
+ * @param keep_file_open If non-nullptr, store the FILE * instead of closing it after writing.
  * @return true when the crash log was successfully written.
  */
-bool CrashLog::WriteCrashLog(const char *buffer, char *filename, const char *filename_last, const char *name, FILE **crashlog_file) const
+bool CrashLog::WriteGeneralLogFile(std::string_view data, char *filename, const char *filename_last, const char *name, std::optional<FileHandle> *keep_file_open) const
 {
-	seprintf(filename, filename_last, "%s%s.log", _personal_dir.c_str(), name);
+	this->PrepareLogFileName(filename, filename_last, name);
 
-	FILE *file = FioFOpenFile(filename, "w", NO_DIRECTORY);
-	if (file == nullptr) return false;
+	auto file = FioFOpenFile(filename, "w", NO_DIRECTORY);
+	if (!file.has_value()) return false;
 
-	size_t len = strlen(buffer);
-	size_t written = (len != 0) ? fwrite(buffer, 1, len, file) : 0;
+	size_t written = (!data.empty()) ? fwrite(data.data(), 1, data.size(), *file) : 0;
 
-	if (crashlog_file) {
-		*crashlog_file = file;
-	} else {
-		FioFCloseFile(file);
+	if (keep_file_open != nullptr) {
+		*keep_file_open = std::move(file);
 	}
-	return len == written;
+	return data.size() == written;
 }
 
-void CrashLog::FlushCrashLogBuffer()
+void CrashLog::FlushCrashLogBuffer(const char *end)
 {
 	if (this->crash_buffer_write == nullptr) return;
 
-	size_t len = strlen(this->crash_buffer_write);
+	size_t len = ttd_strnlen(this->crash_buffer_write, end - this->crash_buffer_write);
 	if (len == 0) return;
 
-	if (this->crash_file != nullptr) {
-		fwrite(this->crash_buffer_write, 1, len, this->crash_file);
-		fflush(this->crash_file);
-	}
+	this->WriteToLogFile(std::string_view(this->crash_buffer_write, len));
 #if !defined(_WIN32)
-	fwrite(this->crash_buffer_write, 1, len, stdout);
-	fflush(stdout);
+	this->WriteToStdout(std::string_view(this->crash_buffer_write, len));
 #endif
 
 	this->crash_buffer_write += len;
 }
 
-void CrashLog::CloseCrashLogFile()
+void CrashLog::CloseCrashLogFile(const char *end)
 {
-	this->FlushCrashLogBuffer();
-	if (this->crash_file != nullptr) {
-		FioFCloseFile(this->crash_file);
-		this->crash_file = nullptr;
-	}
+	this->FlushCrashLogBuffer(end);
+	this->CloseLogFile();
 }
 
 /* virtual */ int CrashLog::WriteCrashDump(char *filename, const char *filename_last) const
@@ -895,7 +838,7 @@ void CrashLog::CloseCrashLogFile()
 	try {
 		GamelogEmergency();
 
-		seprintf(filename, filename_last, "%s%s.sav", _personal_dir.c_str(), name);
+		format_to_fixed_z::format_to(filename, filename_last, "{}{}.sav", _personal_dir, name);
 
 		/* Don't do a threaded saveload. */
 		return SaveOrLoad(filename, SLO_SAVE, DFT_GAME_FILE, NO_DIRECTORY, false) == SL_OK;
@@ -919,7 +862,7 @@ void CrashLog::CloseCrashLogFile()
 	if (_m == nullptr) return false;
 
 	try {
-		seprintf(filename, filename_last, "%s%s.sav", _personal_dir.c_str(), name);
+		format_to_fixed_z::format_to(filename, filename_last, "{}{}.sav", _personal_dir, name);
 
 		return SaveOrLoad(filename, SLO_SAVE, DFT_GAME_FILE, NO_DIRECTORY, true) == SL_OK;
 	} catch (...) {
@@ -945,32 +888,6 @@ void CrashLog::CloseCrashLogFile()
 	return res;
 }
 
-#ifdef DEDICATED
-static bool CopyAutosave(const std::string &old_name, const std::string &new_name)
-{
-	FILE *old_fh = FioFOpenFile(old_name, "rb", AUTOSAVE_DIR);
-	if (old_fh == nullptr) return false;
-	auto guard1 = scope_guard([=]() {
-		FioFCloseFile(old_fh);
-	});
-	FILE *new_fh = FioFOpenFile(new_name, "wb", AUTOSAVE_DIR);
-	if (new_fh == nullptr) return false;
-	auto guard2 = scope_guard([=]() {
-		FioFCloseFile(new_fh);
-	});
-
-	char buffer[4096 * 4];
-	size_t length;
-	do {
-		length = fread(buffer, 1, lengthof(buffer), old_fh);
-		if (fwrite(buffer, 1, length, new_fh) != length) {
-			return false;
-		}
-	} while (length == lengthof(buffer));
-	return true;
-}
-#endif
-
 void CrashLog::SendSurvey() const
 {
 	if (_game_mode == GM_NORMAL) {
@@ -989,8 +906,13 @@ void CrashLog::MakeCrashLog(char *buffer, const char *last)
 	if (CrashLog::HaveAlreadyCrashed()) return;
 	CrashLog::RegisterCrashed();
 
-	char *name_buffer_date = this->name_buffer + seprintf(this->name_buffer, lastof(this->name_buffer), "crash-");
-	UTCTime::Format(name_buffer_date, lastof(this->name_buffer), "%Y%m%dT%H%M%SZ");
+	char name_buffer[64];
+	{
+		format_to_fixed_z buf(name_buffer, lastof(name_buffer));
+		buf.append("crash-");
+		UTCTime::FormatTo(buf, "%Y%m%dT%H%M%SZ");
+		buf.finalise();
+	}
 
 #ifdef DEDICATED
 	if (!_settings_client.gui.keep_all_autosave) {
@@ -998,45 +920,67 @@ void CrashLog::MakeCrashLog(char *buffer, const char *last)
 		FiosNumberedSaveName &autosave = GetAutoSaveFiosNumberedSaveName();
 		int num = autosave.GetLastNumber();
 		if (num >= 0) {
-			std::string old_file = autosave.FilenameUsingNumber(num, "");
-			char save_suffix[MAX_PATH];
-			seprintf(save_suffix, lastof(save_suffix), "-(%s)", this->name_buffer);
-			std::string new_file = autosave.FilenameUsingNumber(num, save_suffix);
-			if (CopyAutosave(old_file, new_file)) {
-				printf("Saving copy of last autosave: %s -> %s\n\n", old_file.c_str(), new_file.c_str());
+			char old_file[MAX_PATH];
+			{
+				format_to_fixed_z buf(old_file, lastof(old_file));
+				buf.append(autosave.GetSavePath());
+				autosave.FilenameUsingNumber(buf, num, "");
+				buf.finalise();
+			}
+			char new_file[MAX_PATH];
+			{
+				char save_suffix[MAX_PATH];
+				format_to_fixed_z::format_to(save_suffix, lastof(save_suffix), "-({})", name_buffer);
+
+				format_to_fixed_z buf(new_file, lastof(new_file));
+				buf.append(autosave.GetSavePath());
+				autosave.FilenameUsingNumber(buf, num, save_suffix);
+				buf.finalise();
+			}
+
+			extern bool FioCopyFile(const char *old_name, const char *new_name);
+			if (FioCopyFile(old_file, new_file)) {
+				format_buffer_fixed<1024> buf;
+				buf.format("Saving copy of last autosave: {} -> {}\n\n", old_file, new_file);
+				this->WriteToStdout(buf);
 			}
 		}
 	}
 #endif
 
 	if (!VideoDriver::EmergencyAcquireGameLock(20, 2)) {
-		printf("Failed to acquire gamelock before filling crash log\n\n");
+		this->WriteToStdout("Failed to acquire gamelock before filling crash log\n\n");
 	}
 
-	printf("Crash encountered, generating crash log...\n");
+	this->WriteToStdout("Crash encountered, generating crash log...\n");
 
-	printf("Writing crash log to disk...\n");
-	bool bret = this->WriteCrashLog("", this->crashlog_filename, lastof(this->crashlog_filename), this->name_buffer, &(this->crash_file));
+	this->WriteToStdout("Writing crash log to disk...\n");
+	this->PrepareLogFileName(this->crashlog_filename, lastof(this->crashlog_filename), name_buffer);
+	bool bret = this->OpenLogFile(this->crashlog_filename);
 	if (bret) {
-		printf("Crash log written to %s. Please add this file to any bug reports.\n\n", this->crashlog_filename);
+		format_buffer_fixed<1024> buf;
+		buf.format("Crash log written to {}. Please add this file to any bug reports.\n\n", this->crashlog_filename);
+		this->WriteToStdout(buf);
 	} else {
-		printf("Writing crash log failed. Please attach the output above to any bug reports.\n\n");
-		seprintf(this->crashlog_filename, lastof(this->crashlog_filename), "(failed to write crash log)");
+		this->WriteToStdout("Writing crash log failed. Please attach the output above to any bug reports.\n\n");
+		strecpy(this->crashlog_filename, "(failed to write crash log)");
 	}
 	this->crash_buffer_write = buffer;
 
-	this->FillCrashLog(buffer, last);
-	this->CloseCrashLogFile();
-	printf("Crash log generated.\n\n");
+	char *end = this->FillCrashLog(buffer, last);
+	this->CloseCrashLogFile(end);
+	this->WriteToStdout("Crash log generated.\n\n");
 
 
 	/* Don't mention writing crash dumps because not all platforms support it. */
 	int dret = this->WriteCrashDump(this->crashdump_filename, lastof(this->crashdump_filename));
 	if (dret < 0) {
-		printf("Writing crash dump failed.\n\n");
+		this->WriteToStdout("Writing crash dump failed.\n\n");
+		strecpy(this->crashdump_filename, "(failed to write crash dump)");
 	} else if (dret > 0) {
-		printf("Crash dump written to %s. Please add this file to any bug reports.\n\n", this->crashdump_filename);
-		seprintf(this->crashdump_filename, lastof(this->crashdump_filename), "(failed to write crash dump)");
+		format_buffer_fixed<1024> buf;
+		buf.format("Crash dump written to {}. Please add this file to any bug reports.\n\n", this->crashdump_filename);
+		this->WriteToStdout(buf);
 	}
 
 	SetScreenshotAuxiliaryText("Crash Log", buffer);
@@ -1044,10 +988,10 @@ void CrashLog::MakeCrashLog(char *buffer, const char *last)
 	_save_DBGC_data = true;
 
 	if (!VideoDriver::EmergencyAcquireGameLock(1000, 5)) {
-		printf("Failed to acquire gamelock before writing crash savegame and screenshot, proceeding without lock as current owner is probably stuck\n\n");
+		this->WriteToStdout("Failed to acquire gamelock before writing crash savegame and screenshot, proceeding without lock as current owner is probably stuck\n\n");
 	}
 
-	CrashLog::MakeCrashSavegameAndScreenshot();
+	CrashLog::MakeCrashSavegameAndScreenshot(name_buffer);
 }
 
 void CrashLog::MakeCrashLogWithStackBuffer()
@@ -1066,30 +1010,29 @@ void CrashLog::MakeDesyncCrashLog(const std::string *log_in, std::string *log_ou
 {
 	char filename[MAX_PATH];
 
-	const size_t length = 65536 * 16;
-	char * const buffer = MallocT<char>(length);
-	auto guard = scope_guard([=]() {
-		free(buffer);
-	});
-	const char * const last = buffer + length - 1;
-
 	const char *mode = _network_server ? "server" : "client";
 
 	char name_buffer[64];
-	char *name_buffer_date = name_buffer + seprintf(name_buffer, lastof(name_buffer), "desync-%s-", mode);
-	UTCTime::Format(name_buffer_date, lastof(this->name_buffer), "%Y%m%dT%H%M%SZ");
+	{
+		format_to_fixed_z buf(name_buffer, lastof(name_buffer));
+		buf.format("desync-{}-", mode);
+		UTCTime::FormatTo(buf, "%Y%m%dT%H%M%SZ");
+		buf.finalise();
+	}
 
 	printf("Desync encountered (%s), generating desync log...\n", mode);
-	char *b = this->FillDesyncCrashLog(buffer, last, info);
+
+	format_buffer buffer;
+	this->FillDesyncCrashLog(buffer, info);
 
 	if (log_out) log_out->assign(buffer);
 
-	if (log_in && !log_in->empty()) {
-		b = strecpy(b, "\n", last, true);
-		b = strecpy(b, log_in->c_str(), last, true);
+	if (log_in != nullptr && !log_in->empty()) {
+		buffer.push_back('\n');
+		buffer.append(*log_in);
 	}
 
-	bool bret = this->WriteCrashLog(buffer, filename, lastof(filename), name_buffer, info.log_file);
+	bool bret = this->WriteGeneralLogFile(buffer, filename, lastof(filename), name_buffer, info.log_file);
 	if (bret) {
 		printf("Desync log written to %s. Please add this file to any bug reports.\n\n", filename);
 	} else {
@@ -1099,7 +1042,7 @@ void CrashLog::MakeDesyncCrashLog(const std::string *log_in, std::string *log_ou
 	if (info.defer_savegame_write != nullptr) {
 		info.defer_savegame_write->name_buffer = name_buffer;
 	} else {
-		this->WriteDesyncSavegame(buffer, name_buffer);
+		this->WriteDesyncSavegame(buffer.c_str(), name_buffer);
 	}
 }
 
@@ -1131,28 +1074,27 @@ void CrashLog::MakeInconsistencyLog(const InconsistencyExtraInfo &info) const
 {
 	char filename[MAX_PATH];
 
-	const size_t length = 65536 * 16;
-	char * const buffer = MallocT<char>(length);
-	auto guard = scope_guard([=]() {
-		free(buffer);
-	});
-	const char * const last = buffer + length - 1;
-
 	char name_buffer[64];
-	char *name_buffer_date = name_buffer + seprintf(name_buffer, lastof(name_buffer), "inconsistency-");
-	UTCTime::Format(name_buffer_date, lastof(this->name_buffer), "%Y%m%dT%H%M%SZ");
+	{
+		format_to_fixed_z buf(name_buffer, lastof(name_buffer));
+		buf.append("inconsistency-");
+		UTCTime::FormatTo(buf, "%Y%m%dT%H%M%SZ");
+		buf.finalise();
+	}
 
 	printf("Inconsistency encountered, generating diagnostics log...\n");
-	this->FillInconsistencyLog(buffer, last, info);
 
-	bool bret = this->WriteCrashLog(buffer, filename, lastof(filename), name_buffer);
+	format_buffer buffer;
+	this->FillInconsistencyLog(buffer, info);
+
+	bool bret = this->WriteGeneralLogFile(buffer, filename, lastof(filename), name_buffer);
 	if (bret) {
 		printf("Inconsistency log written to %s. Please add this file to any bug reports.\n\n", filename);
 	} else {
 		printf("Writing inconsistency log failed.\n\n");
 	}
 
-	_savegame_DBGL_data = buffer;
+	_savegame_DBGL_data = buffer.c_str();
 	_save_DBGC_data = true;
 	bret = this->WriteDiagnosticSavegame(filename, lastof(filename), name_buffer);
 	if (bret) {
@@ -1169,24 +1111,24 @@ void CrashLog::MakeInconsistencyLog(const InconsistencyExtraInfo &info) const
  * information like paths to the console.
  * @return true when everything is made successfully.
  */
-void CrashLog::MakeCrashSavegameAndScreenshot()
+void CrashLog::MakeCrashSavegameAndScreenshot(const char *name_buffer)
 {
 	printf("Writing crash savegame...\n");
-	bool bret = this->WriteSavegame(this->savegame_filename, lastof(this->savegame_filename), this->name_buffer);
+	bool bret = this->WriteSavegame(this->savegame_filename, lastof(this->savegame_filename), name_buffer);
 	if (bret) {
 		printf("Crash savegame written to %s. Please add this file and the last (auto)save to any bug reports.\n\n", this->savegame_filename);
 	} else {
 		printf("Writing crash savegame failed. Please attach the last (auto)save to any bug reports.\n\n");
-		seprintf(this->savegame_filename, lastof(this->savegame_filename), "(failed to write crash savegame)");
+		strecpy(this->savegame_filename, "(failed to write crash savegame)");
 	}
 
 	printf("Writing crash screenshot...\n");
-	bret = this->WriteScreenshot(this->screenshot_filename, lastof(this->screenshot_filename), this->name_buffer);
+	bret = this->WriteScreenshot(this->screenshot_filename, lastof(this->screenshot_filename), name_buffer);
 	if (bret) {
 		printf("Crash screenshot written to %s. Please add this file to any bug reports.\n\n", this->screenshot_filename);
 	} else {
 		printf("Writing crash screenshot failed.\n\n");
-		seprintf(this->screenshot_filename, lastof(this->screenshot_filename), "(failed to write crash screenshot)");
+		strecpy(this->screenshot_filename, "(failed to write crash screenshot)");
 	}
 
 	this->SendSurvey();

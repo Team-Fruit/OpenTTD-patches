@@ -23,8 +23,6 @@ STR_TRANSPARENT_LOADING_TOOLTIP                                 :{BLACK}Wiesselt
 
 # Programmable Pre-Signals
 
-#House construction window (for SE only)
-
 #Town select window (for SE only)
 
 STR_MAPGEN_SNOW_LINE_HEIGHT                                     :{BLACK}Weis d'Schnéilinnhéicht
@@ -50,8 +48,8 @@ STR_VEHICLE_STATUS_CANNOT_REACH_DEPOT_SERVICE_VEL_END           :{LTBLUE}Kann de
 
 STR_ORDERS_GO_TO_TOOLTIP_EXTRA                                  :{BLACK}Setzt en neien Optrag firun den ungewielten Optrag, oder un d'Enn vun der Lëscht. Ctrl+Klick op eng Statioun fir 'voll belueden mat all Wueren', op e Weepunkt fir den 'non-stop Standard' emzeschalten, oder op e Schapp fir eng 'Revisioun'. Klick op e Gefier fir seng Opträg ze kopéieren oder Ctrl+Klick fir seng Opträg ze deelen. En Depot Optrag schalt d'automatesch Revisioun vum Gefier aus
 
-STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :A:
-STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :D:
+STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :A:{SPACE}{SPACE}
+STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :D:{SPACE}{SPACE}
 
 # Cargo type orders Window
 
@@ -88,3 +86,19 @@ STR_ERROR_CAN_T_SELL_25_SHARE_IN                                :{WHITE}Kann ken
 STR_ERROR_PROTECTED                                             :{WHITE}Des Firma ass nach net al genuch fir Undeeler ze handelen...
 
 STR_CONFIG_SETTING_CYCLE_SIGNAL_PBS                             :Nëmmen Wee-Signaler
+
+STR_WARNING_PASSWORD_SECURITY                                   :{YELLOW}Warnung: Server-Administratoren kënnen all Text aus desem Feld liesen.
+STR_NETWORK_NEED_COMPANY_PASSWORD_CAPTION                       :{WHITE}Firma ass geschützt. Passwuert aginn
+STR_NETWORK_CLIENT_LIST_ADMIN_COMPANY_UNLOCK                    :Password entspären
+STR_NETWORK_CLIENT_LIST_ASK_COMPANY_UNLOCK                      :{YELLOW}Bassde sécher dass du d'Password vun der Firma '{COMPANY}' wëlls reseten?
+
+# Network set password
+STR_COMPANY_PASSWORD_CANCEL                                     :{BLACK}Späicher d'Passwuert net
+STR_COMPANY_PASSWORD_OK                                         :{BLACK}Benotz daat neit Passwuert fir d'Firma
+STR_COMPANY_PASSWORD_CAPTION                                    :{WHITE}Firma-Passwuert
+STR_COMPANY_PASSWORD_MAKE_DEFAULT                               :{BLACK}Standard Firma-Passwuert
+STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}Benotzt dëst Passwuert als Standard fir nei Firmen
+
+STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}Passwuert
+STR_COMPANY_VIEW_PASSWORD_TOOLTIP                               :{BLACK}Setzt en Passwuert fir nëmmen authoriséiert Benotzer spillen ze loossen
+STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}Setzt d'Firmen-Passwuert

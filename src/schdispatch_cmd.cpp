@@ -92,7 +92,7 @@ CommandCost CmdScheduledDispatchAdd(TileIndex tile, DoCommandFlag flags, uint32_
 
 	if (schedule_index >= v->orders->GetScheduledDispatchScheduleCount()) return CMD_ERROR;
 
-	if (extra_slots > 512) return_cmd_error(STR_ERROR_SCHDISPATCH_TRIED_TO_ADD_TOO_MANY_SLOTS);
+	if (extra_slots > 512) return CommandCost(STR_ERROR_SCHDISPATCH_TRIED_TO_ADD_TOO_MANY_SLOTS);
 	if (extra_slots > 0 && offset == 0) return CMD_ERROR;
 
 	if (flags & DC_EXEC) {
@@ -413,7 +413,7 @@ CommandCost CmdScheduledDispatchRemoveSchedule(TileIndex tile, DoCommandFlag fla
 	if (flags & DC_EXEC) {
 		std::vector<DispatchSchedule> &scheds = v->orders->GetScheduledDispatchScheduleSet();
 		scheds.erase(scheds.begin() + schedule_index);
-		for (Order *o = v->GetFirstOrder(); o != nullptr; o = o->next) {
+		for (Order *o : v->Orders()) {
 			int idx = o->GetDispatchScheduleIndex();
 			if (idx == (int)schedule_index) {
 				o->SetDispatchScheduleIndex(-1);
@@ -421,15 +421,28 @@ CommandCost CmdScheduledDispatchRemoveSchedule(TileIndex tile, DoCommandFlag fla
 				o->SetDispatchScheduleIndex(idx - 1);
 			}
 			if (o->IsType(OT_CONDITIONAL) && o->GetConditionVariable() == OCV_DISPATCH_SLOT) {
-				uint16_t dispatch_slot = GB(o->GetXData(), 0, 16);
-				if (dispatch_slot == UINT16_MAX) {
+				uint16_t order_schedule = o->GetConditionDispatchScheduleID();
+				if (order_schedule == UINT16_MAX) {
 					/* do nothing */
-				} else if (dispatch_slot == schedule_index) {
-					SB(o->GetXDataRef(), 0, 16, UINT16_MAX);
-				} else if (dispatch_slot > schedule_index) {
-					SB(o->GetXDataRef(), 0, 16, (uint16_t)(dispatch_slot - 1));
+				} else if (order_schedule == schedule_index) {
+					o->SetConditionDispatchScheduleID(UINT16_MAX);
+				} else if (order_schedule > schedule_index) {
+					o->SetConditionDispatchScheduleID((uint16_t)(order_schedule - 1));
 				}
 			}
+		}
+		for (Vehicle *v2 = v->FirstShared(); v2 != nullptr; v2 = v2->NextShared()) {
+			if (v2->dispatch_records.empty()) continue;
+
+			btree::btree_map<uint16_t, LastDispatchRecord> new_records;
+			for (auto &iter : v2->dispatch_records) {
+				if (iter.first < schedule_index) {
+					new_records[iter.first] = std::move(iter.second);
+				} else if (iter.first > schedule_index) {
+					new_records[iter.first - 1] = std::move(iter.second);
+				}
+			}
+			v2->dispatch_records = std::move(new_records);
 		}
 		SchdispatchInvalidateWindows(v);
 	}
@@ -474,6 +487,46 @@ CommandCost CmdScheduledDispatchRenameSchedule(TileIndex tile, DoCommandFlag fla
 		} else {
 			v->orders->GetDispatchScheduleByIndex(schedule_index).ScheduleName() = text;
 		}
+		SetTimetableWindowsDirty(v, STWDF_SCHEDULED_DISPATCH | STWDF_ORDERS);
+	}
+
+	return CommandCost();
+}
+
+/**
+ * Rename scheduled dispatch departure tag
+ *
+ * @param tile Not used.
+ * @param flags Operation to perform.
+ * @param p1 Vehicle index
+ * @param p2 Tag ID
+ * @param text name
+ * @return the cost of this operation or an error
+ */
+CommandCost CmdScheduledDispatchRenameTag(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint32_t p2, const char *text)
+{
+	VehicleID veh = GB(p1, 0, 20);
+	uint schedule_index = GB(p1, 20, 12);
+
+	Vehicle *v = Vehicle::GetIfValid(veh);
+	if (v == nullptr || !v->IsPrimaryVehicle()) return CMD_ERROR;
+
+	CommandCost ret = CheckOwnership(v->owner);
+	if (ret.Failed()) return ret;
+
+	if (v->orders == nullptr) return CMD_ERROR;
+
+	if (schedule_index >= v->orders->GetScheduledDispatchScheduleCount()) return CMD_ERROR;
+	if (p2 >= DispatchSchedule::DEPARTURE_TAG_COUNT) return CMD_ERROR;
+
+	std::string name;
+	if (!StrEmpty(text)) {
+		if (Utf8StringLength(text) >= MAX_LENGTH_VEHICLE_NAME_CHARS) return CMD_ERROR;
+		name = text;
+	}
+
+	if (flags & DC_EXEC) {
+		v->orders->GetDispatchScheduleByIndex(schedule_index).SetSupplementaryName(SDSNT_DEPARTURE_TAG, static_cast<uint16_t>(p2), std::move(name));
 		SetTimetableWindowsDirty(v, STWDF_SCHEDULED_DISPATCH | STWDF_ORDERS);
 	}
 
@@ -626,7 +679,7 @@ CommandCost CmdScheduledDispatchSwapSchedules(TileIndex tile, DoCommandFlag flag
 
 	if (flags & DC_EXEC) {
 		std::swap(v->orders->GetDispatchScheduleByIndex(schedule_index_1), v->orders->GetDispatchScheduleByIndex(schedule_index_2));
-		for (Order *o = v->GetFirstOrder(); o != nullptr; o = o->next) {
+		for (Order *o : v->Orders()) {
 			int idx = o->GetDispatchScheduleIndex();
 			if (idx == (int)schedule_index_1) {
 				o->SetDispatchScheduleIndex((int)schedule_index_2);
@@ -634,12 +687,29 @@ CommandCost CmdScheduledDispatchSwapSchedules(TileIndex tile, DoCommandFlag flag
 				o->SetDispatchScheduleIndex((int)schedule_index_1);
 			}
 			if (o->IsType(OT_CONDITIONAL) && o->GetConditionVariable() == OCV_DISPATCH_SLOT) {
-				uint16_t dispatch_slot = GB(o->GetXData(), 0, 16);
-				if (dispatch_slot == schedule_index_1) {
-					SB(o->GetXDataRef(), 0, 16, schedule_index_2);
-				} else if (dispatch_slot == schedule_index_2) {
-					SB(o->GetXDataRef(), 0, 16, schedule_index_1);
+				uint16_t order_schedule = o->GetConditionDispatchScheduleID();
+				if (order_schedule == schedule_index_1) {
+					o->SetConditionDispatchScheduleID(schedule_index_2);
+				} else if (order_schedule == schedule_index_2) {
+					o->SetConditionDispatchScheduleID(schedule_index_1);
 				}
+			}
+		}
+		for (Vehicle *v2 = v->FirstShared(); v2 != nullptr; v2 = v2->NextShared()) {
+			if (v2->dispatch_records.empty()) continue;
+
+			auto iter_1 = v2->dispatch_records.find(static_cast<uint16_t>(schedule_index_1));
+			auto iter_2 = v2->dispatch_records.find(static_cast<uint16_t>(schedule_index_2));
+			if (iter_1 != v2->dispatch_records.end() && iter_2 != v2->dispatch_records.end()) {
+				std::swap(iter_1->second, iter_2->second);
+			} else if (iter_1 != v2->dispatch_records.end()) {
+				LastDispatchRecord r = std::move(iter_1->second);
+				v2->dispatch_records.erase(iter_1);
+				v2->dispatch_records[static_cast<uint16_t>(schedule_index_2)] = std::move(r);
+			} else if (iter_2 != v2->dispatch_records.end()) {
+				LastDispatchRecord r = std::move(iter_2->second);
+				v2->dispatch_records.erase(iter_2);
+				v2->dispatch_records[static_cast<uint16_t>(schedule_index_1)] = std::move(r);
 			}
 		}
 		SchdispatchInvalidateWindows(v);
@@ -799,5 +869,27 @@ void DispatchSchedule::UpdateScheduledDispatch(const Vehicle *v)
 {
 	if (this->UpdateScheduledDispatchToDate(_state_ticks) && v != nullptr) {
 		SetTimetableWindowsDirty(v, STWDF_SCHEDULED_DISPATCH);
+	}
+}
+
+static inline uint32_t SupplementaryNameKey(ScheduledDispatchSupplementaryNameType name_type, uint16_t id)
+{
+	return (static_cast<uint32_t>(name_type) << 16) | id;
+}
+
+std::string_view DispatchSchedule::GetSupplementaryName(ScheduledDispatchSupplementaryNameType name_type, uint16_t id) const
+{
+	auto iter = this->supplementary_names.find(SupplementaryNameKey(name_type, id));
+	if (iter == this->supplementary_names.end()) return {};
+	return iter->second;
+}
+
+void DispatchSchedule::SetSupplementaryName(ScheduledDispatchSupplementaryNameType name_type, uint16_t id, std::string name)
+{
+	uint32_t key = SupplementaryNameKey(name_type, id);
+	if (name.empty()) {
+		this->supplementary_names.erase(key);
+	} else {
+		this->supplementary_names[key] = std::move(name);
 	}
 }

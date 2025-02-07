@@ -22,15 +22,13 @@
 #include <vector>
 
 /** Bits of the #WWT_MATRIX widget data. */
-enum MatrixWidgetValues {
-	/* Number of column bits of the WWT_MATRIX widget data. */
-	MAT_COL_START = 0, ///< Lowest bit of the number of columns.
-	MAT_COL_BITS  = 8, ///< Number of bits for the number of columns in the matrix.
+/* Number of column bits of the WWT_MATRIX widget data. */
+static constexpr uint8_t MAT_COL_START = 0; ///< Lowest bit of the number of columns.
+static constexpr uint8_t MAT_COL_BITS = 8; ///< Number of bits for the number of columns in the matrix.
 
-	/* Number of row bits of the WWT_MATRIX widget data. */
-	MAT_ROW_START = 8, ///< Lowest bit of the number of rows.
-	MAT_ROW_BITS  = 8, ///< Number of bits for the number of rows in the matrix.
-};
+/* Number of row bits of the WWT_MATRIX widget data. */
+static constexpr uint8_t MAT_ROW_START = 8; ///< Lowest bit of the number of rows.
+static constexpr uint8_t MAT_ROW_BITS = 8; ///< Number of bits for the number of rows in the matrix.
 
 /** Values for an arrow widget */
 enum ArrowWidgetValues {
@@ -84,6 +82,7 @@ enum WidgetType : uint8_t {
 	NWID_MATRIX,          ///< Matrix container.
 	NWID_SPACER,          ///< Invisible widget that takes some space.
 	NWID_SELECTION,       ///< Stacked widgets, only one visible at a time (eg in a panel with tabs).
+	NWID_LAYER,           ///< Layered widgets, all visible together.
 	NWID_VIEWPORT,        ///< Nested widget containing a viewport.
 	NWID_BUTTON_DROPDOWN, ///< Button with a drop-down.
 	NWID_HSCROLLBAR,      ///< Horizontal scrollbar
@@ -91,6 +90,7 @@ enum WidgetType : uint8_t {
 	NWID_CUSTOM,          ///< General Custom widget.
 
 	/* Nested widget part types. */
+	WPT_ATTRIBUTE_BEGIN, ///< Begin marker for attribute NWidgetPart types.
 	WPT_RESIZE,       ///< Widget part for specifying resizing.
 	WPT_MINSIZE,      ///< Widget part for specifying minimal size.
 	WPT_MINTEXTLINES, ///< Widget part for specifying minimal number of lines of text.
@@ -101,9 +101,12 @@ enum WidgetType : uint8_t {
 	WPT_PIPRATIO,     ///< Widget part for specifying pre/inter/post ratio for containers.
 	WPT_TEXTSTYLE,    ///< Widget part for specifying text colour.
 	WPT_ALIGNMENT,    ///< Widget part for specifying text/image alignment.
-	WPT_ENDCONTAINER, ///< Widget part to denote end of a container.
-	WPT_FUNCTION,     ///< Widget part for calling a user function.
 	WPT_SCROLLBAR,    ///< Widget part for attaching a scrollbar.
+	WPT_ASPECT,       ///< Widget part for sepcifying aspect ratio.
+	WPT_ATTRIBUTE_END, ///< End marker for attribute NWidgetPart types.
+
+	WPT_FUNCTION, ///< Widget part for calling a user function.
+	WPT_ENDCONTAINER, ///< Widget part to denote end of a container.
 
 	/* Pushable window widget types. */
 	WWT_MASK = 0x7F,
@@ -131,6 +134,13 @@ enum SizingType {
 	ST_RESIZE,   ///< Resize the nested widget tree.
 };
 
+enum class AspectFlags : uint8_t {
+	ResizeX = 1U << 0,
+	ResizeY = 1U << 1,
+	ResizeXY = ResizeX | ResizeY,
+};
+DECLARE_ENUM_AS_BIT_SET(AspectFlags)
+
 /* Forward declarations. */
 class NWidgetCore;
 class Scrollbar;
@@ -148,6 +158,7 @@ class NWidgetBase : public ZeroedMemoryAllocator {
 public:
 	NWidgetBase(WidgetType tp);
 
+	void ApplyAspectRatio();
 	virtual void AdjustPaddingForZoom();
 	virtual void SetupSmallestSize(Window *w) = 0;
 	virtual void AssignSizePosition(SizingType sizing, int x, int y, uint given_width, uint given_height, bool rtl) = 0;
@@ -246,6 +257,8 @@ public:
 	/* Current widget size (that is, after resizing). */
 	uint current_x;       ///< Current horizontal size (after resizing).
 	uint current_y;       ///< Current vertical size (after resizing).
+	float aspect_ratio = 0; ///< Desired aspect ratio of widget.
+	AspectFlags aspect_flags = AspectFlags::ResizeX; ///< Which dimensions can be resized.
 
 	int pos_x;            ///< Horizontal position of top-left corner of the widget in the window.
 	int pos_y;            ///< Vertical position of top-left corner of the widget in the window.
@@ -319,6 +332,8 @@ public:
 	void SetMinimalTextLines(uint8_t min_lines, uint8_t spacing, FontSize size);
 	void SetFill(uint fill_x, uint fill_y);
 	void SetResize(uint resize_x, uint resize_y);
+	void SetAspect(float ratio, AspectFlags flags = AspectFlags::ResizeX);
+	void SetAspect(int x_ratio, int y_ratio, AspectFlags flags = AspectFlags::ResizeX);
 
 	bool UpdateMultilineWidgetSize(const std::string &str, int max_lines);
 	bool UpdateSize(uint min_x, uint min_y);
@@ -385,6 +400,8 @@ public:
 	inline bool IsLowered() const;
 	inline void SetDisabled(bool disabled);
 	inline bool IsDisabled() const;
+
+	bool IsActiveInLayout() const;
 
 	void FillWidgetLookup(WidgetLookup &widget_lookup) override;
 	NWidgetCore *GetWidgetFromPos(int x, int y) override;
@@ -506,7 +523,6 @@ class NWidgetStacked : public NWidgetContainer {
 public:
 	NWidgetStacked(WidgetID index);
 
-	void AdjustPaddingForZoom() override;
 	void SetupSmallestSize(Window *w) override;
 	void AssignSizePosition(SizingType sizing, int x, int y, uint given_width, uint given_height, bool rtl) override;
 	void FillWidgetLookup(WidgetLookup &widget_lookup) override;
@@ -516,6 +532,8 @@ public:
 	void FillDirtyWidgets(std::vector<NWidgetBase *> &dirty_widgets) override;
 
 	bool SetDisplayedPlane(int plane);
+
+	bool IsChildSelected(const NWidgetBase *child) const;
 
 	int shown_plane; ///< Plane being displayed (for #NWID_SELECTION only).
 	const WidgetID index; ///< If non-negative, index in the #Window::widget_lookup.
@@ -874,7 +892,7 @@ public:
 	template <typename Tcontainer>
 	auto GetVisibleRangeIterators(Tcontainer &container) const
 	{
-		assert((size_t)this->GetCount() == container.size()); // Scrollbar and container size must match.
+		assert(static_cast<size_t>(this->GetCount()) == container.size()); // Scrollbar and container size must match.
 		auto first = std::next(std::begin(container), this->GetPosition());
 		auto last = std::next(first, std::min<size_t>(this->GetCapacity(), this->GetCount() - this->GetPosition()));
 		return std::make_pair(first, last);
@@ -891,15 +909,13 @@ public:
 	 * @return Iterator to the element clicked at. If clicked at a wrong position, returns as interator to the end of the container.
 	 */
 	template <typename Tcontainer>
-	typename Tcontainer::iterator GetScrolledItemFromWidget(Tcontainer &container, int clickpos, const Window * const w, WidgetID widget, int padding = 0, int line_height = -1) const
+	auto GetScrolledItemFromWidget(Tcontainer &container, int clickpos, const Window * const w, WidgetID widget, int padding = 0, int line_height = -1) const
 	{
-		assert((size_t)this->GetCount() == container.size()); // Scrollbar and container size must match.
+		assert(static_cast<size_t>(this->GetCount()) == container.size()); // Scrollbar and container size must match.
 		size_type row = this->GetScrolledRowFromWidget(clickpos, w, widget, padding, line_height);
 		if (row == Scrollbar::npos) return std::end(container);
 
-		typename Tcontainer::iterator it = std::begin(container);
-		std::advance(it, row);
-		return it;
+		return std::next(std::begin(container), row);
 	}
 
 	EventState UpdateListPositionOnKeyPress(int &list_position, uint16_t keycode) const;
@@ -1096,6 +1112,11 @@ struct NWidgetPartAlignment {
 	StringAlignment align; ///< Alignment of text/image.
 };
 
+struct NWidgetPartAspect {
+	float ratio;
+	AspectFlags flags;
+};
+
 /**
  * Pointer to function returning a nested widget.
  * @return Nested widget (tree).
@@ -1119,6 +1140,7 @@ struct NWidgetPart {
 		NWidgetPartAlignment align;      ///< Part with internal alignment.
 		NWidgetFunctionType *func_ptr;   ///< Part with a function call.
 		NWidContainerFlags cont_flags;   ///< Part with container flags.
+		NWidgetPartAspect aspect; ///< Part to set aspect ratio.
 
 		/* Constructors for each NWidgetPartUnion data type. */
 		constexpr NWidgetPartUnion() : xy() {}
@@ -1132,6 +1154,7 @@ struct NWidgetPart {
 		constexpr NWidgetPartUnion(NWidgetPartAlignment align) : align(align) {}
 		constexpr NWidgetPartUnion(NWidgetFunctionType *func_ptr) : func_ptr(func_ptr) {}
 		constexpr NWidgetPartUnion(NWidContainerFlags cont_flags) : cont_flags(cont_flags) {}
+		constexpr NWidgetPartUnion(NWidgetPartAspect aspect) : aspect(aspect) {}
 	} u;
 
 	/* Constructors for each NWidgetPart data type. */
@@ -1146,6 +1169,7 @@ struct NWidgetPart {
 	constexpr NWidgetPart(WidgetType type, NWidgetPartAlignment align) : type(type), u(align) {}
 	constexpr NWidgetPart(WidgetType type, NWidgetFunctionType *func_ptr) : type(type), u(func_ptr) {}
 	constexpr NWidgetPart(WidgetType type, NWidContainerFlags cont_flags) : type(type), u(cont_flags) {}
+	constexpr NWidgetPart(WidgetType type, NWidgetPartAspect aspect) : type(type), u(aspect) {}
 };
 
 /**
@@ -1263,6 +1287,17 @@ constexpr NWidgetPart SetPadding(uint8_t top, uint8_t right, uint8_t bottom, uin
 
 /**
  * Widget part function for setting additional space around a widget.
+ * @param horizontal The padding on either side of the widget.
+ * @param vertical The padding above and below the widget.
+ * @ingroup NestedWidgetParts
+ */
+constexpr NWidgetPart SetPadding(uint8_t horizontal, uint8_t vertical)
+{
+	return NWidgetPart{WPT_PADDING, NWidgetPartPaddings{horizontal, vertical, horizontal, vertical}};
+}
+
+/**
+ * Widget part function for setting additional space around a widget.
  * @param r The padding around the widget.
  * @ingroup NestedWidgetParts
  */
@@ -1318,6 +1353,17 @@ constexpr NWidgetPart SetScrollbar(WidgetID index)
 }
 
 /**
+ * Widget part function for setting the aspect ratio.
+ * @param ratio Desired aspect ratio, or 0 for none.
+ * @param flags Dimensions which should be resized.
+ * @ingroup NestedWidgetParts
+ */
+constexpr NWidgetPart SetAspect(float ratio, AspectFlags flags = AspectFlags::ResizeX)
+{
+	return NWidgetPart{WPT_ASPECT, NWidgetPartAspect{ratio, flags}};
+}
+
+/**
  * Widget part function for starting a new 'real' widget.
  * @param tp  Type of the new nested widget.
  * @param col Colour of the new widget.
@@ -1353,8 +1399,8 @@ constexpr NWidgetPart NWidgetFunction(NWidgetFunctionType *func_ptr)
 }
 
 bool IsContainerWidgetType(WidgetType tp);
-std::unique_ptr<NWidgetBase> MakeNWidgets(const NWidgetPart *nwid_begin, const NWidgetPart *nwid_end, std::unique_ptr<NWidgetBase> container);
-std::unique_ptr<NWidgetBase> MakeWindowNWidgetTree(const NWidgetPart *nwid_begin, const NWidgetPart *nwid_end, NWidgetStacked **shade_select);
+std::unique_ptr<NWidgetBase> MakeNWidgets(std::span<const NWidgetPart> nwid_parts, std::unique_ptr<NWidgetBase> container);
+std::unique_ptr<NWidgetBase> MakeWindowNWidgetTree(std::span<const NWidgetPart> nwid_parts, NWidgetStacked **shade_select);
 
 std::unique_ptr<NWidgetBase> MakeCompanyButtonRows(WidgetID widget_first, WidgetID widget_last, Colours button_colour, int max_length, StringID button_tooltip, bool resizable = true);
 

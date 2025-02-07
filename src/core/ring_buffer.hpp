@@ -25,7 +25,7 @@
 template <class T>
 class ring_buffer
 {
-	std::unique_ptr<byte, FreeDeleter> data;
+	std::unique_ptr<char, FreeDeleter> data;
 	uint32_t head = 0;
 	uint32_t count = 0;
 	uint32_t mask = (uint32_t)-1;
@@ -202,6 +202,21 @@ private:
 		return (a.ring == b.ring) && (a.pos == b.pos);
 	}
 
+	template <typename U>
+	void construct_from(const U &other)
+	{
+		uint32_t cap = round_up_size((uint32_t)other.size());
+		this->data.reset(MallocT<char>(cap * sizeof(T)));
+		this->mask = cap - 1;
+		this->head = 0;
+		this->count = (uint32_t)other.size();
+		char *ptr = this->data.get();
+		for (const T &item : other) {
+			new (ptr) T(item);
+			ptr += sizeof(T);
+		}
+	}
+
 public:
 	friend bool operator==(const const_iterator &a, const iterator &b) noexcept
 	{
@@ -214,21 +229,6 @@ public:
 	}
 
 	ring_buffer() = default;
-
-	template <typename U>
-	void construct_from(const U &other)
-	{
-		uint32_t cap = round_up_size((uint32_t)other.size());
-		this->data.reset(MallocT<byte>(cap * sizeof(T)));
-		this->mask = cap - 1;
-		this->head = 0;
-		this->count = (uint32_t)other.size();
-		byte *ptr = this->data.get();
-		for (const T &item : other) {
-			new (ptr) T(item);
-			ptr += sizeof(T);
-		}
-	}
 
 	ring_buffer(const ring_buffer &other)
 	{
@@ -252,6 +252,24 @@ public:
 		}
 	}
 
+	template <typename InputIt, typename = std::enable_if_t<std::is_convertible<typename std::iterator_traits<InputIt>::iterator_category, std::input_iterator_tag>::value>>
+	ring_buffer(InputIt first, InputIt last)
+	{
+		if (first == last) return;
+
+		uint32_t size = (uint32_t)std::distance(first, last);
+		uint32_t cap = round_up_size(size);
+		this->data.reset(MallocT<char>(cap * sizeof(T)));
+		this->mask = cap - 1;
+		this->head = 0;
+		this->count = size;
+		char *ptr = this->data.get();
+		for (auto iter = first; iter != last; ++iter) {
+			new (ptr) T(*iter);
+			ptr += sizeof(T);
+		}
+	}
+
 	ring_buffer& operator =(const ring_buffer &other)
 	{
 		if (&other != this) {
@@ -259,15 +277,19 @@ public:
 			if (!other.empty()) {
 				if (other.size() > this->capacity()) {
 					uint32_t cap = round_up_size(other.count);
-					this->data.reset(MallocT<byte>(cap * sizeof(T)));
+					this->data.reset(MallocT<char>(cap * sizeof(T)));
 					this->mask = cap - 1;
 				}
 				this->head = 0;
 				this->count = other.count;
-				byte *ptr = this->data.get();
-				for (const T &item : other) {
-					new (ptr) T(item);
-					ptr += sizeof(T);
+				if constexpr (std::is_trivially_copyable_v<T>) {
+					other.memcpy_to(this->data.get());
+				} else {
+					char *ptr = this->data.get();
+					for (const T &item : other) {
+						new (ptr) T(item);
+						ptr += sizeof(T);
+					}
 				}
 			}
 		}
@@ -338,15 +360,47 @@ public:
 	}
 
 private:
+	char *memcpy_to(char *target, uint32_t start_pos, uint32_t end_pos) const
+	{
+		if (start_pos == end_pos) return target;
+
+		const char *start_ptr = static_cast<const char *>(this->raw_ptr_at_pos(start_pos));
+		const char *end_ptr = static_cast<const char *>(this->raw_ptr_at_pos(end_pos));
+		if (end_ptr <= start_ptr) {
+			/* Copy in two chunks due to wrap */
+
+			const char *buffer_end = this->data.get() + (this->capacity() * sizeof(T));
+			memcpy(target, start_ptr, buffer_end - start_ptr);
+			target += buffer_end - start_ptr;
+
+			memcpy(target, this->data.get(), end_ptr - this->data.get());
+			target += end_ptr - this->data.get();
+		} else {
+			/* Copy in one chunk */
+			memcpy(target, start_ptr, end_ptr - start_ptr);
+			target += end_ptr - start_ptr;
+		}
+		return target;
+	}
+
+	char *memcpy_to(char *target) const
+	{
+		return this->memcpy_to(target, this->head, this->head + this->count);
+	}
+
 	void reallocate(uint32_t new_cap)
 	{
 		const uint32_t cap = round_up_size(new_cap);
-		byte *new_buf = MallocT<byte>(cap * sizeof(T));
-		byte *pos = new_buf;
-		for (T &item : *this) {
-			new (pos) T(std::move(item));
-			item.~T();
-			pos += sizeof(T);
+		char *new_buf = MallocT<char>(cap * sizeof(T));
+		if constexpr (std::is_trivially_copyable_v<T>) {
+			this->memcpy_to(new_buf);
+		} else {
+			char *pos = new_buf;
+			for (T &item : *this) {
+				new (pos) T(std::move(item));
+				item.~T();
+				pos += sizeof(T);
+			}
 		}
 		this->mask = cap - 1;
 		this->head = 0;
@@ -522,18 +576,23 @@ private:
 		if (this->count + num > (uint32_t)this->capacity()) {
 			/* grow container */
 			const uint32_t cap = round_up_size(this->count + num);
-			byte *new_buf = MallocT<byte>(cap * sizeof(T));
-			byte *write_to = new_buf;
-			const uint32_t end = this->head + this->count;
-			for (uint32_t idx = this->head; idx != end; idx++) {
-				if (idx == pos) {
-					/* gap for inserted items */
-					write_to += num * sizeof(T);
+			char *new_buf = MallocT<char>(cap * sizeof(T));
+			if constexpr (std::is_trivially_copyable_v<T>) {
+				char *insert_gap = this->memcpy_to(new_buf, this->head, pos);
+				this->memcpy_to(insert_gap + (num * sizeof(T)), pos, this->head + this->count);
+			} else {
+				char *write_to = new_buf;
+				const uint32_t end = this->head + this->count;
+				for (uint32_t idx = this->head; idx != end; idx++) {
+					if (idx == pos) {
+						/* gap for inserted items */
+						write_to += num * sizeof(T);
+					}
+					T &item = *this->ptr_at_pos(idx);
+					new (write_to) T(std::move(item));
+					item.~T();
+					write_to += sizeof(T);
 				}
-				T &item = *this->ptr_at_pos(idx);
-				new (write_to) T(std::move(item));
-				item.~T();
-				write_to += sizeof(T);
 			}
 			uint32_t res = pos - this->head;
 			this->mask = cap - 1;

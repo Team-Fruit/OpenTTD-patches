@@ -9,13 +9,13 @@
 
 #include "../stdafx.h"
 #include "../debug.h"
-#include "../debug_fmt.h"
 #include "../fontcache.h"
 #include "../fontdetection.h"
 #include "../blitter/factory.hpp"
 #include "../core/math_func.hpp"
 #include "../zoom_func.h"
 #include "../fileio_func.h"
+#include "../error_func.h"
 #include "../string_func.h"
 #include "truetypefontcache.h"
 
@@ -34,8 +34,7 @@ class FreeTypeFontCache : public TrueTypeFontCache {
 private:
 	FT_Face face;  ///< The font face associated with this font.
 
-	void SetFontSize(FontSize fs, FT_Face face, int pixels);
-	const void *InternalGetFontTable(uint32_t tag, size_t &length) override;
+	void SetFontSize(int pixels);
 	const Sprite *InternalGetGlyph(GlyphID key, bool aa) override;
 
 public:
@@ -43,7 +42,7 @@ public:
 	~FreeTypeFontCache();
 	void ClearFontCache() override;
 	GlyphID MapCharToGlyph(char32_t key, bool allow_fallback = true) override;
-	std::string GetFontName() override { return stdstr_fmt("%s, %s", face->family_name, face->style_name); }
+	std::string GetFontName() override { return fmt::format("{}, {}", face->family_name, face->style_name); }
 	bool IsBuiltInFont() override { return false; }
 	const void *GetOSHandle() override { return &face; }
 };
@@ -61,10 +60,10 @@ FreeTypeFontCache::FreeTypeFontCache(FontSize fs, FT_Face face, int pixels) : Tr
 {
 	assert(face != nullptr);
 
-	this->SetFontSize(fs, face, pixels);
+	this->SetFontSize(pixels);
 }
 
-void FreeTypeFontCache::SetFontSize(FontSize, FT_Face, int pixels)
+void FreeTypeFontCache::SetFontSize(int pixels)
 {
 	if (pixels == 0) {
 		/* Try to determine a good height based on the minimal height recommended by the font. */
@@ -106,13 +105,12 @@ void FreeTypeFontCache::SetFontSize(FontSize, FT_Face, int pixels)
 	}
 
 	if (err == FT_Err_Ok) {
-		this->units_per_em = this->face->units_per_EM;
 		this->ascender     = this->face->size->metrics.ascender >> 6;
 		this->descender    = this->face->size->metrics.descender >> 6;
 		this->height       = this->ascender - this->descender;
 	} else {
 		/* Both FT_Set_Pixel_Sizes and FT_Select_Size failed. */
-		DEBUG(fontcache, 0, "Font size selection failed. Using FontCache defaults.");
+		Debug(fontcache, 0, "Font size selection failed. Using FontCache defaults.");
 	}
 
 	font_height_cache[this->fs] = this->GetHeight();
@@ -165,18 +163,19 @@ void LoadFreeTypeFont(FontSize fs)
 {
 	FontCacheSubSetting *settings = GetFontCacheSubSetting(fs);
 
-	if (settings->font.empty()) return;
+	std::string font = GetFontCacheFontName(fs);
+	if (font.empty()) return;
 
 	if (_library == nullptr) {
 		if (FT_Init_FreeType(&_library) != FT_Err_Ok) {
-			ShowInfoF("Unable to initialize FreeType, using sprite fonts instead");
+			ShowInfo("Unable to initialize FreeType, using sprite fonts instead");
 			return;
 		}
 
-		DEBUG(fontcache, 2, "Initialized");
+		Debug(fontcache, 2, "Initialized");
 	}
 
-	const char *font_name = settings->font.c_str();
+	const char *font_name = font.c_str();
 	FT_Face face = nullptr;
 
 	/* If font is an absolute path to a ttf, try loading that first. */
@@ -196,7 +195,7 @@ void LoadFreeTypeFont(FontSize fs)
 	if (error != FT_Err_Ok) error = GetFontByFaceName(font_name, &face);
 
 	if (error == FT_Err_Ok) {
-		error = LoadFont(fs, face, font_name, settings->size);
+		error = LoadFont(fs, face, font_name, GetFontCacheFontSize(fs));
 		if (error != FT_Err_Ok) {
 			ShowInfo("Unable to use '{}' for {} font, FreeType reported error 0x{:X}, using sprite font instead", font_name, FontSizeToName(fs), error);
 		}
@@ -204,34 +203,6 @@ void LoadFreeTypeFont(FontSize fs)
 		FT_Done_Face(face);
 	}
 }
-
-/**
- * Load a TrueType font from a file.
- * @param fs The font size to load.
- * @param file_name Path to the font file.
- * @param size Requested font size.
- */
-void LoadFreeTypeFont(FontSize fs, const std::string &file_name, uint size)
-{
-	if (_library == nullptr) {
-		if (FT_Init_FreeType(&_library) != FT_Err_Ok) {
-			ShowInfo("Unable to initialize FreeType, using sprite fonts instead");
-			return;
-		}
-
-		Debug(fontcache, 2, "Initialized");
-	}
-
-	FT_Face face = nullptr;
-	int32_t index = 0;
-	FT_Error error = FT_New_Face(_library, file_name.c_str(), index, &face);
-	if (error == FT_Err_Ok) {
-		LoadFont(fs, face, file_name.c_str(), size);
-	} else {
-		FT_Done_Face(face);
-	}
-}
-
 
 /**
  * Free everything that was allocated for this font cache.
@@ -249,7 +220,7 @@ FreeTypeFontCache::~FreeTypeFontCache()
 void FreeTypeFontCache::ClearFontCache()
 {
 	/* Font scaling might have changed, determine font size anew if it was automatically selected. */
-	if (this->face != nullptr) this->SetFontSize(this->fs, this->face, this->req_size);
+	if (this->face != nullptr) this->SetFontSize(this->req_size);
 
 	this->TrueTypeFontCache::ClearFontCache();
 }
@@ -271,12 +242,12 @@ const Sprite *FreeTypeFontCache::InternalGetGlyph(GlyphID key, bool aa)
 	uint height = std::max(1U, (uint)slot->bitmap.rows  + shadow);
 
 	/* Limit glyph size to prevent overflows later on. */
-	if (width > MAX_GLYPH_DIM || height > MAX_GLYPH_DIM) usererror("Font glyph is too large");
+	if (width > MAX_GLYPH_DIM || height > MAX_GLYPH_DIM) UserError("Font glyph is too large");
 
 	/* FreeType has rendered the glyph, now we allocate a sprite and copy the image into it */
 	SpriteLoader::SpriteCollection spritecollection;
-	SpriteLoader::Sprite &sprite = spritecollection[ZOOM_LVL_NORMAL];
-	sprite.AllocateData(ZOOM_LVL_NORMAL, static_cast<size_t>(width) * height);
+	SpriteLoader::Sprite &sprite = spritecollection[ZOOM_LVL_MIN];
+	sprite.AllocateData(ZOOM_LVL_MIN, static_cast<size_t>(width) * height);
 	sprite.type = SpriteType::Font;
 	sprite.colours = (aa ? SCC_PAL | SCC_ALPHA : SCC_PAL);
 	sprite.width = width;
@@ -305,13 +276,14 @@ const Sprite *FreeTypeFontCache::InternalGetGlyph(GlyphID key, bool aa)
 		}
 	}
 
+	UniquePtrSpriteAllocator allocator;
+	BlitterFactory::GetCurrentBlitter()->Encode(spritecollection, allocator);
+
 	GlyphEntry new_glyph;
-	new_glyph.sprite = BlitterFactory::GetCurrentBlitter()->Encode(spritecollection, SimpleSpriteAlloc);
-	new_glyph.width  = slot->advance.x >> 6;
+	new_glyph.data = std::move(allocator.data);
+	new_glyph.width = slot->advance.x >> 6;
 
-	this->SetGlyphPtr(key, &new_glyph);
-
-	return new_glyph.sprite;
+	return this->SetGlyphPtr(key, std::move(new_glyph)).GetSprite();
 }
 
 
@@ -326,22 +298,6 @@ GlyphID FreeTypeFontCache::MapCharToGlyph(char32_t key, bool allow_fallback)
 	}
 
 	return glyph;
-}
-
-const void *FreeTypeFontCache::InternalGetFontTable(uint32_t tag, size_t &length)
-{
-	FT_ULong len = 0;
-	FT_Byte *result = nullptr;
-
-	FT_Load_Sfnt_Table(this->face, tag, 0, nullptr, &len);
-
-	if (len > 0) {
-		result = MallocT<FT_Byte>(len);
-		FT_Load_Sfnt_Table(this->face, tag, 0, result, &len);
-	}
-
-	length = len;
-	return result;
 }
 
 /**

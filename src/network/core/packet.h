@@ -45,51 +45,74 @@ typedef uint8_t  PacketType; ///< Identifier for the packet
  *     (year % 4 == 0) and ((year % 100 != 0) or (year % 400 == 0))
  */
 struct Packet : public BufferSerialisationHelper<Packet>, public BufferDeserialisationHelper<Packet> {
+	static constexpr size_t EncodedLengthOfPacketSize() { return sizeof(PacketSize); }
+	static constexpr size_t EncodedLengthOfPacketType() { return sizeof(PacketType); }
+
 private:
 	/** The current read/write position in the packet */
 	PacketSize pos;
+	/** Whether encryption is required for this packet */
+	bool encyption_pending = false;
+	/** Packet type, for transmitted packets */
+	PacketType tx_packet_type;
 	/** The buffer of this packet. */
-	std::vector<byte> buffer;
+	std::vector<uint8_t> buffer;
 	/** The limit for the packet size. */
 	size_t limit;
 
 	/** Socket we're associated with. */
 	NetworkSocketHandler *cs;
 
+	void PreSendEncryption();
+
 public:
-	Packet(NetworkSocketHandler *cs, size_t limit, size_t initial_read_size = sizeof(PacketSize));
-	Packet(PacketType type, size_t limit = COMPAT_MTU);
+	struct ReadTag{};
+	Packet(ReadTag tag, NetworkSocketHandler *cs, size_t limit, size_t initial_read_size = EncodedLengthOfPacketSize());
+	Packet(NetworkSocketHandler *cs, PacketType type, size_t limit = COMPAT_MTU);
 
 	void ResetState(PacketType type);
 
-	/* Sending/writing of packets */
-	void PrepareToSend();
+	void PrepareForSendQueue();
 
-	std::vector<byte> &GetSerialisationBuffer() { return this->buffer; }
+	inline void CheckPendingPreSendEncryption()
+	{
+		if (this->encyption_pending) {
+			this->PreSendEncryption();
+		}
+	}
+
+	/* Sending/writing of packets */
+	inline void PrepareToSend()
+	{
+		this->PrepareForSendQueue();
+		this->CheckPendingPreSendEncryption();
+	}
+
+	std::vector<uint8_t> &GetSerialisationBuffer() { return this->buffer; }
 	size_t GetSerialisationLimit() const { return this->limit; }
 
-	const byte *GetDeserialisationBuffer() const { return this->buffer.data(); }
+	const uint8_t *GetDeserialisationBuffer() const { return this->buffer.data(); }
 	size_t GetDeserialisationBufferSize() const { return this->buffer.size(); }
 	PacketSize &GetDeserialisationPosition() { return this->pos; }
+	void RaiseDeserialisationError();
 	bool CanDeserialiseBytes(size_t bytes_to_read, bool raise_error) { return this->CanReadFromPacket(bytes_to_read, raise_error); }
 
 	bool CanWriteToPacket(size_t bytes_to_write);
-
-	void WriteAtOffset_uint16(size_t offset, uint16_t);
 
 	/* Reading/receiving of packets */
 	size_t ReadRawPacketSize() const;
 	bool HasPacketSizeData() const;
 	bool ParsePacketSize();
 	size_t Size() const;
-	void PrepareToRead();
+	[[nodiscard]] bool PrepareToRead();
 	PacketType GetPacketType() const;
+	PacketType GetTransmitPacketType() const { return this->tx_packet_type; }
 
 	bool CanReadFromPacket(size_t bytes_to_read, bool close_connection = false);
 
 	size_t RemainingBytesToTransfer() const;
 
-	const byte *GetBufferData() const { return this->buffer.data(); }
+	const uint8_t *GetBufferData() const { return this->buffer.data(); }
 	PacketSize GetRawPos() const { return this->pos; }
 	void ReserveBuffer(size_t size) { this->buffer.reserve(size); }
 
@@ -189,21 +212,37 @@ public:
 		return bytes;
 	}
 
+	/**
+	 * Send as many of the bytes as possible in the packet. This can mean
+	 * that it is possible that not all bytes are sent. To cope with this
+	 * the function returns the span of bytes that were not sent.
+	 * @param span The span describing the range of bytes to send.
+	 * @return The span of bytes that were not written.
+	 */
+	std::span<const uint8_t> Send_bytes(const std::span<const uint8_t> span)
+	{
+		size_t amount = this->Send_binary_until_full(span.data(), span.data() + span.size());
+		return span.subspan(amount);
+	}
+
+	size_t Recv_bytes(std::span<uint8_t> span);
+
 	NetworkSocketHandler *GetParentSocket() { return this->cs; }
 };
 
 struct SubPacketDeserialiser : public BufferDeserialisationHelper<SubPacketDeserialiser> {
 	NetworkSocketHandler *cs;
-	const byte *data;
+	const uint8_t *data;
 	size_t size;
 	PacketSize pos;
 
-	SubPacketDeserialiser(Packet &p, const byte *data, size_t size, PacketSize pos = 0) : cs(p.GetParentSocket()), data(data), size(size), pos(pos) {}
-	SubPacketDeserialiser(Packet &p, const std::vector<byte> &buffer, PacketSize pos = 0) : cs(p.GetParentSocket()), data(buffer.data()), size(buffer.size()), pos(pos) {}
+	SubPacketDeserialiser(Packet &p, const uint8_t *data, size_t size, PacketSize pos = 0) : cs(p.GetParentSocket()), data(data), size(size), pos(pos) {}
+	SubPacketDeserialiser(Packet &p, const std::vector<uint8_t> &buffer, PacketSize pos = 0) : cs(p.GetParentSocket()), data(buffer.data()), size(buffer.size()), pos(pos) {}
 
-	const byte *GetDeserialisationBuffer() const { return this->data; }
+	const uint8_t *GetDeserialisationBuffer() const { return this->data; }
 	size_t GetDeserialisationBufferSize() const { return this->size; }
 	PacketSize &GetDeserialisationPosition() { return this->pos; }
+	void RaiseDeserialisationError();
 	bool CanDeserialiseBytes(size_t bytes_to_read, bool raise_error);
 };
 

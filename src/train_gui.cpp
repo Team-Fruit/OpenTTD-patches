@@ -13,6 +13,7 @@
 #include "train.h"
 #include "strings_func.h"
 #include "vehicle_func.h"
+#include "vehicle_gui_base.h"
 #include "zoom_func.h"
 #include "core/backup_type.hpp"
 
@@ -36,8 +37,8 @@ void CcBuildWagon(const CommandCost &result, TileIndex tile, uint32_t p1, uint32
 
 	/* find a locomotive in the depot. */
 	const Vehicle *found = nullptr;
-	for (const Train *t : Train::IterateFrontOnly()) {
-		if (t->IsFrontEngine() && t->tile == tile && t->IsStoppedInDepot() && !t->IsVirtual()) {
+	for (const Train *t = Train::From(GetFirstVehicleOnPos(tile, VEH_TRAIN)); t != nullptr; t = t->HashTileNext()) {
+		if (t->IsFrontEngine() && t->IsStoppedInDepot()) {
 			if (found != nullptr) return; // must be exactly one.
 			found = t;
 		}
@@ -112,6 +113,10 @@ void DrawTrainImage(const Train *v, const Rect &r, VehicleID selection, EngineIm
 	{
 		AutoRestoreBackup dpi_backup(_cur_dpi, &tmp_dpi);
 
+		bool do_overlays = ShowCargoIconOverlay();
+		/* List of overlays, only used if cargo icon overlays are enabled. */
+		static std::vector<CargoIconOverlay> overlays;
+
 		int px = rtl ? max_width + skip : -skip;
 		int y = r.Height() / 2;
 		bool sel_articulated = false;
@@ -149,7 +154,13 @@ void DrawTrainImage(const Train *v, const Rect &r, VehicleID selection, EngineIm
 				}
 			}
 
+			if (do_overlays) AddCargoIconOverlay(overlays, px, width, v);
 			px += rtl ? -width : width;
+		}
+
+		if (do_overlays) {
+			DrawCargoIconOverlays(overlays, y);
+			overlays.clear();
 		}
 
 		if (dragging && drag_at_end_of_train) {
@@ -228,7 +239,7 @@ static void TrainDetailsCargoTab(const CargoSummaryItem *item, int left, int rig
  * @param right The right most coordinate to draw
  * @param y     The y coordinate
  */
-static void TrainDetailsInfoTab(const Train *v, int left, int right, int y, byte line_number)
+static void TrainDetailsInfoTab(const Train *v, int left, int right, int y, uint8_t line_number)
 {
 	const RailVehicleInfo *rvi = RailVehInfo(v->engine_type);
 	bool show_speed = !UsesWagonOverride(v) && (_settings_game.vehicle.wagon_speed_limits || rvi->railveh_type != RAILVEH_WAGON);
@@ -336,7 +347,7 @@ static void GetCargoSummaryOfArticulatedVehicle(const Train *v, CargoSummary &su
 		new_item.subtype = GetCargoSubtypeText(v);
 		if (new_item.cargo == INVALID_CARGO && new_item.subtype == STR_EMPTY) continue;
 
-		auto item = std::find(std::begin(summary), std::end(summary), new_item);
+		auto item = std::ranges::find(summary, new_item);
 		if (item == std::end(summary)) {
 			item = summary.emplace(std::end(summary));
 			item->cargo = new_item.cargo;
@@ -425,7 +436,7 @@ void DrawTrainDetails(const Train *v, const Rect &r, int vscroll_pos, uint16_t v
 	if (det_tab != TDW_TAB_TOTALS) {
 		Direction dir = rtl ? DIR_E : DIR_W;
 		int x = rtl ? r.right : r.left;
-		byte line_number = 0;
+		uint8_t line_number = 0;
 		for (; v != nullptr && vscroll_pos > -vscroll_cap; v = v->GetNextVehicle()) {
 			GetCargoSummaryOfArticulatedVehicle(v, _cargo_summary);
 

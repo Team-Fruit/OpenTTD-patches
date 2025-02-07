@@ -43,12 +43,12 @@ inline void RegisterGameEvents(GameEventFlags events)
 	_game_events_overall |= events;
 }
 
-char *DumpGameEventFlags(GameEventFlags events, char *b, const char *last);
+void DumpGameEventFlags(GameEventFlags events, struct format_target &buffer);
 
 void AppendSpecialEventsLogEntry(std::string message);
-char *DumpSpecialEventsLog(char *buffer, const char *last);
+void DumpSpecialEventsLog(struct format_target &buffer);
 void ClearSpecialEventsLog();
 
-void LogGameLoadDateTimes(char *buffer, const char *last);
+void LogGameLoadDateTimes(struct format_target &buffer);
 
 #endif /* EVENT_LOGS_H */

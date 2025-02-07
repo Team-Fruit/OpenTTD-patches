@@ -51,8 +51,8 @@ install(FILES
                 ${CMAKE_SOURCE_DIR}/README.md
                 ${CMAKE_SOURCE_DIR}/CREDITS.md
                 ${CMAKE_SOURCE_DIR}/CONTRIBUTING.md
-                ${CMAKE_SOURCE_DIR}/changelog.txt
-                ${CMAKE_SOURCE_DIR}/known-bugs.txt
+                ${CMAKE_SOURCE_DIR}/changelog.md
+                ${CMAKE_SOURCE_DIR}/known-bugs.md
                 ${CMAKE_SOURCE_DIR}/jgrpp-changelog.md
                 ${CMAKE_SOURCE_DIR}/jgrpp-ya-changelog.md
         DESTINATION ${DOCS_DESTINATION_DIR}
@@ -172,10 +172,10 @@ elseif(WIN32)
 
     set(CPACK_PACKAGE_FILE_NAME "openttd-#CPACK_PACKAGE_VERSION#-windows-${CPACK_SYSTEM_NAME}")
 
-    if(WINDOWS_CERTIFICATE_COMMON_NAME)
+    if(DEFINED ENV{AZURE_CODESIGN_PROFILE_NAME})
       add_custom_command(TARGET openttd
         POST_BUILD
-        COMMAND "${CMAKE_SOURCE_DIR}/os/windows/sign.bat" "$<TARGET_FILE:openttd>" "${WINDOWS_CERTIFICATE_COMMON_NAME}"
+        COMMAND "${CMAKE_SOURCE_DIR}/os/windows/sign.bat" "${BINARY_DESTINATION_DIR}"
       )
     endif()
 elseif(UNIX)

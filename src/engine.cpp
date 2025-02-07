@@ -25,6 +25,7 @@
 #include "engine_gui.h"
 #include "engine_func.h"
 #include "engine_base.h"
+#include "engine_override.h"
 #include "company_base.h"
 #include "vehicle_func.h"
 #include "articulated_vehicles.h"
@@ -80,11 +81,12 @@ Engine::Engine(VehicleType type, EngineID base)
 		/* 'power' defaults to zero, so we also have to default to 'wagon' */
 		if (type == VEH_TRAIN) this->u.rail.railveh_type = RAILVEH_WAGON;
 		/* Set model life to maximum to make wagons available */
-		this->info.base_life = 0xFF;
+		this->info.base_life = YearDelta{0xFF};
 		/* Set road vehicle tractive effort to the default value */
 		if (type == VEH_ROAD) this->u.road.tractive_effort = 0x4C;
-		/* Aircraft must have INVALID_CARGO as default, as there is no property */
-		if (type == VEH_AIRCRAFT) this->info.cargo_type = INVALID_CARGO;
+		/* Aircraft must have CT_INVALID as default, as there is no property */
+		this->info.cargo_type = INVALID_CARGO;
+		this->info.cargo_label = (type == VEH_AIRCRAFT) ? CT_INVALID : CT_PASSENGERS;
 		/* Ships must have a non-zero acceleration. */
 		if (type == VEH_SHIP) this->u.ship.acceleration = 1;
 		/* Set visual effect to the default value */
@@ -114,7 +116,7 @@ Engine::Engine(VehicleType type, EngineID base)
 			this->info.string_id = STR_VEHICLE_NAME_TRAIN_ENGINE_RAIL_KIRBY_PAUL_TANK_STEAM + base;
 
 			/* Set the default model life of original wagons to "infinite" */
-			if (this->u.rail.railveh_type == RAILVEH_WAGON) this->info.base_life = 0xFF;
+			if (this->u.rail.railveh_type == RAILVEH_WAGON) this->info.base_life = YearDelta{0xFF};
 
 			break;
 
@@ -223,9 +225,10 @@ bool Engine::CanPossiblyCarryCargo() const
  * For aircraft the main capacity is determined. Mail might be present as well.
  * @param v Vehicle of interest; nullptr in purchase list
  * @param mail_capacity returns secondary cargo (mail) capacity of aircraft
+ * @param attempt_refit cargo ID to attempt to use, when v is nullptr
  * @return Capacity
  */
-uint Engine::DetermineCapacity(const Vehicle *v, uint16_t *mail_capacity) const
+uint Engine::DetermineCapacity(const Vehicle *v, uint16_t *mail_capacity, CargoID attempt_refit) const
 {
 	assert(v == nullptr || this->index == v->engine_type);
 	if (mail_capacity != nullptr) *mail_capacity = 0;
@@ -234,7 +237,16 @@ uint Engine::DetermineCapacity(const Vehicle *v, uint16_t *mail_capacity) const
 
 	bool new_multipliers = HasBit(this->info.misc_flags, EF_NO_DEFAULT_CARGO_MULTIPLIER);
 	CargoID default_cargo = this->GetDefaultCargoType();
-	CargoID cargo_type = (v != nullptr) ? v->cargo_type : default_cargo;
+	CargoID cargo_type;
+	if (v != nullptr) {
+		cargo_type = v->cargo_type;
+	} else {
+		if (attempt_refit != INVALID_CARGO && HasBit(this->info.refit_mask, attempt_refit)) {
+			cargo_type = attempt_refit;
+		} else {
+			cargo_type = default_cargo;
+		}
+	}
 
 	if (mail_capacity != nullptr && this->type == VEH_AIRCRAFT && IsCargoInClass(cargo_type, CC_PASSENGERS)) {
 		*mail_capacity = GetEngineProperty(this->index, PROP_AIRCRAFT_MAIL_CAPACITY, this->u.air.mail_capacity, v);
@@ -493,7 +505,7 @@ uint Engine::GetDisplayMaxTractiveEffort() const
 DateDelta Engine::GetLifeLengthInDays() const
 {
 	/* Assume leap years; this gives the player a bit more than the given amount of years, but never less. */
-	return (this->info.lifelength + _settings_game.vehicle.extend_vehicle_life).base() * DAYS_IN_LEAP_YEAR;
+	return DateDelta{(this->info.lifelength + _settings_game.vehicle.extend_vehicle_life).base() * DAYS_IN_LEAP_YEAR};
 }
 
 /**
@@ -558,16 +570,13 @@ bool Engine::IsVariantHidden(CompanyID c) const
  */
 void EngineOverrideManager::ResetToDefaultMapping()
 {
-	this->clear();
+	this->mappings.clear();
 	for (VehicleType type = VEH_TRAIN; type <= VEH_AIRCRAFT; type++) {
-		for (uint internal_id = 0; internal_id < _engine_counts[type]; internal_id++) {
-			EngineIDMapping &eid = this->emplace_back();
-			eid.type            = type;
-			eid.grfid           = INVALID_GRFID;
-			eid.internal_id     = internal_id;
-			eid.substitute_id   = internal_id;
+		for (uint8_t internal_id = 0; internal_id < _engine_counts[type]; internal_id++) {
+			this->mappings.push_back({ INVALID_GRFID, internal_id, type, internal_id });
 		}
 	}
+	this->ReIndex();
 }
 
 /**
@@ -581,14 +590,21 @@ void EngineOverrideManager::ResetToDefaultMapping()
  */
 EngineID EngineOverrideManager::GetID(VehicleType type, uint16_t grf_local_id, uint32_t grfid)
 {
+	auto iter = this->mapping_index.find(HashKey(type, grf_local_id, grfid));
+	EngineID id = (iter != this->mapping_index.end()) ? iter->second : INVALID_ENGINE;
+
+#ifdef _DEBUG
 	EngineID index = 0;
-	for (const EngineIDMapping &eid : *this) {
+	for (const EngineIDMapping &eid : this->mappings) {
 		if (eid.type == type && eid.grfid == grfid && eid.internal_id == grf_local_id) {
+			assert(id == index);
 			return index;
 		}
 		index++;
 	}
-	return INVALID_ENGINE;
+	assert(id == INVALID_ENGINE);
+#endif
+	return id;
 }
 
 /**
@@ -609,6 +625,26 @@ bool EngineOverrideManager::ResetToCurrentNewGRFConfig()
 	return true;
 }
 
+void EngineOverrideManager::AddToIndex(EngineID id)
+{
+	this->mapping_index.insert({ HashKey(this->mappings[id]), id });
+}
+
+void EngineOverrideManager::RemoveFromIndex(EngineID id)
+{
+	this->mapping_index.erase(HashKey(this->mappings[id]));
+}
+
+void EngineOverrideManager::ReIndex()
+{
+	this->mapping_index.clear();
+	EngineID index = 0;
+	for (const EngineIDMapping &eid : this->mappings) {
+		this->mapping_index.insert({ HashKey(eid), index });
+		index++;
+	}
+}
+
 /**
  * Initialise the engine pool with the data from the original vehicles.
  */
@@ -617,9 +653,9 @@ void SetupEngines()
 	CloseWindowByClass(WC_ENGINE_PREVIEW);
 	_engine_pool.CleanPool();
 
-	assert(_engine_mngr.size() >= _engine_mngr.NUM_DEFAULT_ENGINES);
+	assert(_engine_mngr.mappings.size() >= EngineOverrideManager::NUM_DEFAULT_ENGINES);
 	[[maybe_unused]] uint index = 0;
-	for (const EngineIDMapping &eid : _engine_mngr) {
+	for (const EngineIDMapping &eid : _engine_mngr.mappings) {
 		/* Assert is safe; there won't be more than 256 original vehicles
 		 * in any case, and we just cleaned the pool. */
 		assert(Engine::CanAllocateItem());
@@ -674,7 +710,7 @@ void CalcEngineReliability(Engine *e, bool new_month)
 {
 	/* Get source engine for reliability age. This is normally our engine unless variant reliability syncing is requested. */
 	Engine *re = e;
-	while (re->info.variant_id != INVALID_ENGINE && (re->info.extra_flags & ExtraEngineFlags::SyncReliability) != ExtraEngineFlags::None) {
+	while (re->info.variant_id != INVALID_ENGINE && HasFlag(re->info.extra_flags, ExtraEngineFlags::SyncReliability)) {
 		re = Engine::Get(re->info.variant_id);
 	}
 
@@ -720,7 +756,7 @@ void CalcEngineReliability(Engine *e, bool new_month)
 void SetYearEngineAgingStops()
 {
 	/* Determine last engine aging year, default to 2050 as previously. */
-	_year_engine_aging_stops = 2050;
+	_year_engine_aging_stops = CalTime::Year{2050};
 
 	for (const Engine *e : Engine::Iterate()) {
 		const EngineInfo *ei = &e->info;
@@ -768,7 +804,7 @@ void StartupOneEngine(Engine *e, const CalTime::YearMonthDay &aging_ymd, const C
 
 	/* Get parent variant index for syncing reliability via random seed. */
 	const Engine *re = e;
-	while (re->info.variant_id != INVALID_ENGINE && (re->info.extra_flags & ExtraEngineFlags::SyncReliability) != ExtraEngineFlags::None) {
+	while (re->info.variant_id != INVALID_ENGINE && HasFlag(re->info.extra_flags, ExtraEngineFlags::SyncReliability)) {
 		re = Engine::Get(re->info.variant_id);
 	}
 
@@ -837,7 +873,7 @@ void StartupEngines()
 	const CalTime::Date expire_stop_date = std::min(CalTime::CurDate(), CalTime::ConvertYMDToDate(aging_stop_year, 0, 1));
 	const CalTime::YearMonthDay expire_stop_ymd = CalTime::ConvertDateToYMD(expire_stop_date);
 
-	CalTime::Date no_introduce_after_date = INT_MAX;
+	CalTime::Date no_introduce_after_date{INT_MAX};
 	if (_settings_game.vehicle.no_introduce_vehicles_after > 0) {
 		no_introduce_after_date = CalTime::ConvertYMDToDate(_settings_game.vehicle.no_introduce_vehicles_after, 0, 1) - 1;
 	}
@@ -943,7 +979,7 @@ static void AcceptEnginePreview(EngineID eid, CompanyID company, int recursion_d
 
 	/* Find variants to be included in preview. */
 	for (Engine *ve : Engine::IterateType(e->type)) {
-		if (ve->index != eid && ve->info.variant_id == eid && (ve->info.extra_flags & ExtraEngineFlags::JoinPreview) != ExtraEngineFlags::None) {
+		if (ve->index != eid && ve->info.variant_id == eid && HasFlag(ve->info.extra_flags, ExtraEngineFlags::JoinPreview)) {
 			AcceptEnginePreview(ve->index, company, recursion_depth + 1);
 		}
 	}
@@ -1067,7 +1103,7 @@ CommandCost CmdSetVehicleVisibility(TileIndex tile, DoCommandFlag flags, uint32_
 	if (!IsEngineBuildable(e->index, e->type, _current_company)) return CMD_ERROR;
 
 	if ((flags & DC_EXEC) != 0) {
-		SB(e->company_hidden, _current_company, 1, GB(p2, 31, 1));
+		AssignBit(e->company_hidden, _current_company, HasBit(p2, 31));
 		AddRemoveEngineFromAutoreplaceAndBuildWindows(e->type);
 	}
 
@@ -1181,7 +1217,7 @@ static void NewVehicleAvailable(Engine *e)
 	if (!IsVehicleTypeDisabled(e->type, true)) AI::BroadcastNewEvent(new ScriptEventEngineAvailable(index));
 
 	/* Only provide the "New Vehicle available" news paper entry, if engine can be built. */
-	if (!IsVehicleTypeDisabled(e->type, false) && (e->info.extra_flags & ExtraEngineFlags::NoNews) == ExtraEngineFlags::None) {
+	if (!IsVehicleTypeDisabled(e->type, false) && !HasFlag(e->info.extra_flags, ExtraEngineFlags::NoNews)) {
 		SetDParam(0, GetEngineCategoryName(index));
 		SetDParam(1, PackEngineNameDParam(index, EngineNameContext::PreviewNews));
 		AddNewsItem(STR_NEWS_NEW_VEHICLE_NOW_AVAILABLE_WITH_TYPE, NT_NEW_VEHICLES, NF_VEHICLE, NR_ENGINE, index);
@@ -1200,7 +1236,7 @@ static void NewVehicleAvailable(Engine *e)
 void EnginesMonthlyLoop()
 {
 	if (CalTime::CurYear() < _year_engine_aging_stops) {
-		CalTime::Date no_introduce_after = INT_MAX;
+		CalTime::Date no_introduce_after{INT_MAX};
 		bool no_engine_aging = (_settings_game.vehicle.no_expire_vehicles_after > 0 && CalTime::CurYear() >= _settings_game.vehicle.no_expire_vehicles_after);
 		if (_settings_game.vehicle.no_introduce_vehicles_after > 0) {
 			no_introduce_after = CalTime::ConvertYMDToDate(_settings_game.vehicle.no_introduce_vehicles_after, 0, 1) - 1;
@@ -1234,7 +1270,7 @@ void EnginesMonthlyLoop()
 				if (IsWagon(e->index)) continue;
 
 				/* Engine has no preview */
-				if ((e->info.extra_flags & ExtraEngineFlags::NoPreview) != ExtraEngineFlags::None) continue;
+				if (HasFlag(e->info.extra_flags, ExtraEngineFlags::NoPreview)) continue;
 
 				/* Show preview dialog to one of the companies. */
 				e->flags |= ENGINE_EXCLUSIVE_PREVIEW;
@@ -1286,7 +1322,7 @@ CommandCost CmdRenameEngine(TileIndex tile, DoCommandFlag flags, uint32_t p1, ui
 
 	if (!reset) {
 		if (Utf8StringLength(text) >= MAX_LENGTH_ENGINE_NAME_CHARS) return CMD_ERROR;
-		if (!IsUniqueEngineName(text)) return_cmd_error(STR_ERROR_NAME_MUST_BE_UNIQUE);
+		if (!IsUniqueEngineName(text)) return CommandCost(STR_ERROR_NAME_MUST_BE_UNIQUE);
 	}
 
 	if (flags & DC_EXEC) {
@@ -1380,7 +1416,7 @@ bool IsEngineRefittable(EngineID engine)
  */
 void CheckEngines()
 {
-	CalTime::Date min_date = INT32_MAX;
+	CalTime::Date min_date{INT32_MAX};
 
 	for (const Engine *e : Engine::Iterate()) {
 		if (!e->IsEnabled()) continue;

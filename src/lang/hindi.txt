@@ -98,6 +98,7 @@ STR_UNITS_POWER_METRIC                                          :{DECIMAL}{NBSP}
 
 
 
+
 # Common window strings
 
 STR_TOOLTIP_SORT_ORDER                                          :{BLACK}क्रमबद्धता क्रम चुनें (अवरोही/आरोही)
@@ -139,20 +140,21 @@ STR_TOOLBAR_TOOLTIP_SHOW_SOUND_MUSIC_WINDOW                     :{BLACK}ध्�
 # Extra tooltips for the scenario editor toolbar
 STR_SCENEDIT_TOOLBAR_OPENTTD                                    :{YELLOW}OpenTTD
 STR_SCENEDIT_TOOLBAR_SCENARIO_EDITOR                            :{YELLOW}परिदृश्य संपादक
-STR_SCENEDIT_TOOLBAR_TOOLTIP_MOVE_THE_STARTING_DATE_BACKWARD    :{BLACK}प्रारंभ दिनांक को 1 वर्ष पीछे ले जाएँ
-STR_SCENEDIT_TOOLBAR_TOOLTIP_MOVE_THE_STARTING_DATE_FORWARD     :{BLACK}शुरुआती तारीख को 1 साल आगे ले जाएं
-STR_SCENEDIT_TOOLBAR_TOOLTIP_DISPLAY_MAP_TOWN_DIRECTORY         :{BLACK}मानचित्र, नगर निर्देशिका दिखायें
-STR_SCENEDIT_TOOLBAR_LANDSCAPE_GENERATION                       :{BLACK}भूनिर्माण मेनू खोलें या एक नई दुनिया उत्पन्न करें
-STR_SCENEDIT_TOOLBAR_INDUSTRY_GENERATION                        :{BLACK}उद्योगों का निर्माण या सृजन
-STR_SCENEDIT_TOOLBAR_ROAD_CONSTRUCTION                          :{BLACK}सड़क के बुनियादी ढांचे का निर्माण
-STR_SCENEDIT_TOOLBAR_PLANT_TREES                                :{BLACK}पेड़ लगाओ। क्षेत्र को तिरछे चुनने के लिए Ctrl+क्लिक करें+खींचें. केवल लागत अनुमान दिखाने के लिए Shift दबाएं
-STR_SCENEDIT_TOOLBAR_PLACE_SIGN                                 :{BLACK} स्थान चिन्ह
-STR_SCENEDIT_TOOLBAR_PLACE_OBJECT                               :{BLACK}वस्तु रखें। क्षेत्र को तिरछे चुनने के लिए Ctrl+क्लिक करें+खींचें. केवल लागत अनुमान दिखाने के लिए Shift दबाएं
+STR_SCENEDIT_TOOLBAR_MOVE_THE_STARTING_DATE_BACKWARD_TOOLTIP    :{BLACK}प्रारंभ दिनांक को 1 वर्ष पीछे ले जाएँ
+STR_SCENEDIT_TOOLBAR_MOVE_THE_STARTING_DATE_FORWARD_TOOLTIP     :{BLACK}शुरुआती तारीख को 1 साल आगे ले जाएं
+STR_SCENEDIT_TOOLBAR_DISPLAY_MAP_TOWN_DIRECTORY_TOOLTIP         :{BLACK}मानचित्र, नगर निर्देशिका दिखायें
+STR_SCENEDIT_TOOLBAR_LANDSCAPE_GENERATION_TOOLTIP               :{BLACK}भूनिर्माण मेनू खोलें या एक नई दुनिया उत्पन्न करें
+STR_SCENEDIT_TOOLBAR_INDUSTRY_GENERATION_TOOLTIP                :{BLACK}उद्योगों का निर्माण या सृजन
+STR_SCENEDIT_TOOLBAR_ROAD_CONSTRUCTION_TOOLTIP                  :{BLACK}सड़क के बुनियादी ढांचे का निर्माण
+STR_SCENEDIT_TOOLBAR_PLANT_TREES_TOOLTIP                        :{BLACK}पेड़ लगाओ। क्षेत्र को तिरछे चुनने के लिए Ctrl+क्लिक करें+खींचें. केवल लागत अनुमान दिखाने के लिए Shift दबाएं
+STR_SCENEDIT_TOOLBAR_PLACE_SIGN_TOOLTIP                         :{BLACK} स्थान चिन्ह
+STR_SCENEDIT_TOOLBAR_PLACE_OBJECT_TOOLTIP                       :{BLACK}वस्तु रखें। क्षेत्र को तिरछे चुनने के लिए Ctrl+क्लिक करें+खींचें. केवल लागत अनुमान दिखाने के लिए Shift दबाएं
 
 # Scenario editor file menu
 ###length 7
 STR_SCENEDIT_FILE_MENU_SEPARATOR                                :
 STR_SCENEDIT_FILE_MENU_QUIT                                     :निकास
+
 
 # Settings menu
 ###length 16
@@ -241,6 +243,7 @@ STR_GRAPH_Y_LABEL_NUMBER                                        :{TINY_FONT}{COM
 STR_GRAPH_CARGO_PAYMENT_CARGO                                   :{TINY_FONT}{BLACK}{STRING}
 
 
+
 # Graph key window
 
 # Company league window
@@ -318,7 +321,7 @@ STR_NEWS_NEW_VEHICLE_TYPE                                       :{BIG_FONT}{BLAC
 
 
 # Extra view window
-STR_EXTRA_VIEW_MOVE_MAIN_TO_VIEW_TT                             :{BLACK}इस व्यूपोर्ट के स्थान को मुख्य दृश्य में कॉपी करें
+STR_EXTRA_VIEW_MOVE_MAIN_TO_VIEW_TOOLTIP                        :{BLACK}इस व्यूपोर्ट के स्थान को मुख्य दृश्य में कॉपी करें
 
 # Game options window
 
@@ -346,6 +349,7 @@ STR_GAME_OPTIONS_VIDEO_ACCELERATION                             :{BLACK}हा�
 
 
 STR_GAME_OPTIONS_GUI_SCALE_FRAME                                :{BLACK}इंटरफ़ेस का आकार
+
 
 
 
@@ -498,6 +502,7 @@ STR_CONFIG_SETTING_ORDER_REVIEW_OFF                             :नहीं
 ###length 2
 
 
+
 ###length 2
 
 
@@ -619,6 +624,8 @@ STR_CONFIG_SETTING_AI_BUILDS_AIRCRAFT                           :कंप्य
 
 
 
+###length 3
+
 ###setting-zero-is-special
 
 
@@ -709,9 +716,7 @@ STR_CONFIG_SETTING_INTERFACE_GENERAL                            :सामान
 STR_CONFIG_SETTING_COMPANY                                      :कंपनी
 STR_CONFIG_SETTING_VEHICLES_ROUTING                             :मार्ग
 
-STR_CONFIG_SETTING_PATHFINDER_FOR_SHIPS_HELPTEXT                :नौकाओं द्वारा उपयोग किया जाने वाला पथान्वेषी
 STR_CONFIG_SETTING_REVERSE_AT_SIGNALS_HELPTEXT                  :यदि ट्रेनें लंबे समय तक वहां प्रतीक्षा करती हैं तो उन्हें सिग्नल पर रिवर्स करने की अनुमति दें
-###length 2
 
 
 # Config errors
@@ -797,10 +802,7 @@ STR_NETWORK_CLIENT_LIST_SERVER_NAME_QUERY_CAPTION               :सर्वर
 
 
 
-# Network set password
-
 # Network company info join/password
-STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}पासवर्ड
 
 # Network chat
 
@@ -811,7 +813,7 @@ STR_NETWORK_ERROR_WRONG_PASSWORD                                :गलत प�
 
 STR_NETWORK_ERROR_CLIENT_GUI_LOST_CONNECTION_CAPTION            :{WHITE}संपर्क विच्छेद संभावित
 
-###length 21
+###length 23
 STR_NETWORK_ERROR_CLIENT_GENERAL                                :सामान्य त्रुटि
 STR_NETWORK_ERROR_CLIENT_SAVEGAME                               :मानचित्र लोड नहीं हो सका
 
@@ -868,6 +870,9 @@ STR_TOOLBAR_DISABLED_NO_VEHICLE_AVAILABLE                       :{BLACK}अक�
 # Rail waypoint construction window
 
 # Rail station construction window
+
+
+
 
 
 STR_STATION_CLASS_DFLT                                          :मानक स्टेशन
@@ -995,6 +1000,8 @@ STR_MAPGEN_BORDER_RANDOM                                        :{BLACK}या�
 
 # Map generation progress
 STR_GENERATION_PROGRESS_NUM                                     :{BLACK}{NUM} / {NUM}
+
+
 
 # NewGRF settings
 STR_NEWGRF_FILTER_TITLE                                         :{ORANGE}फ़िल्टर:
@@ -1148,7 +1155,6 @@ STR_COMPANY_VIEW_COMPANY_NAME_BUTTON                            :{BLACK}कं�
 # Company infrastructure window
 
 # Industry directory
-STR_INDUSTRY_DIRECTORY_CAPTION                                  :{WHITE}उद्योग
 STR_INDUSTRY_DIRECTORY_ITEM_NOPROD                              :{ORANGE}{INDUSTRY}
 STR_INDUSTRY_DIRECTORY_ITEM_PROD1                               :{ORANGE}{INDUSTRY} {STRING}
 STR_INDUSTRY_DIRECTORY_ITEM_PROD3                               :{ORANGE}{INDUSTRY} {STRING}, {STRING}, {STRING}
@@ -1303,9 +1309,6 @@ STR_VEHICLE_VIEW_TRAIN_STATUS_START_STOP_TOOLTIP                :{BLACK}वर�
 
 
 # Vehicle stopped/started animations
-###length 2
-
-###length 2
 
 # Vehicle details
 
@@ -1569,6 +1572,7 @@ STR_ERROR_CAN_T_RENAME_AIRCRAFT_TYPE                            :{WHITE}वि�
 
 ###length VEHICLE_TYPES
 STR_ERROR_CAN_T_SELL_TRAIN                                      :{WHITE}रेल वाहन नहीं बेच सकते...
+
 
 
 

@@ -10,6 +10,9 @@
 #include "stdafx.h"
 #include "landscape.h"
 #include "company_func.h"
+#include "command_func.h"
+#include "3rdparty/nlohmann/json.hpp"
+#include "strings_func.h"
 #include "genworld.h"
 #include "gfxinit.h"
 #include "window_func.h"
@@ -25,12 +28,15 @@
 #include "void_map.h"
 #include "town.h"
 #include "newgrf.h"
+#include "newgrf_house.h"
 #include "core/random_func.hpp"
 #include "core/backup_type.hpp"
 #include "progress.h"
 #include "error.h"
 #include "game/game.hpp"
 #include "game/game_instance.hpp"
+#include "newgrf_railtype.h"
+#include "newgrf_roadtype.h"
 #include "string_func.h"
 #include "thread.h"
 #include "tgp.h"
@@ -45,7 +51,7 @@ void GenerateClearTile();
 void GenerateIndustries();
 void GenerateObjects();
 void GenerateTrees();
-void GeneratePublicRoads();
+extern void GeneratePublicRoads(PublicRoadsConstruction build_mode, RoadType road_type = GetTownRoadType());
 
 void StartupEconomy();
 void StartupCompanies();
@@ -67,6 +73,8 @@ bool _generating_world;
 extern bool _town_noise_no_update;
 
 class AbortGenerateWorldSignal { };
+
+std::function<void()> _exec_with_generate_world;
 
 /**
  * Generation is done; show windows again and delete the progress window.
@@ -97,7 +105,7 @@ static void _GenerateWorld()
 	try {
 		_generating_world = true;
 		_town_noise_no_update = true;
-		if (_network_dedicated) DEBUG(net, 3, "Generating map, please wait...");
+		if (_network_dedicated) Debug(net, 3, "Generating map, please wait...");
 		/* Set the Random() seed to generation_seed so we produce the same map with the same seed */
 		_random.SetSeed(_settings_game.game_creation.generation_seed);
 
@@ -114,6 +122,10 @@ static void _GenerateWorld()
 		IncreaseGeneratingWorldProgress(GWP_MAP_INIT);
 		/* Must start economy early because of the costs. */
 		StartupEconomy();
+		if (!CheckTownRoadTypes()) {
+			HandleGeneratingWorldAbortion();
+			return;
+		}
 
 		bool landscape_generated = false;
 
@@ -152,7 +164,7 @@ static void _GenerateWorld()
 				GenerateIndustries();
 				GenerateObjects();
 				GenerateTrees();
-				GeneratePublicRoads();
+				GeneratePublicRoads(_settings_game.game_creation.build_public_roads);
 			}
 		}
 
@@ -211,12 +223,11 @@ static void _GenerateWorld()
 
 		ShowNewGRFError();
 
-		if (_network_dedicated) DEBUG(net, 3, "Map generated, starting game");
-		DEBUG(desync, 1, "new_map: %08x", _settings_game.game_creation.generation_seed);
+		if (_network_dedicated) Debug(net, 3, "Map generated, starting game");
+		Debug(desync, 1, "new_map: {:08x}", _settings_game.game_creation.generation_seed);
 
-		if (_debug_desync_level > 0) {
-			char name[MAX_PATH];
-			seprintf(name, lastof(name), "dmp_cmds_%08x_%08x.sav", _settings_game.game_creation.generation_seed, EconTime::CurDate().base());
+		if (GetDebugLevel(DebugLevelID::desync) > 0) {
+			std::string name = fmt::format("dmp_cmds_{:08x}_{:08x}.sav", _settings_game.game_creation.generation_seed, EconTime::CurDate());
 			SaveOrLoad(name, SLO_SAVE, DFT_GAME_FILE, AUTOSAVE_DIR, false, SMF_ZSTD_OK);
 		}
 	} catch (AbortGenerateWorldSignal&) {
@@ -227,7 +238,7 @@ static void _GenerateWorld()
 
 		if (_network_dedicated) {
 			/* Exit the game to prevent a return to main menu.  */
-			DEBUG(net, 0, "Generating map failed; closing server");
+			Debug(net, 0, "Generating map failed; closing server");
 			_exit_game = true;
 		} else {
 			SwitchToMode(_switch_mode);
@@ -329,6 +340,9 @@ void GenerateWorld(GenWorldMode mode, uint size_x, uint size_y, bool reset_setti
 
 	/* Load the right landscape stuff, and the NewGRFs! */
 	GfxLoadSprites();
+	SetCurrentRailTypeLabelList();
+	SetCurrentRoadTypeLabelList();
+	InitializeBuildingCounts();
 	InitialiseExtraAspectsVariable();
 	LoadStringWidthTable();
 	AnalyseEngineCallbacks();
@@ -355,6 +369,211 @@ void GenerateWorld(GenWorldMode mode, uint size_x, uint size_y, bool reset_setti
 	}
 
 	_GenerateWorld();
+}
 
-	ReInitAllWindows(false);
+void ExecuteWithGenerateWorld(std::function<void()> func)
+{
+	if (HasModalProgress()) return;
+	SetModalProgress(true);
+	MarkWholeScreenDirty();
+	_gw.abort  = false;
+	_gw.abortp = []() {
+		_switch_mode = SM_NONE; // Don't switch mode on abort
+	};
+
+	PrepareGenerateWorldProgress(true);
+	ShowGenerateWorldProgress();
+
+	try {
+		func();
+	} catch (AbortGenerateWorldSignal&) {
+		/* No action */
+	}
+
+	SetMouseCursorBusy(false);
+	SetModalProgress(false);
+	_gw.proc     = nullptr;
+	_gw.abortp   = nullptr;
+
+	CloseWindowByClass(WC_MODAL_PROGRESS);
+	MarkWholeScreenDirty();
+}
+
+void ScheduleExecuteWithGenerateWorld(std::function<void()> func)
+{
+	_exec_with_generate_world = std::move(func);
+	_check_special_modes = true;
+}
+
+/** Town data imported from JSON files and used to place towns. */
+struct ExternalTownData {
+	TownID town_id; ///< The TownID of the town in OpenTTD. Not imported, but set during the founding proceess and stored here for convenience.
+	std::string name; ///< The name of the town.
+	uint population; ///< The target population of the town when created in OpenTTD. If input is blank, defaults to 0.
+	bool is_city; ///< Should it be created as a city in OpenTTD? If input is blank, defaults to false.
+	float x_proportion; ///< The X coordinate of the town, as a proportion 0..1 of the maximum X coordinate.
+	float y_proportion; ///< The Y coordinate of the town, as a proportion 0..1 of the maximum Y coordinate.
+};
+
+/**
+ * Helper for CircularTileSearch to found a town on or near a given tile.
+ * @param tile The tile to try founding the town upon.
+ * @param user_data The ExternalTownData to attempt to found.
+ * @return True if the town was founded successfully.
+ */
+static bool TryFoundTownNearby(TileIndex tile, void *user_data)
+{
+	ExternalTownData &town = *static_cast<ExternalTownData *>(user_data);
+	CommandCost result = DoCommand(tile, TSZ_SMALL | town.is_city << 2 | _settings_game.economy.town_layout << 3, 0, DC_EXEC, CMD_FOUND_TOWN, town.name.c_str());
+	if (result.HasResultData()) {
+		/* The command succeeded, send the ID back through user_data. */
+		town.town_id = result.GetResultData();
+		return true;
+	} else {
+		return false;
+	}
+}
+
+/**
+ * Load town data from _file_to_saveload, place towns at the appropriate locations, and expand them to their target populations.
+ */
+void LoadTownData()
+{
+	/* Load the JSON file as a string initially. We'll parse it soon. */
+	size_t filesize;
+	auto f = FioFOpenFile(_file_to_saveload.name, "rb", HEIGHTMAP_DIR, &filesize);
+
+	if (!f.has_value()) {
+		ShowErrorMessage(STR_TOWN_DATA_ERROR_LOAD_FAILED, STR_TOWN_DATA_ERROR_JSON_FORMATTED_INCORRECTLY, WL_ERROR);
+		return;
+	}
+
+	std::string text(filesize, '\0');
+	size_t len = fread(text.data(), filesize, 1, *f);
+	f.reset();
+	if (len != 1) {
+		ShowErrorMessage(STR_TOWN_DATA_ERROR_LOAD_FAILED, STR_TOWN_DATA_ERROR_JSON_FORMATTED_INCORRECTLY, WL_ERROR);
+		return;
+	}
+
+	/* Now parse the JSON. */
+	nlohmann::json town_data;
+	try {
+		town_data = nlohmann::json::parse(text);
+	} catch (nlohmann::json::exception &) {
+		ShowErrorMessage(STR_TOWN_DATA_ERROR_LOAD_FAILED, STR_TOWN_DATA_ERROR_JSON_FORMATTED_INCORRECTLY, WL_ERROR);
+		return;
+	}
+
+	/* Check for JSON formatting errors with the array of towns. */
+	if (!town_data.is_array()) {
+		ShowErrorMessage(STR_TOWN_DATA_ERROR_LOAD_FAILED, STR_TOWN_DATA_ERROR_JSON_FORMATTED_INCORRECTLY, WL_ERROR);
+		return;
+	}
+
+	std::vector<std::pair<Town *, uint> > towns;
+	uint failed_towns = 0;
+
+	/* Iterate through towns and attempt to found them. */
+	for (auto &feature : town_data) {
+		ExternalTownData town;
+
+		/* Ensure JSON is formatted properly. */
+		if (!feature.is_object()) {
+			ShowErrorMessage(STR_TOWN_DATA_ERROR_LOAD_FAILED, STR_TOWN_DATA_ERROR_JSON_FORMATTED_INCORRECTLY, WL_ERROR);
+			return;
+		}
+
+		/* Check to ensure all fields exist and are of the correct type.
+		 * If the town name is formatted wrong, all we can do is give a general warning. */
+		if (!feature.contains("name") || !feature.at("name").is_string()) {
+			ShowErrorMessage(STR_TOWN_DATA_ERROR_LOAD_FAILED, STR_TOWN_DATA_ERROR_JSON_FORMATTED_INCORRECTLY, WL_ERROR);
+			return;
+		}
+
+		/* If other fields are formatted wrong, we can actually inform the player which town is the problem. */
+		if (!feature.contains("population") || !feature.at("population").is_number() ||
+				!feature.contains("city") || !feature.at("city").is_boolean() ||
+				!feature.contains("x") || !feature.at("x").is_number() ||
+				!feature.contains("y") || !feature.at("y").is_number()) {
+			feature.at("name").get_to(town.name);
+			SetDParamStr(0, town.name);
+			ShowErrorMessage(STR_TOWN_DATA_ERROR_LOAD_FAILED, STR_TOWN_DATA_ERROR_TOWN_FORMATTED_INCORRECTLY, WL_ERROR);
+			return;
+		}
+
+		/* Set town properties. */
+		feature.at("name").get_to(town.name);
+		feature.at("population").get_to(town.population);
+		feature.at("city").get_to(town.is_city);
+
+		/* Set town coordinates. */
+		feature.at("x").get_to(town.x_proportion);
+		feature.at("y").get_to(town.y_proportion);
+
+		/* Check for improper coordinates and warn the player. */
+		if (town.x_proportion <= 0.0f || town.y_proportion <= 0.0f || town.x_proportion >= 1.0f || town.y_proportion >= 1.0f) {
+			SetDParamStr(0, town.name);
+			ShowErrorMessage(STR_TOWN_DATA_ERROR_LOAD_FAILED, STR_TOWN_DATA_ERROR_BAD_COORDINATE, WL_ERROR);
+			return;
+		}
+
+		/* Find the target tile for the town. */
+		TileIndex tile;
+		switch (_settings_game.game_creation.heightmap_rotation) {
+			case HM_CLOCKWISE:
+				/* Tile coordinates align with what we expect. */
+				tile = TileXY(town.x_proportion * MapMaxX(), town.y_proportion * MapMaxY());
+				break;
+			case HM_COUNTER_CLOCKWISE:
+				/* Tile coordinates are rotated and must be adjusted. */
+				tile = TileXY((1 - town.y_proportion * MapMaxX()), town.x_proportion * MapMaxY());
+				break;
+			default: NOT_REACHED();
+		}
+
+		/* Try founding on the target tile, and if that doesn't work, find the nearest suitable tile up to 16 tiles away.
+		 * The target might be on water, blocked somehow, or on a steep slope that can't be terraformed by the founding command. */
+		TileIndex search_tile = tile;
+		bool success = CircularTileSearch(&search_tile, 16, 0, 0, TryFoundTownNearby, &town);
+
+		/* If we still fail to found the town, we'll create a sign at the intended location and tell the player how many towns we failed to create in an error message.
+		 * This allows the player to diagnose a heightmap misalignment, if towns end up in the sea, or place towns manually, if in rough terrain. */
+		if (!success) {
+			DoCommandP(tile, 0, 0, CMD_PLACE_SIGN, nullptr, town.name.c_str());
+			failed_towns++;
+			continue;
+		}
+
+		towns.emplace_back(std::make_pair(Town::Get(town.town_id), town.population));
+	}
+
+	/* If we couldn't found a town (or multiple), display a message to the player with the number of failed towns. */
+	if (failed_towns > 0) {
+		SetDParam(0, failed_towns);
+		ShowErrorMessage(STR_TOWN_DATA_ERROR_FAILED_TO_FOUND_TOWN, INVALID_STRING_ID, WL_WARNING);
+	}
+
+	/* Now that we've created the towns, let's grow them to their target populations. */
+	for (const auto &item : towns) {
+		Town *t = item.first;
+		uint population = item.second;
+
+		/* Grid towns can grow almost forever, but the town growth algorithm gets less and less efficient as it wanders roads randomly,
+		 * so we set an arbitrary limit. With a flat map and a 3x3 grid layout this results in about 4900 houses, or 2800 houses with "Better roads." */
+		int try_limit = 1000;
+
+		/* If a town repeatedly fails to grow, continuing to try only wastes time. */
+		int fail_limit = 10;
+
+		/* Grow by a constant number of houses each time, instead of growth based on current town size.
+		 * We want our try limit to apply in a predictable way, no matter the road layout and other geography. */
+		const int HOUSES_TO_GROW = 10;
+
+		do {
+			uint before = t->cache.num_houses;
+			DoCommandP(0, t->index, HOUSES_TO_GROW, CMD_EXPAND_TOWN);
+			if (t->cache.num_houses <= before) fail_limit--;
+		} while (fail_limit > 0 && try_limit-- > 0 && t->cache.population < population);
+	}
 }

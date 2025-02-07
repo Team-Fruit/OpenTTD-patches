@@ -18,15 +18,16 @@
 #include <string>
 #include <limits>
 
-void   BufferSend_bool  (std::vector<byte> &buffer, size_t limit, bool   data);
-void   BufferSend_uint8 (std::vector<byte> &buffer, size_t limit, uint8_t  data);
-void   BufferSend_uint16(std::vector<byte> &buffer, size_t limit, uint16_t data);
-void   BufferSend_uint32(std::vector<byte> &buffer, size_t limit, uint32_t data);
-void   BufferSend_uint64(std::vector<byte> &buffer, size_t limit, uint64_t data);
-void   BufferSend_string(std::vector<byte> &buffer, size_t limit, const std::string_view data);
-size_t BufferSend_binary_until_full(std::vector<byte> &buffer, size_t limit, const byte *begin, const byte *end);
-void   BufferSend_binary(std::vector<byte> &buffer, size_t limit, const byte *data, const size_t size);
-void   BufferSend_buffer(std::vector<byte> &buffer, size_t limit, const byte *data, const size_t size);
+void   BufferSend_bool  (std::vector<uint8_t> &buffer, size_t limit, bool     data);
+void   BufferSend_uint8 (std::vector<uint8_t> &buffer, size_t limit, uint8_t  data);
+void   BufferSend_uint16(std::vector<uint8_t> &buffer, size_t limit, uint16_t data);
+void   BufferSend_uint32(std::vector<uint8_t> &buffer, size_t limit, uint32_t data);
+void   BufferSend_uint64(std::vector<uint8_t> &buffer, size_t limit, uint64_t data);
+void   BufferSend_string(std::vector<uint8_t> &buffer, size_t limit, const std::string_view data);
+size_t BufferSend_binary_until_full(std::vector<uint8_t> &buffer, size_t limit, const uint8_t *begin, const uint8_t *end);
+void   BufferSend_binary(std::vector<uint8_t> &buffer, size_t limit, const uint8_t *data, const size_t size);
+void   BufferSend_buffer(std::vector<uint8_t> &buffer, size_t limit, const uint8_t *data, const size_t size);
+void   BufferSendAtOffset_uint16(std::vector<uint8_t> &buffer, size_t offset, uint16_t data);
 
 template <typename T>
 struct BufferSerialisationHelper {
@@ -66,33 +67,47 @@ struct BufferSerialisationHelper {
 		BufferSend_string(self->GetSerialisationBuffer(), self->GetSerialisationLimit(), data);
 	}
 
-	size_t Send_binary_until_full(const byte *begin, const byte *end)
+	size_t Send_binary_until_full(const uint8_t *begin, const uint8_t *end)
 	{
 		T *self = static_cast<T *>(this);
 		return BufferSend_binary_until_full(self->GetSerialisationBuffer(), self->GetSerialisationLimit(), begin, end);
 	}
 
-	void Send_binary(const byte *data, const size_t size)
+	void Send_binary(const uint8_t *data, const size_t size)
 	{
 		T *self = static_cast<T *>(this);
 		BufferSend_binary(self->GetSerialisationBuffer(), self->GetSerialisationLimit(), data, size);
 	}
 
-	void Send_binary(std::span<const byte> data)
+	void Send_binary(std::span<const uint8_t> data)
 	{
 		this->Send_binary(data.data(), data.size());
 	}
 
-	void Send_buffer(const byte *data, const size_t size)
+	void Send_buffer(const uint8_t *data, const size_t size)
 	{
 		T *self = static_cast<T *>(this);
 		BufferSend_buffer(self->GetSerialisationBuffer(), self->GetSerialisationLimit(), data, size);
 	}
 
-	void Send_buffer(const std::vector<byte> &data)
+	void Send_buffer(const std::vector<uint8_t> &data)
 	{
 		this->Send_buffer(data.data(), data.size());
 	}
+
+	void SendAtOffset_uint16(size_t offset, uint16_t data)
+	{
+		T *self = static_cast<T *>(this);
+		BufferSendAtOffset_uint16(self->GetSerialisationBuffer(), offset, data);
+	}
+
+	size_t GetSendOffset() const
+	{
+		T *self = const_cast<T *>(static_cast<const T *>(this));
+		return self->GetSerialisationBuffer().size();
+	}
+
+	struct BufferSerialisationRef AsBufferSerialisationRef();
 };
 
 void BufferRecvStringValidate(std::string &buffer, StringValidationSettings settings);
@@ -100,7 +115,7 @@ void BufferRecvStringValidate(std::string &buffer, StringValidationSettings sett
 template <typename T>
 struct BufferDeserialisationHelper {
 private:
-	const byte *GetBuffer()
+	const uint8_t *GetBuffer()
 	{
 		return static_cast<T *>(this)->GetDeserialisationBuffer();
 	}
@@ -111,6 +126,11 @@ private:
 	}
 
 public:
+	void RaiseRecvError()
+	{
+		return static_cast<T *>(this)->RaiseDeserialisationError();
+	}
+
 	bool CanRecvBytes(size_t bytes_to_read, bool raise_error = true)
 	{
 		return static_cast<T *>(this)->CanDeserialiseBytes(bytes_to_read, raise_error);
@@ -244,7 +264,7 @@ public:
 
 		size_t length = ttd_strnlen((const char *)(this->GetBuffer() + pos), this->GetBufferSize() - pos - 1);
 		buffer.assign((const char *)(this->GetBuffer() + pos), length);
-		pos += (decltype(pos))length + 1;
+		pos += static_cast<std::remove_reference_t<decltype(pos)>>(length + 1);
 		BufferRecvStringValidate(buffer, settings);
 	}
 
@@ -253,21 +273,21 @@ public:
 	 * @param buffer The buffer to put the data into.
 	 * @param size   The size of the data.
 	 */
-	void Recv_binary(byte *buffer, size_t size)
+	void Recv_binary(uint8_t *buffer, size_t size)
 	{
 		if (!this->CanRecvBytes(size, true)) return;
 
 		auto &pos = static_cast<T *>(this)->GetDeserialisationPosition();
 
 		memcpy(buffer, &this->GetBuffer()[pos], size);
-		pos += (decltype(pos)) size;
+		pos += static_cast<std::remove_reference_t<decltype(pos)>>(size);
 	}
 
 	/**
 	 * Reads binary data.
 	 * @param buffer The buffer to put the data into.
 	 */
-	void Recv_binary(std::span<byte> buffer)
+	void Recv_binary(std::span<uint8_t> buffer)
 	{
 		this->Recv_binary(buffer.data(), buffer.size());
 	}
@@ -284,7 +304,7 @@ public:
 		auto &pos = static_cast<T *>(this)->GetDeserialisationPosition();
 
 		std::span<const uint8_t> view { &this->GetBuffer()[pos], size };
-		pos += (decltype(pos)) size;
+		pos += static_cast<std::remove_reference_t<decltype(pos)>>(size);
 
 		return view;
 	}
@@ -328,15 +348,83 @@ public:
 
 		return { view.begin(), view.end() };
 	}
+
+	struct DeserialisationBuffer BorrowAsDeserialisationBuffer();
+	void ReturnDeserialisationBuffer(struct DeserialisationBuffer &&);
 };
 
-struct BufferSerialiser : public BufferSerialisationHelper<BufferSerialiser> {
-	std::vector<byte> &buffer;
+struct BufferSerialisationRef : public BufferSerialisationHelper<BufferSerialisationRef> {
+	std::vector<uint8_t> &buffer;
+	size_t limit;
 
-	BufferSerialiser(std::vector<byte> &buffer) : buffer(buffer) {}
+	BufferSerialisationRef(std::vector<uint8_t> &buffer, size_t limit = std::numeric_limits<size_t>::max()) : buffer(buffer), limit(limit) {}
 
-	std::vector<byte> &GetSerialisationBuffer() { return this->buffer; }
-	size_t GetSerialisationLimit() const { return std::numeric_limits<size_t>::max(); }
+	std::vector<uint8_t> &GetSerialisationBuffer() { return this->buffer; }
+	size_t GetSerialisationLimit() const { return this->limit; }
 };
+
+template <typename T>
+BufferSerialisationRef BufferSerialisationHelper<T>::AsBufferSerialisationRef()
+{
+	T *self = static_cast<T *>(this);
+	return BufferSerialisationRef(self->GetSerialisationBuffer(), self->GetSerialisationLimit());
+}
+
+struct DeserialisationBuffer : public BufferDeserialisationHelper<DeserialisationBuffer> {
+	const uint8_t *buffer;
+	size_t size;
+	size_t pos = 0;
+	bool error = false;
+
+	DeserialisationBuffer(const uint8_t *buffer, size_t size) : buffer(buffer), size(size) {}
+
+	const uint8_t *GetDeserialisationBuffer() const { return this->buffer; }
+	size_t GetDeserialisationBufferSize() const { return this->size; }
+	size_t &GetDeserialisationPosition() { return this->pos; }
+
+	void RaiseDeserialisationError()
+	{
+		this->error = true;
+	}
+
+	bool CanDeserialiseBytes(size_t bytes_to_read, bool raise_error)
+	{
+		if (this->error) return false;
+
+		/* Check if variable is within packet-size */
+		if (this->pos + bytes_to_read > this->size) {
+			if (raise_error) this->RaiseDeserialisationError();
+			return false;
+		}
+
+		return true;
+	}
+};
+
+template <typename T>
+DeserialisationBuffer BufferDeserialisationHelper<T>::BorrowAsDeserialisationBuffer()
+{
+	T *self = static_cast<T *>(this);
+	auto &pos = self->GetDeserialisationPosition();
+
+	return DeserialisationBuffer(self->GetBuffer() + pos, self->GetBufferSize() - pos);
+}
+
+template <typename T>
+void BufferDeserialisationHelper<T>::ReturnDeserialisationBuffer(DeserialisationBuffer &&b)
+{
+	T *self = static_cast<T *>(this);
+
+	if (b.error) {
+		/* Propagate error */
+		self->RaiseDeserialisationError();
+		return;
+	}
+
+	auto &pos = self->GetDeserialisationPosition();
+	this->CanRecvBytes(b.pos);
+	pos += static_cast<std::remove_reference_t<decltype(pos)>>(b.pos);
+	b.buffer = nullptr;
+}
 
 #endif /* SERIALISATION_HPP */

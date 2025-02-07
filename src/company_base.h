@@ -17,6 +17,7 @@
 #include "settings_type.h"
 #include "group.h"
 #include <array>
+#include <numeric>
 #include <string>
 
 static const Money COMPANY_MAX_LOAN_DEFAULT = INT64_MIN;
@@ -31,25 +32,25 @@ struct CompanyEconomyEntry {
 };
 
 struct CompanyInfrastructure {
-	uint32_t road[ROADTYPE_END]; ///< Count of company owned track bits for each road type.
-	uint32_t signal;             ///< Count of company owned signals.
-	uint32_t rail[RAILTYPE_END]; ///< Count of company owned track bits for each rail type.
-	uint32_t water;              ///< Count of company owned track bits for canals.
-	uint32_t station;            ///< Count of company owned station tiles.
-	uint32_t airport;            ///< Count of company owned airports.
+	std::array<uint32_t, RAILTYPE_END> rail{}; ///< Count of company owned track bits for each rail type.
+	std::array<uint32_t, ROADTYPE_END> road{}; ///< Count of company owned track bits for each road type.
+	uint32_t signal{};                         ///< Count of company owned signals.
+	uint32_t water{};                          ///< Count of company owned track bits for canals.
+	uint32_t station{};                        ///< Count of company owned station tiles.
+	uint32_t airport{};                        ///< Count of company owned airports.
 
 	/** Get total sum of all owned track bits. */
 	uint32_t GetRailTotal() const
 	{
-		uint32_t total = 0;
-		for (RailType rt =  RAILTYPE_BEGIN; rt < RAILTYPE_END; rt++) total += this->rail[rt];
-		return total;
+		return std::accumulate(std::begin(this->rail), std::end(this->rail), 0U);
 	}
 
 	uint32_t GetRoadTotal() const;
 	uint32_t GetTramTotal() const;
 
-	char *Dump(char *buffer, const char *last) const;
+	void Dump(struct format_target &buffer) const;
+
+	bool operator==(const CompanyInfrastructure &) const = default;
 };
 
 class FreeUnitIDGenerator {
@@ -65,7 +66,7 @@ private:
 	std::vector<BitmapStorage> used_bitmap;
 };
 
-enum CompanyBankruptcyFlags : byte {
+enum CompanyBankruptcyFlags : uint8_t {
 	CBRF_NONE      =   0x0,
 	CBRF_SALE      =   0x1, ///< the company has been marked for sale
 	CBRF_SALE_ONLY =   0x2, ///< the company has been marked for sale without being in a bankruptcy state first
@@ -85,16 +86,18 @@ struct CompanyProperties {
 	uint32_t president_name_2;       ///< Parameter of #president_name_1
 	std::string president_name;      ///< Name of the president if the user changed it.
 
+	NetworkAuthorizedKeys allow_list; ///< Public keys of clients that are allowed to join this company.
+
 	CompanyManagerFace face;         ///< Face description of the president.
 
 	Money money;                     ///< Money owned by the company.
-	byte money_fraction;             ///< Fraction of money of the company, too small to represent in #money.
+	uint8_t money_fraction;          ///< Fraction of money of the company, too small to represent in #money.
 	Money current_loan;              ///< Amount of money borrowed from the bank.
 	Money max_loan;                  ///< Max allowed amount of the loan or COMPANY_MAX_LOAN_DEFAULT.
 
 	Colours colour;                  ///< Company colour.
 
-	byte block_preview;              ///< Number of quarters that the company is not allowed to get new exclusive engine previews (see CompaniesGenStatistics).
+	uint8_t block_preview;           ///< Number of quarters that the company is not allowed to get new exclusive engine previews (see CompaniesGenStatistics).
 
 	TileIndex location_of_HQ;        ///< Northern tile of HQ; #INVALID_TILE when there is none.
 	TileIndex last_build_coordinate; ///< Coordinate of the last build thing by this company.
@@ -105,7 +108,8 @@ struct CompanyProperties {
 	int32_t display_inaugurated_period;///< Wallclock display period of starting the company.
 	YearDelta age_years;             ///< Number of economy years that the company has been operational.
 
-	byte months_of_bankruptcy;       ///< Number of months that the company is unable to pay its debts
+	uint8_t months_empty = 0;        ///< NOSAVE: Number of months this company has not had a client in multiplayer.
+	uint8_t months_of_bankruptcy;    ///< Number of months that the company is unable to pay its debts
 	CompanyID bankrupt_last_asked;   ///< Which company was most recently asked about buying it?
 	CompanyBankruptcyFlags bankrupt_flags; ///< bankruptcy flags
 	CompanyMask bankrupt_asked;      ///< which companies were asked about buying it?
@@ -127,7 +131,7 @@ struct CompanyProperties {
 	std::array<Expenses, 3> yearly_expenses{}; ///< Expenses of the company for the last three years.
 	CompanyEconomyEntry cur_economy;                       ///< Economic data of the company of this quarter.
 	CompanyEconomyEntry old_economy[MAX_HISTORY_QUARTERS]; ///< Economic data of the company of the last #MAX_HISTORY_QUARTERS quarters.
-	byte num_valid_stat_ent;                               ///< Number of valid statistical entries in #old_economy.
+	uint8_t num_valid_stat_ent;                            ///< Number of valid statistical entries in #old_economy.
 
 	Livery livery[LS_END];
 
@@ -149,13 +153,13 @@ struct CompanyProperties {
 };
 
 struct Company : CompanyPool::PoolItem<&_company_pool>, CompanyProperties {
-	Company(uint16_t name_1 = 0, bool is_ai = false);
+	Company(StringID name_1 = StringID{0}, bool is_ai = false);
 	~Company();
 
 	RailTypes avail_railtypes;         ///< Rail types available to this company.
 	RoadTypes avail_roadtypes;         ///< Road types available to this company.
 
-	class AIInstance *ai_instance;
+	std::unique_ptr<class AIInstance> ai_instance;
 	class AIInfo *ai_info;
 	std::unique_ptr<class AIConfig> ai_config;
 
@@ -165,6 +169,7 @@ struct Company : CompanyPool::PoolItem<&_company_pool>, CompanyProperties {
 	CompanyInfrastructure infrastructure; ///< NOSAVE: Counts of company owned infrastructure.
 
 	FreeUnitIDGenerator freeunits[VEH_COMPANY_END];
+	FreeUnitIDGenerator freegroups;
 
 	Money GetMaxLoan() const;
 

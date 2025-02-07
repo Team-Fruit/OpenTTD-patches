@@ -1,6 +1,10 @@
-## JGR's Patchpack + Yahho's additions version 0.58.3+1
+## JGR's Patchpack + Yahho's additions version 0.64.1+1
 
-This is a collection of patches applied to [OpenTTD](http://www.openttd.org/)
+This is a collection of features and other modifications applied to [OpenTTD](http://www.openttd.org/).  
+It's a separate version of the game which can be installed and played alongside the standard game, not a loadable mod (NewGRF, script, or so on).
+
+This is mainly intended to be used by players who are already familiar with the standard game and how to play it.  
+It is not aimed at beginner/novice players. Some features and settings are there for very experienced players and so may have a steep learning curve.
 
 * * *
 
@@ -24,21 +28,23 @@ See the [wiki](https://github.com/JGRennison/OpenTTD-patches/wiki) for guides on
 
 See [installation.md](/installation.md) for instructions on how to install.
 
+The TT-Forums thread for this patchpack can be found [here](https://www.tt-forums.net/viewtopic.php?f=33&t=73469).
+
 (Nearly all of the patches which are listed below have been modified, fixed or extended in some way, and so are not the same as the originals which are linked).
 
 #### Railways and Trains
 
 * Drive-through train depots.
-* [Template-based train replacement](http://www.tt-forums.net/viewtopic.php?f=33&t=58904).
-* [Routing restrictions](http://www.tt-forums.net/viewtopic.php?f=33&t=73397).  
+* [Template-based train replacement](https://www.tt-forums.net/viewtopic.php?f=33&t=58904).
+* [Routing restrictions](https://www.tt-forums.net/viewtopic.php?f=33&t=73397).  
   See the [guide on the wiki](https://github.com/JGRennison/OpenTTD-patches/wiki/Signalling) for more information.
-* [Programmable pre-signals](http://www.tt-forums.net/viewtopic.php?f=33&t=47690).  
+* [Programmable pre-signals](https://www.tt-forums.net/viewtopic.php?f=33&t=47690).  
   These are not shown in the build signal window by default.  
   See the [guide on the wiki](https://github.com/JGRennison/OpenTTD-patches/wiki/Signalling) for more information.
 * Freight train through load.  
   This is an alternative loading mode for freight trains for the case where the train is longer then the platform.
 * Multiple rail types per tile.
-* [Polyline rail track building tool](http://www.tt-forums.net/viewtopic.php?f=33&t=57080).
+* [Polyline rail track building tool](https://www.tt-forums.net/viewtopic.php?f=33&t=57080).
 * Add news setting for trains waiting due to routing restrictions.
 * Add setting to enable flipping direction of all train types in depot.
 * Realistic train braking.  
@@ -76,7 +82,7 @@ See [installation.md](/installation.md) for instructions on how to install.
 
 #### Level Crossings
 
-* [Close adjacent level crossings](http://www.tt-forums.net/viewtopic.php?p=836749).
+* [Close adjacent level crossings](https://www.tt-forums.net/viewtopic.php?p=836749).
 * Prevent road vehicles from being stopped on level crossings.
 * Add setting to enable improved level crossing safety.
 * Trains break down after colliding with a road vehicle.
@@ -96,27 +102,26 @@ See [installation.md](/installation.md) for instructions on how to install.
 
 #### Airports
 
-* [Upgrade airports](http://www.tt-forums.net/viewtopic.php?f=33&t=35867).
+* [Upgrade airports](https://www.tt-forums.net/viewtopic.php?f=33&t=35867).
 
 #### Ships
 
-* [Ship collision avoidance](http://www.tt-forums.net/viewtopic.php?f=33&t=74365).
+* [Ship collision avoidance](https://www.tt-forums.net/viewtopic.php?f=33&t=74365).
 * Allow NewGRF ships to carry more than one cargo.
 
 #### Vehicles in General
 
-* [Improved breakdowns](http://www.tt-forums.net/viewtopic.php?f=33&t=39518).
-* [Vehicle repair cost setting](http://www.tt-forums.net/viewtopic.php?f=33&t=45642).
+* [Improved breakdowns](https://www.tt-forums.net/viewtopic.php?f=33&t=39518).
+* [Vehicle repair cost setting](https://www.tt-forums.net/viewtopic.php?f=33&t=45642).
 * Send vehicles which need auto-renewing due to age, for servicing, even if breakdowns are off and no servicing if no breakdowns is on.
 * Add shift-clicking on vehicle depot button to select specific depot.
 * Cargo type filter in vehicle list windows.
 * Add client setting for vehicle naming scheme.
-* [Vehicle lifetime profit](http://www.tt-forums.net/viewtopic.php?f=33&t=72844).
+* [Vehicle lifetime profit](https://www.tt-forums.net/viewtopic.php?f=33&t=72844).
 * Add settings to disable vehicle expiry and introduction after the given years.
 * Open train vehicle details window on total cargo tab if shift pressed.
 * Add news/advice setting to warn if no depot order in vehicle schedule.
-* [Add buttons to collapse/expand all groups](http://www.tt-forums.net/viewtopic.php?f=33&t=74365).
-* Add a menu item to the vehicle list to assign all listed vehicles to a new group.
+* [Add buttons to collapse/expand all groups](https://www.tt-forums.net/viewtopic.php?f=33&t=74365).
 * Add a setting to include the train length and group name in the vehicle details window.
 * Add a setting for whether to open the new vehicle GUI when share-cloning.
 * Add setting to disable mass action buttons for top-level vehicle lists.
@@ -130,19 +135,18 @@ See [installation.md](/installation.md) for instructions on how to install.
 
 #### Orders and Timetabling
 
-* [Automated timetables and separation](http://www.tt-forums.net/viewtopic.php?f=33&t=46391).
+* [Automated timetables and separation](https://www.tt-forums.net/viewtopic.php?f=33&t=46391).
 * Allow clearing of timetable time fields which are at 0. Allow explicitly setting timetable time fields to 0 without clearing them.  
-* Allow changing/clearing the timetabled waiting time and max speed of all of a vehicle's orders at once.  
 * Add client setting to show the remainder ticks in timetable, after dividing to days or minutes.  
 * Add a company setting to control the number of ticks used in auto-fill timetable rounding.
 * [Cargo type orders](https://www.tt-forums.net/viewtopic.php?p=1047749).  
   This allows order load/unload types to be set per cargo type. (This does work with cargodist).
 * Order occupancy.  
   Add column to the orders GUI to show occupancy running average, show the average order occupancy, and add a vehicle sort mode.
-* [Timetabling waiting time in depots](http://www.tt-forums.net/viewtopic.php?f=33&t=70969).
+* [Timetabling waiting time in depots](https://www.tt-forums.net/viewtopic.php?f=33&t=70969).
 * Scheduled dispatch.  
   This allows dispatching vehicles from timing points using one or more repeating schedules. This is useful for clock-face timetabling.
-* [More conditional orders](http://www.tt-forums.net/viewtopic.php?f=33&t=38317).  
+* [More conditional orders](https://www.tt-forums.net/viewtopic.php?f=33&t=38317).  
   Next station: is cargo waiting, is cargo accepted, number of free platforms, amount of cargo waiting.  
   Percent of times, per-cargo load percentage, current time/date, timetable lateness.  
   Slots/counters: train in slot, slot occupancy, counter value.  
@@ -167,7 +171,6 @@ See [installation.md](/installation.md) for instructions on how to install.
 
 * [Departure boards](https://www.tt-forums.net/viewtopic.php?f=33&t=49956).
 * Add road waypoints.
-* Add NewGRF road stops.
 * Add a setting to increase the station catchment radius.
 * Station rating: track "last visited vehicle type" separately per cargo.
 * Add setting to scale station cargo capacity and rating tolerance by size.
@@ -188,8 +191,7 @@ See [installation.md](/installation.md) for instructions on how to install.
 
 #### Towns
 
-* [Town cargo generation factor](http://www.tt-forums.net/viewtopic.php?t=46399).
-* [Rating in town label](http://www.tt-forums.net/viewtopic.php?f=33&t=42598).
+* [Rating in town label](https://www.tt-forums.net/viewtopic.php?f=33&t=42598).
 * [Random town road reconstruction](https://www.tt-forums.net/viewtopic.php?f=33&t=36438). This defaults to off.
 * Add very and extremely slow options to town growth rate setting.
 * Add a setting to scale town growth rate by proportion of town cargo transported.
@@ -205,17 +207,16 @@ See [installation.md](/installation.md) for instructions on how to install.
 
 #### Industries
 
-* Industry cargo generation factor.
 * Allow linking only inputs or outputs to the smallmap and map mode viewports in the industry chain window.
+* Add setting to scale the industry event rate.
 
 #### Map and Landscaping
 
-* Add a setting to [reduce](http://www.tt-forums.net/viewtopic.php?p=890778#p890778) or stop the tree growth rate.
-* [Adjusted arctic tree placement](http://www.tt-forums.net/viewtopic.php?f=33&t=72502).
+* Add a setting to [reduce](https://www.tt-forums.net/viewtopic.php?p=890778#p890778) or stop the tree growth rate.
+* [Adjusted arctic tree placement](https://www.tt-forums.net/viewtopic.php?f=33&t=72502).
 * Add a new tree placement mode (perfect).
 * [Minimum town distance](https://www.tt-forums.net/viewtopic.php?f=33&t=33625).
 * Add map generation settings to control river/lake, rocky patch, and tropic zone generation.
-* Add generation of wide rivers.
 * Add settings to customise the size of town zones, and city zones.
 * Add setting to show purchased land using clear tile ground sprites (dirt, grass, snow, desert, etc).
 
@@ -223,7 +224,6 @@ See [installation.md](/installation.md) for instructions on how to install.
 
 * Enable building rivers in game. Off by default.
 * Add a setting to disable removing sea/rivers.
-* Allow building objects by area (1x1 objects only).
 * Allow purchasing a region of tiles at once, by dragging.
 * Add setting to control if and how land purchasing is permitted.
 * Add a company rate limit for land purchasing.
@@ -235,14 +235,14 @@ See [installation.md](/installation.md) for instructions on how to install.
 
 #### Scenario Editor
 
-* [Picking and placing single houses in the scenario editor](http://www.tt-forums.net/viewtopic.php?f=33&t=68894).
+* [Picking and placing single houses in the scenario editor](https://www.tt-forums.net/viewtopic.php?f=33&t=68894).
 * Add settings to enable multiple churches/stadiums and to ignore date/zone/GRF when placing houses in the scenario editor.
-* [Remove all trees in scenario editor](http://www.tt-forums.net/viewtopic.php?f=33&t=49326).
+* [Remove all trees in scenario editor](https://www.tt-forums.net/viewtopic.php?f=33&t=49326).
 
 #### Interface and Visuals
 
-* [Zoning](http://www.tt-forums.net/viewtopic.php?f=33&t=33701).
-* [Measurement tools](http://www.tt-forums.net/viewtopic.php?f=33&t=49212).
+* [Zoning](https://www.tt-forums.net/viewtopic.php?f=33&t=33701).
+* [Measurement tools](https://www.tt-forums.net/viewtopic.php?f=33&t=49212).
 * [Enhanced viewport](https://www.tt-forums.net/viewtopic.php?f=33&t=53394).  
   Extra zoomed-out zoom levels with different map display modes (page up/down or ctrl-mousewheel).  
   Selected vehicle order overlays.  
@@ -251,7 +251,7 @@ See [installation.md](/installation.md) for instructions on how to install.
 * Add setting for shading trees on slopes in viewports (default on).
 * Add setting for alternative linkgraph overlay colour schemes.
 * [When building tunnels, open new viewports at the far end of the tunnel](https://www.tt-forums.net/viewtopic.php?f=33&t=72639).
-* [Smallmap screenshots](http://www.tt-forums.net/viewtopic.php?f=33&t=44596).
+* [Smallmap screenshots](https://www.tt-forums.net/viewtopic.php?f=33&t=44596).
 * Whole map screenshots at current zoom level.
 * Topography and industry screenshots.
 * Make smallmap refresh period variable with map mode/zoom and pause state.
@@ -262,10 +262,11 @@ See [installation.md](/installation.md) for instructions on how to install.
 * Add setting to increase the size of the main toolbar.
 * Add cargo filtering and a show by cargo mode to the company delivered cargo graph.
 * Add setting to display the area outside of the map as water.
+* Add ctrl-clicking sign in sign list window to open extra viewport at sign coordinates.
 
 #### Limits
 
-* [Extra large maps](http://www.tt-forums.net/viewtopic.php?f=33&t=33137).
+* [Extra large maps](https://www.tt-forums.net/viewtopic.php?f=33&t=33137).
   Maximum map size is now 256M tiles, ranging from 16k x 16k to 256 x 1M.
 * Increase the limit of NewGRF house IDs in a single game from 512 to 1024.
 * Increase per-vehicle order limit from 254 to 64k.
@@ -275,12 +276,12 @@ See [installation.md](/installation.md) for instructions on how to install.
 
 #### Time and Date
 
-* [Variable day length](http://www.tt-forums.net/viewtopic.php?p=1148227#p1148227).
+* [Economy speed reduction factor](https://www.tt-forums.net/viewtopic.php?p=1148227#p1148227).
 * Add settings to show time in hours and minutes as well as or instead of days.
 
 #### Multiplayer
 
-* [Infrastructure sharing](http://www.tt-forums.net/viewtopic.php?f=33&t=42254)  
+* [Infrastructure sharing](https://www.tt-forums.net/viewtopic.php?f=33&t=42254)  
 * Add company settings to enable competitors to buy/renew vehicles in this company's depots.  
 * Add setting to control whether trains can crash with trains owned by other companies.
 * [Give money to company, instead of player](https://www.tt-forums.net/viewtopic.php?f=33&t=63899), broadcast money transfer notifications to all players.
@@ -305,7 +306,6 @@ See [installation.md](/installation.md) for instructions on how to install.
 * Add setting to allow non server admins to use the money cheat in multiplayer.
 * Allow clicking the money text in the cheats window to enter a quantity.
 * Add cheats to set inflation income and cost factors.
-* Add cheat to set all station ratings to 100%.
 * Add cheat to set all town local authority ratings to Outstanding.
 
 #### Cargo Distribution and Link Graph
@@ -324,9 +324,8 @@ See [installation.md](/installation.md) for instructions on how to install.
 
 #### Console and Scripts
 
-* Add basic tab-completion to the console window.
 * Add console commands for conditional execution from game date.
-* [Daily/monthly/yearly scripts](http://www.tt-forums.net/viewtopic.php?f=33&t=49595)
+* [Daily/monthly/yearly scripts](https://www.tt-forums.net/viewtopic.php?f=33&t=49595)
 
 #### Miscellaneous
 
@@ -350,12 +349,12 @@ See [installation.md](/installation.md) for instructions on how to install.
 * Savegames from trunk up to the last savegame version which has been merged into this branch (*jgrpp*) should be loadable in this patchpack.  
 * Savegames from other branches which use the save/load code in the *save_ext* branch (usually suffixed: *-sx*) which are also merged into this branch (*jgrpp*), or where the added feature is marked as discardable/ignorable, should be loadable in this patchpack.  
 * Savegames from other patched versions are not loadable in this patchpack except for savegames from:  
-  * The *tracerestrict* branch ([routing restrictions patch](http://www.tt-forums.net/viewtopic.php?f=33&t=73397))  
-  * The [Spring 2013 Patch Pack](http://www.tt-forums.net/viewtopic.php?f=33&t=66892) v2.0 - v2.4 (subject to caveats, see below)  
+  * The *tracerestrict* branch ([routing restrictions patch](https://www.tt-forums.net/viewtopic.php?f=33&t=73397))  
+  * The [Spring 2013 Patch Pack](https://www.tt-forums.net/viewtopic.php?f=33&t=66892) v2.0 - v2.4 (subject to caveats, see below)  
   * [Joker's Patch Pack](https://www.tt-forums.net/viewtopic.php?f=33&t=74365) v1.19 - v1.27 (subject to caveats, see below)  
   * [Chill's Patch Pack](https://www.tt-forums.net/viewtopic.php?f=33&t=47622) v8 and v14.7 (subject to caveats, see below)
 
-#### Caveats for loading savegames from the [Spring 2013 Patch Pack](http://www.tt-forums.net/viewtopic.php?f=33&t=66892):  
+#### Caveats for loading savegames from the [Spring 2013 Patch Pack](https://www.tt-forums.net/viewtopic.php?f=33&t=66892):  
 * This is not guaranteed to be bug free  
 * Savegames with huge airports are rejected  
 * Map sizes greater than 16k x 16k are rejected  
@@ -602,6 +601,9 @@ See `src/3rdparty/monocypher/LICENSE.md` for the complete license text.
 
 The OpenTTD Social Integration API in `src/3rdparty/openttd_social_integration_api` is licensed under the MIT license.
 See `src/3rdparty/openttd_social_integration_api/LICENSE` for the complete license text.
+
+The atomic datatype support detection in `cmake/3rdparty/llvm/CheckAtomic.cmake` is licensed under the Apache 2.0 license.
+See `cmake/3rdparty/llvm/LICENSE.txt` for the complete license text.
 
 ## 4.0 Credits
 

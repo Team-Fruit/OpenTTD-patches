@@ -17,58 +17,28 @@
 #include <optional>
 #include <vector>
 
-struct CommandDeserialisationBuffer : public BufferDeserialisationHelper<CommandDeserialisationBuffer> {
-	const uint8_t *buffer;
-	size_t size;
-	size_t pos = 0;
-	bool error = false;
-
-	CommandDeserialisationBuffer(const uint8_t *buffer, size_t size) : buffer(buffer), size(size) {}
-
-	const byte *GetDeserialisationBuffer() const { return this->buffer; }
-	size_t GetDeserialisationBufferSize() const { return this->size; }
-	size_t &GetDeserialisationPosition() { return this->pos; }
-
-	bool CanDeserialiseBytes(size_t bytes_to_read, bool raise_error)
-	{
-		if (this->error) return false;
-
-		/* Check if variable is within packet-size */
-		if (this->pos + bytes_to_read > this->size) {
-			if (raise_error) this->error = true;
-			return false;
-		}
-
-		return true;
-	}
-};
-
-struct CommandSerialisationBuffer : public BufferSerialisationHelper<CommandSerialisationBuffer> {
-	std::vector<byte> &buffer;
-	size_t limit;
-
-	CommandSerialisationBuffer(std::vector<byte> &buffer, size_t limit) : buffer(buffer), limit(limit) {}
-
-	std::vector<byte> &GetSerialisationBuffer() { return this->buffer; }
-	size_t GetSerialisationLimit() const { return this->limit; }
-};
-
 struct CommandAuxiliarySerialised : public CommandAuxiliaryBase {
-	std::vector<byte> serialised_data;
+	std::vector<uint8_t> serialised_data;
+	mutable std::string debug_summary;
 
 	CommandAuxiliaryBase *Clone() const override
 	{
 		return new CommandAuxiliarySerialised(*this);
 	}
 
-	virtual std::optional<std::span<const uint8_t>> GetDeserialisationSrc() const override { return std::span<const uint8_t>(this->serialised_data.data(), this->serialised_data.size()); }
+	virtual std::optional<CommandAuxiliaryDeserialisationSrc> GetDeserialisationSrc() const override
+	{
+		return CommandAuxiliaryDeserialisationSrc{ std::span<const uint8_t>(this->serialised_data.data(), this->serialised_data.size()), this->debug_summary };
+	}
 
-	virtual void Serialise(CommandSerialisationBuffer &buffer) const override { buffer.Send_binary(this->serialised_data.data(), this->serialised_data.size()); }
+	virtual void Serialise(BufferSerialisationRef buffer) const override { buffer.Send_binary(this->serialised_data.data(), this->serialised_data.size()); }
+
+	virtual std::string GetDebugSummary() const override { return std::move(this->debug_summary); }
 };
 
 template <typename T>
 struct CommandAuxiliarySerialisable : public CommandAuxiliaryBase {
-	virtual std::optional<std::span<const uint8_t>> GetDeserialisationSrc() const override { return {}; }
+	virtual std::optional<CommandAuxiliaryDeserialisationSrc> GetDeserialisationSrc() const override { return {}; }
 
 	CommandAuxiliaryBase *Clone() const override
 	{
@@ -86,10 +56,10 @@ public:
 	inline CommandCost Load(const CommandAuxiliaryBase *base)
 	{
 		if (base == nullptr) return CMD_ERROR;
-		std::optional<std::span<const uint8_t>> deserialise_from = base->GetDeserialisationSrc();
+		std::optional<CommandAuxiliaryDeserialisationSrc> deserialise_from = base->GetDeserialisationSrc();
 		if (deserialise_from.has_value()) {
 			this->store = T();
-			CommandDeserialisationBuffer buffer(deserialise_from->data(), deserialise_from->size());
+			DeserialisationBuffer buffer(deserialise_from->src.data(), deserialise_from->src.size());
 			CommandCost res = this->store->Deserialise(buffer);
 			if (res.Failed()) return res;
 			if (buffer.error || buffer.pos != buffer.size) {
@@ -97,6 +67,7 @@ public:
 				return CMD_ERROR;
 			}
 			this->data = &(*(this->store));
+			deserialise_from->debug_summary = this->data->GetDebugSummary();
 			return res;
 		} else {
 			this->data = dynamic_cast<const T*>(base);
@@ -113,6 +84,11 @@ public:
 	inline const T &operator*() const
 	{
 		return *(this->data);
+	}
+
+	inline bool HasData() const
+	{
+		return this->data != nullptr;
 	}
 };
 

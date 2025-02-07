@@ -23,8 +23,6 @@ STR_TRANSPARENT_LOADING_TOOLTIP                                 :{BLACK}Promena 
 
 # Programmable Pre-Signals
 
-#House construction window (for SE only)
-
 #Town select window (for SE only)
 
 STR_MAPGEN_SNOW_LINE_HEIGHT                                     :{BLACK}Nivo snežnog pokrivača:
@@ -49,8 +47,8 @@ STR_VEHICLE_STATUS_CANNOT_REACH_DEPOT_SERVICE_VEL_END           :{LTBLUE}Ne mož
 
 STR_ORDERS_GO_TO_TOOLTIP_EXTRA                                  :{BLACK}Unosi novu naredbu pre obeležene, ili je dodaje na kraju spiska. Ctrl čini da stanica naredi "pun bilo koji teret", putna tačka naredi "non-stop" i depo naredi "servis". "Deli naredbe" ili Ctrl omogućava da vozilo deli naredbe sa drugim odabranim vozilom. Klikom na drugo vozilo kopiraju se njegove naredbe. Naredbom za depo se isključuje automatsko servisiranje
 
-STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :D:
-STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :P:
+STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :D:{SPACE}{SPACE}
+STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :P:{SPACE}{SPACE}
 
 # Cargo type orders Window
 
@@ -87,3 +85,19 @@ STR_ERROR_CAN_T_SELL_25_SHARE_IN                                :{WHITE}Prodaja 
 STR_ERROR_PROTECTED                                             :{WHITE}Ovo preduzeće nije dovoljno dugo aktivno za trgovinu akcijama...
 
 STR_CONFIG_SETTING_CYCLE_SIGNAL_PBS                             :Samo putna
+
+STR_WARNING_PASSWORD_SECURITY                                   :{YELLOW}Upozorenje: Administratori servera će moći da pročitaju sav tekst koji je ovde unesen.
+STR_NETWORK_NEED_COMPANY_PASSWORD_CAPTION                       :{WHITE}Preduzeće je zaštićeno. Unesi lozinku
+STR_NETWORK_CLIENT_LIST_ADMIN_COMPANY_UNLOCK                    :Otključavanje lozinkom
+STR_NETWORK_CLIENT_LIST_ASK_COMPANY_UNLOCK                      :{YELLOW}Da li zaista želiš da promeniš lozinku preduzeća '{COMPANY}'?
+
+# Network set password
+STR_COMPANY_PASSWORD_CANCEL                                     :{BLACK}Otkaži unetu lozinku
+STR_COMPANY_PASSWORD_OK                                         :{BLACK}Postavi preduzeću novu lozinku
+STR_COMPANY_PASSWORD_CAPTION                                    :{WHITE}Lozinka za preduzeće
+STR_COMPANY_PASSWORD_MAKE_DEFAULT                               :{BLACK}Podrazumevana lozinka za preduzeće
+STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}Koristi ovu lozinku kao podrazumevanu za nova preduzeća
+
+STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}Lozinka
+STR_COMPANY_VIEW_PASSWORD_TOOLTIP                               :{BLACK}Zaštiti svoje preduzeće lozinkom kako se drugi korisnici ne bi nedozvoljeno pridruživali
+STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}Postavi lozinku za preduzeće

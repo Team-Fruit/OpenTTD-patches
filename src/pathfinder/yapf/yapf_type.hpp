@@ -10,8 +10,7 @@
 #ifndef YAPF_TYPE_HPP
 #define YAPF_TYPE_HPP
 
-#include <iomanip>
-#include <sstream>
+#include "../../core/enum_type.hpp"
 
 /* Enum used in PfCalcCost() to see why was the segment closed. */
 enum EndSegmentReason {
@@ -76,19 +75,6 @@ enum EndSegmentReasonBits {
 
 DECLARE_ENUM_AS_BIT_SET(EndSegmentReasonBits)
 
-inline std::string ValueStr(EndSegmentReasonBits bits)
-{
-	static const char * const end_segment_reason_names[] = {
-		"DEAD_END", "DEAD_END_EOL", "RAIL_TYPE", "INFINITE_LOOP", "SEGMENT_TOO_LONG", "CHOICE_FOLLOWS",
-		"DEPOT", "WAYPOINT", "STATION", "SAFE_TILE",
-		"PATH_TOO_LONG", "FIRST_TWO_WAY_RED", "LOOK_AHEAD_END", "TARGET_REACHED",
-		"REVERSE"
-	};
-
-	std::stringstream ss;
-	ss << "0x" << std::setfill('0') << std::setw(4) << std::hex << bits; // 0x%04X
-	ss << " (" << ComposeNameT(bits, end_segment_reason_names, "UNK", ESRB_NONE, "NONE") << ")";
-	return ss.str();
-}
+std::string ValueStr(EndSegmentReasonBits bits);
 
 #endif /* YAPF_TYPE_HPP */

@@ -13,7 +13,6 @@
 #include "industry_type.h"
 #include "company_base.h"
 #include "window_gui.h"
-#include "strings_func.h"
 #include "blitter/factory.hpp"
 #include "linkgraph/linkgraph_gui.h"
 #include "widgets/smallmap_widget.h"
@@ -23,7 +22,7 @@
 static const int NUM_NO_COMPANY_ENTRIES = 4; ///< Number of entries in the owner legend that are not companies.
 
 /** Mapping of tile type to importance of the tile (higher number means more interesting to show). */
-static const byte _tiletype_importance[] = {
+static const uint8_t _tiletype_importance[] = {
 	2, // MP_CLEAR
 	8, // MP_RAILWAY
 	7, // MP_ROAD
@@ -66,7 +65,7 @@ struct LegendAndColour {
 };
 
 /** Types of legends in the #WID_SM_LEGEND widget. */
-enum SmallMapType : byte {
+enum SmallMapType : uint8_t {
 	SMT_CONTOUR,
 	SMT_VEHICLES,
 	SMT_INDUSTRY,
@@ -89,6 +88,7 @@ protected:
 
 	static SmallMapType map_type; ///< Currently displayed legends.
 	static bool show_towns;       ///< Display town names in the smallmap.
+	static bool show_ind_names;   ///< Display industry names in the smallmap.
 	static int map_height_limit;  ///< Currently used/cached map height limit.
 
 	static const uint INDUSTRY_MIN_NUMBER_OF_COLUMNS = 2;     ///< Minimal number of columns in the #WID_SM_LEGEND widget for the #SMT_INDUSTRY legend.
@@ -185,7 +185,8 @@ protected:
 	void DrawMapIndicators() const;
 	void DrawSmallMapColumn(void *dst, uint xc, uint yc, int pitch, int reps, int start_pos, int end_pos, int y, int end_y, Blitter *blitter) const;
 	void DrawVehicles(const DrawPixelInfo *dpi, Blitter *blitter) const;
-	void DrawTowns(const DrawPixelInfo *dpi) const;
+	void DrawTowns(const DrawPixelInfo *dpi, const int vertical_padding) const;
+	void DrawIndustryNames(const DrawPixelInfo *dpi, const int vertical_padding) const;
 	void DrawSmallMap(DrawPixelInfo *dpi, bool draw_indicators = true) const;
 
 	Point TileToPixel(int tx, int ty) const;
@@ -200,7 +201,7 @@ protected:
 public:
 	friend class NWidgetSmallmapDisplay;
 
-	SmallMapWindow(WindowDesc *desc, int window_number);
+	SmallMapWindow(WindowDesc &desc, int window_number);
 
 	static void RebuildColourIndexIfNecessary();
 

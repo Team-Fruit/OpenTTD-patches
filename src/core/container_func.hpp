@@ -26,7 +26,7 @@
 template <typename Container>
 inline bool include(Container &container, typename Container::const_reference &item)
 {
-	const bool is_member = std::find(container.begin(), container.end(), item) != container.end();
+	const bool is_member = std::ranges::find(container, item) != container.end();
 	if (!is_member) container.emplace_back(item);
 	return is_member;
 }
@@ -43,14 +43,31 @@ inline bool include(Container &container, typename Container::const_reference &i
 template <typename Container>
 int find_index(Container const &container, typename Container::const_reference item)
 {
-	auto const it = std::find(container.begin(), container.end(), item);
+	auto const it = std::ranges::find(container, item);
 	if (it != container.end()) return std::distance(container.begin(), it);
 
 	return -1;
 }
 
-template <typename C, typename UP> unsigned int container_unordered_remove_if (C &container, UP predicate) {
-	unsigned int removecount = 0;
+/**
+ * Move elements between first and last to a new position, rotating elements in between as necessary.
+ * @param first Iterator to first element to move.
+ * @param last Iterator to (end-of) last element to move.
+ * @param position Iterator to where range should be moved to.
+ * @returns Iterators to first and last after being moved.
+ */
+template <typename TIter>
+auto Slide(TIter first, TIter last, TIter position) -> std::pair<TIter, TIter>
+{
+	if (last < position) return { std::rotate(first, last, position), position };
+	if (position < first) return { position, std::rotate(position, first, last) };
+	return { first, last };
+}
+
+template <bool ONCE, typename C, typename UP>
+uint container_unordered_remove_if_generic(C &container, UP predicate)
+{
+	uint removecount = 0;
 	for (auto it = container.begin(); it != container.end();) {
 		if (predicate(*it)) {
 			removecount++;
@@ -61,6 +78,7 @@ template <typename C, typename UP> unsigned int container_unordered_remove_if (C
 				container.pop_back();
 				break;
 			}
+			if (ONCE) break;
 		} else {
 			++it;
 		}
@@ -68,14 +86,40 @@ template <typename C, typename UP> unsigned int container_unordered_remove_if (C
 	return removecount;
 }
 
-template <typename C, typename V> unsigned int container_unordered_remove(C &container, const V &value) {
-	return container_unordered_remove_if (container, [&](const typename C::value_type &v) {
+template <typename C, typename UP>
+uint container_unordered_remove_if(C &container, UP predicate)
+{
+	return container_unordered_remove_if_generic<false>(container, predicate);
+}
+
+template <typename C, typename UP>
+uint container_unordered_remove_once_if(C &container, UP predicate)
+{
+	return container_unordered_remove_if_generic<true>(container, predicate);
+}
+
+template <bool ONCE, typename C, typename V>
+unsigned int container_unordered_remove_generic(C &container, const V &value)
+{
+	return container_unordered_remove_if_generic<ONCE>(container, [&](const typename C::value_type &v) {
 		return v == value;
 	});
 }
 
+template <typename C, typename V>
+uint container_unordered_remove(C &container, const V &value)
+{
+	return container_unordered_remove_generic<false>(container, value);
+}
+
+template <typename C, typename V>
+uint container_unordered_remove_once(C &container, const V &value)
+{
+	return container_unordered_remove_generic<true>(container, value);
+}
+
 template <typename T>
-bool multimaps_equalivalent(const T &a, const T&b)
+bool multimaps_equivalent(const T &a, const T&b)
 {
 	if (a.size() != b.size()) return false;
 

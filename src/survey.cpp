@@ -117,14 +117,15 @@ static const std::string _vehicle_type_to_string[] = {
  */
 static void SurveySettingsTable(nlohmann::json &survey, const SettingTable &table, void *object, bool skip_if_default)
 {
-	char buf[512];
+	format_buffer buf;
 	for (auto &sd : table) {
 		/* Skip any old settings we no longer save/load. */
 		if (!SlIsObjectCurrentlyValid(sd->save.version_from, sd->save.version_to, sd->save.ext_feature_test)) continue;
 
 		if (skip_if_default && sd->IsDefaultValue(object)) continue;
-		sd->FormatValue(buf, lastof(buf), object);
+		sd->FormatValue(buf, object);
 		survey[sd->name] = buf;
+		buf.clear();
 	}
 }
 
@@ -192,13 +193,8 @@ void SurveyOpenTTD(nlohmann::json &survey)
 			32
 #endif
 		;
-	survey["endian"] =
-#if (TTD_ENDIAN == TTD_LITTLE_ENDIAN)
-			"little"
-#else
-			"big"
-#endif
-		;
+	if constexpr (std::endian::native == std::endian::little) survey["endian"] = "little";
+	if constexpr (std::endian::native == std::endian::big) survey["endian"] = "big";
 	survey["dedicated_build"] =
 #ifdef DEDICATED
 			"yes"
@@ -255,8 +251,8 @@ void SurveyConfiguration(nlohmann::json &survey)
 	if (BaseGraphics::GetUsedSet() != nullptr) {
 		survey["graphics_set"] = fmt::format("{}.{}", BaseGraphics::GetUsedSet()->name, BaseGraphics::GetUsedSet()->version);
 		const GRFConfig *extra_cfg = BaseGraphics::GetUsedSet()->GetExtraConfig();
-		if (extra_cfg != nullptr && extra_cfg->num_params > 0) {
-			survey["graphics_set_parameters"] = std::span<const uint32_t>(extra_cfg->param.data(), extra_cfg->num_params);
+		if (extra_cfg != nullptr && !extra_cfg->param.empty()) {
+			survey["graphics_set_parameters"] = std::span<const uint32_t>(extra_cfg->param);
 		} else {
 			survey["graphics_set_parameters"] = std::span<const uint32_t>();
 		}
@@ -349,7 +345,7 @@ void SurveyGrfs(nlohmann::json &survey)
 		if ((c->palette & GRFP_BLT_MASK) == GRFP_BLT_32BPP) grf["blitter"] = "32bpp";
 
 		grf["is_static"] = HasBit(c->flags, GCF_STATIC);
-		grf["parameters"] = std::span<const uint32_t>(c->param.data(), c->num_params);
+		grf["parameters"] = std::span<const uint32_t>(c->param);
 	}
 }
 

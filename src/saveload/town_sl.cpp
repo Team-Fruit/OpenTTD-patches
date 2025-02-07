@@ -18,13 +18,10 @@
 #include "../landscape.h"
 #include "../subsidy_func.h"
 #include "../strings_func.h"
-#include "../tilematrix_type.hpp"
 
 #include "../safeguards.h"
 
 namespace upstream_sl {
-
-typedef TileMatrix<CargoTypes, 4> AcceptanceMatrix;
 
 class SlTownSupplied : public DefaultSaveLoadHandler<SlTownSupplied, Town> {
 public:
@@ -85,7 +82,7 @@ public:
 
 	void Load(Town *t) const override
 	{
-		size_t length = IsSavegameVersionBefore(SLV_SAVELOAD_LIST_LENGTH) ? (size_t)TAE_END : SlGetStructListLength(TAE_END);
+		size_t length = IsSavegameVersionBefore(SLV_SAVELOAD_LIST_LENGTH) ? static_cast<size_t>(TAE_END) : SlGetStructListLength(TAE_END);
 		for (size_t i = 0; i < length; i++) {
 			SlObject(&t->received[i], this->GetLoadDescription());
 		}
@@ -93,6 +90,12 @@ public:
 };
 
 class SlTownAcceptanceMatrix : public DefaultSaveLoadHandler<SlTownAcceptanceMatrix, Town> {
+private:
+	/** Compatibility struct with just enough of TileMatrix to facilitate loading. */
+	struct AcceptanceMatrix {
+		TileArea area;
+		static const uint GRID = 4;
+	};
 public:
 	inline static const SaveLoad description[] = {
 		SLE_VAR(AcceptanceMatrix, area.tile, SLE_UINT32),
@@ -177,7 +180,7 @@ static const SaveLoad _town_desc[] = {
 	SLE_CONDVAR(Town, larger_town,           SLE_BOOL,                  SLV_56, SL_MAX_VERSION),
 	SLE_CONDVAR(Town, layout,                SLE_UINT8,                SLV_113, SL_MAX_VERSION),
 
-	SLE_CONDREFLIST(Town, psa_list,          REF_STORAGE,              SLV_161, SL_MAX_VERSION),
+	SLE_CONDREFVECTOR(Town, psa_list,        REF_STORAGE,              SLV_161, SL_MAX_VERSION),
 
 	SLEG_CONDSTRUCTLIST("supplied", SlTownSupplied,                    SLV_165, SL_MAX_VERSION),
 	SLEG_CONDSTRUCTLIST("received", SlTownReceived,                    SLV_165, SL_MAX_VERSION),

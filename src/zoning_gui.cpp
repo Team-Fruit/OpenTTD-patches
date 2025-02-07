@@ -9,7 +9,7 @@
 
 #include "stdafx.h"
 #include "openttd.h"
-#include "widgets/dropdown_func.h"
+#include "dropdown_func.h"
 #include "widget_type.h"
 #include "window_func.h"
 #include "gui.h"
@@ -71,7 +71,7 @@ static const ZoningModeInfo &ZoningEvaluationModeToInfo(ZoningEvaluationMode ev_
 
 struct ZoningWindow : public Window {
 
-	ZoningWindow(WindowDesc *desc, int window_number)
+	ZoningWindow(WindowDesc &desc, int window_number)
 			: Window(desc)
 	{
 		this->InitNested(window_number);
@@ -94,7 +94,7 @@ struct ZoningWindow : public Window {
 		for (const ZoningModeInfo &info : _zone_modes) {
 			if (info.debug && !IsDebugEnabled()) continue;
 			SetDParamStr(0, info.param);
-			list.push_back(std::make_unique<DropDownListStringItem>(info.str, info.mode, false));
+			list.push_back(MakeDropDownListStringItem(info.str, info.mode, false));
 		}
 		ShowDropDownList(this, std::move(list), current, widget);
 	}
@@ -139,22 +139,22 @@ struct ZoningWindow : public Window {
 		}
 	}
 
-	void UpdateWidgetSize(WidgetID widget, Dimension *size, const Dimension &padding, Dimension *fill, Dimension *resize) override
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, const Dimension &padding, Dimension &fill, Dimension &resize) override
 	{
 		switch (widget) {
 			case ZTW_OUTER_DROPDOWN:
 			case ZTW_INNER_DROPDOWN:
 				for (const ZoningModeInfo &info : _zone_modes) {
 					SetDParamStr(0, info.param);
-					*size = maxdim(*size, GetStringBoundingBox(info.str));
+					size = maxdim(size, GetStringBoundingBox(info.str));
 				}
 				break;
 
 			default:
 				return;
 		}
-		size->width += padding.width;
-		size->height = GetCharacterHeight(FS_NORMAL) + WidgetDimensions::scaled.dropdowntext.Vertical();
+		size.width += padding.width;
+		size.height = GetCharacterHeight(FS_NORMAL) + WidgetDimensions::scaled.dropdowntext.Vertical();
 	}
 };
 
@@ -167,12 +167,12 @@ static constexpr NWidgetPart _nested_zoning_widgets[] = {
 	EndContainer(),
 
 	NWidget(WWT_PANEL, COLOUR_GREY),
-		NWidget(NWID_HORIZONTAL, COLOUR_GREY), SetPIP(10, 3, 10),
-			NWidget(NWID_VERTICAL, COLOUR_GREY), SetPadding(5, 0, 5, 0), SetPIP(0, 5, 0),
-				NWidget(WWT_TEXT, COLOUR_GREY), SetDataTip(STR_ZONING_OUTER, STR_ZONING_OUTER_INFO), SetResize(1, 0), SetPadding(1, 6, 1, 6),
-				NWidget(WWT_TEXT, COLOUR_GREY), SetDataTip(STR_ZONING_INNER, STR_ZONING_INNER_INFO), SetResize(1, 0), SetPadding(1, 6, 1, 6),
+		NWidget(NWID_HORIZONTAL), SetPIP(10, 3, 10),
+			NWidget(NWID_VERTICAL), SetPadding(5, 0, 5, 0), SetPIP(0, 5, 0),
+				NWidget(WWT_TEXT, INVALID_COLOUR), SetDataTip(STR_ZONING_OUTER, STR_ZONING_OUTER_INFO), SetResize(1, 0), SetPadding(1, 6, 1, 6),
+				NWidget(WWT_TEXT, INVALID_COLOUR), SetDataTip(STR_ZONING_INNER, STR_ZONING_INNER_INFO), SetResize(1, 0), SetPadding(1, 6, 1, 6),
 			EndContainer(),
-			NWidget(NWID_VERTICAL, COLOUR_GREY), SetPadding(5, 0, 5, 0), SetPIP(0, 5, 0),
+			NWidget(NWID_VERTICAL), SetPadding(5, 0, 5, 0), SetPIP(0, 5, 0),
 				NWidget(WWT_DROPDOWN, COLOUR_GREY, ZTW_OUTER_DROPDOWN), SetDataTip(STR_JUST_STRING1, STR_NULL), SetFill(1, 0),
 				NWidget(WWT_DROPDOWN, COLOUR_GREY, ZTW_INNER_DROPDOWN), SetDataTip(STR_JUST_STRING1, STR_NULL), SetFill(1, 0),
 			EndContainer(),
@@ -184,10 +184,10 @@ static WindowDesc _zoning_desc (__FILE__, __LINE__,
 	WDP_CENTER, "zoning_gui", 0, 0,
 	WC_ZONING_TOOLBAR, WC_NONE,
 	0,
-	std::begin(_nested_zoning_widgets), std::end(_nested_zoning_widgets)
+	_nested_zoning_widgets
 );
 
 void ShowZoningToolbar()
 {
-	AllocateWindowDescFront<ZoningWindow>(&_zoning_desc, 0);
+	AllocateWindowDescFront<ZoningWindow>(_zoning_desc, 0);
 }

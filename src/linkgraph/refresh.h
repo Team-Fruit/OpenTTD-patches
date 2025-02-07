@@ -58,8 +58,8 @@ protected:
 	 * line.
 	 */
 	struct Hop {
-		OrderID from;  ///< Last order where vehicle could interact with cargo or absolute first order.
-		OrderID to;    ///< Next order to be processed.
+		VehicleOrderID from;  ///< Last order where vehicle could interact with cargo or absolute first order.
+		VehicleOrderID to;    ///< Next order to be processed.
 		CargoID cargo; ///< Cargo the consist is probably carrying or INVALID_CARGO if unknown.
 		uint8_t flags; ///< Flags, for branches
 
@@ -75,7 +75,7 @@ protected:
 		 * @param to Second order of the hop.
 		 * @param cargo Cargo the consist is probably carrying when passing the hop.
 		 */
-		Hop(OrderID from, OrderID to, CargoID cargo, uint8_t flags = 0) : from(from), to(to), cargo(cargo), flags(flags) {}
+		Hop(VehicleOrderID from, VehicleOrderID to, CargoID cargo, uint8_t flags = 0) : from(from), to(to), cargo(cargo), flags(flags) {}
 		bool operator<(const Hop &other) const { return std::tie(this->from, this->to, this->cargo, this->flags) < std::tie(other.from, other.to, other.cargo, other.flags); }
 		bool operator==(const Hop &other) const { return std::tie(this->from, this->to, this->cargo, this->flags) == std::tie(other.from, other.to, other.cargo, other.flags); }
 		bool operator!=(const Hop &other) const { return !(*this == other); }
@@ -98,7 +98,7 @@ protected:
 	typedef btree::btree_set<Hop> HopSet;
 
 	Vehicle *vehicle;           ///< Vehicle for which the links should be refreshed.
-	uint capacities[NUM_CARGO]; ///< Current added capacities per cargo ID in the consist.
+	CargoArray capacities{};    ///< Current added capacities per cargo ID in the consist.
 	RefitList refit_capacities; ///< Current state of capacity remaining from previous refits versus overall capacity per vehicle in the consist.
 	HopSet *seen_hops;          ///< Hops already seen. If the same hop is seen twice we stop the algorithm. This is shared between all Refreshers of the same run.
 	CargoID cargo;              ///< Cargo given in last refit order.

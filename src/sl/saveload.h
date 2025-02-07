@@ -19,7 +19,6 @@
 #include "../core/tinystring_type.hpp"
 #include "../core/strong_typedef_type.hpp"
 
-#include <stdarg.h>
 #include <vector>
 #include <array>
 #include <list>
@@ -56,7 +55,7 @@ enum SavegameType {
 	SGT_INVALID = 0xFF, ///< broken savegame (used internally)
 };
 
-enum SaveModeFlags : byte {
+enum SaveModeFlags : uint8_t {
 	SMF_NONE             = 0,
 	SMF_NET_SERVER       = 1 << 0, ///< Network server save
 	SMF_ZSTD_OK          = 1 << 1, ///< Zstd OK
@@ -68,7 +67,8 @@ extern FileToSaveLoad _file_to_saveload;
 
 std::string GenerateDefaultSaveName();
 void SetSaveLoadError(StringID str);
-std::string GetSaveLoadErrorString();
+StringID GetSaveLoadErrorType();
+StringID GetSaveLoadErrorMessage();
 SaveOrLoadResult SaveOrLoad(const std::string &filename, SaveLoadOperation fop, DetailedFileType dft, Subdirectory sb, bool threaded = true, SaveModeFlags flags = SMF_NONE);
 void WaitTillSaved();
 void ProcessAsyncSaveFinish();
@@ -82,7 +82,6 @@ bool IsNetworkServerSave();
 bool IsScenarioSave();
 
 typedef void ChunkSaveLoadProc();
-typedef void AutolengthProc(void *arg);
 
 void SlUnreachablePlaceholder();
 
@@ -111,7 +110,7 @@ enum ChunkType {
 	CH_SPARSE_TABLE = 4,
 	CH_EXT_HDR      = 15, ///< Extended chunk header
 
-	CH_UNUSED = 0x80,
+	CH_READONLY = 0x80,
 };
 
 /** Handlers and description of chunk. */
@@ -179,7 +178,7 @@ namespace upstream_sl {
 			SlUnreachablePlaceholder,
 			SlUnreachablePlaceholder,
 			SlUnreachablePlaceholder,
-			CH_UNUSED
+			CH_READONLY
 		};
 		ch.special_proc = [](uint32_t chunk_id, ChunkSaveLoadSpecialOp op) -> ChunkSaveLoadSpecialOpResult {
 			assert(id == chunk_id);
@@ -261,7 +260,7 @@ namespace upstream_sl {
 	template <uint32_t id, SlXvFeatureIndex feature, uint16_t min_version = 1, uint16_t max_version = 0xFFFF>
 	ChunkHandler MakeSaveUpstreamFeatureConditionalLoadUpstreamChunkHandler(ChunkSaveLoadProc *load_proc, ChunkSaveLoadProc *ptrs_proc, ChunkSaveLoadProc *load_check_proc)
 	{
-		return MakeConditionallyUpstreamChunkHandler<id, SaveUpstreamFeatureConditionalLoadUpstreamChunkInfo<feature, min_version, max_version>>(nullptr, load_proc, ptrs_proc, load_check_proc, CH_UNUSED);
+		return MakeConditionallyUpstreamChunkHandler<id, SaveUpstreamFeatureConditionalLoadUpstreamChunkInfo<feature, min_version, max_version>>(nullptr, load_proc, ptrs_proc, load_check_proc, CH_READONLY);
 	}
 }
 
@@ -275,7 +274,7 @@ using upstream_sl::MakeConditionallyUpstreamChunkHandler;
 using upstream_sl::MakeSaveUpstreamFeatureConditionalLoadUpstreamChunkHandler;
 
 struct NullStruct {
-	byte null;
+	uint8_t null;
 };
 
 /** A table of ChunkHandler entries. */
@@ -453,13 +452,13 @@ inline constexpr bool SlCheckVar(SaveLoadType cmd, VarType type, size_t length)
 			}
 			return false;
 
-		case SL_PTRRING:
+		case SL_REFRING:
 			if constexpr (sl_is_instance<T, ring_buffer>{}) {
 				return std::is_pointer_v<typename T::value_type> || sl_is_instance<typename T::value_type, std::unique_ptr>{};
 			}
 			return false;
 
-		case SL_VEC:
+		case SL_REFVEC:
 			if constexpr (sl_is_instance<T, std::vector>{}) {
 				return std::is_pointer_v<typename T::value_type> || sl_is_instance<typename T::value_type, std::unique_ptr>{};
 			}
@@ -500,7 +499,7 @@ inline constexpr void *SlVarWrapper(void* ptr)
  * @param extver   SlXvFeatureTest to test (along with from and to) which savegames have the field
  * @note In general, it is better to use one of the SLE_* macros below.
  */
-#define SLE_GENERAL_X(cmd, base, variable, type, length, from, to, extver) SaveLoad {false, cmd, type, length, from, to, SlVarWrapper<decltype(base::variable), cmd, type, length>((void*)cpp_offsetof(base, variable)), sizeof(base::variable), extver}
+#define SLE_GENERAL_X(cmd, base, variable, type, length, from, to, extver) SaveLoad {false, cmd, type, length, from, to, SLTAG_DEFAULT, { SlVarWrapper<decltype(base::variable), cmd, type, length>((void*)cpp_offsetof(base, variable)) }, extver}
 #define SLE_GENERAL(cmd, base, variable, type, length, from, to) SLE_GENERAL_X(cmd, base, variable, type, length, from, to, SlXvFeatureTest())
 
 /**
@@ -586,8 +585,8 @@ inline constexpr void *SlVarWrapper(void* ptr)
  * @param to       Last savegame version that has the list.
  * @param extver   SlXvFeatureTest to test (along with from and to) which savegames have the field
  */
-#define SLE_CONDPTRRING_X(base, variable, type, from, to, extver) SLE_GENERAL_X(SL_PTRRING, base, variable, type, 0, from, to, extver)
-#define SLE_CONDPTRRING(base, variable, type, from, to) SLE_CONDPTRRING_X(base, variable, type, from, to, SlXvFeatureTest())
+#define SLE_CONDREFRING_X(base, variable, type, from, to, extver) SLE_GENERAL_X(SL_REFRING, base, variable, type, 0, from, to, extver)
+#define SLE_CONDREFRING(base, variable, type, from, to) SLE_CONDREFRING_X(base, variable, type, from, to, SlXvFeatureTest())
 
 /**
  * Storage of a vector in some savegame versions.
@@ -598,8 +597,8 @@ inline constexpr void *SlVarWrapper(void* ptr)
  * @param to       Last savegame version that has the list.
  * @param extver   SlXvFeatureTest to test (along with from and to) which savegames have the field
  */
-#define SLE_CONDVEC_X(base, variable, type, from, to, extver) SLE_GENERAL_X(SL_VEC, base, variable, type, 0, from, to, extver)
-#define SLE_CONDVEC(base, variable, type, from, to) SLE_CONDVEC_X(base, variable, type, from, to, SlXvFeatureTest())
+#define SLE_CONDREFVEC_X(base, variable, type, from, to, extver) SLE_GENERAL_X(SL_REFVEC, base, variable, type, 0, from, to, extver)
+#define SLE_CONDREFVEC(base, variable, type, from, to) SLE_CONDREFVEC_X(base, variable, type, from, to, SlXvFeatureTest())
 
 /**
  * Storage of a variable vector in some savegame versions.
@@ -676,12 +675,12 @@ inline constexpr void *SlVarWrapper(void* ptr)
 #define SLE_REFLIST(base, variable, type) SLE_CONDREFLIST(base, variable, type, SL_MIN_VERSION, SL_MAX_VERSION)
 
 /**
- * Storage of a ring in every savegame version.
+ * Storage of a ring of #SL_REF elements in every savegame version.
  * @param base     Name of the class or struct containing the list.
  * @param variable Name of the variable in the class or struct referenced by \a base.
  * @param type     Storage of the data in memory and in the savegame.
  */
-#define SLE_PTRRING(base, variable, type) SLE_CONDPTRRING(base, variable, type, SL_MIN_VERSION, SL_MAX_VERSION)
+#define SLE_REFRING(base, variable, type) SLE_CONDREFRING(base, variable, type, SL_MIN_VERSION, SL_MAX_VERSION)
 
 /**
  * Storage of a vector in every savegame version.
@@ -689,7 +688,7 @@ inline constexpr void *SlVarWrapper(void* ptr)
  * @param variable Name of the variable in the class or struct referenced by \a base.
  * @param type     Storage of the data in memory and in the savegame.
  */
-#define SLE_VEC(base, variable, type) SLE_CONDVEC(base, variable, type, SL_MIN_VERSION, SL_MAX_VERSION)
+#define SLE_VEC(base, variable, type) SLE_CONDREFVEC(base, variable, type, SL_MIN_VERSION, SL_MAX_VERSION)
 
 /**
  * Storage of a variable vector in every savegame version.
@@ -718,8 +717,8 @@ inline constexpr void *SlVarWrapper(void* ptr)
 /** Translate values ingame to different values in the savegame and vv. */
 #define SLE_WRITEBYTE(base, variable) SLE_GENERAL(SL_WRITEBYTE, base, variable, 0, 0, SL_MIN_VERSION, SL_MAX_VERSION)
 
-#define SLE_VEH_INCLUDE() {false, SL_VEH_INCLUDE, 0, 0, SL_MIN_VERSION, SL_MAX_VERSION, nullptr, 0, SlXvFeatureTest()}
-#define SLE_ST_INCLUDE() {false, SL_ST_INCLUDE, 0, 0, SL_MIN_VERSION, SL_MAX_VERSION, nullptr, 0, SlXvFeatureTest()}
+/** SaveLoad include, for non-table use with SlFilterObject/SlFilterNamedSaveLoadTable. */
+#define SLE_INCLUDE(inc_functor) SaveLoad { false, SL_INCLUDE, 0, 0, SL_MIN_VERSION, SL_MAX_VERSION, SLTAG_DEFAULT, { .include_functor = inc_functor }, SlXvFeatureTest()}
 
 /**
  * Storage of global simple variables, references (pointers), and arrays.
@@ -731,7 +730,7 @@ inline constexpr void *SlVarWrapper(void* ptr)
  * @param extver   SlXvFeatureTest to test (along with from and to) which savegames have the field
  * @note In general, it is better to use one of the SLEG_* macros below.
  */
-#define SLEG_GENERAL_X(cmd, variable, type, length, from, to, extver) SaveLoad {true, cmd, type, length, from, to, SlVarWrapper<decltype(variable), cmd, type, length>((void*)&variable), sizeof(variable), extver}
+#define SLEG_GENERAL_X(cmd, variable, type, length, from, to, extver) SaveLoad {true, cmd, type, length, from, to, SLTAG_DEFAULT, { SlVarWrapper<decltype(variable), cmd, type, length>((void*)&variable) }, extver}
 #define SLEG_GENERAL(cmd, variable, type, length, from, to) SLEG_GENERAL_X(cmd, variable, type, length, from, to, SlXvFeatureTest())
 
 /**
@@ -802,26 +801,26 @@ inline constexpr void *SlVarWrapper(void* ptr)
 #define SLEG_CONDREFLIST(variable, type, from, to) SLEG_CONDREFLIST_X(variable, type, from, to, SlXvFeatureTest())
 
 /**
- * Storage of a global ring in some savegame versions.
+ * Storage of a global reference ring in some savegame versions.
  * @param variable Name of the global variable.
  * @param type     Storage of the data in memory and in the savegame.
  * @param from     First savegame version that has the list.
  * @param to       Last savegame version that has the list.
  * @param extver   SlXvFeatureTest to test (along with from and to) which savegames have the field
  */
-#define SLEG_CONDPTRRING_X(variable, type, from, to, extver) SLEG_GENERAL_X(SL_PTRRING, variable, type, 0, from, to, extver)
-#define SLEG_CONDPTRRING(variable, type, from, to) SLEG_CONDPTRRING_X(variable, type, from, to, SlXvFeatureTest())
+#define SLEG_CONDREFRING_X(variable, type, from, to, extver) SLEG_GENERAL_X(SL_REFRING, variable, type, 0, from, to, extver)
+#define SLEG_CONDREFRING(variable, type, from, to) SLEG_CONDREFRING_X(variable, type, from, to, SlXvFeatureTest())
 
 /**
- * Storage of a global vector in some savegame versions.
+ * Storage of a global reference vector in some savegame versions.
  * @param variable Name of the global variable.
  * @param type     Storage of the data in memory and in the savegame.
  * @param from     First savegame version that has the list.
  * @param to       Last savegame version that has the list.
  * @param extver   SlXvFeatureTest to test (along with from and to) which savegames have the field
  */
-#define SLEG_CONDVEC_X(variable, type, from, to, extver) SLEG_GENERAL_X(SL_VEC, variable, type, 0, from, to, extver)
-#define SLEG_CONDVEC(variable, type, from, to) SLEG_CONDVEC_X(variable, type, from, to, SlXvFeatureTest())
+#define SLEG_CONDREFVEC_X(variable, type, from, to, extver) SLEG_GENERAL_X(SL_REFVEC, variable, type, 0, from, to, extver)
+#define SLEG_CONDREFVEC(variable, type, from, to) SLEG_CONDREFVEC_X(variable, type, from, to, SlXvFeatureTest())
 
 /**
  * Storage of a variable vector in some savegame versions.
@@ -877,27 +876,26 @@ inline constexpr void *SlVarWrapper(void* ptr)
 #define SLEG_REFLIST(variable, type) SLEG_CONDREFLIST(variable, type, SL_MIN_VERSION, SL_MAX_VERSION)
 
 /**
- * Storage of a global ring in every savegame version.
+ * Storage of a global reference ring in every savegame version.
  * @param variable Name of the global variable.
  * @param type     Storage of the data in memory and in the savegame.
  */
-#define SLEG_PTRRING(variable, type) SLEG_CONDPTRRING(variable, type, SL_MIN_VERSION, SL_MAX_VERSION)
+#define SLEG_REFRING(variable, type) SLEG_CONDREFRING(variable, type, SL_MIN_VERSION, SL_MAX_VERSION)
 
 /**
- * Storage of a global vector in every savegame version.
+ * Storage of a global reference ector in every savegame version.
  * @param variable Name of the global variable.
  * @param type     Storage of the data in memory and in the savegame.
  */
-#define SLEG_VEC(variable, type) SLEG_CONDVEC(variable, type, SL_MIN_VERSION, SL_MAX_VERSION)
+#define SLEG_VEC(variable, type) SLEG_CONDREFVEC(variable, type, SL_MIN_VERSION, SL_MAX_VERSION)
 
 /**
  * Empty global space in some savegame versions.
  * @param length Length of the empty space.
  * @param from   First savegame version that has the empty space.
  * @param to     Last savegame version that has the empty space.
- * @param extver SlXvFeatureTest to test (along with from and to) which savegames have empty space
  */
-#define SLEG_CONDNULL(length, from, to) {true, SL_ARR, SLE_FILE_U8 | SLE_VAR_NULL, length, from, to, (void*)nullptr, SlXvFeatureTest()}
+#define SLEG_CONDNULL(length, from, to) SaveLoad {true, SL_ARR, SLE_FILE_U8 | SLE_VAR_NULL, length, from, to, SLTAG_DEFAULT, { nullptr }, SlXvFeatureTest()}
 
 /**
  * Checks whether the savegame is below \a major.\a minor.
@@ -905,10 +903,10 @@ inline constexpr void *SlVarWrapper(void* ptr)
  * @param minor Minor number of the version to check against. If \a minor is 0 or not specified, only the major number is checked.
  * @return Savegame version is earlier than the specified version.
  */
-inline bool IsSavegameVersionBefore(SaveLoadVersion major, byte minor = 0)
+inline bool IsSavegameVersionBefore(SaveLoadVersion major, uint8_t minor = 0)
 {
 	extern SaveLoadVersion _sl_version;
-	extern byte            _sl_minor_version;
+	extern uint8_t         _sl_minor_version;
 	return _sl_version < major || (minor > 0 && _sl_version == major && _sl_minor_version < minor);
 }
 
@@ -971,7 +969,7 @@ inline void *GetVariableAddress(const void *object, const SaveLoad &sld)
 	/* Everything else should be a non-null pointer. */
 	assert(object != nullptr);
 #endif
-	return const_cast<byte *>((const byte *)object + (ptrdiff_t)sld.address);
+	return const_cast<uint8_t *>((const uint8_t *)object + (ptrdiff_t)sld.address);
 }
 
 int64_t ReadValue(const void *ptr, VarType conv);
@@ -980,11 +978,31 @@ void WriteValue(void *ptr, VarType conv, int64_t val);
 void SlSetArrayIndex(uint index);
 int SlIterateArray();
 
-void SlAutolength(AutolengthProc *proc, void *arg);
 size_t SlGetFieldLength();
 void SlSetLength(size_t length);
 size_t SlCalcObjMemberLength(const void *object, const SaveLoad &sld);
 size_t SlCalcObjLength(const void *object, const SaveLoadTable &slt);
+
+uint SlReadSimpleGamma();
+void SlWriteSimpleGamma(size_t i);
+uint SlGetGammaLength(size_t i);
+constexpr uint SlGetMaxGammaLength() { return 5; }
+
+/**
+ * Run proc, automatically prepending the written length
+ * @param proc The callback procedure that is called
+ * @param args Any
+ */
+template <typename F, typename... Args>
+void SlAutolength(F proc, Args... args)
+{
+	extern void SlAutolengthSetup();
+	extern void SlAutolengthCompletion();
+
+	SlAutolengthSetup();
+	proc(std::forward<Args>(args)...);
+	SlAutolengthCompletion();
+}
 
 /**
  * Run proc, saving result in the autolength temp buffer
@@ -992,10 +1010,10 @@ size_t SlCalcObjLength(const void *object, const SaveLoadTable &slt);
  * @return Span of the saved data, in the autolength temp buffer
  */
 template <typename F>
-std::span<byte> SlSaveToTempBuffer(F proc)
+std::span<uint8_t> SlSaveToTempBuffer(F proc)
 {
 	extern uint8_t SlSaveToTempBufferSetup();
-	extern std::span<byte> SlSaveToTempBufferRestore(uint8_t state);
+	extern std::span<uint8_t> SlSaveToTempBufferRestore(uint8_t state);
 
 	uint8_t state = SlSaveToTempBufferSetup();
 	proc();
@@ -1011,7 +1029,7 @@ std::span<byte> SlSaveToTempBuffer(F proc)
 template <typename F>
 std::vector<uint8_t> SlSaveToVector(F proc)
 {
-	std::span<byte> result = SlSaveToTempBuffer(proc);
+	std::span<uint8_t> result = SlSaveToTempBuffer(proc);
 	return std::vector<uint8_t>(result.begin(), result.end());
 }
 
@@ -1040,8 +1058,8 @@ bool SlConditionallySave(F proc)
 
 struct SlLoadFromBufferState {
 	size_t old_obj_len;
-	byte *old_bufp;
-	byte *old_bufe;
+	uint8_t *old_bufp;
+	uint8_t *old_bufe;
 };
 
 /**
@@ -1049,10 +1067,10 @@ struct SlLoadFromBufferState {
  * @param proc The callback procedure that is called
  */
 template <typename F>
-void SlLoadFromBuffer(const byte *buffer, size_t length, F proc)
+void SlLoadFromBuffer(const uint8_t *buffer, size_t length, F proc)
 {
-	extern SlLoadFromBufferState SlLoadFromBufferSetup(const byte *buffer, size_t length);
-	extern void SlLoadFromBufferRestore(const SlLoadFromBufferState &state, const byte *buffer, size_t length);
+	extern SlLoadFromBufferState SlLoadFromBufferSetup(const uint8_t *buffer, size_t length);
+	extern void SlLoadFromBufferRestore(const SlLoadFromBufferState &state, const uint8_t *buffer, size_t length);
 
 	SlLoadFromBufferState state = SlLoadFromBufferSetup(buffer, length);
 	proc();
@@ -1060,34 +1078,57 @@ void SlLoadFromBuffer(const byte *buffer, size_t length, F proc)
 }
 
 void SlGlobList(const SaveLoadTable &slt);
+void SlStdString(std::string *str, VarType conv);
 void SlArray(void *array, size_t length, VarType conv);
 void SlObject(void *object, const SaveLoadTable &slt);
 bool SlObjectMember(void *object, const SaveLoad &sld);
 
 std::vector<SaveLoad> SlFilterObject(const SaveLoadTable &slt);
+void SlFilterNamedSaveLoadTable(const NamedSaveLoadTable &nslt, std::vector<SaveLoad> &save);
+std::vector<SaveLoad> SlFilterNamedSaveLoadTable(const NamedSaveLoadTable &nslt);
 void SlObjectSaveFiltered(void *object, const SaveLoadTable &slt);
 void SlObjectLoadFiltered(void *object, const SaveLoadTable &slt);
 void SlObjectPtrOrNullFiltered(void *object, const SaveLoadTable &slt);
 
+struct TableHeaderSpecialHandler {
+	virtual ~TableHeaderSpecialHandler() {}
+
+	virtual bool MissingField(const std::string &key, uint8_t type, std::vector<SaveLoad> &saveloads) { return false; } // By default, do not handle
+};
+
 bool SlIsTableChunk();
 void SlSkipTableHeader();
-std::vector<SaveLoad> SlTableHeader(const NamedSaveLoadTable &slt);
-std::vector<SaveLoad> SlTableHeaderOrRiff(const NamedSaveLoadTable &slt);
-void SlSaveTableObjectChunk(const SaveLoadTable &slt);
-void SlLoadTableOrRiffFiltered(const SaveLoadTable &slt);
+[[nodiscard]] SaveLoadTableData SlTableHeader(const NamedSaveLoadTable &slt, TableHeaderSpecialHandler *special_handler = nullptr);
+[[nodiscard]] SaveLoadTableData SlTableHeaderOrRiff(const NamedSaveLoadTable &slt);
+[[nodiscard]] SaveLoadTableData SlPrepareNamedSaveLoadTableForPtrOrNull(const NamedSaveLoadTable &slt);
+void SlSaveTableObjectChunk(const SaveLoadTable &slt, void *object = nullptr);
+void SlLoadTableOrRiffFiltered(const SaveLoadTable &slt, void *object = nullptr);
 void SlLoadTableWithArrayLengthPrefixesMissing();
 
-inline void SlSaveTableObjectChunk(const NamedSaveLoadTable &slt)
+void SlSetStructListLength(size_t length);
+size_t SlGetStructListLength(size_t limit);
+
+void SlSkipChunkContents();
+
+inline void SlSaveTableObjectChunk(const NamedSaveLoadTable &slt, void *object = nullptr)
 {
-	SlSaveTableObjectChunk(SlTableHeader(slt));
+	SlSaveTableObjectChunk(SlTableHeader(slt), object);
 }
 
-inline void SlLoadTableOrRiffFiltered(const NamedSaveLoadTable &slt)
+inline void SlLoadTableObjectChunk(const NamedSaveLoadTable &slt, void *object = nullptr)
 {
-	SlLoadTableOrRiffFiltered(SlTableHeaderOrRiff(slt));
+	SlLoadTableOrRiffFiltered(SlTableHeader(slt), object);
 }
 
-[[noreturn]] void CDECL SlErrorFmt(StringID string, const char *msg, ...) WARN_FORMAT(2, 3);
+inline void SlLoadTableObjectChunk(const SaveLoadTable &slt, void *object = nullptr)
+{
+	SlLoadTableOrRiffFiltered(slt, object);
+}
+
+inline void SlLoadTableOrRiffFiltered(const NamedSaveLoadTable &slt, void *object = nullptr)
+{
+	SlLoadTableOrRiffFiltered(SlTableHeaderOrRiff(slt), object);
+}
 
 bool SaveloadCrashWithMissingNewGRFs();
 
@@ -1095,6 +1136,9 @@ void SlResetVENC();
 void SlProcessVENC();
 
 void SlResetTNNC();
+
+void SlResetERNC();
+void SlProcessERNC();
 
 extern std::string _savegame_format;
 extern bool _do_autosave;

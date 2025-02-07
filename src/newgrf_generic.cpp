@@ -17,6 +17,7 @@
 #include "newgrf_extension.h"
 #include "water_map.h"
 #include "string_func.h"
+#include "newgrf_dump.h"
 #include <list>
 
 #include "safeguards.h"
@@ -45,7 +46,7 @@ struct GenericScopeResolver : public ScopeResolver {
 	{
 	}
 
-	uint32_t GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra *extra) const override;
+	uint32_t GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra &extra) const override;
 
 private:
 	bool ai_callback; ///< Callback comes from the AI.
@@ -97,8 +98,8 @@ static GenericCallbackList _gcl[GSF_END];
  */
 void ResetGenericCallbacks()
 {
-	for (uint8_t feature = 0; feature < lengthof(_gcl); feature++) {
-		_gcl[feature].clear();
+	for (auto &gcl : _gcl) {
+		gcl.clear();
 	}
 }
 
@@ -112,7 +113,7 @@ void ResetGenericCallbacks()
 void AddGenericCallback(GrfSpecFeature feature, const GRFFile *file, const SpriteGroup *group)
 {
 	if (feature >= lengthof(_gcl)) {
-		grfmsg(5, "AddGenericCallback: Unsupported feature %s", GetFeatureString(feature));
+		GrfMsg(5, "AddGenericCallback: Unsupported feature {}", GetFeatureString(feature));
 		return;
 	}
 
@@ -121,7 +122,7 @@ void AddGenericCallback(GrfSpecFeature feature, const GRFFile *file, const Sprit
 	_gcl[feature].push_back(GenericCallback(file, group));
 }
 
-/* virtual */ uint32_t GenericScopeResolver::GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra *extra) const
+/* virtual */ uint32_t GenericScopeResolver::GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra &extra) const
 {
 	if (this->ai_callback) {
 		switch (variable) {
@@ -141,9 +142,9 @@ void AddGenericCallback(GrfSpecFeature feature, const GRFFile *file, const Sprit
 		}
 	}
 
-	DEBUG(grf, 1, "Unhandled generic feature variable 0x%02X", variable);
+	Debug(grf, 1, "Unhandled generic feature variable 0x{:02X}", variable);
 
-	extra->available = false;
+	extra.available = false;
 	return UINT_MAX;
 }
 
@@ -213,13 +214,13 @@ uint16_t GetAiPurchaseCallbackResult(GrfSpecFeature feature, CargoID cargo_type,
 	if (src_industry != IT_AI_UNKNOWN && src_industry != IT_AI_TOWN) {
 		const IndustrySpec *is = GetIndustrySpec(src_industry);
 		/* If this is no original industry, use the substitute type */
-		if (is->grf_prop.subst_id != INVALID_INDUSTRYTYPE) src_industry = is->grf_prop.subst_id;
+		if (is->grf_prop.subst_id != IT_INVALID) src_industry = is->grf_prop.subst_id;
 	}
 
 	if (dst_industry != IT_AI_UNKNOWN && dst_industry != IT_AI_TOWN) {
 		const IndustrySpec *is = GetIndustrySpec(dst_industry);
 		/* If this is no original industry, use the substitute type */
-		if (is->grf_prop.subst_id != INVALID_INDUSTRYTYPE) dst_industry = is->grf_prop.subst_id;
+		if (is->grf_prop.subst_id != IT_INVALID) dst_industry = is->grf_prop.subst_id;
 	}
 
 	object.generic_scope.cargo_type        = cargo_type;
@@ -298,10 +299,8 @@ void DumpGenericCallbackSpriteGroups(GrfSpecFeature feature, SpriteGroupDumper &
 	bool first = true;
 	for (GenericCallbackList::const_reverse_iterator it = _gcl[feature].rbegin(); it != _gcl[feature].rend(); ++it) {
 		if (!first) dumper.Print("");
-		char buffer[64];
-		seprintf(buffer, lastof(buffer), "GRF: %08X, town zone cb enabled: %s",
-				BSWAP32(it->file->grfid), HasBit(it->file->observed_feature_tests, GFTOF_TOWN_ZONE_CALLBACK) ? "yes" : "no");
-		dumper.Print(buffer);
+		dumper.Print(fmt::format("GRF: {:08X}, town zone cb enabled: {}",
+				BSWAP32(it->file->grfid), HasBit(it->file->observed_feature_tests, GFTOF_TOWN_ZONE_CALLBACK) ? "yes" : "no"));
 		first = false;
 		dumper.DumpSpriteGroup(it->group, 0);
 	}

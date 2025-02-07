@@ -27,9 +27,9 @@
 
 /* static */ ScriptLeagueTable::LeagueTableID ScriptLeagueTable::New(Text *title, Text *header, Text *footer)
 {
-	CCountedPtr<Text> title_counter(title);
-	CCountedPtr<Text> header_counter(header);
-	CCountedPtr<Text> footer_counter(footer);
+	ScriptObjectRef title_counter(title);
+	ScriptObjectRef header_counter(header);
+	ScriptObjectRef footer_counter(footer);
 
 	EnforceDeityMode(LEAGUE_TABLE_INVALID);
 	EnforcePrecondition(LEAGUE_TABLE_INVALID, title != nullptr);
@@ -41,7 +41,7 @@
 	if (header != nullptr) data.header = header->GetEncodedText();
 	if (footer != nullptr) data.footer = footer->GetEncodedText();
 
-	if (!ScriptObject::DoCommandEx(0, 0, 0, 0, CMD_CREATE_LEAGUE_TABLE, nullptr, &data, &ScriptInstance::DoCommandReturnLeagueTableID)) return LEAGUE_TABLE_INVALID;
+	if (!ScriptObject::DoCommandAux(0, &data, CMD_CREATE_LEAGUE_TABLE, &ScriptInstance::DoCommandReturnLeagueTableID)) return LEAGUE_TABLE_INVALID;
 
 	/* In case of test-mode, we return LeagueTableID 0 */
 	return (ScriptLeagueTable::LeagueTableID)0;
@@ -52,10 +52,10 @@
 	return ::LeagueTableElement::IsValidID(element_id);
 }
 
-/* static */ ScriptLeagueTable::LeagueTableElementID ScriptLeagueTable::NewElement(ScriptLeagueTable::LeagueTableID table, SQInteger rating, ScriptCompany::CompanyID company, Text *text, Text *score, LinkType link_type, LinkTargetID link_target)
+/* static */ ScriptLeagueTable::LeagueTableElementID ScriptLeagueTable::NewElement(ScriptLeagueTable::LeagueTableID table, SQInteger rating, ScriptCompany::CompanyID company, Text *text, Text *score, LinkType link_type, SQInteger link_target)
 {
-	CCountedPtr<Text> text_counter(text);
-	CCountedPtr<Text> score_counter(score);
+	ScriptObjectRef text_counter(text);
+	ScriptObjectRef score_counter(score);
 
 	EnforceDeityMode(LEAGUE_TABLE_ELEMENT_INVALID);
 
@@ -76,18 +76,23 @@
 	EnforcePrecondition(LEAGUE_TABLE_ELEMENT_INVALID, IsValidLink(Link((::LinkType)link_type, link_target)));
 
 	LeagueTableElementCmdData data;
+	data.table = table;
+	data.rating = rating;
+	data.company = c;
+	data.link_type = (::LinkType)link_type;
+	data.link_target = (::LinkTargetID)link_target;
 	data.text_str = std::move(encoded_text);
 	data.score = encoded_score;
 
-	if (!ScriptObject::DoCommandEx(0, table | (c << 8) | (link_type << 16), link_target, rating, CMD_CREATE_LEAGUE_TABLE_ELEMENT, nullptr, &data, &ScriptInstance::DoCommandReturnLeagueTableElementID)) return LEAGUE_TABLE_ELEMENT_INVALID;
+	if (!ScriptObject::DoCommandAux(0, &data, CMD_CREATE_LEAGUE_TABLE_ELEMENT, &ScriptInstance::DoCommandReturnLeagueTableElementID)) return LEAGUE_TABLE_ELEMENT_INVALID;
 
 	/* In case of test-mode, we return LeagueTableElementID 0 */
 	return (ScriptLeagueTable::LeagueTableElementID)0;
 }
 
-/* static */ bool ScriptLeagueTable::UpdateElementData(LeagueTableElementID element, ScriptCompany::CompanyID company, Text *text, LinkType link_type, LinkTargetID link_target)
+/* static */ bool ScriptLeagueTable::UpdateElementData(LeagueTableElementID element, ScriptCompany::CompanyID company, Text *text, LinkType link_type, SQInteger link_target)
 {
-	CCountedPtr<Text> text_counter(text);
+	ScriptObjectRef text_counter(text);
 
 	EnforceDeityMode(false);
 	EnforcePrecondition(false, IsValidLeagueTableElement(element));
@@ -107,7 +112,7 @@
 
 /* static */ bool ScriptLeagueTable::UpdateElementScore(LeagueTableElementID element, SQInteger rating, Text *score)
 {
-	CCountedPtr<Text> score_counter(score);
+	ScriptObjectRef score_counter(score);
 
 	EnforceDeityMode(false);
 	EnforcePrecondition(false, IsValidLeagueTableElement(element));

@@ -49,17 +49,17 @@ void LinkGraphSchedule::SpawnNext()
 {
 	if (this->schedule.empty()) return;
 
-	GraphList schedule_to_back;
+	std::vector<LinkGraph *> schedule_to_back;
 	uint64_t total_cost = 0;
 	for (auto iter = this->schedule.begin(); iter != this->schedule.end();) {
-		auto current = iter;
-		++iter;
-		const LinkGraph *lg = *current;
+		const LinkGraph *lg = *iter;
 
 		if (lg->Size() < 2) {
-			schedule_to_back.splice(schedule_to_back.end(), this->schedule, current);
+			schedule_to_back.push_back(*iter);
+			iter = this->schedule.erase(iter);
 		} else {
 			total_cost += lg->CalculateCostEstimate();
+			++iter;
 		}
 	}
 	for (auto &it : this->running) {
@@ -83,15 +83,15 @@ void LinkGraphSchedule::SpawnNext()
 			jobs_to_execute.emplace_back(job.get(), cost);
 			if (this->running.empty() || job->JoinTick() >= this->running.back()->JoinTick()) {
 				this->running.push_back(std::move(job));
-				DEBUG(linkgraph, 3, "LinkGraphSchedule::SpawnNext(): Running job: id: %u, nodes: %u, cost: " OTTD_PRINTF64U ", duration_multiplier: %u",
+				Debug(linkgraph, 3, "LinkGraphSchedule::SpawnNext(): Running job: id: {}, nodes: {}, cost: {}, duration_multiplier: {}",
 						lg->index, lg->Size(), cost, duration_multiplier);
 			} else {
-				// find right place to insert
+				/* Find right place to insert */
 				auto iter = std::upper_bound(this->running.begin(), this->running.end(), job->JoinTick(), [](ScaledTickCounter a, const std::unique_ptr<LinkGraphJob> &b) {
 					return a < b->JoinTick();
 				});
 				this->running.insert(iter, std::move(job));
-				DEBUG(linkgraph, 3, "LinkGraphSchedule::SpawnNext(): Running job (re-ordering): id: %u, nodes: %u, cost: " OTTD_PRINTF64U ", duration_multiplier: %u",
+				Debug(linkgraph, 3, "LinkGraphSchedule::SpawnNext(): Running job (re-ordering): id: {}, nodes: {}, cost: {}, duration_multiplier: {}",
 						lg->index, lg->Size(), cost, duration_multiplier);
 			}
 		} else {
@@ -99,11 +99,11 @@ void LinkGraphSchedule::SpawnNext()
 		}
 	}
 
-	this->schedule.splice(this->schedule.end(), schedule_to_back);
+	this->schedule.insert(this->schedule.end(), schedule_to_back.begin(), schedule_to_back.end());
 
 	LinkGraphJobGroup::ExecuteJobSet(std::move(jobs_to_execute));
 
-	DEBUG(linkgraph, 2, "LinkGraphSchedule::SpawnNext(): Linkgraph job totals: cost: " OTTD_PRINTF64U ", budget: " OTTD_PRINTF64U ", scaling: %u, scheduled: " PRINTF_SIZE ", running: " PRINTF_SIZE,
+	Debug(linkgraph, 2, "LinkGraphSchedule::SpawnNext(): Linkgraph job totals: cost: {}, budget: {}, scaling: {}, scheduled: {}, running: {}",
 			total_cost, cost_budget, scaling, this->schedule.size(), this->running.size());
 }
 
@@ -152,9 +152,9 @@ void LinkGraphSchedule::JoinNext()
  */
 /* static */ void LinkGraphSchedule::Run(LinkGraphJob *job)
 {
-	for (uint i = 0; i < lengthof(instance.handlers); ++i) {
+	for (const auto &handler : instance.handlers) {
 		if (job->IsJobAborted()) return;
-		instance.handlers[i]->Run(*job);
+		handler->Run(*job);
 	}
 
 	/*
@@ -210,12 +210,12 @@ void LinkGraphSchedule::ShiftDates(DateDelta interval)
  */
 LinkGraphSchedule::LinkGraphSchedule()
 {
-	this->handlers[0].reset(new InitHandler);
-	this->handlers[1].reset(new DemandHandler);
-	this->handlers[2].reset(new MCFHandler<MCF1stPass>);
-	this->handlers[3].reset(new FlowMapper(false));
-	this->handlers[4].reset(new MCFHandler<MCF2ndPass>);
-	this->handlers[5].reset(new FlowMapper(true));
+	this->handlers[0] = std::make_unique<InitHandler>();
+	this->handlers[1] = std::make_unique<DemandHandler>();
+	this->handlers[2] = std::make_unique<MCFHandler<MCF1stPass>>();
+	this->handlers[3] = std::make_unique<FlowMapper>(false);
+	this->handlers[4] = std::make_unique<MCFHandler<MCF2ndPass>>();
+	this->handlers[5] = std::make_unique<FlowMapper>(true);
 }
 
 /**
@@ -283,7 +283,7 @@ void LinkGraphJobGroup::JoinThread()
 	ScaledTickCounter bucket_join_tick = 0;
 	auto flush_bucket = [&]() {
 		if (!bucket_cost) return;
-		DEBUG(linkgraph, 2, "LinkGraphJobGroup::ExecuteJobSet: Creating Job Group: jobs: " PRINTF_SIZE ", cost: %u, join after: " OTTD_PRINTF64,
+		Debug(linkgraph, 2, "LinkGraphJobGroup::ExecuteJobSet: Creating Job Group: jobs: {}, cost: {}, join after: {}",
 				bucket.size(), bucket_cost, bucket_join_tick - _scaled_tick_counter);
 		auto group = std::make_shared<LinkGraphJobGroup>(constructor_token(), std::move(bucket));
 		group->SpawnThread();

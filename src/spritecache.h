@@ -13,7 +13,7 @@
 #include "gfx_type.h"
 #include "zoom_type.h"
 #include "spriteloader/spriteloader.hpp"
-#include "3rdparty/cpp-btree/btree_map.h"
+#include "3rdparty/robin_hood/robin_hood.h"
 
 /** Data structure describing a sprite. */
 struct Sprite {
@@ -25,12 +25,12 @@ struct Sprite {
 	uint32_t lru;                ///< Sprite cache LRU of this sprite structure.
 	uint8_t missing_zoom_levels; ///< Bitmask of zoom levels missing in data
 	Sprite *next = nullptr;      ///< Next sprite structure, this is the only member which may be changed after the sprite has been inserted in the sprite cache
-	byte data[];                 ///< Sprite data.
+	uint8_t data[];              ///< Sprite data.
 };
 
 /*
- * Allow skipping sprites with zoom < ZOOM_LVL_OUT_4X, for sprite min zoom setting at 1x, if ZOOM_LVL_OUT_4X bit of present zoom levels is set.
- * Allow skipping sprites with zoom < ZOOM_LVL_OUT_2X, for sprite min zoom setting at 2x, if either ZOOM_LVL_OUT_4X or ZOOM_LVL_OUT_2X bits of present zoom levels are set.
+ * Allow skipping sprites with zoom < ZOOM_LVL_NORMAL, for sprite min zoom setting at 1x, if ZOOM_LVL_NORMAL bit of present zoom levels is set.
+ * Allow skipping sprites with zoom < ZOOM_LVL_IN_2X, for sprite min zoom setting at 2x, if either ZOOM_LVL_NORMAL or ZOOM_LVL_IN_2X bits of present zoom levels are set.
  */
 enum SpriteCacheCtrlFlags {
 	SCC_PAL_ZOOM_START            =  0, ///< Start bit of present zoom levels in palette mode.
@@ -40,10 +40,21 @@ enum SpriteCacheCtrlFlags {
 
 extern uint _sprite_cache_size;
 
-typedef void *AllocatorProc(size_t size);
+/** SpriteAllocate that uses malloc to allocate memory. */
+class SimpleSpriteAllocator : public SpriteAllocator {
+protected:
+	void *AllocatePtr(size_t size) override;
+};
 
-void *SimpleSpriteAlloc(size_t size);
-void *GetRawSprite(SpriteID sprite, SpriteType type, uint8_t zoom_levels, AllocatorProc *allocator = nullptr, SpriteEncoder *encoder = nullptr);
+/** SpriteAllocator that allocates memory via a unique_ptr array. */
+class UniquePtrSpriteAllocator : public SpriteAllocator {
+public:
+	std::unique_ptr<uint8_t[]> data;
+protected:
+	void *AllocatePtr(size_t size) override;
+};
+
+void *GetRawSprite(SpriteID sprite, SpriteType type, uint8_t zoom_levels, SpriteAllocator *allocator = nullptr, SpriteEncoder *encoder = nullptr);
 bool SpriteExists(SpriteID sprite);
 
 SpriteType GetSpriteType(SpriteID sprite);
@@ -58,30 +69,34 @@ inline const Sprite *GetSprite(SpriteID sprite, SpriteType type, uint8_t zoom_le
 	return (Sprite*)GetRawSprite(sprite, type, zoom_levels);
 }
 
-inline const byte *GetNonSprite(SpriteID sprite, SpriteType type)
+inline const uint8_t *GetNonSprite(SpriteID sprite, SpriteType type)
 {
 	dbg_assert(type == SpriteType::Recolour);
-	return (byte*)GetRawSprite(sprite, type, UINT8_MAX);
+	return (uint8_t*)GetRawSprite(sprite, type, UINT8_MAX);
 }
 
 void GfxInitSpriteMem();
+void GfxClearSpriteCacheLoadIndex();
 void GfxClearSpriteCache();
 void GfxClearFontSpriteCache();
 void IncreaseSpriteLRU();
 
 SpriteFile &OpenCachedSpriteFile(const std::string &filename, Subdirectory subdir, bool palette_remap);
+std::span<const std::unique_ptr<SpriteFile>> GetCachedSpriteFiles();
 
 void ReadGRFSpriteOffsets(SpriteFile &file);
 size_t GetGRFSpriteOffset(uint32_t id);
-bool LoadNextSprite(int load_index, SpriteFile &file, uint file_sprite_id);
-bool SkipSpriteData(SpriteFile &file, byte type, uint16_t num);
+bool LoadNextSprite(SpriteID load_index, SpriteFile &file, uint file_sprite_id);
+bool SkipSpriteData(SpriteFile &file, uint8_t type, uint16_t num);
 void DupSprite(SpriteID old_spr, SpriteID new_spr);
 
+#if !defined(DEDICATED)
 uint32_t GetSpriteMainColour(SpriteID sprite_id, PaletteID palette_id);
+#endif /* !DEDICATED */
 
 struct SpritePointerHolder {
 private:
-	btree::btree_map<uint32_t, const void *> cache;
+	robin_hood::unordered_map<uint32_t, const void *> cache;
 
 public:
 	inline const Sprite *GetSprite(SpriteID sprite, SpriteType type) const
@@ -89,9 +104,9 @@ public:
 		return (const Sprite*)(this->cache.find(sprite | (static_cast<uint32_t>(type) << 29))->second);
 	}
 
-	inline const byte *GetRecolourSprite(SpriteID sprite) const
+	inline const uint8_t *GetRecolourSprite(SpriteID sprite) const
 	{
-		return (const byte*)(this->cache.find(sprite | (static_cast<uint32_t>(SpriteType::Recolour) << 29))->second);
+		return (const uint8_t*)(this->cache.find(sprite | (static_cast<uint32_t>(SpriteType::Recolour) << 29))->second);
 	}
 
 	void Clear()

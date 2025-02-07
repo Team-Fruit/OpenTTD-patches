@@ -22,13 +22,13 @@
 #include "../company_base.h"
 #include "../company_func.h"
 #include "../disaster_vehicle.h"
+#include "../debug.h"
 
 #include <map>
 #include <vector>
 
 #include "../safeguards.h"
 
-void AfterLoadVehicles(bool part_of_load);
 bool TrainController(Train *v, Vehicle *nomove, bool reverse = true); // From train_cmd.cpp
 void ReverseTrainDirection(Train *v);
 void ReverseTrainSwapVeh(Train *v, int l, int r);
@@ -48,17 +48,7 @@ static VehicleUnbunchState _unbunch_state;
 
 class SlVehicleCommon : public DefaultSaveLoadHandler<SlVehicleCommon, Vehicle> {
 public:
-#if defined(_MSC_VER) && (_MSC_VER == 1915 || _MSC_VER == 1916)
-	/* This table access private members of other classes; they have this
-	 * class as friend. For MSVC CL 19.15 and 19.16 this doesn't work for
-	 * "inline static const", so we are forced to wrap the table in a
-	 * function. CL 19.16 is the latest for VS2017. */
-	inline static const SaveLoad description[] = {{}};
-	SaveLoadTable GetDescription() const override {
-#else
-	inline
-#endif
-	static const SaveLoad description[] = {
+	inline static const SaveLoad description[] = {
 		    SLE_VAR(Vehicle, subtype,               SLE_UINT8),
 
 		    SLE_REF(Vehicle, next,                  REF_VEHICLE_OLD),
@@ -134,7 +124,7 @@ public:
 		SLE_CONDVAR(Vehicle, timetable_start,       SLE_FILE_I32 | SLE_VAR_I64, SLV_129, SLV_TIMETABLE_START_TICKS),
 		SLE_CONDVAR(Vehicle, timetable_start,       SLE_FILE_U64 | SLE_VAR_I64, SLV_TIMETABLE_START_TICKS, SL_MAX_VERSION),
 
-		SLE_CONDREF(Vehicle, orders,                REF_ORDER,                    SL_MIN_VERSION, SLV_105),
+		//SLE_CONDREF(Vehicle, orders,                REF_ORDER,                    SL_MIN_VERSION, SLV_105),
 		SLE_CONDREF(Vehicle, orders,                REF_ORDERLIST,              SLV_105, SL_MAX_VERSION),
 
 		SLE_CONDVAR(Vehicle, age,                   SLE_FILE_U16 | SLE_VAR_I32,   SL_MIN_VERSION,  SLV_31),
@@ -187,10 +177,7 @@ public:
 		SLEG_CONDVAR("depot_unbunching_next_departure", _unbunch_state.depot_unbunching_next_departure, SLE_UINT64, SLV_DEPOT_UNBUNCHING, SL_MAX_VERSION),
 		SLEG_CONDVAR("round_trip_time",                 _unbunch_state.round_trip_time,                 SLE_INT32,  SLV_DEPOT_UNBUNCHING, SL_MAX_VERSION),
 	};
-#if defined(_MSC_VER) && (_MSC_VER == 1915 || _MSC_VER == 1916)
-		return description;
-	}
-#endif
+
 	inline const static SaveLoadCompatTable compat_description = _vehicle_common_sl_compat;
 
 	void Save(Vehicle *v) const override
@@ -246,6 +233,52 @@ public:
 	}
 };
 
+class SlVehicleRoadVehPath : public DefaultSaveLoadHandler<SlVehicleRoadVehPath, RoadVehicle> {
+public:
+	struct RoadVehPathElement {
+		Trackdir trackdir; ///< Trackdir for this element.
+		TileIndex tile; ///< Tile for this element.
+	};
+
+	inline static const SaveLoad description[] = {
+		SLE_VAR(RoadVehPathElement, trackdir, SLE_UINT8),
+		SLE_VAR(RoadVehPathElement, tile, SLE_UINT32),
+	};
+	inline const static SaveLoadCompatTable compat_description = {};
+
+	void Save(RoadVehicle *rv) const override
+	{
+		NOT_REACHED();
+	}
+
+	void Load(RoadVehicle *rv) const override
+	{
+		size_t count = SlGetStructListLength(UINT32_MAX);
+
+		RoadVehPathElement elem{};
+		if (count > RV_PATH_CACHE_SEGMENTS) {
+			/* Cache too long, just bin it */
+			while (count-- > 0) {
+				SlObject(&elem, this->GetLoadDescription());
+			}
+			return;
+		}
+
+		rv->cached_path = std::make_unique<RoadVehPathCache>();
+		RoadVehPathCache &cache = *(rv->cached_path);
+		cache.count = (uint8_t)count;
+
+		/* Path cache is taken from back instead of front from SLV_PATH_CACHE_FORMAT, so needs reversing. */
+		size_t i = count;
+		while (count-- > 0) {
+			SlObject(&elem, this->GetLoadDescription());
+			i--;
+			cache.td[i] = elem.trackdir;
+			cache.tile[i] = elem.tile;
+		}
+	}
+};
+
 class SlVehicleRoadVeh : public DefaultSaveLoadHandler<SlVehicleRoadVeh, Vehicle> {
 public:
 	inline static const SaveLoad description[] = {
@@ -257,8 +290,9 @@ public:
 		      SLE_VAR(RoadVehicle, overtaking_ctr,       SLE_UINT8),
 		      SLE_VAR(RoadVehicle, crashed_ctr,          SLE_UINT16),
 		      SLE_VAR(RoadVehicle, reverse_ctr,          SLE_UINT8),
-		SLEG_CONDVECTOR("path.td", _path_td,             SLE_UINT8,                  SLV_ROADVEH_PATH_CACHE, SL_MAX_VERSION),
-		SLEG_CONDVECTOR("path.tile", _path_tile,         SLE_UINT32,                 SLV_ROADVEH_PATH_CACHE, SL_MAX_VERSION),
+		SLEG_CONDVECTOR("path.td", _path_td,             SLE_UINT8,                  SLV_ROADVEH_PATH_CACHE, SLV_PATH_CACHE_FORMAT),
+		SLEG_CONDVECTOR("path.tile", _path_tile,         SLE_UINT32,                 SLV_ROADVEH_PATH_CACHE, SLV_PATH_CACHE_FORMAT),
+		SLEG_CONDSTRUCTLIST("path", SlVehicleRoadVehPath,                            SLV_PATH_CACHE_FORMAT, SL_MAX_VERSION),
 		  SLE_CONDVAR(RoadVehicle, gv_flags,             SLE_UINT16,                 SLV_139, SL_MAX_VERSION),
 	};
 	inline const static SaveLoadCompatTable compat_description = _vehicle_roadveh_sl_compat;
@@ -294,12 +328,43 @@ public:
 	}
 };
 
+class SlVehicleShipPath : public DefaultSaveLoadHandler<SlVehicleShipPath, Ship> {
+public:
+	struct ShipPathElement {
+		Trackdir trackdir; ///< Trackdir for this element.
+	};
+
+	inline static const SaveLoad description[] = {
+		SLE_VAR(ShipPathElement, trackdir, SLE_UINT8),
+	};
+	inline const static SaveLoadCompatTable compat_description = {};
+
+	void Save(Ship *s) const override
+	{
+		NOT_REACHED();
+	}
+
+	void Load(Ship *s) const override
+	{
+		size_t count = SlGetStructListLength(UINT32_MAX);
+
+		/* Since SLV_PATH_CACHE_FORMAT path cache is taken from back instead of front, so needs reversing. */
+		s->cached_path.reserve(count);
+		ShipPathElement elem{};
+		while (count-- > 0) {
+			SlObject(&elem, this->GetLoadDescription());
+			s->cached_path.push_front(elem.trackdir);
+		}
+	}
+};
+
 class SlVehicleShip : public DefaultSaveLoadHandler<SlVehicleShip, Vehicle> {
 public:
 	inline static const SaveLoad description[] = {
 		  SLEG_STRUCT("common", SlVehicleCommon),
 		      SLE_VAR(Ship, state,                     SLE_UINT8),
-		SLEG_CONDVECTOR("path", _path_td,              SLE_UINT8,                  SLV_SHIP_PATH_CACHE, SL_MAX_VERSION),
+		SLEG_CONDVECTOR("path", _path_td,              SLE_UINT8,                  SLV_SHIP_PATH_CACHE, SLV_PATH_CACHE_FORMAT),
+		SLEG_CONDSTRUCTLIST("path", SlVehicleShipPath,                             SLV_PATH_CACHE_FORMAT, SL_MAX_VERSION),
 		  SLE_CONDVAR(Ship, rotation,                  SLE_UINT8,                  SLV_SHIP_ROTATION, SL_MAX_VERSION),
 	};
 	inline const static SaveLoadCompatTable compat_description = _vehicle_ship_sl_compat;
@@ -416,17 +481,7 @@ public:
 
 class SlVehicleDisaster : public DefaultSaveLoadHandler<SlVehicleDisaster, Vehicle> {
 public:
-#if defined(_MSC_VER) && (_MSC_VER == 1915 || _MSC_VER == 1916)
-	/* This table access private members of other classes; they have this
-	 * class as friend. For MSVC CL 19.15 and 19.16 this doesn't work for
-	 * "inline static const", so we are forced to wrap the table in a
-	 * function. CL 19.16 is the latest for VS2017. */
-	inline static const SaveLoad description[] = {{}};
-	SaveLoadTable GetDescription() const override {
-#else
-	inline
-#endif
-	static const SaveLoad description[] = {
+	inline static const SaveLoad description[] = {
 		    SLE_REF(Vehicle, next,                  REF_VEHICLE_OLD),
 
 		    SLE_VAR(Vehicle, subtype,               SLE_UINT8),
@@ -461,10 +516,7 @@ public:
 		SLE_CONDVAR(DisasterVehicle, big_ufo_destroyer_target,  SLE_UINT32,                 SLV_191, SL_MAX_VERSION),
 		SLE_CONDVAR(DisasterVehicle, flags,                     SLE_UINT8,                  SLV_194, SL_MAX_VERSION),
 	};
-#if defined(_MSC_VER) && (_MSC_VER == 1915 || _MSC_VER == 1916)
-		return description;
-	}
-#endif
+
 	inline const static SaveLoadCompatTable compat_description = _vehicle_disaster_sl_compat;
 
 	void Save(Vehicle *v) const override

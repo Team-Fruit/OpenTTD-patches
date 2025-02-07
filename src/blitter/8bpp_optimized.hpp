@@ -19,11 +19,11 @@ public:
 	/** Data stored about a (single) sprite. */
 	struct SpriteData {
 		uint32_t offset[ZOOM_LVL_SPR_COUNT]; ///< Offsets (from .data) to streams for different zoom levels.
-		byte data[];                         ///< Data, all zoomlevels.
+		uint8_t data[];                      ///< Data, all zoomlevels.
 	};
 
 	void Draw(Blitter::BlitterParams *bp, BlitterMode mode, ZoomLevel zoom) override;
-	Sprite *Encode(const SpriteLoader::SpriteCollection &sprite, AllocatorProc *allocator) override;
+	Sprite *Encode(const SpriteLoader::SpriteCollection &sprite, SpriteAllocator &allocator) override;
 
 	const char *GetName() override { return "8bpp-optimized"; }
 };

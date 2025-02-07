@@ -34,6 +34,8 @@ const size_t MAX_SLE_INT16 = INT16_MAX;
 const size_t MAX_SLE_INT32 = INT32_MAX;
 const size_t MAX_SLE_INT = INT_MAX;
 
+static constexpr uint MAX_SIGNAL_DRAG_DISTANCE = 40;
+
 /** Settings profiles and highscore tables. */
 enum SettingsProfile {
 	SP_BEGIN = 0,
@@ -131,10 +133,27 @@ enum ViewportScrollMode {
 	VSM_END,                ///< Number of scroll mode settings.
 };
 
+/** Settings related to scroll wheel behavior. */
+enum ScrollWheelScrollingSetting {
+	SWS_ZOOM_MAP = 0,       ///< Scroll wheel zooms the map.
+	SWS_SCROLL_MAP = 1,     ///< Scroll wheel scrolls the map.
+	SWS_OFF = 2             ///< Scroll wheel has no effect.
+};
+
 enum ShowSignalDefaultMode {
 	SSDM_OFF,
 	SSDM_ON,
 	SSDM_RESTRICTED_RECOLOUR,
+};
+
+/** Whether to build public roads */
+enum PublicRoadsConstruction : uint8_t {
+	PRC_BEGIN = 0,
+	PRC_NONE = PRC_BEGIN,         ///< Generate no public roads
+	PRC_WITH_CURVES,              ///< Generate roads with lots of curves
+	PRC_AVOID_CURVES,             ///< Generate roads avoiding curves if possible
+
+	PRC_END
 };
 
 /** Settings related to time display. This may be loaded from the savegame and/or overriden by the client. */
@@ -145,7 +164,12 @@ struct TimeSettings {
 
 	TickMinutes ToTickMinutes(StateTicks ticks) const
 	{
-		return (ticks.base() / this->ticks_per_minute) + this->clock_offset;
+		return TickMinutes{(ticks.base() / this->ticks_per_minute) + this->clock_offset};
+	}
+
+	Ticks GetTickMinutesRemainder(StateTicks ticks) const
+	{
+		return static_cast<Ticks>((ticks.base() % this->ticks_per_minute));
 	}
 
 	TickMinutes NowInTickMinutes() const
@@ -156,7 +180,7 @@ struct TimeSettings {
 
 	StateTicks FromTickMinutes(TickMinutes minutes) const
 	{
-		return (minutes.base() - this->clock_offset) * this->ticks_per_minute;
+		return StateTicks{(minutes.base() - this->clock_offset) * this->ticks_per_minute};
 	}
 };
 
@@ -166,6 +190,7 @@ struct GUISettings : public TimeSettings {
 	bool        lost_vehicle_warn;                               ///< if a vehicle can't find its destination, show a warning
 	bool        restriction_wait_vehicle_warn;                   ///< if a vehicle is waiting for an extended time due to a routing restriction, show a warning
 	uint8_t     order_review_system;                             ///< perform order reviews on vehicles
+	bool        old_vehicle_warn;                                ///< if a vehicle is getting old, show a warning
 	uint8_t     no_depot_order_warn;                             ///< if a non-air vehicle doesn't have at least one depot order, show a warning
 	bool        vehicle_income_warn;                             ///< if a vehicle isn't generating income, show a warning
 	bool        show_finances;                                   ///< show finances at end of year
@@ -240,12 +265,13 @@ struct GUISettings : public TimeSettings {
 	bool        departure_show_vehicle_color;                    ///< whether to show vehicle type icons in silver instead of orange
 	bool        departure_larger_font;                           ///< whether to show the calling at list in a larger font
 	bool        departure_destination_type;                      ///< whether to show destination types for ports and airports
-	bool        departure_show_both;                             ///< whether to show departure and arrival times on the same line
-	bool        departure_only_passengers;                       ///< whether to only show passenger services
 	bool        departure_smart_terminus;                        ///< whether to only show passenger services
 	uint8_t     departure_conditionals;                          ///< how to handle conditional orders
-	bool        departure_show_all_stops;                        ///< whether to show stops regardless of loading/unloading done at them
 	bool        departure_merge_identical;                       ///< whether to merge identical departures
+	uint8_t     departure_default_mode;                          ///< default mode for non-waypoint departure board window
+	uint8_t     departure_default_source;                        ///< default source for departure board window
+	bool        departure_default_via;                           ///< default via type for station departure board window
+	bool        departure_default_show_empty;                    ///< default show empty mode for departure board window
 	RightClickClose right_click_wnd_close;                       ///< close window with right click
 	bool        pause_on_newgame;                                ///< whether to start new games paused or not
 	SignalGUISettings signal_gui_mode;                           ///< select which signal types are shown in the signal GUI
@@ -262,6 +288,7 @@ struct GUISettings : public TimeSettings {
 	uint8_t     drag_signals_density;                            ///< many signals density
 	bool        drag_signals_fixed_distance;                     ///< keep fixed distance between signals when dragging
 	bool        drag_signals_skip_stations;                      ///< continue past station/waypoint tiles when auto-fill dragging signals
+	bool        drag_signals_stop_restricted_signal;             ///< when removing signals using auto-fill drag, sto pwhen reaching a signal with an attached routing restriction
 	CalTime::Year semaphore_build_before;                        ///< build semaphore signals automatically before this year
 	uint8_t     news_message_timeout;                            ///< how much longer than the news message "age" should we keep the message in the history
 	bool        show_track_reservation;                          ///< highlight reserved tracks.
@@ -315,6 +342,7 @@ struct GUISettings : public TimeSettings {
 	bool        show_vehicle_group_hierarchy_name;               ///< Show the full group hierarchy in vehicle names
 	bool        show_order_number_vehicle_view;                  ///< Show order number in vehicle view window
 	bool        show_speed_first_vehicle_view;                   ///< Show speed before destination in vehicle view window
+	bool        shorten_vehicle_view_status;                     ///< Show status text in vehicle view window
 	bool        hide_default_stop_location;                      ///< Hide default stop location for orders
 	bool        show_rail_polyline_tool;                         ///< Show rail polyline tool
 	bool        show_running_costs_calendar_year;                ///< Show vehicle running costs in calendar years
@@ -367,11 +395,11 @@ struct SoundSettings {
 
 /** Settings related to music. */
 struct MusicSettings {
-	byte playlist;     ///< The playlist (number) to play
-	byte music_vol;    ///< The requested music volume
-	byte effect_vol;   ///< The requested effects volume
-	byte custom_1[33]; ///< The order of the first custom playlist
-	byte custom_2[33]; ///< The order of the second custom playlist
+	uint8_t playlist;     ///< The playlist (number) to play
+	uint8_t music_vol;    ///< The requested music volume
+	uint8_t effect_vol;   ///< The requested effects volume
+	uint8_t custom_1[33]; ///< The order of the first custom playlist
+	uint8_t custom_2[33]; ///< The order of the second custom playlist
 	bool playing;      ///< Whether music is playing
 	bool shuffle;      ///< Whether to shuffle the music
 };
@@ -434,10 +462,17 @@ struct NetworkSettings {
 	std::string server_invite_code_secret;                ///< Secret to proof we got this invite code from the Game Coordinator.
 	std::string server_name;                              ///< name of the server
 	std::string server_password;                          ///< password for joining this server
+	NetworkAuthorizedKeys server_authorized_keys;         ///< Public keys of clients that are authorized to connect to the game.
 	std::string rcon_password;                            ///< password for rconsole (server side)
+	NetworkAuthorizedKeys rcon_authorized_keys;           ///< Public keys of clients that are authorized to use the rconsole (server side).
+	bool allow_insecure_admin_login;                      ///< Whether to allow logging in as admin using the insecure old JOIN packet.
 	std::string admin_password;                           ///< password for the admin network
+	NetworkAuthorizedKeys admin_authorized_keys;          ///< Public keys of clients that are authorized to use the admin network.
 	std::string settings_password;                        ///< password for game settings (server side)
+	NetworkAuthorizedKeys settings_authorized_keys;       ///< Public keys of clients that are authorized to use settings access (server side).
 	std::string client_name;                              ///< name of the player (as client)
+	std::string client_secret_key;                        ///< The secret key of the client for authorized key logins.
+	std::string client_public_key;                        ///< The public key of the client for authorized key logins.
 	std::string default_company_pass;                     ///< default password for new companies in encrypted form
 	std::string connect_to_ip;                            ///< default for the "Add server" query
 	std::string network_id;                               ///< network ID for servers
@@ -457,6 +492,8 @@ struct NetworkSettings {
 	std::string last_joined;                              ///< Last joined server
 	UseRelayService use_relay_service;                    ///< Use relay service?
 	ParticipateSurvey participate_survey;                 ///< Participate in the automated survey
+
+	bool AdminAuthenticationConfigured() const { return !this->admin_password.empty() || !this->admin_authorized_keys.empty(); }
 };
 
 /** Settings related to the creation of games. */
@@ -498,7 +535,7 @@ struct GameCreationSettings {
 	bool     lakes_allowed_in_deserts;       ///< are lakes allowed in deserts?
 	uint8_t  amount_of_rocks;                ///< the amount of rocks
 	uint8_t  height_affects_rocks;           ///< the affect that map height has on rocks
-	uint8_t  build_public_roads;             ///< build public roads connecting towns
+	PublicRoadsConstruction build_public_roads; ///< build public roads connecting towns
 };
 
 /** Settings related to construction in-game */
@@ -571,42 +608,11 @@ struct ScriptSettings {
 	uint32_t script_max_memory_megabytes;      ///< limit on memory a single script instance may have allocated
 };
 
-/** Settings related to the new pathfinder. */
-struct NPFSettings {
-	/**
-	 * The maximum amount of search nodes a single NPF run should take. This
-	 * limit should make sure performance stays at acceptable levels at the cost
-	 * of not being perfect anymore.
-	 */
-	uint32_t npf_max_search_nodes;
-	uint32_t maximum_go_to_depot_penalty;      ///< What is the maximum penalty that may be endured for going to a depot
-
-	uint32_t npf_rail_firstred_penalty;        ///< the penalty for when the first signal is red (and it is not an exit or combo signal)
-	uint32_t npf_rail_firstred_exit_penalty;   ///< the penalty for when the first signal is red (and it is an exit or combo signal)
-	uint32_t npf_rail_lastred_penalty;         ///< the penalty for when the last signal is red
-	uint32_t npf_rail_station_penalty;         ///< the penalty for station tiles
-	uint32_t npf_rail_slope_penalty;           ///< the penalty for sloping upwards
-	uint32_t npf_rail_curve_penalty;           ///< the penalty for curves
-	uint32_t npf_rail_depot_reverse_penalty;   ///< the penalty for reversing in depots
-	uint32_t npf_rail_pbs_cross_penalty;       ///< the penalty for crossing a reserved rail track
-	uint32_t npf_rail_pbs_signal_back_penalty; ///< the penalty for passing a pbs signal from the backside
-	uint32_t npf_buoy_penalty;                 ///< the penalty for going over (through) a buoy
-	uint32_t npf_water_curve_penalty;          ///< the penalty for curves
-	uint32_t npf_road_curve_penalty;           ///< the penalty for curves
-	uint32_t npf_crossing_penalty;             ///< the penalty for level crossings
-	uint32_t npf_road_drive_through_penalty;   ///< the penalty for going through a drive-through road stop
-	uint32_t npf_road_dt_occupied_penalty;     ///< the penalty multiplied by the fill percentage of a drive-through road stop
-	uint32_t npf_road_bay_occupied_penalty;    ///< the penalty multiplied by the fill percentage of a road bay
-};
-
 /** Settings related to the yet another pathfinder. */
 struct YAPFSettings {
 	bool   disable_node_optimization;          ///< whether to use exit-dir instead of trackdir in node key
 	uint32_t max_search_nodes;                 ///< stop path-finding when this number of nodes visited
 	uint32_t maximum_go_to_depot_penalty;      ///< What is the maximum penalty that may be endured for going to a depot
-	bool   ship_use_yapf;                      ///< use YAPF for ships
-	bool   road_use_yapf;                      ///< use YAPF for road
-	bool   rail_use_yapf;                      ///< use YAPF for rail
 	uint32_t road_slope_penalty;               ///< penalty for up-hill slope
 	uint32_t road_curve_penalty;               ///< penalty for curves
 	uint32_t road_crossing_penalty;            ///< penalty for level crossing
@@ -643,11 +649,6 @@ struct YAPFSettings {
 
 /** Settings related to all pathfinders. */
 struct PathfinderSettings {
-	uint8_t  pathfinder_for_trains;          ///< the pathfinder to use for trains
-	uint8_t  pathfinder_for_roadvehs;        ///< the pathfinder to use for roadvehicles
-	uint8_t  pathfinder_for_ships;           ///< the pathfinder to use for ships
-	bool     new_pathfinding_all;            ///< use the newest pathfinding algorithm for all
-
 	bool     roadveh_queue;                  ///< buggy road vehicle queueing
 	bool     forbid_90_deg;                  ///< forbid trains to make 90 deg turns
 	bool     back_of_one_way_pbs_waiting_point;///< whether the back of one-way PBS signals is a safe waiting point
@@ -661,7 +662,6 @@ struct PathfinderSettings {
 	uint8_t  wait_for_pbs_path;              ///< how long to wait for a path reservation.
 	uint8_t  path_backoff_interval;          ///< ticks between checks for a free path.
 
-	NPFSettings  npf;                        ///< pathfinder settings for the new pathfinder
 	YAPFSettings yapf;                       ///< pathfinder settings for the yet another pathfinder
 };
 
@@ -688,6 +688,8 @@ struct VehicleSettings {
 	uint8_t  train_braking_model;              ///< braking model for trains
 	uint8_t  realistic_braking_aspect_limited; ///< realistic braking lookahead is aspect limited
 	bool     limit_train_acceleration;         ///< when using realistic braking, also limit train acceleration
+	uint8_t  train_acc_braking_percent;        ///< adjustment factor for acceleration and braking of trains
+	bool     track_edit_ignores_realistic_braking; ///< when using realistic braking, allow track editing operations to ignore realistic braking restrictions
 	uint8_t  roadveh_acceleration_model;       ///< realistic acceleration for road vehicles
 	uint8_t  train_slope_steepness;            ///< Steepness of hills for trains when using realistic acceleration
 	uint8_t  roadveh_slope_steepness;          ///< Steepness of hills for road vehicles when using realistic acceleration
@@ -758,6 +760,7 @@ struct EconomySettings {
 	TownLayout town_layout;                  ///< select town layout, @see TownLayout
 	TownCargoGenMode town_cargogen_mode;     ///< algorithm for generating cargo from houses, @see TownCargoGenMode
 	bool     allow_town_roads;               ///< towns are allowed to build roads (always allowed when generating world / in SE)
+	bool     allow_town_road_branch_non_build; ///< towns are allowed to branch from road types which they cannot build, but which allow houses
 	uint16_t town_min_distance;              ///< minimum distance between towns
 	uint8_t  max_town_heightlevel;           ///< maximum height level for towns
 	uint16_t min_town_land_area;             ///< minimum contiguous lang area for towns.
@@ -772,6 +775,7 @@ struct EconomySettings {
 	TownTunnelMode town_build_tunnels;       ///< if/when towns are allowed to build road tunnels
 	uint8_t  town_max_road_slope;            ///< maximum number of consecutive sloped road tiles which towns are allowed to build
 	bool     allow_town_bridges;             ///< towns are allowed to build bridges
+	bool     default_allow_town_growth;      ///< town growth is allowed per-town by default
 	bool     infrastructure_maintenance;     ///< enable monthly maintenance fee for owner infrastructure
 	TimekeepingUnits timekeeping_units;      ///< time units to use for the game economy, either calendar or wallclock
 	uint16_t minutes_per_calendar_year;      ///< minutes per calendar year. Special value 0 means that calendar time is frozen.
@@ -784,6 +788,7 @@ struct EconomySettings {
 	bool     disable_inflation_newgrf_flag;  ///< Disable NewGRF inflation flag
 	CargoPaymentAlgorithm payment_algorithm; ///< Cargo payment algorithm
 	TickRateMode tick_rate;                  ///< Tick rate mode
+	uint8_t industry_event_rate;             ///< Rate of industry events
 };
 
 struct OldEconomySettings {
@@ -820,7 +825,6 @@ struct LinkGraphSettings {
 struct StationSettings {
 	bool     modified_catchment;               ///< different-size catchment areas
 	bool     serve_neutral_industries;         ///< company stations can serve industries with attached neutral stations
-	bool     adjacent_stations;                ///< allow stations to be built directly adjacent to other stations
 	bool     distant_join_stations;            ///< allow to join non-adjacent stations
 	bool     never_expire_airports;            ///< never expire airports
 	uint8_t  station_spread;                   ///< amount a station may spread
@@ -865,15 +869,6 @@ struct DebugSettings {
 	uint32_t chicken_bits;                   ///< chicken bits
 	uint32_t newgrf_optimiser_flags;         ///< NewGRF optimiser flags
 };
-
-/** Scenario editor settings. */
-struct ScenarioSettings {
-	bool multiple_buildings;                 ///< allow manually adding more than one church/stadium
-	bool house_ignore_dates;                 ///< allow manually adding houses regardless of date restrictions
-	uint8_t house_ignore_zones;              ///< allow manually adding houses regardless of zone restrictions
-	bool house_ignore_grf;                   ///< allow manually adding houses regardless of GRF restrictions
-};
-
 /** Settings related to currency/unit systems. */
 struct ClientLocaleSettings {
 	bool sync_locale_network_server;         ///< sync locale settings with network server
@@ -902,7 +897,7 @@ struct GameSettings {
 
 	uint8_t EffectiveDayLengthFactor() const
 	{
-		return this->economy.timekeeping_units == TKU_CALENDAR ? this->economy.day_length_factor : 1;
+		return this->economy.day_length_factor;
 	}
 };
 
@@ -915,7 +910,6 @@ struct ClientSettings {
 	SoundSettings        sound;              ///< sound effect settings
 	MusicSettings        music;              ///< settings related to music/sound
 	NewsSettings         news_display;       ///< news display settings.
-	ScenarioSettings     scenario;           ///< scenario editor settings
 };
 
 /** The current settings for this game. */

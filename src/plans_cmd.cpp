@@ -17,6 +17,7 @@
 #include "company_base.h"
 #include "string_func.h"
 #include "window_gui.h"
+#include "core/format.hpp"
 #include "table/strings.h"
 
 /**
@@ -30,7 +31,7 @@
  */
 CommandCost CmdAddPlan(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint32_t p2, const char *text)
 {
-	if (!Plan::CanAllocateItem()) return_cmd_error(STR_ERROR_TOO_MANY_PLANS);
+	if (!Plan::CanAllocateItem()) return CommandCost(STR_ERROR_TOO_MANY_PLANS);
 	if (flags & DC_EXEC) {
 		_new_plan = new Plan(_current_company);
 	}
@@ -40,7 +41,7 @@ CommandCost CmdAddPlan(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint32_
 struct PlanLineCmdData : public CommandAuxiliarySerialisable<PlanLineCmdData> {
 	TileVector tiles;
 
-	virtual void Serialise(CommandSerialisationBuffer &buffer) const override
+	virtual void Serialise(BufferSerialisationRef buffer) const override
 	{
 		buffer.Send_uint32((uint32_t)this->tiles.size());
 		for (TileIndex t : this->tiles) {
@@ -48,7 +49,7 @@ struct PlanLineCmdData : public CommandAuxiliarySerialisable<PlanLineCmdData> {
 		}
 	}
 
-	CommandCost Deserialise(CommandDeserialisationBuffer &buffer)
+	CommandCost Deserialise(DeserialisationBuffer &buffer)
 	{
 		uint32_t size = buffer.Recv_uint32();
 		if (!buffer.CanRecvBytes(size * 4)) return CMD_ERROR;
@@ -57,6 +58,11 @@ struct PlanLineCmdData : public CommandAuxiliarySerialisable<PlanLineCmdData> {
 			this->tiles[i] = buffer.Recv_uint32();
 		}
 		return CommandCost();
+	}
+
+	std::string GetDebugSummary() const override
+	{
+		return fmt::format("{} tiles", this->tiles.size());
 	}
 };
 
@@ -88,17 +94,16 @@ CommandCost CmdAddPlanLine(TileIndex tile, DoCommandFlag flags, uint32_t p1, uin
 	ret = data.Load(aux_data);
 	if (ret.Failed()) return ret;
 
-	if (data->tiles.size() > (MAX_CMD_TEXT_LENGTH / sizeof(TileIndex))) return_cmd_error(STR_ERROR_TOO_MANY_NODES);
+	if (data->tiles.size() > (MAX_CMD_TEXT_LENGTH / sizeof(TileIndex))) return CommandCost(STR_ERROR_TOO_MANY_NODES);
 	if (flags & DC_EXEC) {
-		PlanLine *pl = p->NewLine();
-		if (!pl) return_cmd_error(STR_ERROR_NO_MORE_SPACE_FOR_LINES);
-		pl->tiles = std::move(data->tiles);
-		pl->UpdateVisualExtents();
+		PlanLine &pl = p->NewLine();
+		pl.tiles = std::move(data->tiles);
+		pl.UpdateVisualExtents();
 		if (p->IsListable()) {
-			pl->SetVisibility(p->visible);
-			if (p->visible) pl->MarkDirty();
+			pl.SetVisibility(p->visible);
+			if (p->visible) pl.MarkDirty();
 			Window *w = FindWindowById(WC_PLANS, 0);
-			if (w) w->InvalidateData(INVALID_PLAN, false);
+			if (w != nullptr) w->InvalidateData(INVALID_PLAN, false);
 		}
 	}
 	return CommandCost();
@@ -124,10 +129,10 @@ CommandCost CmdChangePlanVisibility(TileIndex tile, DoCommandFlag flags, uint32_
 		if (p->visible_by_all != visible) {
 			p->visible_by_all = visible;
 			Window *w = FindWindowById(WC_PLANS, 0);
-			if (w) w->InvalidateData(INVALID_PLAN, false);
+			if (w != nullptr) w->InvalidateData(INVALID_PLAN, false);
 			if (p->owner != _local_company && p->visible) {
-				for (PlanLine *line : p->lines) {
-					if (line->visible) line->MarkDirty();
+				for (PlanLine &line : p->lines) {
+					if (line.visible) line.MarkDirty();
 				}
 			}
 		}
@@ -155,11 +160,11 @@ CommandCost CmdChangePlanColour(TileIndex tile, DoCommandFlag flags, uint32_t p1
 		p->colour = (Colours)p2;
 		_plan_update_counter++;
 		Window *w = FindWindowById(WC_PLANS, 0);
-		if (w) w->InvalidateData(INVALID_PLAN, false);
-		for (const PlanLine *line : p->lines) {
-			if (line->visible) line->MarkDirty();
+		if (w != nullptr) w->InvalidateData(INVALID_PLAN, false);
+		for (const PlanLine &line : p->lines) {
+			if (line.visible) line.MarkDirty();
 		}
-		if (p->temp_line) p->temp_line->MarkDirty();
+		p->temp_line.MarkDirty();
 	}
 	return CommandCost();
 }
@@ -183,7 +188,7 @@ CommandCost CmdRemovePlan(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint
 		if (p->IsListable()) {
 			p->SetVisibility(false);
 			Window *w = FindWindowById(WC_PLANS, 0);
-			if (w) w->InvalidateData(p->index, false);
+			if (w != nullptr) w->InvalidateData(p->index, false);
 		}
 		if (p == _current_plan) _current_plan = nullptr;
 		delete p;
@@ -208,14 +213,11 @@ CommandCost CmdRemovePlanLine(TileIndex tile, DoCommandFlag flags, uint32_t p1, 
 	if (ret.Failed()) return ret;
 	if (p2 >= p->lines.size()) return CMD_ERROR;
 	if (flags & DC_EXEC) {
-		PlanLineVector::iterator it = p->lines.begin();
-		std::advance(it, p2);
-		(*it)->SetVisibility(false);
-		delete *it;
-		p->lines.erase(it);
+		p->lines[p2].SetVisibility(false);
+		p->lines.erase(p->lines.begin() + p2);
 		if (p->IsListable()) {
 			Window *w = FindWindowById(WC_PLANS, 0);
-			if (w) w->InvalidateData(p->index, false);
+			if (w != nullptr) w->InvalidateData(p->index, false);
 		}
 	}
 	return CommandCost();
@@ -269,8 +271,8 @@ CommandCost CmdAcquireUnownedPlan(TileIndex tile, DoCommandFlag flags, uint32_t 
 		p->owner = _current_company;
 		InvalidateWindowClassesData(WC_PLANS);
 		if (p->visible) {
-			for (PlanLine *line : p->lines) {
-				if (line->visible) line->MarkDirty();
+			for (PlanLine &line : p->lines) {
+				if (line.visible) line.MarkDirty();
 			}
 		}
 	}

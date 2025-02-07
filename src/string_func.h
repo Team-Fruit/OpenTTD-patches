@@ -24,28 +24,29 @@
 #ifndef STRING_FUNC_H
 #define STRING_FUNC_H
 
-#include <stdarg.h>
 #include <iosfwd>
 #include <iterator>
 
 #include "core/bitmath_func.hpp"
 #include "string_type.h"
 
-char *strecat(char *dst, const char *src, const char *last) NOACCESS(3);
 char *strecpy(char *dst, const char *src, const char *last, bool quiet_mode = false) NOACCESS(3);
 char *stredup(const char *src, const char *last = nullptr) NOACCESS(2);
 
-int CDECL seprintf(char *str, const char *last, const char *format, ...) WARN_FORMAT(3, 4) NOACCESS(2);
-int CDECL vseprintf(char *str, const char *last, const char *format, va_list ap) WARN_FORMAT(3, 0) NOACCESS(2);
+void strecpy(std::span<char> dst, std::string_view src);
 
-std::string CDECL stdstr_fmt(const char *str, ...) WARN_FORMAT(1, 2);
-std::string stdstr_vfmt(const char *str, va_list va) WARN_FORMAT(1, 0);
-
-std::string FormatArrayAsHex(std::span<const byte> data, bool upper_case = false);
+std::string FormatArrayAsHex(std::span<const uint8_t> data, bool upper_case = true);
 
 char *StrMakeValidInPlace(char *str, const char *last, StringValidationSettings settings = SVS_REPLACE_WITH_QUESTION_MARK) NOACCESS(2);
 [[nodiscard]] std::string StrMakeValid(std::string_view str, StringValidationSettings settings = SVS_REPLACE_WITH_QUESTION_MARK);
 void StrMakeValidInPlace(char *str, StringValidationSettings settings = SVS_REPLACE_WITH_QUESTION_MARK);
+
+inline void StrMakeValidInPlace(std::string &str, StringValidationSettings settings = SVS_REPLACE_WITH_QUESTION_MARK)
+{
+	if (str.empty()) return;
+	char *buf = str.data();
+	str.resize(StrMakeValidInPlace(buf, buf + str.size(), settings) - buf);
+}
 
 const char *str_fix_scc_encoded(char *str, const char *last) NOACCESS(2);
 void str_strip_colours(char *str);
@@ -62,7 +63,7 @@ char *str_replace_wchar(char *str, const char *last, char32_t find, char32_t rep
 bool strtolower(char *str);
 bool strtolower(std::string &str, std::string::size_type offs = 0);
 
-[[nodiscard]] bool StrValid(const char *str, const char *last) NOACCESS(2);
+[[nodiscard]] bool StrValid(std::span<const char> str);
 void StrTrimInPlace(std::string &str);
 std::string_view StrTrimView(std::string_view str);
 
@@ -111,7 +112,7 @@ inline bool StrEmpty(const char *s)
 inline size_t ttd_strnlen(const char *str, size_t maxlen)
 {
 	const char *t;
-	for (t = str; (size_t)(t - str) < maxlen && *t != '\0'; t++) {}
+	for (t = str; static_cast<size_t>(t - str) < maxlen && *t != '\0'; t++) {}
 	return t - str;
 }
 
@@ -305,5 +306,18 @@ inline bool IsWhitespace(char32_t c)
 #	define DEFINE_STRCASESTR
 char *strcasestr(const char *haystack, const char *needle);
 #endif /* strcasestr is available */
+
+/**
+ * The use of a struct is so that when used as an argument to seprintf/etc, the buffer lives
+ * on the stack with a lifetime which lasts until the end of the statement.
+ * This avoids using a static buffer which is thread-unsafe, or needing to call malloc, which would then need to be freed.
+ */
+struct StrErrorDumper {
+	const char *Get(int errornum);
+	const char *GetLast();
+
+private:
+	char buf[128];
+};
 
 #endif /* STRING_FUNC_H */

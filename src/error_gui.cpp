@@ -38,7 +38,7 @@ static constexpr NWidgetPart _nested_errmsg_widgets[] = {
 		NWidget(WWT_CAPTION, COLOUR_RED, WID_EM_CAPTION), SetDataTip(STR_ERROR_MESSAGE_CAPTION, STR_NULL),
 	EndContainer(),
 	NWidget(WWT_PANEL, COLOUR_RED),
-		NWidget(WWT_EMPTY, COLOUR_RED, WID_EM_MESSAGE), SetPadding(WidgetDimensions::unscaled.modalpopup), SetFill(1, 0), SetMinimalSize(236, 0),
+		NWidget(WWT_EMPTY, INVALID_COLOUR, WID_EM_MESSAGE), SetPadding(WidgetDimensions::unscaled.modalpopup), SetFill(1, 0), SetMinimalSize(236, 0),
 	EndContainer(),
 };
 
@@ -46,7 +46,7 @@ static WindowDesc _errmsg_desc(__FILE__, __LINE__,
 	WDP_MANUAL, nullptr, 0, 0,
 	WC_ERRMSG, WC_NONE,
 	0,
-	std::begin(_nested_errmsg_widgets), std::end(_nested_errmsg_widgets)
+	_nested_errmsg_widgets
 );
 
 static constexpr NWidgetPart _nested_errmsg_face_widgets[] = {
@@ -56,8 +56,8 @@ static constexpr NWidgetPart _nested_errmsg_face_widgets[] = {
 	EndContainer(),
 	NWidget(WWT_PANEL, COLOUR_RED),
 		NWidget(NWID_HORIZONTAL),
-			NWidget(WWT_EMPTY, COLOUR_RED, WID_EM_FACE), SetPadding(2, 0, 2, 2), SetFill(0, 1), SetMinimalSize(92, 119),
-			NWidget(WWT_EMPTY, COLOUR_RED, WID_EM_MESSAGE), SetPadding(WidgetDimensions::unscaled.modalpopup), SetFill(1, 1), SetMinimalSize(236, 0),
+			NWidget(WWT_EMPTY, INVALID_COLOUR, WID_EM_FACE), SetPadding(2, 0, 2, 2), SetFill(0, 1), SetMinimalSize(92, 119),
+			NWidget(WWT_EMPTY, INVALID_COLOUR, WID_EM_MESSAGE), SetPadding(WidgetDimensions::unscaled.modalpopup), SetFill(1, 1), SetMinimalSize(236, 0),
 		EndContainer(),
 	EndContainer(),
 };
@@ -66,7 +66,7 @@ static WindowDesc _errmsg_face_desc(__FILE__, __LINE__,
 	WDP_MANUAL, nullptr, 0, 0,
 	WC_ERRMSG, WC_NONE,
 	0,
-	std::begin(_nested_errmsg_face_widgets), std::end(_nested_errmsg_face_widgets)
+	_nested_errmsg_face_widgets
 );
 
 /**
@@ -173,32 +173,33 @@ private:
 	uint height_extra;              ///< Height of the #extra_msg string in pixels in the #WID_EM_MESSAGE widget.
 
 public:
-	ErrmsgWindow(const ErrorMessageData &data) : Window(data.HasFace() ? &_errmsg_face_desc : &_errmsg_desc), ErrorMessageData(data)
+	ErrmsgWindow(const ErrorMessageData &data) : Window(data.HasFace() ? _errmsg_face_desc : _errmsg_desc), ErrorMessageData(data)
 	{
 		this->InitNested();
 	}
 
-	void UpdateWidgetSize(WidgetID widget, Dimension *size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension *fill, [[maybe_unused]] Dimension *resize) override
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
 	{
 		switch (widget) {
 			case WID_EM_MESSAGE: {
 				CopyInDParam(this->params);
 				if (this->textref_stack_size > 0) StartTextRefStackUsage(this->textref_stack_grffile, this->textref_stack_size, this->textref_stack);
 
-				this->height_summary = GetStringHeight(this->summary_msg, size->width);
-				this->height_detailed = (this->detailed_msg == INVALID_STRING_ID) ? 0 : GetStringHeight(this->detailed_msg, size->width);
-				this->height_extra = (this->extra_msg == INVALID_STRING_ID) ? 0 : GetStringHeight(this->extra_msg, size->width);
+				this->height_summary = GetStringHeight(this->summary_msg, size.width);
+				this->height_detailed = (this->detailed_msg == INVALID_STRING_ID) ? 0 : GetStringHeight(this->detailed_msg, size.width);
+				this->height_extra = (this->extra_msg == INVALID_STRING_ID) ? 0 : GetStringHeight(this->extra_msg, size.width);
 
 				if (this->textref_stack_size > 0) StopTextRefStackUsage();
 
 				uint panel_height = this->height_summary;
 				if (this->detailed_msg != INVALID_STRING_ID) panel_height += this->height_detailed + WidgetDimensions::scaled.vsep_wide;
 				if (this->extra_msg != INVALID_STRING_ID) panel_height += this->height_extra + WidgetDimensions::scaled.vsep_wide;
-				size->height = std::max(size->height, panel_height);
+
+				size.height = std::max(size.height, panel_height);
 				break;
 			}
 			case WID_EM_FACE:
-				*size = maxdim(*size, GetScaledSpriteSize(SPR_GRADIENT));
+				size = maxdim(size, GetScaledSpriteSize(SPR_GRADIENT));
 				break;
 		}
 	}
@@ -343,7 +344,7 @@ void ShowFirstError()
  */
 void UnshowCriticalError()
 {
-	ErrmsgWindow *w = (ErrmsgWindow*)FindWindowById(WC_ERRMSG, 0);
+	ErrmsgWindow *w = dynamic_cast<ErrmsgWindow *>(FindWindowById(WC_ERRMSG, 0));
 	if (_window_system_initialized && w != nullptr) {
 		if (w->IsCritical()) _error_list.push_front(*w);
 		_window_system_initialized = false;
@@ -373,21 +374,22 @@ void ShowErrorMessage(StringID summary_msg, StringID detailed_msg, WarningLevel 
 
 		if (textref_stack_size > 0) StartTextRefStackUsage(textref_stack_grffile, textref_stack_size, textref_stack);
 
-		std::string message = GetString(summary_msg);
+		format_buffer message;
+		AppendStringInPlace(message, summary_msg);
 		if (detailed_msg != INVALID_STRING_ID) {
-			message += ' ';
-			message += GetString(detailed_msg);
+			message.push_back(' ');
+			AppendStringInPlace(message, detailed_msg);
 		}
 		if (extra_msg != INVALID_STRING_ID) {
-			message += ' ';
-			message += GetString(extra_msg);
+			message.push_back(' ');
+			AppendStringInPlace(message, extra_msg);
 		}
 
 		if (textref_stack_size > 0) StopTextRefStackUsage();
 
 		switch (wl) {
-			case WL_WARNING: IConsolePrint(CC_WARNING, message.c_str()); break;
-			default:         IConsoleError(message.c_str()); break;
+			case WL_WARNING: IConsolePrint(CC_WARNING, message.to_string()); break;
+			default:         IConsolePrint(CC_ERROR, message.to_string()); break;
 		}
 	}
 
@@ -399,7 +401,7 @@ void ShowErrorMessage(StringID summary_msg, StringID detailed_msg, WarningLevel 
 	ErrorMessageData data(summary_msg, detailed_msg, no_timeout ? 0 : _settings_client.gui.errmsg_duration, x, y, textref_stack_grffile, textref_stack_size, textref_stack, extra_msg);
 	data.CopyOutDParams();
 
-	ErrmsgWindow *w = (ErrmsgWindow*)FindWindowById(WC_ERRMSG, 0);
+	ErrmsgWindow *w = dynamic_cast<ErrmsgWindow *>(FindWindowById(WC_ERRMSG, 0));
 	if (w != nullptr) {
 		if (w->IsCritical()) {
 			/* A critical error is currently shown. */
@@ -423,7 +425,7 @@ void ShowErrorMessage(StringID summary_msg, StringID detailed_msg, WarningLevel 
  */
 bool HideActiveErrorMessage()
 {
-	ErrmsgWindow *w = (ErrmsgWindow*)FindWindowById(WC_ERRMSG, 0);
+	ErrmsgWindow *w = dynamic_cast<ErrmsgWindow *>(FindWindowById(WC_ERRMSG, 0));
 	if (w == nullptr) return false;
 	w->Close();
 	return true;

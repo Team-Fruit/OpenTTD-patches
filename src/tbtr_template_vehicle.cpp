@@ -160,6 +160,7 @@ bool ShouldServiceTrainForTemplateReplacement(const Train *t, const TemplateVehi
 	if (needed_money > c->money) return false;
 	TBTRDiffFlags diff = TrainTemplateDifference(t, tv);
 	if (diff & TBTRDF_CONSIST) {
+		if (_settings_game.difficulty.infinite_money) return true;
 		/* Check money.
 		 * We want 2*(the price of the whole template) without looking at the value of the vehicle(s) we are going to sell, or not need to buy. */
 		for (const TemplateVehicle *tv_unit = tv; tv_unit != nullptr; tv_unit = tv_unit->GetNextUnit()) {
@@ -208,7 +209,7 @@ static void MarkTrainsInGroupAsPendingTemplateReplacement(GroupID gid, const Tem
 		if (!t->IsFrontEngine() || t->owner != owner || t->group_id >= NEW_GROUP) continue;
 
 		if (std::binary_search(groups.begin(), groups.end(), t->group_id)) {
-			SB(t->vehicle_flags, VF_REPLACEMENT_PENDING, 1, (tv != nullptr && ShouldServiceTrainForTemplateReplacement(t, tv)) ? 1 : 0);
+			AssignBit(t->vehicle_flags, VF_REPLACEMENT_PENDING, tv != nullptr && ShouldServiceTrainForTemplateReplacement(t, tv));
 		}
 	}
 }
@@ -221,7 +222,7 @@ void MarkTrainsUsingTemplateAsPendingTemplateReplacement(const TemplateVehicle *
 		if (!t->IsFrontEngine() || t->owner != owner || t->group_id >= NEW_GROUP) continue;
 
 		if (GetTemplateIDByGroupIDRecursive(t->group_id) == tv->index) {
-			SB(t->vehicle_flags, VF_REPLACEMENT_PENDING, 1, ShouldServiceTrainForTemplateReplacement(t, tv) ? 1 : 0);
+			AssignBit(t->vehicle_flags, VF_REPLACEMENT_PENDING, ShouldServiceTrainForTemplateReplacement(t, tv));
 		}
 	}
 }

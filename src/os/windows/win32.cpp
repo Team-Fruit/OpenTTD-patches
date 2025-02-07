@@ -24,6 +24,7 @@
 #include "../../fios.h"
 #include "../../core/alloc_func.hpp"
 #include "../../openttd.h"
+#include "../../core/format.hpp"
 #include "../../core/random_func.hpp"
 #include "../../string_func.h"
 #include "../../crashlog.h"
@@ -33,6 +34,7 @@
 #include "../../thread.h"
 #include "../../library_loader.h"
 #include <array>
+#include <atomic>
 #include <map>
 #include <mutex>
 
@@ -100,13 +102,13 @@ struct DIR {
  * already in use (it's important to avoid surprises since this is such a
  * low-level routine). */
 static DIR _global_dir;
-static LONG _global_dir_is_in_use = false;
+static std::atomic<bool> _global_dir_is_in_use{false};
 
 static inline DIR *dir_calloc()
 {
 	DIR *d;
 
-	if (InterlockedExchange(&_global_dir_is_in_use, true) == (LONG)true) {
+	if (_global_dir_is_in_use.load(std::memory_order_acquire) || _global_dir_is_in_use.exchange(true) == true) {
 		d = CallocT<DIR>(1);
 	} else {
 		d = &_global_dir;
@@ -118,7 +120,7 @@ static inline DIR *dir_calloc()
 static inline void dir_free(DIR *d)
 {
 	if (d == &_global_dir) {
-		_global_dir_is_in_use = (LONG)false;
+		_global_dir_is_in_use.store(false, std::memory_order_release);
 	} else {
 		free(d);
 	}
@@ -189,9 +191,9 @@ int closedir(DIR *d)
 	return 0;
 }
 
-bool FiosIsRoot(const char *file)
+bool FiosIsRoot(std::string_view path)
 {
-	return file[3] == '\0'; // C:\...
+	return path.size() == 3; // C:\...
 }
 
 void FiosGetDrives(FileList &file_list)
@@ -199,7 +201,7 @@ void FiosGetDrives(FileList &file_list)
 	wchar_t drives[256];
 	const wchar_t *s;
 
-	GetLogicalDriveStrings(lengthof(drives), drives);
+	GetLogicalDriveStrings(static_cast<DWORD>(std::size(drives)), drives);
 	for (s = drives; *s != '\0';) {
 		FiosItem *fios = &file_list.emplace_back();
 		fios->type = FIOS_TYPE_DRIVE;
@@ -211,7 +213,7 @@ void FiosGetDrives(FileList &file_list)
 	}
 }
 
-bool FiosIsValidFile(const char *path, const struct dirent *ent, struct stat *sb)
+bool FiosIsValidFile(const wchar_t *fspath, const struct dirent *ent, struct stat *sb)
 {
 	/* hectonanoseconds between Windows and POSIX epoch */
 	static const int64_t posix_epoch_hns = 0x019DB1DED53E8000LL;
@@ -223,7 +225,10 @@ bool FiosIsValidFile(const char *path, const struct dirent *ent, struct stat *sb
 	 * http://www.gamedev.net/community/forums/topic.asp?topic_id=294070&whichpage=1&#1860504
 	 * XXX - not entirely correct, since filetimes on FAT aren't UTC but local,
 	 * this won't entirely be correct, but we use the time only for comparison. */
-	sb->st_mtime = (time_t)((*(const uint64_t*)&fd->ftLastWriteTime - posix_epoch_hns) / 1E7);
+	uint64_t lastWriteTime = fd->ftLastWriteTime.dwHighDateTime;
+	lastWriteTime <<= 32;
+	lastWriteTime |= fd->ftLastWriteTime.dwLowDateTime;
+	sb->st_mtime = (time_t)((lastWriteTime - posix_epoch_hns) / 1E7);
 	sb->st_mode  = (fd->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)? S_IFDIR : S_IFREG;
 
 	return true;
@@ -232,6 +237,15 @@ bool FiosIsValidFile(const char *path, const struct dirent *ent, struct stat *sb
 bool FiosIsHiddenFile(const struct dirent *ent)
 {
 	return (ent->dir->fd.dwFileAttributes & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)) != 0;
+}
+
+bool FioCopyFile(const char *old_name, const char *new_name)
+{
+	wchar_t w_old_name[MAX_PATH];
+	wchar_t w_new_name[MAX_PATH];
+	convert_to_fs(old_name, w_old_name);
+	convert_to_fs(new_name, w_new_name);
+	return CopyFileW(w_old_name, w_new_name, false) != 0;
 }
 
 std::optional<uint64_t> FiosGetDiskFreeSpace(const std::string &path)
@@ -274,11 +288,11 @@ void CreateConsole()
 		_close(fd);
 		CloseHandle(hand);
 
-		ShowInfoI("Unable to open an output handle to the console. Check known-bugs.txt for details.");
+		ShowInfoI("Unable to open an output handle to the console. Check known-bugs.md for details.");
 		return;
 	}
 
-#if defined(_MSC_VER) && _MSC_VER >= 1900
+#if defined(_MSC_VER)
 	freopen("CONOUT$", "a", stdout);
 	freopen("CONIN$", "r", stdin);
 	freopen("CONOUT$", "a", stderr);
@@ -301,31 +315,34 @@ void CreateConsole()
 }
 
 /** Temporary pointer to get the help message to the window */
-static const char *_help_msg;
+static std::string_view _help_msg;
 
 /** Callback function to handle the window */
 static INT_PTR CALLBACK HelpDialogFunc(HWND wnd, UINT msg, WPARAM wParam, LPARAM)
 {
 	switch (msg) {
 		case WM_INITDIALOG: {
-			char help_msg[8192];
-			const char *p = _help_msg;
-			char *q = help_msg;
-			while (q != lastof(help_msg) && *p != '\0') {
-				if (*p == '\n') {
+			const size_t help_msg_size = 1 + _help_msg.size() + std::count(_help_msg.begin(), _help_msg.end(), '\n');
+			auto help_msg = std::make_unique<char[]>(help_msg_size);
+			char *q = help_msg.get();
+			char *last = q + help_msg_size - 1;
+			for (char c : _help_msg) {
+				if (q == last) break;
+				if (c == '\n') {
 					*q++ = '\r';
-					if (q == lastof(help_msg)) {
+					if (q == last) {
 						q[-1] = '\0';
 						break;
 					}
 				}
-				*q++ = *p++;
+				*q++ = c;
 			}
-			*q = '\0';
+			*q++ = '\0';
 			/* We need to put the text in a separate buffer because the default
 			 * buffer in OTTD2FS might not be large enough (512 chars). */
-			wchar_t help_msg_buf[8192];
-			SetDlgItemText(wnd, 11, convert_to_fs(help_msg, help_msg_buf, lengthof(help_msg_buf)));
+			const size_t help_msg_buf_size = ((q - help_msg.get()) * 3) / 2;
+			auto help_msg_buf = std::make_unique<wchar_t[]>(help_msg_buf_size);
+			SetDlgItemText(wnd, 11, convert_to_fs(help_msg.get(), {help_msg_buf.get(), help_msg_buf_size}));
 			SendDlgItemMessage(wnd, 11, WM_SETFONT, (WPARAM)GetStockObject(ANSI_FIXED_FONT), FALSE);
 		} return TRUE;
 
@@ -339,17 +356,17 @@ static INT_PTR CALLBACK HelpDialogFunc(HWND wnd, UINT msg, WPARAM wParam, LPARAM
 	return FALSE;
 }
 
-void ShowInfoI(const char *str)
+void ShowInfoI(std::string_view str)
 {
 	if (_has_console) {
-		fprintf(stderr, "%s\n", str);
+		fmt::print(stderr, "{}\n", str);
 	} else {
 		bool old;
 		ReleaseCapture();
 		_left_button_clicked = _left_button_down = false;
 
 		old = MyShowCursor(true);
-		if (strlen(str) > 2048) {
+		if (str.size() > 2048) {
 			/* The minimum length of the help message is 2048. Other messages sent via
 			 * ShowInfo are much shorter, or so long they need this way of displaying
 			 * them anyway. */
@@ -359,9 +376,22 @@ void ShowInfoI(const char *str)
 			/* We need to put the text in a separate buffer because the default
 			 * buffer in OTTD2FS might not be large enough (512 chars). */
 			wchar_t help_msg_buf[8192];
-			MessageBox(GetActiveWindow(), convert_to_fs(str, help_msg_buf, lengthof(help_msg_buf)), L"OpenTTD", MB_ICONINFORMATION | MB_OK);
+			MessageBox(GetActiveWindow(), convert_to_fs(str, help_msg_buf), L"OpenTTD", MB_ICONINFORMATION | MB_OK);
 		}
 		MyShowCursor(old);
+	}
+}
+
+void ShowInfoVFmt(fmt::string_view msg, fmt::format_args args)
+{
+	fmt::memory_buffer buf{};
+	fmt::vformat_to(std::back_inserter(buf), msg, args);
+	if (_has_console) {
+		buf.push_back('\n');
+		fwrite(buf.data(), 1, buf.size(), stderr);
+	} else {
+		/* Forward to ShowInfoI */
+		ShowInfoI({ buf.data(), buf.size() });
 	}
 }
 
@@ -369,7 +399,7 @@ char *getcwd(char *buf, size_t size)
 {
 	wchar_t path[MAX_PATH];
 	GetCurrentDirectory(MAX_PATH - 1, path);
-	convert_from_fs(path, buf, size);
+	convert_from_fs(path, {buf, size});
 	return buf;
 }
 
@@ -418,9 +448,9 @@ void DetermineBasePaths(const char *exe)
 	} else {
 		/* Use the folder of the config file as working directory. */
 		wchar_t config_dir[MAX_PATH];
-		wcsncpy(path, convert_to_fs(_config_file, path, lengthof(path)), lengthof(path));
-		if (!GetFullPathName(path, lengthof(config_dir), config_dir, nullptr)) {
-			DEBUG(misc, 0, "GetFullPathName failed (%lu)\n", GetLastError());
+		convert_to_fs(_config_file, path);
+		if (!GetFullPathName(path, static_cast<DWORD>(std::size(config_dir)), config_dir, nullptr)) {
+			Debug(misc, 0, "GetFullPathName failed ({})", GetLastError());
 			_searchpaths[SP_WORKING_DIR].clear();
 		} else {
 			std::string tmp(FS2OTTD(config_dir));
@@ -431,14 +461,14 @@ void DetermineBasePaths(const char *exe)
 		}
 	}
 
-	if (!GetModuleFileName(nullptr, path, lengthof(path))) {
-		DEBUG(misc, 0, "GetModuleFileName failed (%lu)\n", GetLastError());
+	if (!GetModuleFileName(nullptr, path, static_cast<DWORD>(std::size(path)))) {
+		Debug(misc, 0, "GetModuleFileName failed ({})", GetLastError());
 		_searchpaths[SP_BINARY_DIR].clear();
 	} else {
 		wchar_t exec_dir[MAX_PATH];
-		wcsncpy(path, convert_to_fs(exe, path, lengthof(path)), lengthof(path));
-		if (!GetFullPathName(path, lengthof(exec_dir), exec_dir, nullptr)) {
-			DEBUG(misc, 0, "GetFullPathName failed (%lu)\n", GetLastError());
+		convert_to_fs(exe, path);
+		if (!GetFullPathName(path, static_cast<DWORD>(std::size(exec_dir)), exec_dir, nullptr)) {
+			Debug(misc, 0, "GetFullPathName failed ({})", GetLastError());
 			_searchpaths[SP_BINARY_DIR].clear();
 		} else {
 			std::string tmp(FS2OTTD(exec_dir));
@@ -478,14 +508,14 @@ std::optional<std::string> GetClipboardContents()
  * @see the current code-page comes from video\win32_v.cpp, event-notification
  * WM_INPUTLANGCHANGE
  */
-std::string FS2OTTD(const std::wstring &name)
+std::string FS2OTTD(std::wstring_view name)
 {
 	int name_len = (name.length() >= INT_MAX) ? INT_MAX : (int)name.length();
-	int len = WideCharToMultiByte(CP_UTF8, 0, name.c_str(), name_len, nullptr, 0, nullptr, nullptr);
+	int len = WideCharToMultiByte(CP_UTF8, 0, name.data(), name_len, nullptr, 0, nullptr, nullptr);
 	if (len <= 0) return std::string();
-	char *utf8_buf = AllocaM(char, len + 1);
+	TempBufferST<char, 1024> utf8_buf(len + 1);
 	utf8_buf[len] = '\0';
-	WideCharToMultiByte(CP_UTF8, 0, name.c_str(), name_len, utf8_buf, len, nullptr, nullptr);
+	WideCharToMultiByte(CP_UTF8, 0, name.data(), name_len, utf8_buf, len, nullptr, nullptr);
 	return std::string(utf8_buf, static_cast<size_t>(len));
 }
 
@@ -496,14 +526,14 @@ std::string FS2OTTD(const std::wstring &name)
  * @param console_cp convert to the console encoding instead of the normal system encoding.
  * @return converted string; if failed string is of zero-length
  */
-std::wstring OTTD2FS(const std::string &name)
+std::wstring OTTD2FS(std::string_view name)
 {
 	int name_len = (name.length() >= INT_MAX) ? INT_MAX : (int)name.length();
-	int len = MultiByteToWideChar(CP_UTF8, 0, name.c_str(), name_len, nullptr, 0);
+	int len = MultiByteToWideChar(CP_UTF8, 0, name.data(), name_len, nullptr, 0);
 	if (len <= 0) return std::wstring();
-	wchar_t *system_buf = AllocaM(wchar_t, len + 1);
+	TempBufferST<wchar_t, 1024> system_buf(len + 1);
 	system_buf[len] = L'\0';
-	MultiByteToWideChar(CP_UTF8, 0, name.c_str(), name_len, system_buf, len);
+	MultiByteToWideChar(CP_UTF8, 0, name.data(), name_len, system_buf, len);
 	return std::wstring(system_buf, static_cast<size_t>(len));
 }
 
@@ -511,37 +541,33 @@ std::wstring OTTD2FS(const std::string &name)
 /**
  * Convert to OpenTTD's encoding from that of the environment in
  * UNICODE. OpenTTD encoding is UTF8, local is wide.
- * @param name pointer to a valid string that will be converted
- * @param utf8_buf pointer to a valid buffer that will receive the converted string
- * @param buflen length in characters of the receiving buffer
- * @return pointer to utf8_buf. If conversion fails the string is of zero-length
+ * @param src wide string that will be converted
+ * @param dst_buf span of valid char buffer that will receive the converted string
+ * @return pointer to dst_buf. If conversion fails the string is of zero-length
  */
-char *convert_from_fs(const wchar_t *name, char *utf8_buf, size_t buflen)
+char *convert_from_fs(const std::wstring_view src, std::span<char> dst_buf)
 {
 	/* Convert UTF-16 string to UTF-8. */
-	int len = WideCharToMultiByte(CP_UTF8, 0, name, -1, utf8_buf, (int)buflen, nullptr, nullptr);
-	if (len == 0) utf8_buf[0] = '\0';
+	int len = WideCharToMultiByte(CP_UTF8, 0, src.data(), static_cast<int>(src.size()), dst_buf.data(), static_cast<int>(dst_buf.size() - 1U), nullptr, nullptr);
+	dst_buf[len] = '\0';
 
-	return utf8_buf;
+	return dst_buf.data();
 }
 
 
 /**
  * Convert from OpenTTD's encoding to that of the environment in
  * UNICODE. OpenTTD encoding is UTF8, local is wide.
- * @param name pointer to a valid string that will be converted
- * @param system_buf pointer to a valid wide-char buffer that will receive the
- * converted string
- * @param buflen length in wide characters of the receiving buffer
- * @param console_cp convert to the console encoding instead of the normal system encoding.
- * @return pointer to system_buf. If conversion fails the string is of zero-length
+ * @param src string that will be converted
+ * @param dst_buf span of valid wide-char buffer that will receive the converted string
+ * @return pointer to dst_buf. If conversion fails the string is of zero-length
  */
-wchar_t *convert_to_fs(const std::string_view name, wchar_t *system_buf, size_t buflen)
+wchar_t *convert_to_fs(const std::string_view src, std::span<wchar_t> dst_buf)
 {
-	int len = MultiByteToWideChar(CP_UTF8, 0, name.data(), (int)name.size(), system_buf, (int)buflen);
-	system_buf[len] = '\0';
+	int len = MultiByteToWideChar(CP_UTF8, 0, src.data(), static_cast<int>(src.size()), dst_buf.data(), static_cast<int>(dst_buf.size() - 1U));
+	dst_buf[len] = '\0';
 
-	return system_buf;
+	return dst_buf.data();
 }
 
 /** Determine the current user's locale. */
@@ -551,8 +577,8 @@ const char *GetCurrentLocale(const char *)
 	const LCID userUiLocale = MAKELCID(userUiLang, SORT_DEFAULT);
 
 	char lang[9], country[9];
-	if (GetLocaleInfoA(userUiLocale, LOCALE_SISO639LANGNAME, lang, lengthof(lang)) == 0 ||
-	    GetLocaleInfoA(userUiLocale, LOCALE_SISO3166CTRYNAME, country, lengthof(country)) == 0) {
+	if (GetLocaleInfoA(userUiLocale, LOCALE_SISO639LANGNAME, lang, static_cast<int>(std::size(lang))) == 0 ||
+	    GetLocaleInfoA(userUiLocale, LOCALE_SISO3166CTRYNAME, country, static_cast<int>(std::size(country))) == 0) {
 		/* Unable to retrieve the locale. */
 		return nullptr;
 	}
@@ -578,7 +604,7 @@ void Win32SetCurrentLocaleName(std::string iso_code)
 		}
 	}
 
-	MultiByteToWideChar(CP_UTF8, 0, iso_code.c_str(), -1, _cur_iso_locale, lengthof(_cur_iso_locale));
+	MultiByteToWideChar(CP_UTF8, 0, iso_code.c_str(), -1, _cur_iso_locale, static_cast<int>(std::size(_cur_iso_locale)));
 }
 
 int OTTDStringCompare(std::string_view s1, std::string_view s2)
@@ -600,28 +626,22 @@ int OTTDStringCompare(std::string_view s1, std::string_view s2)
 		first_time = false;
 	}
 
+	int len_s1 = MultiByteToWideChar(CP_UTF8, 0, s1.data(), (int)s1.size(), nullptr, 0);
+	int len_s2 = MultiByteToWideChar(CP_UTF8, 0, s2.data(), (int)s2.size(), nullptr, 0);
+
+	TempBufferST<WCHAR, 1024> str_s1(len_s1);
+	TempBufferST<WCHAR, 1024> str_s2(len_s2);
+
+	if (len_s1 != 0) MultiByteToWideChar(CP_UTF8, 0, s1.data(), (int)s1.size(), str_s1.get(), len_s1);
+	if (len_s2 != 0) MultiByteToWideChar(CP_UTF8, 0, s2.data(), (int)s2.size(), str_s2.get(), len_s2);
+
+	/* CompareStringEx takes UTF-16 strings, even in ANSI-builds. */
 	if (_CompareStringEx != nullptr) {
-		/* CompareStringEx takes UTF-16 strings, even in ANSI-builds. */
-		int len_s1 = MultiByteToWideChar(CP_UTF8, 0, s1.data(), (int)s1.size(), nullptr, 0);
-		int len_s2 = MultiByteToWideChar(CP_UTF8, 0, s2.data(), (int)s2.size(), nullptr, 0);
-
-		if (len_s1 != 0 && len_s2 != 0) {
-			LPWSTR str_s1 = AllocaM(WCHAR, len_s1);
-			LPWSTR str_s2 = AllocaM(WCHAR, len_s2);
-
-			len_s1 = MultiByteToWideChar(CP_UTF8, 0, s1.data(), (int)s1.size(), str_s1, len_s1);
-			len_s2 = MultiByteToWideChar(CP_UTF8, 0, s2.data(), (int)s2.size(), str_s2, len_s2);
-
-			int result = _CompareStringEx(_cur_iso_locale, LINGUISTIC_IGNORECASE | SORT_DIGITSASNUMBERS, str_s1, len_s1, str_s2, len_s2, nullptr, nullptr, 0);
-			if (result != 0) return result;
-		}
+		int result = _CompareStringEx(_cur_iso_locale, LINGUISTIC_IGNORECASE | SORT_DIGITSASNUMBERS, str_s1.get(), len_s1, str_s2.get(), len_s2, nullptr, nullptr, 0);
+		if (result != 0) return result;
 	}
 
-	wchar_t s1_buf[512], s2_buf[512];
-	convert_to_fs(s1, s1_buf, lengthof(s1_buf));
-	convert_to_fs(s2, s2_buf, lengthof(s2_buf));
-
-	return CompareString(MAKELCID(_current_language->winlangid, SORT_DEFAULT), NORM_IGNORECASE, s1_buf, -1, s2_buf, -1);
+	return CompareString(MAKELCID(_current_language->winlangid, SORT_DEFAULT), NORM_IGNORECASE, str_s1.get(), len_s1, str_s2.get(), len_s2);
 }
 
 /**
@@ -649,13 +669,13 @@ int Win32StringContains(const std::string_view str, const std::string_view value
 		int len_value = MultiByteToWideChar(CP_UTF8, 0, value.data(), (int)value.size(), nullptr, 0);
 
 		if (len_str != 0 && len_value != 0) {
-			std::wstring str_str(len_str, L'\0'); // len includes terminating null
-			std::wstring str_value(len_value, L'\0');
+			TempBufferST<WCHAR, 1024> str_str(len_str);
+			TempBufferST<WCHAR, 1024> str_value(len_value);
 
-			MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), str_str.data(), len_str);
-			MultiByteToWideChar(CP_UTF8, 0, value.data(), (int)value.size(), str_value.data(), len_value);
+			MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), str_str.get(), len_str);
+			MultiByteToWideChar(CP_UTF8, 0, value.data(), (int)value.size(), str_value.get(), len_value);
 
-			return _FindNLSStringEx(_cur_iso_locale, FIND_FROMSTART | (case_insensitive ? LINGUISTIC_IGNORECASE : 0), str_str.data(), -1, str_value.data(), -1, nullptr, nullptr, nullptr, 0) >= 0 ? 1 : 0;
+			return _FindNLSStringEx(_cur_iso_locale, FIND_FROMSTART | (case_insensitive ? LINGUISTIC_IGNORECASE : 0), str_str.get(), len_str, str_value.get(), len_value, nullptr, nullptr, nullptr, 0) >= 0 ? 1 : 0;
 		}
 	}
 
@@ -677,11 +697,15 @@ void SetSelfAsGameThread()
 
 static BOOL (WINAPI *_SetThreadStackGuarantee)(PULONG) = nullptr;
 
-void PerThreadSetup()
+void PerThreadSetup(bool non_main_thread)
 {
 	if (_SetThreadStackGuarantee != nullptr) {
 		ULONG stacksize = 65536;
 		_SetThreadStackGuarantee(&stacksize);
+	}
+	if (non_main_thread) {
+		extern void CrashLogWindowsInitThread();
+		CrashLogWindowsInitThread();
 	}
 }
 
@@ -720,14 +744,13 @@ static void Win32SetThreadName(uint id, const char *name)
 	_thread_name_map[id] = name;
 }
 
-int GetCurrentThreadName(char *str, const char *last)
+void GetCurrentThreadName(format_target &buffer)
 {
 	std::lock_guard<std::mutex> lock(_thread_name_map_mutex);
 	auto iter = _thread_name_map.find(GetCurrentThreadId());
 	if (iter != _thread_name_map.end()) {
-		return seprintf(str, last, "%s", iter->second.c_str());
+		buffer.append(iter->second);
 	}
-	return 0;
 }
 
 #ifdef _MSC_VER

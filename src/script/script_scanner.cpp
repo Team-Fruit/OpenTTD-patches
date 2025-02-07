@@ -39,7 +39,7 @@ bool ScriptScanner::AddFile(const std::string &filename, size_t, const std::stri
 	try {
 		this->engine->LoadScript(filename);
 	} catch (Script_FatalError &e) {
-		DEBUG(script, 0, "Fatal error '%s' when trying to load the script '%s'.", e.GetErrorMessage().c_str(), filename.c_str());
+		Debug(script, 0, "Fatal error '{}' when trying to load the script '{}'.", e.GetErrorMessage(), filename);
 		return false;
 	}
 	return true;
@@ -99,7 +99,7 @@ void ScriptScanner::RegisterScript(ScriptInfo *info)
 
 	/* Check if GetShortName follows the rules */
 	if (info->GetShortName().size() != 4) {
-		DEBUG(script, 0, "The script '%s' returned a string from GetShortName() which is not four characaters. Unable to load the script.", info->GetName().c_str());
+		Debug(script, 0, "The script '{}' returned a string from GetShortName() which is not four characters. Unable to load the script.", info->GetName());
 		delete info;
 		return;
 	}
@@ -116,10 +116,10 @@ void ScriptScanner::RegisterScript(ScriptInfo *info)
 			return;
 		}
 
-		DEBUG(script, 1, "Registering two scripts with the same name and version");
-		DEBUG(script, 1, "  1: %s", this->info_list[script_name]->GetMainScript().c_str());
-		DEBUG(script, 1, "  2: %s", info->GetMainScript().c_str());
-		DEBUG(script, 1, "The first is taking precedence.");
+		Debug(script, 1, "Registering two scripts with the same name and version");
+		Debug(script, 1, "  1: {}", this->info_list[script_name]->GetMainScript());
+		Debug(script, 1, "  2: {}", info->GetMainScript());
+		Debug(script, 1, "The first is taking precedence.");
 
 		delete info;
 		return;
@@ -141,12 +141,11 @@ void ScriptScanner::RegisterScript(ScriptInfo *info)
 
 std::string ScriptScanner::GetConsoleList(bool newest_only) const
 {
-	std::string p;
-	p += stdstr_fmt("List of %s:\n", this->GetScannerName());
+	std::string p = fmt::format("List of {}:\n", this->GetScannerName());
 	const ScriptInfoList &list = newest_only ? this->info_single_list : this->info_list;
 	for (const auto &item : list) {
 		ScriptInfo *i = item.second;
-		p += stdstr_fmt("%10s (v%d): %s\n", i->GetName().c_str(), i->GetVersion(), i->GetDescription().c_str());
+		fmt::format_to(std::back_inserter(p), "{:10} (v{}): {}\n", i->GetName(), i->GetVersion(), i->GetDescription());
 	}
 	p += "\n";
 
@@ -172,19 +171,17 @@ struct ScriptFileChecksumCreator : FileScanner {
 		size_t len, size;
 
 		/* Open the file ... */
-		FILE *f = FioFOpenFile(filename.c_str(), "rb", this->dir, &size);
-		if (f == nullptr) return false;
+		auto f = FioFOpenFile(filename, "rb", this->dir, &size);
+		if (!f.has_value()) return false;
 
 		/* ... calculate md5sum... */
-		while ((len = fread(buffer, 1, (size > sizeof(buffer)) ? sizeof(buffer) : size, f)) != 0 && size != 0) {
+		while ((len = fread(buffer, 1, (size > sizeof(buffer)) ? sizeof(buffer) : size, *f)) != 0 && size != 0) {
 			size -= len;
 			checksum.Append(buffer, len);
 		}
 
 		MD5Hash tmp_md5sum;
 		checksum.Finish(tmp_md5sum);
-
-		FioFCloseFile(f);
 
 		/* ... and xor it to the overall md5sum. */
 		this->md5sum ^= tmp_md5sum;

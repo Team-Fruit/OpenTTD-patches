@@ -196,8 +196,8 @@ static bool IsOpenGLExtensionSupported(const char *extension)
 	return false;
 }
 
-static byte _gl_major_ver = 0; ///< Major OpenGL version.
-static byte _gl_minor_ver = 0; ///< Minor OpenGL version.
+static uint8_t _gl_major_ver = 0; ///< Major OpenGL version.
+static uint8_t _gl_minor_ver = 0; ///< Minor OpenGL version.
 
 /**
  * Check if the current OpenGL version is equal or higher than a given one.
@@ -206,7 +206,7 @@ static byte _gl_minor_ver = 0; ///< Minor OpenGL version.
  * @pre OpenGL was initialized.
  * @return True if the OpenGL version is equal or higher than the requested one.
  */
-bool IsOpenGLVersionAtLeast(byte major, byte minor)
+bool IsOpenGLVersionAtLeast(uint8_t major, uint8_t minor)
 {
 	return (_gl_major_ver > major) || (_gl_major_ver == major && _gl_minor_ver >= minor);
 }
@@ -427,14 +427,14 @@ void APIENTRY DebugOutputCallback([[maybe_unused]] GLenum source, GLenum type, [
 		case GL_DEBUG_TYPE_PORTABILITY:         type_str = "Portability"; break;
 	}
 
-	DEBUG(driver, 6, "OpenGL: %s (%s) - %s", type_str, severity_str, message);
+	Debug(driver, 6, "OpenGL: {} ({}) - {}", type_str, severity_str, message);
 }
 
 /** Enable OpenGL debug messages if supported. */
 void SetupDebugOutput()
 {
 #ifndef NO_DEBUG_MESSAGES
-	if (_debug_driver_level < 6) return;
+	if (GetDebugLevel(DebugLevelID::driver) < 6) return;
 
 	if (IsOpenGLVersionAtLeast(4, 3)) {
 		BindGLProc(_glDebugMessageControl, "glDebugMessageControl");
@@ -447,11 +447,11 @@ void SetupDebugOutput()
 	if (_glDebugMessageControl != nullptr && _glDebugMessageCallback != nullptr) {
 		/* Enable debug output. As synchronous debug output costs performance, we only enable it with a high debug level. */
 		_glEnable(GL_DEBUG_OUTPUT);
-		if (_debug_driver_level >= 8) _glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+		if (GetDebugLevel(DebugLevelID::driver) >= 8) _glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 
 		_glDebugMessageCallback(&DebugOutputCallback, nullptr);
 		/* Enable all messages on highest debug level.*/
-		_glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, _debug_driver_level >= 9 ? GL_TRUE : GL_FALSE);
+		_glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GetDebugLevel(DebugLevelID::driver) >= 9 ? GL_TRUE : GL_FALSE);
 		/* Get debug messages for errors and undefined/deprecated behaviour. */
 		_glDebugMessageControl(GL_DONT_CARE, GL_DEBUG_TYPE_ERROR, GL_DONT_CARE, 0, nullptr, GL_TRUE);
 		_glDebugMessageControl(GL_DONT_CARE, GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR, GL_DONT_CARE, 0, nullptr, GL_TRUE);
@@ -536,7 +536,7 @@ const char *OpenGLBackend::Init(const Dimension &screen_res)
 
 	if (ver == nullptr || vend == nullptr || renderer == nullptr) return "OpenGL not supported";
 
-	DEBUG(driver, 1, "OpenGL driver: %s - %s (%s)", vend, renderer, ver);
+	Debug(driver, 1, "OpenGL driver: {} - {} ({})", vend, renderer, ver);
 
 #ifndef GL_ALLOW_SOFTWARE_RENDERER
 	/* Don't use MESA software rendering backends as they are slower than
@@ -584,10 +584,10 @@ const char *OpenGLBackend::Init(const Dimension &screen_res)
 #endif
 
 	if (this->persistent_mapping_supported && !BindPersistentBufferExtensions()) {
-		DEBUG(driver, 1, "OpenGL claims to support persistent buffer mapping but doesn't export all functions, not using persistent mapping.");
+		Debug(driver, 1, "OpenGL claims to support persistent buffer mapping but doesn't export all functions, not using persistent mapping.");
 		this->persistent_mapping_supported = false;
 	}
-	if (this->persistent_mapping_supported) DEBUG(driver, 3, "OpenGL: Using persistent buffer mapping");
+	if (this->persistent_mapping_supported) Debug(driver, 3, "OpenGL: Using persistent buffer mapping");
 
 	/* Check maximum texture size against screen resolution. */
 	GLint max_tex_size = 0;
@@ -599,7 +599,7 @@ const char *OpenGLBackend::Init(const Dimension &screen_res)
 	_glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &max_tex_units);
 	if (max_tex_units < 4) return "Not enough simultaneous textures supported";
 
-	DEBUG(driver, 2, "OpenGL shading language version: %s, texture units = %d", (const char *)_glGetString(GL_SHADING_LANGUAGE_VERSION), (int)max_tex_units);
+	Debug(driver, 2, "OpenGL shading language version: {}, texture units = {}", (const char *)_glGetString(GL_SHADING_LANGUAGE_VERSION), (int)max_tex_units);
 
 	if (!this->InitShaders()) return "Failed to initialize shaders";
 
@@ -771,7 +771,7 @@ static bool VerifyShader(GLuint shader)
 	_glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &log_len);
 	if (log_len > 0) {
 		_glGetShaderInfoLog(shader, log_len, nullptr, log_buf.Allocate(log_len));
-		DEBUG(driver, result != GL_TRUE ? 0 : 2, "%s", log_buf.GetBuffer()); // Always print on failure.
+		Debug(driver, result != GL_TRUE ? 0 : 2, "{}", log_buf.GetBuffer()); // Always print on failure.
 	}
 
 	return result == GL_TRUE;
@@ -794,7 +794,7 @@ static bool VerifyProgram(GLuint program)
 	_glGetProgramiv(program, GL_INFO_LOG_LENGTH, &log_len);
 	if (log_len > 0) {
 		_glGetProgramInfoLog(program, log_len, nullptr, log_buf.Allocate(log_len));
-		DEBUG(driver, result != GL_TRUE ? 0 : 2, "%s", log_buf.GetBuffer()); // Always print on failure.
+		Debug(driver, result != GL_TRUE ? 0 : 2, "{}", log_buf.GetBuffer()); // Always print on failure.
 	}
 
 	return result == GL_TRUE;
@@ -947,10 +947,10 @@ bool OpenGLBackend::Resize(int w, int h, bool force)
 		}
 	} else if (bpp == 8) {
 		if (_glClearBufferSubData != nullptr) {
-			byte b = 0;
+			uint8_t b = 0;
 			_glClearBufferSubData(GL_PIXEL_UNPACK_BUFFER, GL_R8, 0, line_pixel_count, GL_RED, GL_UNSIGNED_BYTE, &b);
 		} else {
-			ClearPixelBuffer<byte>(line_pixel_count, 0);
+			ClearPixelBuffer<uint8_t>(line_pixel_count, 0);
 		}
 	}
 
@@ -978,10 +978,10 @@ bool OpenGLBackend::Resize(int w, int h, bool force)
 
 		/* Initialize buffer as 0 == no remap. */
 		if (_glClearBufferSubData != nullptr) {
-			byte b = 0;
+			uint8_t b = 0;
 			_glClearBufferSubData(GL_PIXEL_UNPACK_BUFFER, GL_R8, 0, line_pixel_count, GL_RED, GL_UNSIGNED_BYTE, &b);
 		} else {
-			ClearPixelBuffer<byte>(line_pixel_count, 0);
+			ClearPixelBuffer<uint8_t>(line_pixel_count, 0);
 		}
 
 		_glBindTexture(GL_TEXTURE_2D, this->anim_texture);
@@ -1077,16 +1077,14 @@ void OpenGLBackend::DrawMouseCursor()
 
 	/* Draw cursor on screen */
 	_cur_dpi = &_screen;
-	for (uint i = 0; i < this->cursor_sprite_count; ++i) {
-		SpriteID sprite = this->cursor_sprite_seq[i].sprite;
-
+	for (const auto &cs : this->cursor_sprites) {
 		/* Sprites are cached by PopulateCursorCache(). */
-		if (this->cursor_cache.Contains(sprite)) {
-			Sprite *spr = this->cursor_cache.Get(sprite);
+		if (this->cursor_cache.Contains(cs.image.sprite)) {
+			Sprite *spr = this->cursor_cache.Get(cs.image.sprite);
 
-			this->RenderOglSprite((OpenGLSprite *)spr->data, this->cursor_sprite_seq[i].pal,
-					this->cursor_pos.x + this->cursor_sprite_pos[i].x + UnScaleByZoom(spr->x_offs, ZOOM_LVL_GUI),
-					this->cursor_pos.y + this->cursor_sprite_pos[i].y + UnScaleByZoom(spr->y_offs, ZOOM_LVL_GUI),
+			this->RenderOglSprite((OpenGLSprite *)spr->data, cs.image.pal,
+					this->cursor_pos.x + cs.pos.x + UnScaleByZoom(spr->x_offs, ZOOM_LVL_GUI),
+					this->cursor_pos.y + cs.pos.y + UnScaleByZoom(spr->y_offs, ZOOM_LVL_GUI),
 					ZOOM_LVL_GUI);
 		}
 	}
@@ -1094,9 +1092,6 @@ void OpenGLBackend::DrawMouseCursor()
 
 void OpenGLBackend::PopulateCursorCache()
 {
-	static_assert(lengthof(_cursor.sprite_seq) == lengthof(this->cursor_sprite_seq));
-	static_assert(lengthof(_cursor.sprite_pos) == lengthof(this->cursor_sprite_pos));
-
 	if (this->clear_cursor_cache) {
 		/* We have a pending cursor cache clear to do first. */
 		this->clear_cursor_cache = false;
@@ -1106,16 +1101,15 @@ void OpenGLBackend::PopulateCursorCache()
 	}
 
 	this->cursor_pos = _cursor.pos;
-	this->cursor_sprite_count = _cursor.sprite_count;
 	this->cursor_in_window = _cursor.in_window;
 
-	for (uint i = 0; i < _cursor.sprite_count; ++i) {
-		this->cursor_sprite_seq[i] = _cursor.sprite_seq[i];
-		this->cursor_sprite_pos[i] = _cursor.sprite_pos[i];
-		SpriteID sprite = _cursor.sprite_seq[i].sprite;
+	this->cursor_sprites.clear();
+	for (const auto &sc : _cursor.sprites) {
+		this->cursor_sprites.emplace_back(sc);
 
-		if (!this->cursor_cache.Contains(sprite)) {
-			Sprite *old = this->cursor_cache.Insert(sprite, (Sprite *)GetRawSprite(sprite, SpriteType::Normal, UINT8_MAX, &SimpleSpriteAlloc, this));
+		if (!this->cursor_cache.Contains(sc.image.sprite)) {
+			SimpleSpriteAllocator allocator;
+			Sprite *old = this->cursor_cache.Insert(sc.image.sprite, static_cast<Sprite *>(GetRawSprite(sc.image.sprite, SpriteType::Normal, UINT8_MAX, &allocator, this)));
 			if (old != nullptr) {
 				OpenGLSprite *gl_sprite = (OpenGLSprite *)old->data;
 				gl_sprite->~OpenGLSprite();
@@ -1267,26 +1261,25 @@ void OpenGLBackend::ReleaseAnimBuffer(const Rect &update_rect)
 	}
 }
 
-/* virtual */ Sprite *OpenGLBackend::Encode(const SpriteLoader::SpriteCollection &sprite, AllocatorProc *allocator)
+/* virtual */ Sprite *OpenGLBackend::Encode(const SpriteLoader::SpriteCollection &sprite, SpriteAllocator &allocator)
 {
 	/* Allocate and construct sprite data. */
-	Sprite *dest_sprite = (Sprite *)allocator(sizeof(*dest_sprite) + sizeof(OpenGLSprite));
+	Sprite *dest_sprite = allocator.Allocate<Sprite>(sizeof(*dest_sprite) + sizeof(OpenGLSprite));
 
 	OpenGLSprite *gl_sprite = (OpenGLSprite *)dest_sprite->data;
-	new (gl_sprite) OpenGLSprite(sprite[ZOOM_LVL_NORMAL].width, sprite[ZOOM_LVL_NORMAL].height, sprite[ZOOM_LVL_NORMAL].type == SpriteType::Font ? 1 : ZOOM_LVL_SPR_COUNT, sprite[ZOOM_LVL_NORMAL].colours);
+	new (gl_sprite) OpenGLSprite(sprite[ZOOM_LVL_MIN].width, sprite[ZOOM_LVL_MIN].height, sprite[ZOOM_LVL_MIN].type == SpriteType::Font ? 1 : ZOOM_LVL_SPR_COUNT, sprite[ZOOM_LVL_MIN].colours);
 
 	/* Upload texture data. */
-	for (int i = 0; i < (sprite[ZOOM_LVL_NORMAL].type == SpriteType::Font ? 1 : ZOOM_LVL_SPR_COUNT); i++) {
+	for (int i = 0; i < (sprite[ZOOM_LVL_MIN].type == SpriteType::Font ? 1 : ZOOM_LVL_SPR_COUNT); i++) {
 		gl_sprite->Update(sprite[i].width, sprite[i].height, i, sprite[i].data);
 	}
 
-	dest_sprite->height = sprite[ZOOM_LVL_NORMAL].height;
-	dest_sprite->width  = sprite[ZOOM_LVL_NORMAL].width;
-	dest_sprite->x_offs = sprite[ZOOM_LVL_NORMAL].x_offs;
-	dest_sprite->y_offs = sprite[ZOOM_LVL_NORMAL].y_offs;
+	dest_sprite->height = sprite[ZOOM_LVL_MIN].height;
+	dest_sprite->width  = sprite[ZOOM_LVL_MIN].width;
+	dest_sprite->x_offs = sprite[ZOOM_LVL_MIN].x_offs;
+	dest_sprite->y_offs = sprite[ZOOM_LVL_MIN].y_offs;
 	dest_sprite->next = nullptr;
 	dest_sprite->missing_zoom_levels = 0;
-
 	return dest_sprite;
 }
 
@@ -1313,7 +1306,7 @@ void OpenGLBackend::RenderOglSprite(OpenGLSprite *gl_sprite, PaletteID pal, int 
 			_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, OpenGLSprite::pal_pbo);
 			_glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 
-			_glBufferSubData(GL_PIXEL_UNPACK_BUFFER, 0, 256, GetNonSprite(GB(pal, 0, PALETTE_WIDTH), SpriteType::Recolour) + 1);
+			_glBufferSubData(GL_PIXEL_UNPACK_BUFFER, 0, 256, GetNonSprite(GB(pal, 0, PALETTE_WIDTH), SpriteType::Recolour));
 			_glTexSubImage1D(GL_TEXTURE_1D, 0, 0, 256, GL_RED, GL_UNSIGNED_BYTE, nullptr);
 
 			_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);

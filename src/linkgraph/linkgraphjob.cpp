@@ -45,6 +45,7 @@ LinkGraphJob::LinkGraphJob(const LinkGraph &orig, uint duration_multiplier) :
 		settings(_settings_game.linkgraph),
 		join_tick(GetLinkGraphJobJoinTick(duration_multiplier)),
 		start_tick(_scaled_tick_counter),
+		day_length_factor(::DayLengthFactor()),
 		job_completed(false),
 		job_aborted(false)
 {
@@ -182,6 +183,7 @@ void LinkGraphJob::FinaliseJob()
 			geflows.insert(std::move(*it));
 		}
 		geflows.SortStorage();
+		ge.RemoveDataIfUnused();
 		InvalidateWindowData(WC_STATION_VIEW, st->index, this->Cargo());
 	}
 }

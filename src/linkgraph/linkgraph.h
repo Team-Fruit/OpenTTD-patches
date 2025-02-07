@@ -287,7 +287,7 @@ public:
 	static const uint MIN_TIMEOUT_DISTANCE = 32;
 
 	/** Number of days before deleting links served only by vehicles stopped in depot. */
-	static constexpr DateDelta STALE_LINK_DEPOT_TIMEOUT = 1024;
+	static constexpr DateDelta STALE_LINK_DEPOT_TIMEOUT = DateDelta{1024};
 
 	/** Minimum number of ticks between subsequent compressions of a LG. */
 	static constexpr ScaledTickCounter COMPRESSION_INTERVAL = 256 * DAY_TICKS;
@@ -382,10 +382,10 @@ public:
 protected:
 	friend class LinkGraph::ConstNode;
 	friend class LinkGraph::Node;
-	friend SaveLoadTable GetLinkGraphDesc();
-	friend SaveLoadTable GetLinkGraphJobDesc();
-	friend void Save_LinkGraph(LinkGraph &lg);
-	friend void Load_LinkGraph(LinkGraph &lg);
+	friend struct LinkGraphNodeStructHandler;
+	friend struct LinkGraphNonTableHelper;
+	friend NamedSaveLoadTable GetLinkGraphDesc();
+	friend NamedSaveLoadTable GetLinkGraphJobDesc();
 
 	friend upstream_sl::SaveLoadTable upstream_sl::GetLinkGraphDesc();
 	friend upstream_sl::SaveLoadTable upstream_sl::GetLinkGraphJobDesc();

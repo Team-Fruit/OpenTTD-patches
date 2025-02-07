@@ -69,7 +69,7 @@ protected:
 			 */
 			blitters.insert(Blitters::value_type(this->name, this));
 		} else {
-			DEBUG(driver, 1, "Not registering blitter %s as it is not usable", name);
+			Debug(driver, 1, "Not registering blitter {} as it is not usable", name);
 		}
 	}
 
@@ -94,7 +94,7 @@ public:
 	 * @param name the blitter to select.
 	 * @post Sets the blitter so GetCurrentBlitter() returns it too.
 	 */
-	static Blitter *SelectBlitter(const std::string &name)
+	static Blitter *SelectBlitter(const std::string_view name)
 	{
 		BlitterFactory *b = GetBlitterFactory(name);
 		if (b == nullptr) return nullptr;
@@ -103,7 +103,7 @@ public:
 		delete *GetActiveBlitter();
 		*GetActiveBlitter() = newb;
 
-		DEBUG(driver, 1, "Successfully %s blitter '%s'", name.empty() ? "probed" : "loaded", newb->GetName());
+		Debug(driver, 1, "Successfully {} blitter '{}'", name.empty() ? "probed" : "loaded", newb->GetName());
 		return newb;
 	}
 
@@ -112,17 +112,17 @@ public:
 	 * @param name the blitter factory to select.
 	 * @return The blitter factory, or nullptr when there isn't one with the wanted name.
 	 */
-	static BlitterFactory *GetBlitterFactory(const std::string &name)
+	static BlitterFactory *GetBlitterFactory(const std::string_view name)
 	{
 #if defined(DEDICATED)
-		const char *default_blitter = "null";
+		const std::string_view default_blitter = "null";
 #elif defined(WITH_COCOA)
-		const char *default_blitter = "32bpp-anim";
+		const std::string_view default_blitter = "32bpp-anim";
 #else
-		const char *default_blitter = "8bpp-optimized";
+		const std::string_view default_blitter = "8bpp-optimized";
 #endif
 		if (GetBlitters().empty()) return nullptr;
-		const char *bname = name.empty() ? default_blitter : name.c_str();
+		const std::string_view bname = name.empty() ? default_blitter : name;
 
 		for (auto &it : GetBlitters()) {
 			BlitterFactory *b = it.second;
@@ -143,20 +143,16 @@ public:
 
 	/**
 	 * Fill a buffer with information about the blitters.
-	 * @param p The buffer to fill.
-	 * @param last The last element of the buffer.
-	 * @return p The location till where we filled the buffer.
+	 * @param output The buffer to fill.
 	 */
-	static char *GetBlittersInfo(char *p, const char *last)
+	static void GetBlittersInfo(format_target &output)
 	{
-		p += seprintf(p, last, "List of blitters:\n");
+		output.append("List of blitters:\n");
 		for (auto &it : GetBlitters()) {
 			BlitterFactory *b = it.second;
-			p += seprintf(p, last, "%18s: %s\n", b->name.c_str(), b->GetDescription().c_str());
+			output.format("{:>18}: {}\n", b->name, b->GetDescription());
 		}
-		p += seprintf(p, last, "\n");
-
-		return p;
+		output.push_back('\n');
 	}
 
 	/**

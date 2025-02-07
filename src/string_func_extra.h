@@ -12,27 +12,20 @@
 #include <string>
 #include <limits>
 
-inline void StrMakeValidInPlace(std::string &str, StringValidationSettings settings = SVS_REPLACE_WITH_QUESTION_MARK)
-{
-	if (str.empty()) return;
-	char *buf = str.data();
-	str.resize(StrMakeValidInPlace(buf, buf + str.size(), settings) - buf);
-}
-
 template <typename F>
-inline void ProcessLineByLine(char *buf, F line_functor)
+inline void ProcessLineByLine(std::string_view str, F line_functor)
 {
-	char *p = buf;
-	char *p2 = buf;
-	/* Print output line by line */
-	for (; *p2 != '\0'; p2++) {
+	const char *p = str.data();
+	const char *p2 = str.data();
+	const char *end = str.data() + str.size();
+	/* Process output line by line */
+	for (; p2 != end; p2++) {
 		if (*p2 == '\n') {
-			*p2 = '\0';
-			line_functor(p);
+			line_functor(std::string_view(p, p2));
 			p = p2 + 1;
 		}
 	}
-	if (p < p2) line_functor(p);
+	if (p < p2) line_functor(std::string_view(p, p2));
 }
 
 /*

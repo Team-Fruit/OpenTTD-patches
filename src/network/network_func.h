@@ -12,7 +12,7 @@
 
 /**
  * Uncomment the following define to enable command replaying.
- * See docs/desync.txt for details.
+ * See docs/desync.md for details.
  */
 // #define DEBUG_DUMP_COMMANDS
 // #define DEBUG_FAILED_DUMP_COMMANDS
@@ -36,7 +36,7 @@ extern StringList _network_bind_list;
 extern StringList _network_host_list;
 extern StringList _network_ban_list;
 
-byte NetworkSpectatorCount();
+uint8_t NetworkSpectatorCount();
 uint NetworkClientCount();
 bool NetworkIsValidClientName(const std::string_view client_name);
 bool NetworkValidateOurClientName();
@@ -67,7 +67,10 @@ bool NetworkCompanyIsPassworded(CompanyID company_id);
 uint NetworkMaxCompaniesAllowed();
 bool NetworkMaxCompaniesReached();
 void NetworkPrintClients();
+std::string_view NetworkGetPublicKeyOfClient(ClientID client_id);
 void NetworkHandlePauseChange(PauseMode prev_mode, PauseMode changed_mode);
+
+void NetworkOnGameStart();
 
 /*** Commands ran by the server ***/
 void NetworkServerEconomyDailyLoop();

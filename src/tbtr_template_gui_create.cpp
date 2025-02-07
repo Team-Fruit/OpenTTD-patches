@@ -67,7 +67,7 @@ enum TemplateReplaceCreateWindowWidgets {
 	TCW_CLONE,
 };
 
-static constexpr NWidgetPart _widgets[] = {
+static constexpr NWidgetPart _template_create_window_widgets[] = {
 	NWidget(NWID_HORIZONTAL),
 		NWidget(WWT_CLOSEBOX, COLOUR_GREY),
 		NWidget(WWT_CAPTION, COLOUR_GREY, TCW_CAPTION), SetDataTip(STR_TMPL_CREATEGUI_TITLE, STR_TOOLTIP_WINDOW_TITLE_DRAG_THIS),
@@ -97,15 +97,13 @@ static constexpr NWidgetPart _widgets[] = {
 
 static WindowDesc _template_create_window_desc(__FILE__, __LINE__,
 	WDP_AUTO,                       // window position
-	"template create window",       // const char* ini_key
+	"template_create",              // const char* ini_key
 	456, 100,                       // window size
 	WC_CREATE_TEMPLATE,             // window class
 	WC_TEMPLATEGUI_MAIN,            // parent window class
 	WDF_CONSTRUCTION,               // window flags
-	std::begin(_widgets), std::end(_widgets)
+	_template_create_window_widgets
 );
-
-void ShowTemplateTrainBuildVehicleWindow(Train **virtual_train);
 
 static void TrainDepotMoveVehicle(const Vehicle *wagon, VehicleID sel, const Vehicle *head)
 {
@@ -139,7 +137,7 @@ private:
 	btree::btree_set<VehicleID> pending_deletions; ///< Vehicle IDs where deletion is in progress
 
 public:
-	TemplateCreateWindow(WindowDesc* _wdesc, TemplateVehicle *to_edit, bool *window_open) : Window(_wdesc)
+	TemplateCreateWindow(WindowDesc &desc, TemplateVehicle *to_edit, bool *window_open) : Window(desc)
 	{
 		this->CreateNestedTree();
 		this->hscroll = this->GetScrollbar(TCW_SCROLLBAR_H_NEW_TMPL);
@@ -651,7 +649,7 @@ public:
 			TrainDepotMoveVehicle(v, sel, gdvp.head);
 		} else if (v != nullptr) {
 			SetObjectToPlaceWnd(SPR_CURSOR_MOUSE, PAL_NONE, HT_DRAG, this);
-			SetMouseCursorVehicle(v, EIT_PURCHASE);
+			SetMouseCursorVehicle(v, EIT_IN_DEPOT);
 			_cursor.vehchain = _ctrl_pressed;
 
 			this->sel = v->index;
@@ -708,7 +706,7 @@ public:
 void ShowTemplateCreateWindow(TemplateVehicle *to_edit, bool *create_window_open)
 {
 	if (BringWindowToFrontById(WC_CREATE_TEMPLATE, VEH_TRAIN) != nullptr) return;
-	new TemplateCreateWindow(&_template_create_window_desc, to_edit, create_window_open);
+	new TemplateCreateWindow(_template_create_window_desc, to_edit, create_window_open);
 }
 
 void CcSetVirtualTrain(const CommandCost &result, TileIndex tile, uint32_t p1, uint32_t p2, uint64_t p3, uint32_t cmd)

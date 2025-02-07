@@ -101,6 +101,7 @@ enum SlXvFeatureIndex {
 	XSLFI_MORE_VEHICLE_ORDERS,                    ///< More vehicle orders - VehicleOrderID is 16 bits instead of 8
 	XSLFI_ORDER_FLAGS_EXTRA,                      ///< Order flags field extra size
 	XSLFI_ONE_WAY_DT_ROAD_STOP,                   ///< One-way drive-through road stops
+	XSLFI_ONE_WAY_ROAD_BRIDGE,                    ///< One-way road bridges
 	XSLFI_ONE_WAY_ROAD_STATE,                     ///< One-way road state cache
 	XSLFI_VENC_CHUNK,                             ///< VENC chunk
 	XSLFI_ANIMATED_TILE_EXTRA,                    ///< Animated tile extra info
@@ -143,6 +144,9 @@ enum SlXvFeatureIndex {
 	XSLFI_ROAD_VEH_FLAGS,                         ///< Road vehicle flags
 	XSLFI_STATION_TILE_CACHE_FLAGS,               ///< Station tile cache flags
 	XSLFI_INDUSTRY_CARGO_TOTALS,                  ///< Industry cargo totals are 32 bit
+	XSLFI_SIGNAL_SPECIAL_PROPAGATION_FLAG,        ///< Signal special propagation flag
+	XSLFI_ORDER_VECTOR,                           ///< Use std::vector for order lists
+	XSLFI_ERNC_CHUNK,                             ///< ERNC chunk
 
 	XSLFI_SCRIPT_INT64,                           ///< See: SLV_SCRIPT_INT64
 	XSLFI_U64_TICK_COUNTER,                       ///< See: SLV_U64_TICK_COUNTER
@@ -161,15 +165,26 @@ enum SlXvFeatureIndex {
 	XSLFI_SHIP_ACCELERATION,                      ///< See: SLV_SHIP_ACCELERATION (PR #10734)
 	XSLFI_DEPOT_UNBUNCHING,                       ///< See: SLV_DEPOT_UNBUNCHING (PR #11945)
 	XSLFI_VEHICLE_ECONOMY_AGE,                    ///< See: SLV_VEHICLE_ECONOMY_AGE (PR #12141)
+	XSLFI_GROUP_NUMBERS,                          ///< See: SLV_GROUP_NUMBERS (PR #12297)
+	XSLFI_WATER_TILE_TYPE,                        ///< See: SLV_WATER_TILE_TYPE (PR #13030)
+	XSLFI_INDUSTRY_CARGO_REORGANISE,              ///< See: SLV_INDUSTRY_CARGO_REORGANISE (PR #10853)
 
 	XSLFI_TABLE_PATS,                             ///< Use upstream table format for PATS
+	XSLFI_TABLE_PLYR,                             ///< Use table format for PLYR
 	XSLFI_TABLE_MISC_SL,                          ///< Use upstream table format for miscellaneous chunks:
 	                                              ///<     v1: DATE, VIEW, MAPS
 	                                              ///<     v2: SUBS, CMDL, CMPU, ERNW, DEPT, CAPY, ECMY, EIDS, ENGN, GOAL, GRPS, RAIL, OBJS, SIGN, PSAC, STPE, STPA
+	                                              ///<     v3: CAPA, CITY, ROAD
 	XSLFI_TABLE_SCRIPT_SL,                        ///< Use upstream table format for script chunks
 	XSLFI_TABLE_NEWGRF_SL,                        ///< Use upstream table format for NewGRF/ID mapping chunks
 	                                              ///<     In v1, NGRF chunks were saved incorrectly: see SLBF_TABLE_ARRAY_LENGTH_PREFIX_MISSING
-	XSLFI_TABLE_INDUSTRY_SL,                      ///< Use upstream table format for industry chunks: IBLD, ITBL
+	XSLFI_TABLE_INDUSTRY_SL,                      ///< Use table format for industry chunks:
+	                                              ///<     v1: IBLD, ITBL
+	                                              ///<     v2: INDY
+	XSLFI_TABLE_STATION_SL,                       ///< Use table format for station chunks:
+	                                              ///<     v1: STNN
+	XSLFI_TABLE_LINKGRAPH_SL,                     ///< Use table format for link graph chunks:
+	XSLFI_TABLE_VEHICLE_SL,                       ///< Use table format for vehicle chunks:
 
 	XSLFI_RIFF_HEADER_60_BIT,                     ///< Size field in RIFF chunk header is 60 bit
 	XSLFI_HEIGHT_8_BIT,                           ///< Map tile height is 8 bit instead of 4 bit, but savegame version may be before this became true in trunk
@@ -268,8 +283,8 @@ DECLARE_ENUM_AS_BIT_SET(SlxiSubChunkFlags)
 
 struct SlxiSubChunkInfo;
 
-typedef uint32_t SlxiSubChunkSaveProc(const SlxiSubChunkInfo *info, bool dry_run);  ///< sub chunk save procedure type, must return length and write no data when dry_run is true
-typedef void SlxiSubChunkLoadProc(const SlxiSubChunkInfo *info, uint32_t length);   ///< sub chunk load procedure, must consume length bytes
+typedef uint32_t SlxiSubChunkSaveProc(const SlxiSubChunkInfo &info, bool dry_run);  ///< sub chunk save procedure type, must return length and write no data when dry_run is true
+typedef void SlxiSubChunkLoadProc(const SlxiSubChunkInfo &info, uint32_t length);   ///< sub chunk load procedure, must consume length bytes
 
 /** Handlers and description of chunk. */
 struct SlxiSubChunkInfo {
@@ -280,7 +295,7 @@ struct SlxiSubChunkInfo {
 	const char *name;                             ///< feature name, this *IS* saved, so must be globally unique
 	SlxiSubChunkSaveProc *save_proc;              ///< save procedure of the sub chunk, this may be nullptr in which case no extra chunk data is saved
 	SlxiSubChunkLoadProc *load_proc;              ///< load procedure of the sub chunk, this may be nullptr in which case the extra chunk data must be missing or of 0 length
-	const char *chunk_list;                       ///< this is a list of chunks that this feature uses, which should be written to the savegame, this must be a comma-seperated list of 4-character IDs, with no spaces, or nullptr
+	const char *chunk_list;                       ///< this is a list of chunks that this feature uses, which should be written to the savegame, this must be a comma-separated list of 4-character IDs, with no spaces, or nullptr
 };
 
 void SlXvResetState();

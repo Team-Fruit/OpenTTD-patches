@@ -294,7 +294,7 @@ extern AirportTileOverrideManager _airporttile_mngr;
 extern ObjectOverrideManager _object_mngr;
 
 uint32_t GetTerrainType(TileIndex tile, TileContext context = TCX_NORMAL);
-TileIndex GetNearbyTile(byte parameter, TileIndex tile, bool signed_offsets = true, Axis axis = INVALID_AXIS);
+TileIndex GetNearbyTile(uint8_t parameter, TileIndex tile, bool signed_offsets = true, Axis axis = INVALID_AXIS);
 uint32_t GetNearbyTileInformation(TileIndex tile, bool grf_version8, uint32_t mask);
 uint32_t GetCompanyInfo(CompanyID owner, const struct Livery *l = nullptr);
 CommandCost GetErrorMessageFromLocationCallbackResult(uint16_t cb_res, const GRFFile *grffile, StringID default_error);
@@ -309,28 +309,32 @@ bool Convert8bitBooleanCallback(const struct GRFFile *grffile, uint16_t cbid, ui
  */
 template <size_t Tcnt>
 struct GRFFilePropsBase {
-	GRFFilePropsBase() : local_id(0), grffile(nullptr)
-	{
-		/* The lack of some compilers to provide default constructors complying to the specs
-		 * requires us to zero the stuff ourself. */
-		memset(spritegroup, 0, sizeof(spritegroup));
-	}
+	uint16_t local_id = 0;                       ///< id defined by the grf file for this entity
+	uint32_t grfid = 0;                          ///< grfid that introduced this entity.
+	const struct GRFFile *grffile = nullptr;     ///< grf file that introduced this entity
+	std::array<const struct SpriteGroup *, Tcnt> spritegroup{}; ///< pointers to the different sprites of the entity
 
-	uint16_t local_id;                           ///< id defined by the grf file for this entity
-	const struct GRFFile *grffile;               ///< grf file that introduced this entity
-	const struct SpriteGroup *spritegroup[Tcnt]; ///< pointer to the different sprites of the entity
+	/**
+	 * Test if this entity was introduced by NewGRF.
+	 * @returns true iff the grfid property is set.
+	 */
+	inline bool HasGrfFile() const { return this->grffile != nullptr; }
 };
 
 /** Data related to the handling of grf files. */
 struct GRFFileProps : GRFFilePropsBase<1> {
 	/** Set all default data constructor for the props. */
-	GRFFileProps(uint16_t subst_id = 0) :
-			GRFFilePropsBase<1>(), subst_id(subst_id), override(subst_id)
-	{
-	}
+	constexpr GRFFileProps(uint16_t subst_id = 0) : subst_id(subst_id), override(subst_id) {}
 
 	uint16_t subst_id;
 	uint16_t override;                      ///< id of the entity been replaced by
+};
+
+/** Container for a label for rail or road type conversion. */
+template <typename T>
+struct LabelObject {
+	T label = {}; ///< Label of rail or road type.
+	uint8_t subtype = 0; ///< Subtype of type (road or tram).
 };
 
 enum SpriteGroupCallbacksUsed : uint8_t {
@@ -354,8 +358,8 @@ enum CustomSignalSpriteContextMode : uint8_t {
 
 enum CustomSignalSpriteContextFlags : uint8_t {
 	CSSCF_NONE                          = 0,
-	CSSCF_TUNNEL                        = 1 << 1,
-	CSSCF_SECOND_SIGNAL                 = 1 << 2,
+	CSSCF_TUNNEL                        = 1 << 0,
+	CSSCF_SECOND_SIGNAL                 = 1 << 1,
 };
 DECLARE_ENUM_AS_BIT_SET(CustomSignalSpriteContextFlags)
 

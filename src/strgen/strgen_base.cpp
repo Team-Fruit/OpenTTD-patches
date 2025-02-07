@@ -11,6 +11,7 @@
 #include "../core/endian_func.hpp"
 #include "../core/alloc_func.hpp"
 #include "../core/mem_func.hpp"
+#include "../error_func.h"
 #include "../string_func.h"
 #include "../table/control_codes.h"
 
@@ -31,8 +32,7 @@ int _cur_line;                        ///< The current line we're parsing in the
 int _errors, _warnings, _show_todo;
 LanguagePackHeader _lang;             ///< Header information about a language.
 
-static const ptrdiff_t MAX_COMMAND_PARAM_SIZE = 100; ///< Maximum size of every command block, not counting the name of the command itself
-static const CmdStruct *ParseCommandString(const char **str, char *param, int *argno, int *casei);
+static const CmdStruct *ParseCommandString(const char **str, std::string &param, int *argno, int *casei);
 
 /**
  * Create a new case.
@@ -130,7 +130,7 @@ uint StringData::Version() const
 		if (ls != nullptr) {
 			const CmdStruct *cs;
 			const char *s;
-			char buf[MAX_COMMAND_PARAM_SIZE];
+			std::string buf;
 			int argno;
 			int casei;
 
@@ -170,12 +170,12 @@ static ParsedCommandStruct _cur_pcs;
 static int _cur_argidx;
 
 /** The buffer for writing a single string. */
-struct Buffer : std::vector<byte> {
+struct Buffer : std::vector<uint8_t> {
 	/**
 	 * Convenience method for adding a byte.
 	 * @param value The value to add.
 	 */
-	void AppendByte(byte value)
+	void AppendByte(uint8_t value)
 	{
 		this->push_back(value);
 	}
@@ -201,7 +201,7 @@ struct Buffer : std::vector<byte> {
 			this->push_back(0x80 + GB(value,  6, 6));
 			this->push_back(0x80 + GB(value,  0, 6));
 		} else {
-			strgen_warning("Invalid unicode value U+0x%X", value);
+			StrgenWarning("Invalid unicode value U+0x{:X}", value);
 		}
 	}
 };
@@ -233,7 +233,7 @@ size_t Utf8Validate(const char *s)
 
 void EmitSingleChar(Buffer *buffer, char *buf, int value)
 {
-	if (*buf != '\0') strgen_warning("Ignoring trailing letters in command");
+	if (*buf != '\0') StrgenWarning("Ignoring trailing letters in command");
 	buffer->AppendUtf8(value);
 }
 
@@ -312,8 +312,15 @@ static int TranslateArgumentIdx(int arg, int offset = 0);
 
 static void EmitWordList(Buffer *buffer, const char * const *words, uint nw)
 {
+	/* Maximum word length in bytes, excluding trailing NULL. */
+	constexpr uint MAX_WORD_LENGTH = UINT8_MAX - 2;
+
 	buffer->AppendByte(nw);
-	for (uint i = 0; i < nw; i++) buffer->AppendByte((byte)strlen(words[i]) + 1);
+	for (uint i = 0; i < nw; i++) {
+		size_t len = strlen(words[i]) + 1;
+		if (len >= UINT8_MAX) StrgenFatal("WordList {}/{} string '{}' too long, max bytes {}", i + 1, nw, words[i], MAX_WORD_LENGTH);
+		buffer->AppendByte(static_cast<uint8_t>(len));
+	}
 	for (uint i = 0; i < nw; i++) {
 		for (uint j = 0; words[i][j] != '\0'; j++) buffer->AppendByte(words[i][j]);
 		buffer->AppendByte(0);
@@ -325,7 +332,7 @@ void EmitPlural(Buffer *buffer, char *buf, int)
 	int argidx = _cur_argidx;
 	int offset = -1;
 	int expected = _plural_forms[_lang.plural_form].plural_count;
-	const char **words = AllocaM(const char *, std::max(expected, MAX_PLURALS));
+	TempBufferT<const char *, 16> words(std::max(expected, MAX_PLURALS));
 	int nw = 0;
 
 	/* Parse out the number, if one exists. Otherwise default to prev arg. */
@@ -335,7 +342,7 @@ void EmitPlural(Buffer *buffer, char *buf, int)
 	if (offset == -1) {
 		/* Use default offset */
 		if (cmd == nullptr || cmd->default_plural_offset < 0) {
-			strgen_fatal("Command '%s' has no (default) plural position", cmd == nullptr ? "<empty>" : cmd->cmd);
+			StrgenFatal("Command '{}' has no (default) plural position", cmd == nullptr ? "<empty>" : cmd->cmd);
 		}
 		offset = cmd->default_plural_offset;
 	}
@@ -347,15 +354,15 @@ void EmitPlural(Buffer *buffer, char *buf, int)
 	}
 
 	if (nw == 0) {
-		strgen_fatal("%s: No plural words", _cur_ident);
+		StrgenFatal("{}: No plural words", _cur_ident);
 	}
 
 	if (expected != nw) {
 		if (_translated) {
-			strgen_fatal("%s: Invalid number of plural forms. Expecting %d, found %d.", _cur_ident,
+			StrgenFatal("{}: Invalid number of plural forms. Expecting {}, found {}.", _cur_ident,
 				expected, nw);
 		} else {
-			if ((_show_todo & 2) != 0) strgen_warning("'%s' is untranslated. Tweaking english string to allow compilation for plural forms", _cur_ident);
+			if ((_show_todo & 2) != 0) StrgenWarning("'{}' is untranslated. Tweaking english string to allow compilation for plural forms", _cur_ident);
 			if (nw > expected) {
 				nw = expected;
 			} else {
@@ -384,7 +391,7 @@ void EmitGender(Buffer *buffer, char *buf, int)
 
 		/* This is a {G=DER} command */
 		nw = _lang.GetGenderIndex(buf);
-		if (nw >= MAX_NUM_GENDERS) strgen_fatal("G argument '%s' invalid", buf);
+		if (nw >= MAX_NUM_GENDERS) StrgenFatal("G argument '{}' invalid", buf);
 
 		/* now nw contains the gender index */
 		buffer->AppendUtf8(SCC_GENDER_INDEX);
@@ -398,14 +405,14 @@ void EmitGender(Buffer *buffer, char *buf, int)
 
 		const CmdStruct *cmd = _cur_pcs.consuming_commands[argidx];
 		if (cmd == nullptr || (cmd->flags & C_GENDER) == 0) {
-			strgen_fatal("Command '%s' can't have a gender", cmd == nullptr ? "<empty>" : cmd->cmd);
+			StrgenFatal("Command '{}' can't have a gender", cmd == nullptr ? "<empty>" : cmd->cmd);
 		}
 
 		for (nw = 0; nw < MAX_NUM_GENDERS; nw++) {
 			words[nw] = ParseWord(&buf);
 			if (words[nw] == nullptr) break;
 		}
-		if (nw != _lang.num_genders) strgen_fatal("Bad # of arguments for gender command");
+		if (nw != _lang.num_genders) StrgenFatal("Bad # of arguments for gender command");
 
 		assert(IsInsideBS(cmd->value, SCC_CONTROL_START, UINT8_MAX));
 		buffer->AppendUtf8(SCC_GENDER_LIST);
@@ -416,8 +423,8 @@ void EmitGender(Buffer *buffer, char *buf, int)
 
 static const CmdStruct *FindCmd(const char *s, int len)
 {
-	for (const CmdStruct *cs = _cmd_structs; cs != endof(_cmd_structs); cs++) {
-		if (strncmp(cs->cmd, s, len) == 0 && cs->cmd[len] == '\0') return cs;
+	for (const auto &cs : _cmd_structs) {
+		if (strncmp(cs.cmd, s, len) == 0 && cs.cmd[len] == '\0') return &cs;
 	}
 	return nullptr;
 }
@@ -431,14 +438,14 @@ static uint ResolveCaseName(const char *str, size_t len)
 	case_str[len] = '\0';
 
 	uint8_t case_idx = _lang.GetCaseIndex(case_str);
-	if (case_idx >= MAX_NUM_CASES) strgen_fatal("Invalid case-name '%s'", case_str);
+	if (case_idx >= MAX_NUM_CASES) StrgenFatal("Invalid case-name '{}'", case_str);
 	return case_idx + 1;
 }
 
 
 /* returns nullptr on eof
  * else returns command struct */
-static const CmdStruct *ParseCommandString(const char **str, char *param, int *argno, int *casei)
+static const CmdStruct *ParseCommandString(const char **str, std::string &param, int *argno, int *casei)
 {
 	const char *s = *str, *start;
 	char c;
@@ -456,7 +463,7 @@ static const CmdStruct *ParseCommandString(const char **str, char *param, int *a
 		char *end;
 
 		*argno = std::strtoul(s, &end, 0);
-		if (*end != ':') strgen_fatal("missing arg #");
+		if (*end != ':') StrgenFatal("missing arg #");
 		s = end + 1;
 	}
 
@@ -468,7 +475,7 @@ static const CmdStruct *ParseCommandString(const char **str, char *param, int *a
 
 	const CmdStruct *cmd = FindCmd(start, s - start - 1);
 	if (cmd == nullptr) {
-		strgen_error("Undefined command '%.*s'", (int)(s - start - 1), start);
+		StrgenError("Undefined command '{}'", std::string_view(start, (s - start - 1)));
 		return nullptr;
 	}
 
@@ -476,7 +483,7 @@ static const CmdStruct *ParseCommandString(const char **str, char *param, int *a
 		const char *casep = s;
 
 		if (!(cmd->flags & C_CASE)) {
-			strgen_fatal("Command '%s' can't have a case", cmd->cmd);
+			StrgenFatal("Command '{}' can't have a case", cmd->cmd);
 		}
 
 		do {
@@ -486,7 +493,7 @@ static const CmdStruct *ParseCommandString(const char **str, char *param, int *a
 	}
 
 	if (c == '\0') {
-		strgen_error("Missing } from command '%s'", start);
+		StrgenError("Missing }} from command '{}'", start);
 		return nullptr;
 	}
 
@@ -499,14 +506,12 @@ static const CmdStruct *ParseCommandString(const char **str, char *param, int *a
 			c = *s++;
 			if (c == '}') break;
 			if (c == '\0') {
-				strgen_error("Missing } from command '%s'", start);
+				StrgenError("Missing }} from command '{}'", start);
 				return nullptr;
 			}
-			if (s - start == MAX_COMMAND_PARAM_SIZE) error("param command too long");
-			*param++ = c;
+			param += c;
 		}
 	}
-	*param = '\0';
 
 	*str = s;
 
@@ -527,7 +532,6 @@ StringReader::StringReader(StringData &data, std::string file, bool master, bool
 
 ParsedCommandStruct ExtractCommandString(const char *s, bool)
 {
-	char param[MAX_COMMAND_PARAM_SIZE];
 	int argno;
 	int argidx = 0;
 	int casei;
@@ -536,21 +540,22 @@ ParsedCommandStruct ExtractCommandString(const char *s, bool)
 
 	for (;;) {
 		/* read until next command from a. */
+		std::string param;
 		const CmdStruct *ar = ParseCommandString(&s, param, &argno, &casei);
 
 		if (ar == nullptr) break;
 
 		/* Sanity checking */
-		if (argno != -1 && ar->consumes == 0) strgen_fatal("Non consumer param can't have a paramindex");
+		if (argno != -1 && ar->consumes == 0) StrgenFatal("Non consumer param can't have a paramindex");
 
 		if (ar->consumes) {
 			if (argno != -1) argidx = argno;
-			if (argidx < 0 || (uint)argidx >= p.consuming_commands.max_size()) strgen_fatal("invalid param idx %d", argidx);
-			if (p.consuming_commands[argidx] != nullptr && p.consuming_commands[argidx] != ar) strgen_fatal("duplicate param idx %d", argidx);
+			if (argidx < 0 || (uint)argidx >= p.consuming_commands.max_size()) StrgenFatal("invalid param idx {}", argidx);
+			if (p.consuming_commands[argidx] != nullptr && p.consuming_commands[argidx] != ar) StrgenFatal("duplicate param idx {}", argidx);
 
 			p.consuming_commands[argidx++] = ar;
 		} else if (!(ar->flags & C_DONTCOUNT)) { // Ignore some of them
-			p.non_consuming_commands.emplace_back(CmdPair{ar, param});
+			p.non_consuming_commands.emplace_back(CmdPair{ar, std::move(param)});
 		}
 	}
 
@@ -593,7 +598,7 @@ static bool CheckCommandsMatch(const char *a, const char *b, const char *name)
 
 	/* For each string in templ, see if we find it in lang */
 	if (templ.non_consuming_commands.max_size() != lang.non_consuming_commands.max_size()) {
-		strgen_warning("%s: template string and language string have a different # of commands", name);
+		StrgenWarning("{}: template string and language string have a different # of commands", name);
 		result = false;
 	}
 
@@ -610,7 +615,7 @@ static bool CheckCommandsMatch(const char *a, const char *b, const char *name)
 		}
 
 		if (!found) {
-			strgen_warning("%s: command '%s' exists in template file but not in language file", name, templ_nc.cmd->cmd);
+			StrgenWarning("{}: command '{}' exists in template file but not in language file", name, templ_nc.cmd->cmd);
 			result = false;
 		}
 	}
@@ -619,7 +624,7 @@ static bool CheckCommandsMatch(const char *a, const char *b, const char *name)
 	 * Check if the non consumer commands match up also. */
 	for (uint i = 0; i < templ.consuming_commands.max_size(); i++) {
 		if (TranslateCmdForCompare(templ.consuming_commands[i]) != lang.consuming_commands[i]) {
-			strgen_warning("%s: Param idx #%d '%s' doesn't match with template command '%s'", name, i,
+			StrgenWarning("{}: Param idx #{} '{}' doesn't match with template command '{}'", name, i,
 				lang.consuming_commands[i]  == nullptr ? "<empty>" : TranslateCmdForCompare(lang.consuming_commands[i])->cmd,
 				templ.consuming_commands[i] == nullptr ? "<empty>" : templ.consuming_commands[i]->cmd);
 			result = false;
@@ -641,7 +646,7 @@ void StringReader::HandleString(char *str)
 
 	char *s = strchr(str, ':');
 	if (s == nullptr) {
-		strgen_error("Line has no ':' delimiter");
+		StrgenError("Line has no ':' delimiter");
 		return;
 	}
 
@@ -656,7 +661,7 @@ void StringReader::HandleString(char *str)
 	const char *tmp;
 	for (tmp = s; *tmp != '\0';) {
 		size_t len = Utf8Validate(tmp);
-		if (len == 0) strgen_fatal("Invalid UTF-8 sequence in '%s'", s);
+		if (len == 0) StrgenFatal("Invalid UTF-8 sequence in '{}'", s);
 
 		char32_t c;
 		Utf8Decode(&c, tmp);
@@ -664,7 +669,7 @@ void StringReader::HandleString(char *str)
 				c == 0x200B || // Zero width space
 				(c >= 0xE000 && c <= 0xF8FF) || // Private range
 				(c >= 0xFFF0 && c <= 0xFFFF)) { // Specials range
-			strgen_fatal("Unwanted UTF-8 character U+%04X in sequence '%s'", c, s);
+			StrgenFatal("Unwanted UTF-8 character U+{:04X} in sequence '{}'", (int)c, s);
 		}
 
 		tmp += len;
@@ -680,7 +685,7 @@ void StringReader::HandleString(char *str)
 
 	if (this->master) {
 		if (casep != nullptr) {
-			strgen_error("Cases in the base translation are not supported.");
+			StrgenError("Cases in the base translation are not supported.");
 			return;
 		}
 
@@ -689,15 +694,15 @@ void StringReader::HandleString(char *str)
 				ent->ReplaceDefinition(s, _cur_line);
 				return;
 			}
-			strgen_error("String name '%s' is used multiple times", str);
+			StrgenError("String name '{}' is used multiple times", str);
 			return;
 		} else if (this->data.override_mode) {
-			strgen_error("String '%s' marked as overriding, but does not override", str);
+			StrgenError("String '{}' marked as overriding, but does not override", str);
 			return;
 		}
 
 		if (this->data.next_string_id >= 0 && (this->data.insert_after != nullptr || this->data.insert_before != nullptr)) {
-			strgen_error("Cannot use insert_after/insert_before and id at the same time: '%s'", str);
+			StrgenError("Cannot use insert_after/insert_before and id at the same time: '{}'", str);
 		}
 
 		/* Allocate a new LangString */
@@ -725,12 +730,12 @@ void StringReader::HandleString(char *str)
 		}
 	} else {
 		if (ent == nullptr) {
-			strgen_warning("String name '%s' does not exist in master file", str);
+			StrgenWarning("String name '{}' does not exist in master file", str);
 			return;
 		}
 
 		if (ent->no_translate_mode && _translation) {
-			strgen_error("String name '%s' is marked as no-translate", str);
+			StrgenError("String name '{}' is marked as no-translate", str);
 			return;
 		}
 
@@ -738,7 +743,7 @@ void StringReader::HandleString(char *str)
 			if (this->data.override_mode) {
 				ent->translated.clear();
 			} else {
-				strgen_error("String name '%s' is used multiple times", str);
+				StrgenError("String name '{}' is used multiple times", str);
 				return;
 			}
 		}
@@ -763,10 +768,10 @@ void StringReader::HandlePragma(char *str)
 	if (!memcmp(str, "plural ", 7)) {
 		_lang.plural_form = atoi(str + 7);
 		if (_lang.plural_form >= lengthof(_plural_forms)) {
-			strgen_fatal("Invalid pluralform %d", _lang.plural_form);
+			StrgenFatal("Invalid pluralform {}", _lang.plural_form);
 		}
 	} else {
-		strgen_fatal("unknown pragma '%s'", str);
+		StrgenFatal("unknown pragma '{}'", str);
 	}
 }
 
@@ -791,9 +796,9 @@ void StringReader::ParseFile()
 
 	/* For each new file we parse, reset the genders, and language codes. */
 	MemSetT(&_lang, 0);
-	strecpy(_lang.digit_group_separator, ",", lastof(_lang.digit_group_separator));
-	strecpy(_lang.digit_group_separator_currency, ",", lastof(_lang.digit_group_separator_currency));
-	strecpy(_lang.digit_decimal_separator, ".", lastof(_lang.digit_decimal_separator));
+	strecpy(_lang.digit_group_separator, ",");
+	strecpy(_lang.digit_group_separator_currency, ",");
+	strecpy(_lang.digit_decimal_separator, ".");
 
 	_cur_line = 1;
 	while (this->ReadLine(buf, lastof(buf)) != nullptr) {
@@ -823,10 +828,10 @@ void StringReader::AssignIDs(size_t &next_id, LangString *ls)
 		}
 
 		if ((size_t)ls->index >= this->data.max_strings) {
-			strgen_error("Too many strings, maximum allowed is " PRINTF_SIZE, this->data.max_strings);
+			StrgenError("Too many strings, maximum allowed is {}", this->data.max_strings);
 			return;
 		} else if (this->data.strings[ls->index] != nullptr) {
-			strgen_error("String ID 0x%X for '%s' already in use by '%s'", (uint)ls->index, ls->name.c_str(), this->data.strings[ls->index]->name.c_str());
+			StrgenError("String ID 0x{:X} for '{}' already in use by '{}'", ls->index, ls->name, this->data.strings[ls->index]->name);
 			return;
 		} else {
 			this->data.strings[ls->index] = ls;
@@ -859,15 +864,15 @@ static int TranslateArgumentIdx(int argidx, int offset)
 	int sum;
 
 	if (argidx < 0 || (uint)argidx >= _cur_pcs.consuming_commands.max_size()) {
-		strgen_fatal("invalid argidx %d", argidx);
+		StrgenFatal("invalid argidx {}", argidx);
 	}
 	const CmdStruct *cs = _cur_pcs.consuming_commands[argidx];
 	if (cs != nullptr && cs->consumes <= offset) {
-		strgen_fatal("invalid argidx offset %d:%d", argidx, offset);
+		StrgenFatal("invalid argidx offset {}:{}", argidx, offset);
 	}
 
 	if (_cur_pcs.consuming_commands[argidx] == nullptr) {
-		strgen_fatal("no command for this argidx %d", argidx);
+		StrgenFatal("no command for this argidx {}", argidx);
 	}
 
 	for (int i = sum = 0; i < argidx; i++) {
@@ -897,7 +902,7 @@ static void PutCommandString(Buffer *buffer, const char *str)
 			continue;
 		}
 
-		char param[MAX_COMMAND_PARAM_SIZE];
+		std::string param;
 		int argno;
 		int casei;
 		const CmdStruct *cs = ParseCommandString(&str, param, &argno, &casei);
@@ -919,11 +924,11 @@ static void PutCommandString(Buffer *buffer, const char *str)
 			/* Output the one from the master string... it's always accurate. */
 			cs = _cur_pcs.consuming_commands[_cur_argidx++];
 			if (cs == nullptr) {
-				strgen_fatal("%s: No argument exists at position %d", _cur_ident, _cur_argidx - 1);
+				StrgenFatal("{}: No argument exists at position {}", _cur_ident, _cur_argidx - 1);
 			}
 		}
 
-		cs->proc(buffer, param, cs->value);
+		cs->proc(buffer, param.data(), cs->value);
 	}
 }
 
@@ -936,14 +941,14 @@ void LanguageWriter::WriteLength(uint length)
 	char buffer[2];
 	int offs = 0;
 	if (length >= 0x4000) {
-		strgen_fatal("string too long");
+		StrgenFatal("string too long");
 	}
 
 	if (length >= 0xC0) {
 		buffer[offs++] = (length >> 8) | 0xC0;
 	}
 	buffer[offs++] = length & 0xFF;
-	this->Write((byte*)buffer, offs);
+	this->Write((uint8_t*)buffer, offs);
 }
 
 /**
@@ -952,7 +957,7 @@ void LanguageWriter::WriteLength(uint length)
  */
 void LanguageWriter::WriteLang(const StringData &data)
 {
-	uint *in_use = AllocaM(uint, data.tabs);
+	TempBufferST<uint> in_use(data.tabs);
 	for (size_t tab = 0; tab < data.tabs; tab++) {
 		uint n = data.CountInUse((uint)tab);
 
@@ -992,7 +997,7 @@ void LanguageWriter::WriteLang(const StringData &data)
 			/* Produce a message if a string doesn't have a translation. */
 			if (_show_todo > 0 && ls->translated.empty()) {
 				if ((_show_todo & 2) != 0) {
-					strgen_warning("'%s' is untranslated", ls->name.c_str());
+					StrgenWarning("'{}' is untranslated", ls->name);
 				}
 				if ((_show_todo & 1) != 0) {
 					const char *s = "<TODO> ";
@@ -1020,7 +1025,7 @@ void LanguageWriter::WriteLang(const StringData &data)
 				 * <0x9E> <NUM CASES> <CASE1> <LEN1> <STRING1> <CASE2> <LEN2> <STRING2> <CASE3> <LEN3> <STRING3> <STRINGDEFAULT>
 				 * Each LEN is printed using 2 bytes in big endian order. */
 				buffer.AppendUtf8(SCC_SWITCH_CASE);
-				buffer.AppendByte((byte)ls->translated_cases.size());
+				buffer.AppendByte((uint8_t)ls->translated_cases.size());
 
 				/* Write each case */
 				for (const Case &c : ls->translated_cases) {

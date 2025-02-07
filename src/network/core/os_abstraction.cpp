@@ -19,6 +19,11 @@
 #include "stdafx.h"
 #include "os_abstraction.h"
 #include "../../string_func.h"
+
+#if defined(_WIN32)
+#include "../../core/format.hpp"
+#endif
+
 #include <mutex>
 
 #include "../../safeguards.h"
@@ -82,22 +87,13 @@ const char *NetworkError::AsString() const
 #if defined(_WIN32)
 		wchar_t buffer[512];
 		if (FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, this->error,
-			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buffer, lengthof(buffer), nullptr) == 0) {
-			char errbuffer[32];
-			seprintf(errbuffer, lastof(errbuffer), "Unknown error %d", this->error);
-			this->message.assign(errbuffer);
+			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buffer, static_cast<DWORD>(std::size(buffer)), nullptr) == 0) {
+			this->message = fmt::format("Unknown error {}", this->error);
 		} else {
-			this->message.assign(FS2OTTD(buffer));
+			this->message = FS2OTTD(buffer);
 		}
 #else
-		/* Make strerror thread safe by locking access to it. There is a thread safe strerror_r, however
-		 * the non-POSIX variant is available due to defining _GNU_SOURCE meaning it is not portable.
-		 * The problem with the non-POSIX variant is that it does not necessarily fill the buffer with
-		 * the error message but can also return a pointer to a static bit of memory, whereas the POSIX
-		 * variant always fills the buffer. This makes the behaviour too erratic to work with. */
-		static std::mutex mutex;
-		std::lock_guard<std::mutex> guard(mutex);
-		this->message.assign(strerror(this->error));
+		this->message.assign(StrErrorDumper().Get(this->error));
 #endif
 	}
 	return this->message.c_str();

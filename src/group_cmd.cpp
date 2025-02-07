@@ -428,8 +428,9 @@ CommandCost CmdCreateGroup(TileIndex tile, DoCommandFlag flags, uint32_t p1, uin
 		g->vehicle_type = vt;
 		g->parent = INVALID_GROUP;
 
+		Company *c = Company::Get(g->owner);
+		g->number = c->freegroups.UseID(c->freegroups.NextID());
 		if (pg == nullptr) {
-			const Company *c = Company::Get(_current_company);
 			g->livery.colour1 = c->livery[LS_DEFAULT].colour1;
 			g->livery.colour2 = c->livery[LS_DEFAULT].colour2;
 			if (c->settings.renew_keep_length) SetBit(g->flags, GroupFlags::GF_REPLACE_WAGON_REMOVAL);
@@ -481,14 +482,15 @@ CommandCost CmdDeleteGroup(TileIndex tile, DoCommandFlag flags, uint32_t p1, uin
 		/* Update backupped orders if needed */
 		OrderBackup::ClearGroup(g->index);
 
-		/* If we set an autoreplace for the group we delete, remove it. */
-		if (_current_company < MAX_COMPANIES) {
-			Company *c;
+		if (g->owner < MAX_COMPANIES) {
+			Company *c = Company::Get(g->owner);
 
-			c = Company::Get(_current_company);
+			/* If we set an autoreplace for the group we delete, remove it. */
 			for (EngineRenew *er : EngineRenew::Iterate()) {
 				if (er->group_id == g->index) RemoveEngineReplacementForCompany(c, er->from, g->index, flags);
 			}
+
+			c->freegroups.ReleaseID(g->number);
 		}
 
 		VehicleType vt = g->vehicle_type;
@@ -517,7 +519,7 @@ CommandCost CmdDeleteGroup(TileIndex tile, DoCommandFlag flags, uint32_t p1, uin
  * @param flags type of operation
  * @param p1   index of array group
  *   - p1 bit 0-15 : GroupID
- *   - p1 bit 16: 0 - Rename grouop
+ *   - p1 bit 16: 0 - Rename group
  *                1 - Set group parent
  * @param p2   parent group index
  * @param text the new name or an empty string when resetting to the default
@@ -554,7 +556,7 @@ CommandCost CmdAlterGroup(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint
 
 			/* Ensure request parent isn't child of group.
 			 * This is the only place that infinite loops are prevented. */
-			if (GroupIsInGroup(pg->index, g->index)) return_cmd_error(STR_ERROR_GROUP_CAN_T_SET_PARENT_RECURSION);
+			if (GroupIsInGroup(pg->index, g->index)) return CommandCost(STR_ERROR_GROUP_CAN_T_SET_PARENT_RECURSION);
 		}
 
 		if (flags & DC_EXEC) {
@@ -744,7 +746,7 @@ static void GetAutoGroupMostRelevantTowns(const Vehicle *vehicle, Town* &from, T
 
 	for (int x = 0; x < num; x++)
 	{
-		Order *order = vehicle->GetOrder(x);
+		const Order *order = vehicle->GetOrder(x);
 
 		if (order->GetType() != OT_GOTO_STATION) continue;
 
@@ -897,11 +899,11 @@ CommandCost CmdSetGroupLivery(TileIndex tile, DoCommandFlag flags, uint32_t p1, 
 
 	if (flags & DC_EXEC) {
 		if (primary) {
-			SB(g->livery.in_use, 0, 1, colour != INVALID_COLOUR);
+			AssignBit(g->livery.in_use, 0, colour != INVALID_COLOUR);
 			if (colour == INVALID_COLOUR) colour = GetParentLivery(g)->colour1;
 			g->livery.colour1 = colour;
 		} else {
-			SB(g->livery.in_use, 1, 1, colour != INVALID_COLOUR);
+			AssignBit(g->livery.in_use, 1, colour != INVALID_COLOUR);
 			if (colour == INVALID_COLOUR) colour = GetParentLivery(g)->colour2;
 			g->livery.colour2 = colour;
 		}

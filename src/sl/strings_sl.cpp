@@ -11,7 +11,6 @@
 #include "../string_func.h"
 #include "../strings_func.h"
 #include "saveload_internal.h"
-#include <sstream>
 
 #include "table/strings.h"
 
@@ -66,10 +65,10 @@ std::string CopyFromOldName(StringID id)
 		uint offs = _savegame_type == SGT_TTO ? LEN_OLD_STRINGS_TTO * GB(id, 0, 8) : LEN_OLD_STRINGS * GB(id, 0, 9);
 		const char *strfrom = &_old_name_array[offs];
 
-		std::ostringstream tmp;
-		std::ostreambuf_iterator<char> strto(tmp);
+		std::string tmp;
+		auto strto = std::back_inserter(tmp);
 		for (; *strfrom != '\0'; strfrom++) {
-			char32_t c = (byte)*strfrom;
+			char32_t c = (uint8_t)*strfrom;
 
 			/* Map from non-ISO8859-15 characters to UTF-8. */
 			switch (c) {
@@ -87,7 +86,7 @@ std::string CopyFromOldName(StringID id)
 			Utf8Encode(strto, c);
 		}
 
-		return tmp.str();
+		return tmp;
 	} else {
 		/* Name will already be in UTF-8. */
 		return std::string(&_old_name_array[LEN_OLD_STRINGS * GB(id, 0, 9)]);
@@ -132,7 +131,7 @@ static void Load_NAME()
 
 /** Chunk handlers related to strings. */
 static const ChunkHandler name_chunk_handlers[] = {
-	{ 'NAME', nullptr, Load_NAME, nullptr, nullptr, CH_ARRAY },
+	{ 'NAME', nullptr, Load_NAME, nullptr, nullptr, CH_READONLY },
 };
 
 extern const ChunkHandlerTable _name_chunk_handlers(name_chunk_handlers);

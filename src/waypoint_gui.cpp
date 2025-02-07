@@ -73,7 +73,7 @@ public:
 	 * @param desc The description of the window.
 	 * @param window_number The window number, in this case the waypoint's ID.
 	 */
-	WaypointWindow(WindowDesc *desc, WindowNumber window_number) : Window(desc)
+	WaypointWindow(WindowDesc &desc, WindowNumber window_number) : Window(desc)
 	{
 		this->wp = Waypoint::Get(window_number);
 		if (wp->string_id == STR_SV_STNAME_WAYPOINT) {
@@ -148,7 +148,7 @@ public:
 				break;
 
 			case WID_W_DEPARTURES: // show departure times of vehicles
-				ShowWaypointDepartures((StationID)this->wp->index);
+				ShowDeparturesWindow((StationID)this->wp->index);
 				break;
 
 			case WID_W_CATCHMENT:
@@ -198,11 +198,11 @@ public:
 		}
 	}
 
-	void OnQueryTextFinished(char *str) override
+	void OnQueryTextFinished(std::optional<std::string> str) override
 	{
-		if (str == nullptr) return;
+		if (!str.has_value()) return;
 
-		DoCommandP(0, this->window_number, 0, CMD_RENAME_WAYPOINT | CMD_MSG(STR_ERROR_CAN_T_CHANGE_WAYPOINT_NAME), nullptr, str);
+		DoCommandP(0, this->window_number, 0, CMD_RENAME_WAYPOINT | CMD_MSG(STR_ERROR_CAN_T_CHANGE_WAYPOINT_NAME), nullptr, str->c_str());
 	}
 
 	bool IsNewGRFInspectable() const override
@@ -220,9 +220,9 @@ public:
 static constexpr NWidgetPart _nested_waypoint_view_widgets[] = {
 	NWidget(NWID_HORIZONTAL),
 		NWidget(WWT_CLOSEBOX, COLOUR_GREY),
-		NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_W_RENAME), SetMinimalSize(12, 14), SetDataTip(SPR_RENAME, STR_BUOY_VIEW_CHANGE_BUOY_NAME),
+		NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_W_RENAME), SetAspect(WidgetDimensions::ASPECT_RENAME), SetDataTip(SPR_RENAME, STR_BUOY_VIEW_RENAME_TOOLTIP),
 		NWidget(WWT_CAPTION, COLOUR_GREY, WID_W_CAPTION), SetDataTip(STR_WAYPOINT_VIEW_CAPTION, STR_TOOLTIP_WINDOW_TITLE_DRAG_THIS),
-		NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_W_CENTER_VIEW), SetMinimalSize(12, 14), SetDataTip(SPR_GOTO_LOCATION, STR_BUOY_VIEW_CENTER_TOOLTIP),
+		NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_W_CENTER_VIEW), SetAspect(WidgetDimensions::ASPECT_LOCATION), SetDataTip(SPR_GOTO_LOCATION, STR_BUOY_VIEW_CENTER_TOOLTIP),
 		NWidget(WWT_DEBUGBOX, COLOUR_GREY),
 		NWidget(WWT_SHADEBOX, COLOUR_GREY),
 		NWidget(WWT_DEFSIZEBOX, COLOUR_GREY),
@@ -239,7 +239,7 @@ static constexpr NWidgetPart _nested_waypoint_view_widgets[] = {
 		NWidget(NWID_SELECTION, INVALID_COLOUR, WID_W_TOGGLE_HIDDEN_SEL),
 			NWidget(WWT_IMGBTN, COLOUR_GREY, WID_W_TOGGLE_HIDDEN), SetMinimalSize(15, 12), SetDataTip(SPR_MISC_GUI_BASE, STR_WAYPOINT_VIEW_HIDE_VIEWPORT_LABEL),
 		EndContainer(),
-		NWidget(WWT_PUSHTXTBTN, COLOUR_GREY, WID_W_SHOW_VEHICLES), SetMinimalSize(15, 12), SetDataTip(STR_SHIP, STR_STATION_VIEW_SCHEDULED_SHIPS_TOOLTIP),
+		NWidget(WWT_PUSHTXTBTN, COLOUR_GREY, WID_W_SHOW_VEHICLES), SetAspect(WidgetDimensions::ASPECT_VEHICLE_ICON), SetDataTip(STR_SHIP, STR_STATION_VIEW_SCHEDULED_SHIPS_TOOLTIP),
 		NWidget(WWT_RESIZEBOX, COLOUR_GREY),
 	EndContainer(),
 };
@@ -249,7 +249,7 @@ static WindowDesc _waypoint_view_desc(__FILE__, __LINE__,
 	WDP_AUTO, "view_waypoint", 260, 118,
 	WC_WAYPOINT_VIEW, WC_NONE,
 	0,
-	std::begin(_nested_waypoint_view_widgets), std::end(_nested_waypoint_view_widgets)
+	_nested_waypoint_view_widgets
 );
 
 /**
@@ -258,5 +258,5 @@ static WindowDesc _waypoint_view_desc(__FILE__, __LINE__,
  */
 void ShowWaypointWindow(const Waypoint *wp)
 {
-	AllocateWindowDescFront<WaypointWindow>(&_waypoint_view_desc, wp->index);
+	AllocateWindowDescFront<WaypointWindow>(_waypoint_view_desc, wp->index);
 }

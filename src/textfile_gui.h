@@ -17,12 +17,7 @@
 #include <optional>
 #include <vector>
 
-const char *GetTextfile(TextfileType type, Subdirectory dir, const char *filename);
-
-inline const char *GetTextfile(TextfileType type, Subdirectory dir, const std::string &filename)
-{
-	return GetTextfile(type, dir, filename.c_str());
-}
+std::optional<std::string> GetTextfile(TextfileType type, Subdirectory dir, std::string_view filename);
 
 /** Window for displaying a textfile */
 struct TextfileWindow : public Window, MissingGlyphSearcher {
@@ -30,7 +25,7 @@ struct TextfileWindow : public Window, MissingGlyphSearcher {
 	Scrollbar *vscroll;              ///< Vertical scrollbar.
 	Scrollbar *hscroll;              ///< Horizontal scrollbar.
 
-	void UpdateWidgetSize(WidgetID widget, Dimension *size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension *fill, [[maybe_unused]] Dimension *resize) override;
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override;
 	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override;
 	void DrawWidget(const Rect &r, WidgetID widget) const override;
 	void OnResize() override;
@@ -44,22 +39,17 @@ struct TextfileWindow : public Window, MissingGlyphSearcher {
 	void SetFontNames(FontCacheSettings *settings, const char *font_name, const void *os_data) override;
 	void ScrollToLine(size_t line);
 
-	virtual void LoadTextfile(const char *textfile, Subdirectory dir);
-
-	inline void LoadTextfile(const std::string &textfile, Subdirectory dir)
-	{
-		this->LoadTextfile(textfile.c_str(), dir);
-	}
+	virtual void LoadTextfile(const std::string &textfile, Subdirectory dir);
 
 protected:
 	TextfileWindow(TextfileType file_type);
 	void ConstructWindow();
 
 	struct Line {
-		int top{0};                  ///< Top scroll position in visual lines.
-		int bottom{0};               ///< Bottom scroll position in visual lines.
-		std::string text{};          ///< Contents of the line.
-		TextColour colour{TC_WHITE}; ///< Colour to render text line in.
+		int top = 0;                  ///< Top scroll position in visual lines.
+		int bottom = 0;               ///< Bottom scroll position in visual lines.
+		std::string text{};           ///< Contents of the line.
+		TextColour colour = TC_WHITE; ///< Colour to render text line in.
 
 		Line(int top, std::string_view text) : top(top), bottom(top + 1), text(text) {}
 		Line() {}
@@ -85,8 +75,8 @@ protected:
 	std::vector<Hyperlink> links;        ///< Clickable links in lines.
 	std::vector<Hyperlink> link_anchors; ///< Anchor names of headings that can be linked to.
 	std::vector<HistoryEntry> history;   ///< Browsing history in this window.
-	size_t history_pos{0};               ///< Position in browsing history (for forward movement).
-	bool trusted{false};                 ///< Whether the content is trusted (read: not from content like NewGRFs, etc).
+	size_t history_pos = 0;              ///< Position in browsing history (for forward movement).
+	bool trusted = false;                ///< Whether the content is trusted (read: not from content like NewGRFs, etc).
 
 	void LoadText(std::string_view buf);
 	void FindHyperlinksInMarkdown(Line &line, size_t line_index);
@@ -109,8 +99,8 @@ protected:
 	void NavigateHistory(int delta);
 
 private:
-	uint search_iterator{0};     ///< Iterator for the font check search.
-	uint max_length{0};          ///< Maximum length of unwrapped text line.
+	uint search_iterator = 0;     ///< Iterator for the font check search.
+	uint max_length = 0;          ///< Maximum length of unwrapped text line.
 
 	uint ReflowContent();
 	uint GetContentHeight();

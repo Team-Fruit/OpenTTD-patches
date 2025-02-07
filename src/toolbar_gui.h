@@ -11,7 +11,7 @@
 #define TOOLBAR_GUI_H
 
 #include "company_type.h"
-#include "widgets/dropdown_type.h"
+#include "dropdown_type.h"
 
 enum MainToolbarHotkeys {
 	MTHK_PAUSE,
@@ -69,7 +69,7 @@ void ToggleBoundingBoxes();
 void ToggleDirtyBlocks();
 void ToggleWidgetOutlines();
 
-DropDownListItem *MakeCompanyDropDownListItem(CompanyID cid);
+std::unique_ptr<DropDownListItem> MakeCompanyDropDownListItem(CompanyID cid, bool selectable = true);
 
 extern uint _toolbar_width;
 

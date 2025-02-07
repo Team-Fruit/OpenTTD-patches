@@ -41,26 +41,26 @@ inline void Blitter_32bppOptimized::Draw(const Blitter::BlitterParams *bp, ZoomL
 
 	/* skip upper lines in src_px and src_n */
 	for (uint i = bp->skip_top; i != 0; i--) {
-		src_px = (const Colour *)((const byte *)src_px + *(const uint32_t *)src_px);
-		src_n = (const uint16_t *)((const byte *)src_n + *(const uint32_t *)src_n);
+		src_px = (const Colour *)((const uint8_t *)src_px + *(const uint32_t *)src_px);
+		src_n = (const uint16_t *)((const uint8_t *)src_n + *(const uint32_t *)src_n);
 	}
 
 	/* skip lines in dst */
 	Colour *dst = (Colour *)bp->dst + bp->top * bp->pitch + bp->left;
 
 	/* store so we don't have to access it via bp every time (compiler assumes pointer aliasing) */
-	const byte *remap = bp->remap;
+	const uint8_t *remap = bp->remap;
 
 	for (int y = 0; y < bp->height; y++) {
 		/* next dst line begins here */
 		Colour *dst_ln = dst + bp->pitch;
 
 		/* next src line begins here */
-		const Colour *src_px_ln = (const Colour *)((const byte *)src_px + *(const uint32_t *)src_px);
+		const Colour *src_px_ln = (const Colour *)((const uint8_t *)src_px + *(const uint32_t *)src_px);
 		src_px++;
 
 		/* next src_n line begins here */
-		const uint16_t *src_n_ln = (const uint16_t *)((const byte *)src_n + *(const uint32_t *)src_n);
+		const uint16_t *src_n_ln = (const uint16_t *)((const uint8_t *)src_n + *(const uint32_t *)src_n);
 		src_n += 2;
 
 		/* we will end this line when we reach this point */
@@ -295,7 +295,7 @@ void Blitter_32bppOptimized::Draw(Blitter::BlitterParams *bp, BlitterMode mode, 
 	this->Draw<false>(bp, mode, zoom);
 }
 
-template <bool Tpal_to_rgb> Sprite *Blitter_32bppOptimized::EncodeInternal(const SpriteLoader::SpriteCollection &sprite, AllocatorProc *allocator)
+template <bool Tpal_to_rgb> Sprite *Blitter_32bppOptimized::EncodeInternal(const SpriteLoader::SpriteCollection &sprite, SpriteAllocator &allocator)
 {
 	/* streams of pixels (a, r, g, b channels)
 	 *
@@ -317,9 +317,9 @@ template <bool Tpal_to_rgb> Sprite *Blitter_32bppOptimized::EncodeInternal(const
 	ZoomLevel zoom_max;
 	uint8_t missing_zoom_levels = 0;
 
-	if (sprite[ZOOM_LVL_NORMAL].type == SpriteType::Font) {
-		zoom_min = ZOOM_LVL_NORMAL;
-		zoom_max = ZOOM_LVL_NORMAL;
+	if (sprite[ZOOM_LVL_MIN].type == SpriteType::Font) {
+		zoom_min = ZOOM_LVL_MIN;
+		zoom_max = ZOOM_LVL_MIN;
 	} else {
 		zoom_min = _settings_client.gui.zoom_min;
 		zoom_max = (ZoomLevel) std::min(_settings_client.gui.zoom_max, ZOOM_LVL_DRAW_SPR);
@@ -459,8 +459,8 @@ template <bool Tpal_to_rgb> Sprite *Blitter_32bppOptimized::EncodeInternal(const
 			dst_n_ln =  (uint32_t *)dst_n;
 		}
 
-		lengths[z][0] = (byte *)dst_px_ln - (byte *)dst_px_orig[z]; // all are aligned to 4B boundary
-		lengths[z][1] = (byte *)dst_n_ln  - (byte *)dst_n_orig[z];
+		lengths[z][0] = (uint8_t *)dst_px_ln - (uint8_t *)dst_px_orig[z]; // all are aligned to 4B boundary
+		lengths[z][1] = (uint8_t *)dst_n_ln  - (uint8_t *)dst_n_orig[z];
 
 		px_buffer_next = (Colour *)dst_px_ln;
 		n_buffer_next = (uint16_t *)dst_n_ln;
@@ -471,17 +471,17 @@ template <bool Tpal_to_rgb> Sprite *Blitter_32bppOptimized::EncodeInternal(const
 		len += lengths[z][0] + lengths[z][1];
 	}
 
-	Sprite *dest_sprite = (Sprite *)allocator(sizeof(Sprite) + sizeof(SpriteData) + len);
+	Sprite *dest_sprite = allocator.Allocate<Sprite>(sizeof(Sprite) + sizeof(SpriteData) + len);
 
 	if (len == 0) {
 		/* Mark sprite as having no levels at all, and therefore replaceable */
 		missing_zoom_levels = UINT8_MAX;
 	}
 
-	dest_sprite->height = sprite[ZOOM_LVL_NORMAL].height;
-	dest_sprite->width  = sprite[ZOOM_LVL_NORMAL].width;
-	dest_sprite->x_offs = sprite[ZOOM_LVL_NORMAL].x_offs;
-	dest_sprite->y_offs = sprite[ZOOM_LVL_NORMAL].y_offs;
+	dest_sprite->height = sprite[ZOOM_LVL_MIN].height;
+	dest_sprite->width  = sprite[ZOOM_LVL_MIN].width;
+	dest_sprite->x_offs = sprite[ZOOM_LVL_MIN].x_offs;
+	dest_sprite->y_offs = sprite[ZOOM_LVL_MIN].y_offs;
 	dest_sprite->next = nullptr;
 	dest_sprite->missing_zoom_levels = missing_zoom_levels;
 
@@ -507,10 +507,10 @@ template <bool Tpal_to_rgb> Sprite *Blitter_32bppOptimized::EncodeInternal(const
 	return dest_sprite;
 }
 
-template Sprite *Blitter_32bppOptimized::EncodeInternal<true>(const SpriteLoader::SpriteCollection &sprite, AllocatorProc *allocator);
-template Sprite *Blitter_32bppOptimized::EncodeInternal<false>(const SpriteLoader::SpriteCollection &sprite, AllocatorProc *allocator);
+template Sprite *Blitter_32bppOptimized::EncodeInternal<true>(const SpriteLoader::SpriteCollection &sprite, SpriteAllocator &allocator);
+template Sprite *Blitter_32bppOptimized::EncodeInternal<false>(const SpriteLoader::SpriteCollection &sprite, SpriteAllocator &allocator);
 
-Sprite *Blitter_32bppOptimized::Encode(const SpriteLoader::SpriteCollection &sprite, AllocatorProc *allocator)
+Sprite *Blitter_32bppOptimized::Encode(const SpriteLoader::SpriteCollection &sprite, SpriteAllocator &allocator)
 {
 	return this->EncodeInternal<true>(sprite, allocator);
 }

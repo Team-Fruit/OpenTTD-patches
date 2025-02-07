@@ -33,6 +33,9 @@
 #include "departures_func.h"
 #include "cargotype.h"
 #include "zoom_func.h"
+#include "depot_map.h"
+#include "tilehighlight_func.h"
+#include "viewport_func.h"
 #include "core/backup_type.hpp"
 
 #include "table/sprites.h"
@@ -41,7 +44,9 @@
 static constexpr NWidgetPart _nested_departures_list[] = {
 	NWidget(NWID_HORIZONTAL),
 		NWidget(WWT_CLOSEBOX, COLOUR_GREY),
-		NWidget(WWT_CAPTION, COLOUR_GREY, WID_DB_CAPTION), SetDataTip(STR_DEPARTURES_CAPTION, STR_TOOLTIP_WINDOW_TITLE_DRAG_THIS),
+		NWidget(WWT_CAPTION, COLOUR_GREY, WID_DB_CAPTION), SetDataTip(STR_JUST_STRING6, STR_TOOLTIP_WINDOW_TITLE_DRAG_THIS),
+		NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_DB_LOCATION), SetAspect(WidgetDimensions::ASPECT_LOCATION), SetDataTip(SPR_GOTO_LOCATION, STR_STATION_VIEW_CENTER_TOOLTIP),
+		NWidget(WWT_TEXTBTN, COLOUR_GREY, WID_DB_DUPLICATE), SetDataTip(STR_DEPARTURES_DUPLICATE, STR_DEPARTURES_DUPLICATE_TOOLTIP),
 		NWidget(WWT_SHADEBOX, COLOUR_GREY),
 		NWidget(WWT_STICKYBOX, COLOUR_GREY),
 	EndContainer(),
@@ -51,13 +56,14 @@ static constexpr NWidgetPart _nested_departures_list[] = {
 		NWidget(NWID_VSCROLLBAR, COLOUR_GREY, WID_DB_SCROLLBAR),
 	EndContainer(),
 
-	NWidget(NWID_HORIZONTAL),
-		NWidget(WWT_PANEL, COLOUR_GREY), SetMinimalSize(0, 12), SetResize(1, 0), SetFill(1, 1), EndContainer(),
-		NWidget(WWT_TEXTBTN, COLOUR_GREY, WID_DB_SHOW_PAX), SetMinimalSize(6, 12), SetFill(0, 1), SetDataTip(STR_DEPARTURES_PAX, STR_DEPARTURES_PAX_TOOLTIP),
-		NWidget(WWT_TEXTBTN, COLOUR_GREY, WID_DB_SHOW_FREIGHT), SetMinimalSize(6, 12), SetFill(0, 1), SetDataTip(STR_DEPARTURES_FREIGHT, STR_DEPARTURES_FREIGHT_TOOLTIP),
-		NWidget(WWT_TEXTBTN, COLOUR_GREY, WID_DB_SHOW_ARRS), SetMinimalSize(6, 12), SetFill(0, 1), SetDataTip(STR_DEPARTURES_ARRIVALS, STR_DEPARTURES_ARRIVALS_TOOLTIP),
-		NWidget(WWT_TEXTBTN, COLOUR_GREY, WID_DB_SHOW_DEPS), SetMinimalSize(6, 12), SetFill(0, 1), SetDataTip(STR_DEPARTURES_DEPARTURES, STR_DEPARTURES_DEPARTURES_TOOLTIP),
+	NWidget(NWID_HORIZONTAL, NC_EQUALSIZE),
+		NWidget(WWT_DROPDOWN, COLOUR_GREY, WID_DB_CARGO_MODE), SetFill(1, 1), SetResize(1, 0), SetDataTip(STR_JUST_STRING, STR_DEPARTURES_CARGO_MODE_TOOLTIP),
+		NWidget(WWT_DROPDOWN, COLOUR_GREY, WID_DB_SOURCE_MODE), SetFill(1, 1), SetResize(1, 0), SetDataTip(STR_JUST_STRING, STR_DEPARTURES_SOURCE_MODE_TOOLTIP),
+		NWidget(WWT_DROPDOWN, COLOUR_GREY, WID_DB_DEPARTURE_MODE), SetFill(1, 1), SetResize(1, 0), SetDataTip(STR_JUST_STRING, STR_DEPARTURES_DEPARTURE_MODE_TOOLTIP),
+		NWidget(WWT_TEXTBTN, COLOUR_GREY, WID_DB_SHOW_TIMES), SetMinimalSize(11, 12), SetFill(0, 1), SetDataTip(STR_DEPARTURES_TIMES_BUTTON, STR_DEPARTURES_TIMES_TOOLTIP),
+		NWidget(WWT_TEXTBTN, COLOUR_GREY, WID_DB_SHOW_EMPTY), SetMinimalSize(11, 12), SetFill(0, 1), SetDataTip(STR_DEPARTURES_EMPTY_BUTTON, STR_DEPARTURES_EMPTY_TOOLTIP),
 		NWidget(WWT_TEXTBTN, COLOUR_GREY, WID_DB_SHOW_VIA), SetMinimalSize(11, 12), SetFill(0, 1), SetDataTip(STR_DEPARTURES_VIA_BUTTON, STR_DEPARTURES_VIA_TOOLTIP),
+		NWidget(WWT_TEXTBTN, COLOUR_GREY, WID_DB_FILTER), SetMinimalSize(11, 12), SetFill(0, 1), SetDataTip(STR_DEPARTURES_FILTER_BUTTON, STR_DEPARTURES_FILTER_TOOLTIP),
 		NWidget(WWT_TEXTBTN, COLOUR_GREY, WID_DB_SHOW_TRAINS), SetMinimalSize(14, 12), SetFill(0, 1), SetDataTip(STR_TRAIN, STR_NULL),
 		NWidget(WWT_TEXTBTN, COLOUR_GREY, WID_DB_SHOW_ROADVEHS), SetMinimalSize(14, 12), SetFill(0, 1), SetDataTip(STR_LORRY, STR_NULL),
 		NWidget(WWT_TEXTBTN, COLOUR_GREY, WID_DB_SHOW_SHIPS), SetMinimalSize(14, 12), SetFill(0, 1), SetDataTip(STR_SHIP, STR_NULL),
@@ -70,15 +76,15 @@ static WindowDesc _departures_desc(__FILE__, __LINE__,
 	WDP_AUTO, "depatures", 260, 246,
 	WC_DEPARTURES_BOARD, WC_NONE,
 	0,
-	std::begin(_nested_departures_list), std::end(_nested_departures_list)
+	_nested_departures_list
 );
 
 static uint cached_date_width = 0;         ///< The cached maximum width required to display a date.
+static uint cached_date_combined_width = 0;///< The cached maximum width required to display a date (combined mode).
 static uint cached_status_width = 0;       ///< The cached maximum width required to show the status field.
 static uint cached_date_arrow_width = 0;   ///< The cached width of the red/green arrows that may be displayed alongside times.
 static uint cached_veh_type_width = 0;     ///< The cached width of the vehicle type icon.
 static bool cached_date_display_method;    ///< Whether the above cached values refers to original (d,m,y) dates or the 24h clock.
-static bool cached_arr_dep_display_method; ///< Whether to show departures and arrivals on a single line.
 
 void FlushDeparturesWindowTextCaches()
 {
@@ -86,72 +92,80 @@ void FlushDeparturesWindowTextCaches()
 	InvalidateWindowClassesData(WC_DEPARTURES_BOARD, 1);
 }
 
-template<bool Twaypoint = false>
+enum DeparturesCargoMode : uint8_t {
+	DCF_ALL_CARGOES = 0,
+	DCF_PAX_ONLY,
+	DCF_FREIGHT_ONLY,
+
+	DCF_END
+};
+
+static const StringID _departure_cargo_mode_strings[DCF_END] = {
+	STR_CARGO_TYPE_FILTER_ALL,
+	STR_CARGO_PLURAL_PASSENGERS,
+	STR_CARGO_TYPE_FILTER_FREIGHT,
+};
+
+enum DeparturesMode : uint8_t {
+	DM_DEPARTURES = 0,
+	DM_ARRIVALS,
+	DM_COMBINED,
+	DM_SEPARATE,
+
+	DM_END
+};
+
+static const StringID _departure_mode_strings[DM_END] = {
+	STR_DEPARTURES_DEPARTURES,
+	STR_DEPARTURES_ARRIVALS,
+	STR_DEPARTURES_BOTH_COMBINED,
+	STR_DEPARTURES_BOTH_SEPARATE,
+};
+
+enum DepartureSourceType : uint8_t {
+	DST_STATION,
+	DST_WAYPOINT,
+	DST_DEPOT,
+};
+
+
+static const StringID _departure_source_mode_strings[DSM_END] = {
+	STR_DEPARTURES_SOURCE_MODE_LIVE,
+	STR_DEPARTURES_SOURCE_MODE_SCHEDULE_24_HOUR,
+};
+
 struct DeparturesWindow : public Window {
 protected:
-	StationID station;         ///< The station whose departures we're showing.
-	DepartureList *departures; ///< The current list of departures from this station.
-	DepartureList *arrivals;   ///< The current list of arrivals from this station.
-	bool departures_invalid;   ///< The departures and arrivals list are currently invalid.
-	bool vehicles_invalid;     ///< The vehicles list is currently invalid.
-	uint entry_height;         ///< The height of an entry in the departures list.
-	uint64_t elapsed_ms;       ///< The number of milliseconds that have elapsed since the window was created. Used for scrolling text.
-	int calc_tick_countdown;   ///< The number of ticks to wait until recomputing the departure list. Signed in case it goes below zero.
-	bool show_types[4];        ///< The vehicle types to show in the departure list.
-	bool departure_types[3];   ///< The types of departure to show in the departure list.
-	bool departure_types_both; ///< Arrivals and departures buttons disabled (shown combined as single entry)
-	bool show_pax;             ///< Show passenger vehicles
-	bool show_freight;         ///< Show freight vehicles
-	bool cargo_buttons_disabled;///< Show pax/freight buttons disabled
+	DepartureSourceType source_type{};          ///< Source type.
+	DepartureOrderDestinationDetector source{}; ///< Source order detector.
+	DepartureList departures;                   ///< The current list of departures from this station.
+	DepartureList arrivals;                     ///< The current list of arrivals from this station.
+	bool departures_invalid = true;             ///< The departures and arrivals list are currently invalid.
+	bool vehicles_invalid = true;               ///< The vehicles list is currently invalid.
+	uint entry_height;                          ///< The height of an entry in the departures list.
+	uint64_t elapsed_ms = 0;                    ///< The number of milliseconds that have elapsed since the window was created. Used for scrolling text.
+	int calc_tick_countdown = 0;                ///< The number of ticks to wait until recomputing the departure list. Signed in case it goes below zero.
+	bool show_types[4];                         ///< The vehicle types to show in the departure list.
+	DeparturesCargoMode cargo_mode = DCF_ALL_CARGOES;
+	DeparturesMode mode = DM_DEPARTURES;
+	DeparturesSourceMode source_mode = DSM_LIVE;
+	bool show_via = false;
+	bool show_empty = false;
+	bool show_arrival_times = false;
 	mutable bool scroll_refresh; ///< Whether the window should be refreshed when paused due to scrolling
-	uint min_width;            ///< The minimum width of this window.
+	uint min_width = 400;                  ///< The minimum width of this window.
 	Scrollbar *vscroll;
-	std::vector<const Vehicle *> vehicles; /// current set of vehicles
-	int veh_width;                         /// current width of vehicle field
-	int group_width;                       /// current width of group field
-	int toc_width;                         /// current width of company field
+	std::vector<const Vehicle *> vehicles; ///< current set of vehicles
+	int veh_width;                         ///< current width of vehicle field
+	int group_width;                       ///< current width of group field
+	int toc_width;                         ///< current width of company field
+	std::array<uint32_t, 3> title_params{};///< title string parameters
+	CallAtTargetID filter_target;          ///< Filter target
 
-	virtual uint GetMinWidth() const;
+	uint GetScrollbarCapacity() const;
+	uint GetMinWidth() const;
 	static void RecomputeDateWidth();
-	virtual void DrawDeparturesListItems(const Rect &r) const;
-	void DeleteDeparturesList(DepartureList* list);
-
-	void ToggleCargoFilter(WidgetID widget, bool &flag)
-	{
-		flag = !flag;
-		this->SetWidgetLoweredState(widget, flag);
-		/* We need to recompute the departures list. */
-		this->calc_tick_countdown = 0;
-		/* We need to redraw the button that was pressed. */
-		this->SetWidgetDirty(widget);
-	}
-
-	void SetCargoFilterDisabledState()
-	{
-		this->cargo_buttons_disabled = _settings_client.gui.departure_only_passengers;
-		this->SetWidgetDisabledState(WID_DB_SHOW_PAX, cargo_buttons_disabled);
-		this->SetWidgetDisabledState(WID_DB_SHOW_FREIGHT, cargo_buttons_disabled);
-		if (this->cargo_buttons_disabled) {
-			this->show_pax = true;
-			this->LowerWidget(WID_DB_SHOW_PAX);
-			this->show_freight = false;
-			this->RaiseWidget(WID_DB_SHOW_FREIGHT);
-		}
-	}
-
-	void SetDepartureTypesDisabledState()
-	{
-		this->departure_types_both = _settings_client.gui.departure_show_both;
-		this->SetWidgetDisabledState(WID_DB_SHOW_DEPS, departure_types_both);
-		this->SetWidgetDisabledState(WID_DB_SHOW_ARRS, departure_types_both);
-		if (this->departure_types_both) {
-			this->LowerWidget(WID_DB_SHOW_DEPS);
-			this->LowerWidget(WID_DB_SHOW_ARRS);
-		} else {
-			this->SetWidgetLoweredState(WID_DB_SHOW_DEPS, this->departure_types[0]);
-			this->SetWidgetLoweredState(WID_DB_SHOW_ARRS, this->departure_types[1]);
-		}
-	}
+	void DrawDeparturesListItems(const Rect &r) const;
 
 	void FillVehicleList()
 	{
@@ -164,29 +178,36 @@ protected:
 		CompanyMask companies = 0;
 		int unitnumber_max[4] = { -1, -1, -1, -1 };
 
-		for (const Vehicle *v : Vehicle::IterateFrontOnly()) {
-			if (v->type < 4 && this->show_types[v->type] && v->IsPrimaryVehicle()) {
-				for(const Order *order : v->Orders()) {
-					if ((order->IsType(OT_GOTO_STATION) || order->IsType(OT_GOTO_WAYPOINT) || order->IsType(OT_IMPLICIT))
-							&& order->GetDestination() == this->station) {
-						this->vehicles.push_back(v);
+		VehicleTypeMask vt_mask = 0;
+		for (VehicleType vt = VEH_BEGIN; vt != VEH_COMPANY_END; vt++) {
+			if (this->show_types[vt]) SetBit(vt_mask, vt);
+		}
+		for (const Vehicle *veh : Vehicle::IterateTypeMaskFrontOnly(vt_mask)) {
+			if (veh->IsPrimaryVehicle() && veh == veh->FirstShared()) {
+				if (this->source_mode != DSM_LIVE && !HasBit(veh->vehicle_flags, VF_SCHEDULED_DISPATCH)) continue;
+				for (const Order *order : veh->Orders()) {
+					if (this->source.OrderMatches(order)) {
+						if (this->source_mode != DSM_LIVE) this->vehicles.push_back(veh);
+						for (const Vehicle *v = veh; v != nullptr; v = v->NextShared()) {
+							if (this->source_mode == DSM_LIVE) this->vehicles.push_back(v);
 
-						if (_settings_client.gui.departure_show_vehicle) {
-							if (v->name.empty() && !(v->group_id != DEFAULT_GROUP && _settings_client.gui.vehicle_names != 0)) {
-								if (v->unitnumber > unitnumber_max[v->type]) unitnumber_max[v->type] = v->unitnumber;
-							} else {
-								SetDParam(0, v->index | (_settings_client.gui.departure_show_group ? VEHICLE_NAME_NO_GROUP : 0));
-								int width = (GetStringBoundingBox(STR_DEPARTURES_VEH)).width + 4;
-								if (width > this->veh_width) this->veh_width = width;
+							if (_settings_client.gui.departure_show_vehicle) {
+								if (v->name.empty() && !(v->group_id != DEFAULT_GROUP && _settings_client.gui.vehicle_names != 0)) {
+									if (v->unitnumber > unitnumber_max[v->type]) unitnumber_max[v->type] = v->unitnumber;
+								} else {
+									SetDParam(0, v->index | (_settings_client.gui.departure_show_group ? VEHICLE_NAME_NO_GROUP : 0));
+									int width = (GetStringBoundingBox(STR_DEPARTURES_VEH)).width + 4;
+									if (width > this->veh_width) this->veh_width = width;
+								}
 							}
-						}
 
-						if (v->group_id != INVALID_GROUP && v->group_id != DEFAULT_GROUP && _settings_client.gui.departure_show_group) {
-							groups.insert(v->group_id);
-						}
+							if (v->group_id != INVALID_GROUP && v->group_id != DEFAULT_GROUP && _settings_client.gui.departure_show_group) {
+								groups.insert(v->group_id);
+							}
 
-						if (_settings_client.gui.departure_show_company) {
-							SetBit(companies, v->owner);
+							if (_settings_client.gui.departure_show_company) {
+								SetBit(companies, v->owner);
+							}
 						}
 						break;
 					}
@@ -230,67 +251,123 @@ protected:
 		this->calc_tick_countdown = 0;
 	}
 
-public:
-
-	DeparturesWindow(WindowDesc *desc, WindowNumber window_number) : Window(desc),
-		station(window_number),
-		departures(new DepartureList()),
-		arrivals(new DepartureList()),
-		departures_invalid(true),
-		vehicles_invalid(true),
-		elapsed_ms(0),
-		calc_tick_countdown(0),
-		min_width(400)
+	void ConstructWidgetLayout(WindowNumber window_number)
 	{
 		this->SetupValues();
 		this->CreateNestedTree();
 		this->vscroll = this->GetScrollbar(WID_DB_SCROLLBAR);
 		this->FinishInitNested(window_number);
+	}
 
-		/* By default, only show departures. */
-		departure_types[0] = true;
-		departure_types[1] = false;
-		departure_types[2] = false;
-		show_pax = true;
-		show_freight = true;
-		this->LowerWidget(WID_DB_SHOW_DEPS);
-		this->RaiseWidget(WID_DB_SHOW_ARRS);
-		this->RaiseWidget(WID_DB_SHOW_VIA);
-		this->LowerWidget(WID_DB_SHOW_PAX);
-		this->LowerWidget(WID_DB_SHOW_FREIGHT);
-		if (!Twaypoint) this->SetDepartureTypesDisabledState();
-		this->SetCargoFilterDisabledState();
-
-		for (uint i = 0; i < 4; ++i) {
-			show_types[i] = true;
-			this->LowerWidget(WID_DB_SHOW_TRAINS + i);
-		}
-
-		if (Twaypoint) {
-			this->GetWidget<NWidgetCore>(WID_DB_CAPTION)->SetDataTip(STR_DEPARTURES_CAPTION_WAYPOINT, STR_TOOLTIP_WINDOW_TITLE_DRAG_THIS);
-
-			for (uint i = 0; i < 4; ++i) {
-				this->DisableWidget(WID_DB_SHOW_TRAINS + i);
-			}
-
-			this->DisableWidget(WID_DB_SHOW_ARRS);
-			this->DisableWidget(WID_DB_SHOW_DEPS);
-			this->DisableWidget(WID_DB_SHOW_VIA);
-
-			departure_types[2] = true;
-
-			this->LowerWidget(WID_DB_SHOW_VIA);
-		}
+	void PostConstructSetup()
+	{
+		this->show_empty = _settings_client.gui.departure_default_show_empty;
+		this->SetWidgetLoweredState(WID_DB_SHOW_EMPTY, this->show_empty);
+		this->UpdateViaButtonState();
 
 		this->RefreshVehicleList();
 
 		if (_pause_mode != PM_UNPAUSED) this->OnGameTick();
 	}
 
-	virtual ~DeparturesWindow()
+	void UpdateViaButtonState()
 	{
-		this->DeleteDeparturesList(this->departures);
-		this->DeleteDeparturesList(this->arrivals);
+		NWidgetCore *btn = this->GetWidget<NWidgetCore>(WID_DB_SHOW_VIA);
+		bool disabled = (this->source_type != DST_STATION);
+		if (disabled != btn->IsDisabled()) {
+			btn->SetDisabled(disabled);
+			btn->SetDirty(this);
+		}
+		if (this->show_via != btn->IsLowered()) {
+			btn->SetLowered(this->show_via);
+			btn->SetDirty(this);
+		}
+	}
+
+public:
+	DeparturesWindow(WindowDesc &desc, StationID station) : Window(desc)
+	{
+		this->ConstructWidgetLayout(station);
+
+		this->title_params[1] = station;
+
+		if (Waypoint::IsValidID(station)) {
+			this->source_type = DST_WAYPOINT;
+			SetBit(this->source.order_type_mask, OT_GOTO_WAYPOINT);
+			this->source.destination = station;
+			this->title_params[0] = STR_WAYPOINT_NAME;
+
+			const Waypoint *wp = Waypoint::Get(window_number);
+			VehicleType vt;
+			if (wp->string_id == STR_SV_STNAME_WAYPOINT) {
+				vt = HasBit(wp->waypoint_flags, WPF_ROAD) ? VEH_ROAD : VEH_TRAIN;
+				this->GetWidget<NWidgetCore>(WID_DB_LOCATION)->tool_tip = STR_WAYPOINT_VIEW_CENTER_TOOLTIP;
+			} else {
+				vt = VEH_SHIP;
+				this->GetWidget<NWidgetCore>(WID_DB_LOCATION)->tool_tip = STR_BUOY_VIEW_CENTER_TOOLTIP;
+			}
+			for (uint i = 0; i < 4; ++i) {
+				if (i == vt) {
+					this->show_types[i] = true;
+					this->LowerWidget(WID_DB_SHOW_TRAINS + i);
+				}
+				this->DisableWidget(WID_DB_SHOW_TRAINS + i);
+			}
+
+			this->show_via = true;
+		} else {
+			this->source_type = DST_STATION;
+			SetBit(this->source.order_type_mask, OT_GOTO_STATION);
+			SetBit(this->source.order_type_mask, OT_IMPLICIT);
+			this->source.destination = window_number;
+			this->title_params[0] = STR_STATION_NAME;
+
+			for (uint i = 0; i < 4; ++i) {
+				this->show_types[i] = true;
+				this->LowerWidget(WID_DB_SHOW_TRAINS + i);
+			}
+
+			this->mode = static_cast<DeparturesMode>(_settings_client.gui.departure_default_mode);
+			this->show_via = _settings_client.gui.departure_default_via;
+		}
+
+		this->source_mode = static_cast<DeparturesSourceMode>(_settings_client.gui.departure_default_source);
+
+		this->PostConstructSetup();
+	}
+
+	static WindowNumber GetDepotWindowNumber(TileIndex tile)
+	{
+		static constexpr WindowNumber DEPARTURE_WINDOW_NUMBER_DEPOT_TAG = 1 << 31;
+		return tile | DEPARTURE_WINDOW_NUMBER_DEPOT_TAG;
+	}
+
+	struct DepotTag{};
+	DeparturesWindow(WindowDesc &desc, DepotTag tag, TileIndex tile, VehicleType vt) : Window(desc)
+	{
+		this->ConstructWidgetLayout(DeparturesWindow::GetDepotWindowNumber(tile));
+
+		this->source_type = DST_DEPOT;
+		SetBit(this->source.order_type_mask, OT_GOTO_DEPOT);
+		this->source.destination = (vt == VEH_AIRCRAFT) ? GetStationIndex(tile) : GetDepotIndex(tile);
+		this->title_params[0] = STR_DEPOT_NAME;
+		this->title_params[1] = vt;
+		this->title_params[2] = this->source.destination;
+
+		this->GetWidget<NWidgetCore>(WID_DB_LOCATION)->tool_tip = STR_DEPOT_TRAIN_LOCATION_TOOLTIP + vt;
+
+		for (uint i = 0; i < 4; ++i) {
+			if (i == vt) {
+				this->show_types[i] = true;
+				this->LowerWidget(WID_DB_SHOW_TRAINS + i);
+			}
+			this->DisableWidget(WID_DB_SHOW_TRAINS + i);
+		}
+
+		this->show_via = true;
+		this->source_mode = static_cast<DeparturesSourceMode>(_settings_client.gui.departure_default_source);
+
+		this->PostConstructSetup();
 	}
 
 	void SetupValues()
@@ -302,22 +379,72 @@ public:
 		}
 	}
 
-	virtual void UpdateWidgetSize(WidgetID widget, Dimension *size, const Dimension &padding, Dimension *fill, Dimension *resize) override
+	virtual void UpdateWidgetSize(WidgetID widget, Dimension &size, const Dimension &padding, Dimension &fill, Dimension &resize) override
 	{
 		switch (widget) {
 			case WID_DB_LIST:
-				resize->height = DeparturesWindow::entry_height;
-				size->height = 2 * resize->height;
-				size->width = this->min_width;
+				resize.height = DeparturesWindow::entry_height;
+				size.height = 2 * resize.height;
+				size.width = this->min_width;
+				break;
+
+			case WID_DB_CARGO_MODE:
+				size.width = GetStringListWidth(_departure_cargo_mode_strings);
+				size.width += padding.width;
+				break;
+
+			case WID_DB_DEPARTURE_MODE:
+				size.width = GetStringListWidth(_departure_mode_strings);
+				size.width += padding.width;
+				break;
+
+			case WID_DB_SOURCE_MODE:
+				size.width = GetStringListWidth(_departure_source_mode_strings);
+				size.width += padding.width;
 				break;
 		}
 	}
 
 	virtual void SetStringParameters(WidgetID widget) const override
 	{
-		if (widget == WID_DB_CAPTION) {
-			const Station *st = Station::Get(this->station);
-			SetDParam(0, st->index);
+		switch (widget) {
+			case WID_DB_CAPTION: {
+				uint title_offset;
+				if (!this->filter_target.IsValid()) {
+					SetDParam(0, STR_DEPARTURES_CAPTION);
+					title_offset = 1;
+				} else {
+					SetDParam(0, STR_DEPARTURES_CAPTION_FILTER);
+					SetDParam(1, STR_DEPARTURES_CAPTION);
+					title_offset = 2;
+					if (Waypoint::IsValidID(this->filter_target.GetStationID())) {
+						SetDParam(5, STR_WAYPOINT_NAME);
+					} else {
+						SetDParam(5, STR_STATION_NAME);
+					}
+					SetDParam(6, this->filter_target.GetStationID());
+				}
+
+				SetDParam(title_offset + 0, this->title_params[0]);
+				SetDParam(title_offset + 1, this->title_params[1]);
+				SetDParam(title_offset + 2, this->title_params[2]);
+				break;
+			}
+
+			case WID_DB_CARGO_MODE: {
+				SetDParam(0, _departure_cargo_mode_strings[this->cargo_mode]);
+				break;
+			}
+
+			case WID_DB_DEPARTURE_MODE: {
+				SetDParam(0, _departure_mode_strings[this->mode]);
+				break;
+			}
+
+			case WID_DB_SOURCE_MODE: {
+				SetDParam(0, _departure_source_mode_strings[this->source_mode]);
+				break;
+			}
 		}
 	}
 
@@ -367,33 +494,36 @@ public:
 				break;
 			}
 
-			case WID_DB_SHOW_DEPS:
-			case WID_DB_SHOW_ARRS:
-				if (_settings_client.gui.departure_show_both) break;
-				/* FALL THROUGH */
+			case WID_DB_SHOW_TIMES:
+				this->show_arrival_times = !this->show_arrival_times;
+				this->SetWidgetLoweredState(widget, this->show_arrival_times);
+				this->SetWidgetDirty(widget);
+				if (_pause_mode != PM_UNPAUSED) this->OnGameTick();
+				break;
 
-			case WID_DB_SHOW_VIA:
+			case WID_DB_SHOW_EMPTY:
+				this->show_empty = !this->show_empty;
+				this->SetWidgetLoweredState(widget, this->show_empty);
 
-				this->departure_types[widget - WID_DB_SHOW_DEPS] = !this->departure_types[widget - WID_DB_SHOW_DEPS];
-				this->SetWidgetLoweredState(widget, this->departure_types[widget - WID_DB_SHOW_DEPS]);
-
-				/* Side effects */
-				if (widget == WID_DB_SHOW_DEPS) {
-					if (!this->departure_types[0]) {
-						this->RaiseWidget(WID_DB_SHOW_VIA);
-						this->DisableWidget(WID_DB_SHOW_VIA);
-					} else {
-						this->EnableWidget(WID_DB_SHOW_VIA);
-						this->SetWidgetLoweredState(WID_DB_SHOW_VIA, this->departure_types[2]);
-					}
-					/* Redraw required. */
-					this->SetWidgetDirty(WID_DB_SHOW_VIA);
-				}
+				_settings_client.gui.departure_default_show_empty = this->show_empty;
 
 				/* We need to recompute the departures list. */
 				this->calc_tick_countdown = 0;
 				/* We need to redraw the button that was pressed. */
 				this->SetWidgetDirty(widget);
+				if (_pause_mode != PM_UNPAUSED) this->OnGameTick();
+				break;
+
+			case WID_DB_SHOW_VIA:
+				this->show_via = !this->show_via;
+				this->UpdateViaButtonState();
+
+				if (this->source_type == DST_STATION) {
+					_settings_client.gui.departure_default_via = this->show_via;
+				}
+
+				/* We need to recompute the departures list. */
+				this->calc_tick_countdown = 0;
 				if (_pause_mode != PM_UNPAUSED) this->OnGameTick();
 				break;
 
@@ -407,22 +537,22 @@ public:
 
 				id_v += (uint32_t)this->vscroll->GetPosition();
 
-				if (id_v >= (this->departures->size() + this->arrivals->size())) return; // click out of list bound
+				if (id_v >= (this->departures.size() + this->arrivals.size())) return; // click out of list bound
 
 				uint departure = 0;
 				uint arrival = 0;
 
 				/* Draw each departure. */
 				for (uint i = 0; i <= id_v; ++i) {
-					const Departure *d;
+					const Departure *d = nullptr;
 
-					if (arrival == this->arrivals->size()) {
-						d = (*(this->departures))[departure++];
-					} else if (departure == this->departures->size()) {
-						d = (*(this->arrivals))[arrival++];
+					if (arrival == this->arrivals.size()) {
+						d = this->departures[departure++].get();
+					} else if (departure == this->departures.size()) {
+						d = this->arrivals[arrival++].get();
 					} else {
-						d = (*(this->departures))[departure];
-						const Departure *a = (*(this->arrivals))[arrival];
+						d = this->departures[departure].get();
+						const Departure *a = this->arrivals[arrival].get();
 
 						if (a->scheduled_tick < d->scheduled_tick) {
 							d = a;
@@ -441,16 +571,121 @@ public:
 				break;
 			}
 
-			case WID_DB_SHOW_PAX:
-				this->ToggleCargoFilter(widget, this->show_pax);
-				if (_pause_mode != PM_UNPAUSED) this->OnGameTick();
+			case WID_DB_CARGO_MODE:
+				ShowDropDownMenu(this, _departure_cargo_mode_strings, this->cargo_mode, WID_DB_CARGO_MODE, 0, 0);
 				break;
 
-			case WID_DB_SHOW_FREIGHT:
-				this->ToggleCargoFilter(widget, this->show_freight);
-				if (_pause_mode != PM_UNPAUSED) this->OnGameTick();
+			case WID_DB_DEPARTURE_MODE:
+				ShowDropDownMenu(this, _departure_mode_strings, this->mode, WID_DB_DEPARTURE_MODE, 0, 0);
 				break;
+
+			case WID_DB_SOURCE_MODE: {
+				uint32_t disabled_mask = 0;
+				if (!_settings_time.time_in_minutes) SetBit(disabled_mask, DSM_SCHEDULE_24H);
+				ShowDropDownMenu(this, _departure_source_mode_strings, this->source_mode, WID_DB_SOURCE_MODE, disabled_mask, 0);
+				break;
+			}
+
+			case WID_DB_DUPLICATE: {
+				this->CloneWindow();
+				break;
+			}
+
+			case WID_DB_FILTER: {
+				if (_thd.GetCallbackWnd() == this) {
+					ResetObjectToPlace();
+					return;
+				}
+				if (this->IsWidgetLowered(WID_DB_FILTER)) {
+					this->RaiseWidget(WID_DB_FILTER);
+					this->filter_target = CallAtTargetID();
+					this->OnInvalidateData(0, false);
+				} else {
+					this->LowerWidget(WID_DB_FILTER);
+					SetObjectToPlaceWnd(ANIMCURSOR_PICKSTATION, PAL_NONE, HT_RECT, this);
+				}
+				this->SetWidgetDirty(WID_DB_FILTER);
+				this->SetWidgetDirty(WID_DB_CAPTION);
+				break;
+			}
+
+			case WID_DB_LOCATION: {
+				TileIndex tile;
+				if (this->source_type == DST_DEPOT) {
+					tile = this->window_number & (MapSize() - 1);
+				} else {
+					tile = BaseStation::Get(this->window_number)->xy;
+				}
+				if (_ctrl_pressed) {
+					ShowExtraViewportWindow(tile);
+				} else {
+					ScrollMainWindowToTile(tile);
+				}
+				break;
+			}
 		}
+	}
+
+	void OnDropdownSelect(WidgetID widget, int index) override
+	{
+		switch (widget) {
+			case WID_DB_CARGO_MODE: {
+				if (this->cargo_mode != index) {
+					this->cargo_mode = static_cast<DeparturesCargoMode>(index);
+					this->calc_tick_countdown = 0;
+					if (_pause_mode != PM_UNPAUSED) this->OnGameTick();
+				}
+				this->SetWidgetDirty(widget);
+				break;
+			}
+
+			case WID_DB_DEPARTURE_MODE: {
+				if (this->mode != index) {
+					this->mode = static_cast<DeparturesMode>(index);
+					this->calc_tick_countdown = 0;
+					if (_pause_mode != PM_UNPAUSED) this->OnGameTick();
+				}
+				if (this->source_type == DST_STATION) {
+					_settings_client.gui.departure_default_mode = this->mode;
+				}
+				this->SetWidgetDirty(widget);
+				break;
+			}
+
+			case WID_DB_SOURCE_MODE: {
+				if (this->source_mode != index) {
+					this->source_mode = static_cast<DeparturesSourceMode>(index);
+					if (!_settings_time.time_in_minutes && this->source_mode == DSM_SCHEDULE_24H) {
+						this->source_mode = DSM_LIVE;
+					}
+					this->vehicles_invalid = true;
+					this->calc_tick_countdown = 0;
+					if (_pause_mode != PM_UNPAUSED) this->OnGameTick();
+				}
+				_settings_client.gui.departure_default_source = this->source_mode;
+				this->SetWidgetDirty(widget);
+				break;
+			}
+		}
+	}
+
+	void OnPlaceObject([[maybe_unused]] Point pt, TileIndex tile) override
+	{
+		CallAtTargetID target = CallAtTargetID::FromTile(tile);
+		if (target.IsValid() && target.IsStationID()) {
+			this->filter_target = target;
+			this->OnInvalidateData(0, false);
+			ResetObjectToPlace();
+			this->LowerWidget(WID_DB_FILTER);
+			this->SetWidgetDirty(WID_DB_FILTER);
+			this->SetWidgetDirty(WID_DB_CAPTION);
+		}
+	}
+
+	void OnPlaceObjectAbort() override
+	{
+		this->RaiseWidget(WID_DB_FILTER);
+		this->SetWidgetDirty(WID_DB_FILTER);
 	}
 
 	virtual void OnGameTick() override
@@ -460,24 +695,10 @@ public:
 		}
 
 		/* Recompute the minimum date display width if the cached one is no longer valid. */
-		if (cached_date_width == 0 ||
-				_settings_time.time_in_minutes != cached_date_display_method ||
-				_settings_client.gui.departure_show_both != cached_arr_dep_display_method) {
+		if (cached_status_width == 0 ||
+				((cached_date_width == 0) != (!_settings_time.time_in_minutes && CalTime::IsCalendarFrozen())) ||
+				_settings_time.time_in_minutes != cached_date_display_method) {
 			this->RecomputeDateWidth();
-		}
-
-		if (this->cargo_buttons_disabled != _settings_client.gui.departure_only_passengers) {
-			this->SetCargoFilterDisabledState();
-			this->calc_tick_countdown = 0;
-			this->SetWidgetDirty(WID_DB_SHOW_PAX);
-			this->SetWidgetDirty(WID_DB_SHOW_FREIGHT);
-		}
-
-		if (!Twaypoint && this->departure_types_both != _settings_client.gui.departure_show_both) {
-			this->SetDepartureTypesDisabledState();
-			this->calc_tick_countdown = 0;
-			this->SetWidgetDirty(WID_DB_SHOW_DEPS);
-			this->SetWidgetDirty(WID_DB_SHOW_ARRS);
 		}
 
 		/* We need to redraw the scrolling text in its new position. */
@@ -490,14 +711,47 @@ public:
 		/* Recompute the list of departures if we're due to. */
 		if (this->calc_tick_countdown <= 0) {
 			this->calc_tick_countdown = _settings_client.gui.departure_calc_frequency;
-			this->DeleteDeparturesList(this->departures);
-			this->DeleteDeparturesList(this->arrivals);
-			bool show_pax = _settings_client.gui.departure_only_passengers ? true : this->show_pax;
-			bool show_freight = _settings_client.gui.departure_only_passengers ? false : this->show_freight;
-			this->departures = (this->departure_types[0] || _settings_client.gui.departure_show_both ? MakeDepartureList(this->station, this->vehicles, D_DEPARTURE, Twaypoint || this->departure_types[2], show_pax, show_freight) : new DepartureList());
-			this->arrivals   = (this->departure_types[1] && !_settings_client.gui.departure_show_both ? MakeDepartureList(this->station, this->vehicles, D_ARRIVAL, false, show_pax, show_freight) : new DepartureList());
+			bool show_pax = this->cargo_mode != DCF_FREIGHT_ONLY;
+			bool show_freight = this->cargo_mode != DCF_PAX_ONLY;
+
+			DepartureOrderDestinationDetector list_source = this->source;
+			ClrBit(list_source.order_type_mask, OT_IMPLICIT); // Not interested in implicit orders in this phase
+
+			DepartureCallingSettings settings;
+			settings.SetViaMode((this->source_type != DST_STATION) || this->show_via, (this->source_type == DST_STATION) && this->show_via);
+			settings.SetDepartureNoLoadTest(this->show_empty);
+			settings.SetShowAllStops(this->show_empty);
+			settings.SetCargoFilter(show_pax, show_freight);
+			settings.SetSmartTerminusEnabled(_settings_client.gui.departure_smart_terminus && (this->source_type == DST_STATION));
+			settings.SetDispatchArrivalTicksEnabled(this->mode == DM_COMBINED && this->source_mode == DSM_SCHEDULE_24H);
+
+			if (this->mode != DM_ARRIVALS) {
+				this->departures = MakeDepartureList(this->source_mode, list_source, this->vehicles, D_DEPARTURE, settings);
+			} else {
+				this->departures.clear();
+			}
+			if (this->mode == DM_ARRIVALS || this->mode == DM_SEPARATE) {
+				this->arrivals = MakeDepartureList(this->source_mode, list_source, this->vehicles, D_ARRIVAL, settings);
+			} else {
+				this->arrivals.clear();
+			}
+
+			if (this->filter_target.IsValid()) {
+				auto erase_non_matching = [&](const std::unique_ptr<Departure> &d) -> bool {
+					if (d->terminus == this->filter_target) return false;
+					for (const CallAt &c : d->calling_at) {
+						if (c.target == this->filter_target) return false;
+					}
+					return true;
+				};
+				this->departures.erase(std::remove_if(this->departures.begin(), this->departures.end(), erase_non_matching), this->departures.end());
+				this->arrivals.erase(std::remove_if(this->arrivals.begin(), this->arrivals.end(), erase_non_matching), this->arrivals.end());
+			}
+
 			this->departures_invalid = false;
+			this->vscroll->SetCount(this->GetScrollbarCapacity());
 			this->SetWidgetDirty(WID_DB_LIST);
+			this->SetWidgetDirty(WID_DB_SCROLLBAR);
 		}
 
 		uint new_width = this->GetMinWidth();
@@ -526,12 +780,6 @@ public:
 		}
 	}
 
-	virtual void OnPaint() override
-	{
-		this->vscroll->SetCount(std::min<uint>(_settings_client.gui.max_departures, (uint)this->departures->size() + (uint)this->arrivals->size()));
-		this->DrawWidgets();
-	}
-
 	virtual void DrawWidget(const Rect &r, WidgetID widget) const override
 	{
 		switch (widget) {
@@ -557,10 +805,47 @@ public:
 	{
 		this->vehicles_invalid = true;
 		this->departures_invalid = true;
+		this->calc_tick_countdown = 0;
 		if (data > 0) {
+			if (!_settings_time.time_in_minutes && this->source_mode == DSM_SCHEDULE_24H) {
+				this->source_mode = DSM_LIVE;
+				this->vehicles_invalid = true;
+			}
+			if (!_settings_time.time_in_minutes && this->show_arrival_times) {
+				this->show_arrival_times = false;
+				this->RaiseWidget(WID_DB_SHOW_TIMES);
+			}
+			this->SetWidgetDisabledState(WID_DB_SHOW_TIMES, !_settings_time.time_in_minutes);
 			this->SetupValues();
 			this->ReInit();
 			if (_pause_mode != PM_UNPAUSED) this->OnGameTick();
+		}
+	}
+
+	void CloneWindow() const
+	{
+		if (this->source_type == DST_DEPOT) {
+			VehicleType vt{};
+			for (uint i = 0; i < 4; ++i) {
+				if (this->show_types[i]) {
+					vt = (VehicleType)i;
+					break;
+				}
+			}
+			new DeparturesWindow(_departures_desc, DeparturesWindow::DepotTag{}, this->window_number & (MapSize() - 1), vt);
+		} else {
+			new DeparturesWindow(_departures_desc, (StationID)this->window_number);
+		}
+	}
+
+	void NotifyRemoveStationID(StationID station)
+	{
+		if (this->filter_target.MatchesStationID(station)) {
+			this->filter_target = CallAtTargetID();
+			this->OnInvalidateData(0, false);
+			this->RaiseWidget(WID_DB_FILTER);
+			this->SetWidgetDirty(WID_DB_FILTER);
+			this->SetWidgetDirty(WID_DB_CAPTION);
 		}
 	}
 };
@@ -569,50 +854,88 @@ public:
  * Shows a window of scheduled departures for a station.
  * @param station the station to show a departures window for
  */
-void ShowStationDepartures(StationID station)
+void ShowDeparturesWindow(StationID station)
 {
-	AllocateWindowDescFront<DeparturesWindow<> >(&_departures_desc, station);
+	AllocateWindowDescFront<DeparturesWindow>(_departures_desc, station);
 }
 
 /**
  * Shows a window of scheduled departures for a station.
  * @param station the station to show a departures window for
  */
-void ShowWaypointDepartures(StationID waypoint)
+void ShowDepotDeparturesWindow(TileIndex tile, VehicleType vt)
 {
-	AllocateWindowDescFront<DeparturesWindow<true> >(&_departures_desc, waypoint);
+	if (BringWindowToFrontById(_departures_desc.cls, DeparturesWindow::GetDepotWindowNumber(tile)) != nullptr) return;
+	new DeparturesWindow(_departures_desc, DeparturesWindow::DepotTag{}, tile, vt);
 }
 
-template<bool Twaypoint>
-void DeparturesWindow<Twaypoint>::RecomputeDateWidth()
+void CloseStationDeparturesWindow(StationID station)
+{
+	if (HaveWindowByClass(WC_DEPARTURES_BOARD)) {
+		for (Window *w : Window::Iterate()) {
+			if (w->window_class == WC_DEPARTURES_BOARD) {
+				if (w->window_number == station) {
+					w->Close();
+				} else {
+					static_cast<DeparturesWindow *>(w)->NotifyRemoveStationID(station);
+				}
+			}
+		}
+	}
+}
+
+void CloseDepotDeparturesWindow(TileIndex tile)
+{
+	CloseAllWindowsById(WC_DEPARTURES_BOARD, DeparturesWindow::GetDepotWindowNumber(tile));
+}
+
+void DeparturesWindow::RecomputeDateWidth()
 {
 	cached_date_width = 0;
+	cached_date_combined_width = 0;
 	cached_status_width = 0;
 	cached_date_display_method = _settings_time.time_in_minutes;
-	cached_arr_dep_display_method = _settings_client.gui.departure_show_both;
 
 	cached_status_width = std::max((GetStringBoundingBox(STR_DEPARTURES_ON_TIME)).width, cached_status_width);
 	cached_status_width = std::max((GetStringBoundingBox(STR_DEPARTURES_DELAYED)).width, cached_status_width);
 	cached_status_width = std::max((GetStringBoundingBox(STR_DEPARTURES_CANCELLED)).width, cached_status_width);
+	cached_status_width = std::max((GetStringBoundingBox(STR_DEPARTURES_SCHEDULED)).width, cached_status_width);
 
-	uint interval = cached_date_display_method ? _settings_time.ticks_per_minute : DAY_TICKS;
-	uint count = cached_date_display_method ? 24*60 : 365;
+	auto eval_tick = [&](StateTicks tick) {
+		SetDParam(0, TC_ORANGE);
+		SetDParam(1, STR_JUST_TT_TIME_ABS);
+		SetDParam(2, tick);
+		SetDParam(3, TC_ORANGE);
+		SetDParam(4, STR_JUST_TT_TIME_ABS);
+		SetDParam(5, tick);
+		cached_date_width = std::max(GetStringBoundingBox(STR_DEPARTURES_TIME).width, cached_date_width);
+		cached_date_combined_width = std::max(GetStringBoundingBox(STR_DEPARTURES_TIME_BOTH).width, cached_date_combined_width);
 
-	for (uint i = 0; i < count; ++i) {
 		SetDParam(0, STR_JUST_TT_TIME_ABS);
-		SetDParam(1, INT_MAX - (i*interval));
-		SetDParam(2, STR_JUST_TT_TIME_ABS);
-		SetDParam(3, INT_MAX - (i*interval));
-		cached_date_width = std::max(GetStringBoundingBox(cached_arr_dep_display_method ? STR_DEPARTURES_TIME_BOTH : STR_DEPARTURES_TIME_DEP).width, cached_date_width);
+		SetDParam(1, tick);
 		cached_status_width = std::max((GetStringBoundingBox(STR_DEPARTURES_EXPECTED)).width, cached_status_width);
+	};
+
+	if (_settings_time.time_in_minutes) {
+		StateTicks tick = _settings_time.FromTickMinutes(_settings_time.NowInTickMinutes().ToSameDayClockTime(GetBroadestHourDigitsValue(), (int)GetBroadestDigitsValue(2)));
+		eval_tick(tick);
+	} else if (!CalTime::IsCalendarFrozen()) {
+		/* If the calendar is frozen, all dates are the same, so just don't show anything */
+		for (uint i = 0; i < 365; ++i) {
+			eval_tick(StateTicks{INT_MAX - (i * DAY_TICKS)});
+		}
 	}
 
-	SetDParam(0, 0);
+	SetDParam(0, STR_JUST_TT_TIME_ABS);
+	SetDParam(1, 0);
 	cached_date_arrow_width = GetStringBoundingBox(STR_DEPARTURES_TIME_DEP).width - GetStringBoundingBox(STR_DEPARTURES_TIME).width;
+}
 
-	if (!_settings_client.gui.departure_show_both) {
-		cached_date_width -= cached_date_arrow_width;
-	}
+uint DeparturesWindow::GetScrollbarCapacity() const
+{
+	uint count = (uint)this->departures.size() + (uint)this->arrivals.size();
+	if (this->source_mode == DSM_LIVE) count = std::min<uint>(_settings_client.gui.max_departures, count);
+	return count;
 }
 
 static int PadWidth(int width)
@@ -621,13 +944,16 @@ static int PadWidth(int width)
 	return width;
 }
 
-template<bool Twaypoint>
-uint DeparturesWindow<Twaypoint>::GetMinWidth() const
+uint DeparturesWindow::GetMinWidth() const
 {
 	uint result = 0;
 
 	/* Time */
-	result = cached_date_width;
+	result = (this->mode == DM_COMBINED) ? cached_date_combined_width : cached_date_width;
+
+	if (this->show_arrival_times && _settings_time.time_in_minutes) {
+		result += PadWidth(cached_date_width);
+	}
 
 	/* Vehicle type icon */
 	result += _settings_client.gui.departure_show_vehicle_type ? cached_veh_type_width : 0;
@@ -638,28 +964,27 @@ uint DeparturesWindow<Twaypoint>::GetMinWidth() const
 	return result + ScaleGUITrad(140);
 }
 
-/**
- * Deletes this window's departure list.
- */
-template<bool Twaypoint>
-void DeparturesWindow<Twaypoint>::DeleteDeparturesList(DepartureList *list)
+/* Uses 3 parameters */
+static void FillCallingAtTargetDParam(size_t n, const Departure *d, CallAtTargetID target)
 {
-	/* SmallVector uses free rather than delete on its contents (which doesn't invoke the destructor), so we need to delete each departure manually. */
-	for (uint i = 0; i < list->size(); ++i) {
-		Departure **d = &(*list)[i];
-		delete *d;
-		/* Make sure a double free doesn't happen. */
-		*d = nullptr;
+	if (target.IsStationID()) {
+		if (Waypoint::IsValidID(target.GetStationID())) {
+			SetDParam(n, STR_WAYPOINT_NAME);
+		} else {
+			SetDParam(n, STR_STATION_NAME);
+		}
+		SetDParam(n + 1, target.GetStationID());
+	} else {
+		SetDParam(n, STR_DEPOT_NAME);
+		SetDParam(n + 1, d->vehicle->type);
+		SetDParam(n + 2, target.GetDepotDestinationID());
 	}
-	delete list;
-	list = nullptr;
 }
 
 /**
  * Draws a list of departures.
  */
-template<bool Twaypoint>
-void DeparturesWindow<Twaypoint>::DrawDeparturesListItems(const Rect &r) const
+void DeparturesWindow::DrawDeparturesListItems(const Rect &r) const
 {
 	this->scroll_refresh = false;
 
@@ -674,11 +999,7 @@ void DeparturesWindow<Twaypoint>::DrawDeparturesListItems(const Rect &r) const
 	const int text_right = right - (rtl ? text_offset :           0);
 
 	int y = r.top + 1;
-	uint max_departures = std::min<uint>(this->vscroll->GetPosition() + this->vscroll->GetCapacity(), (uint)this->departures->size() + (uint)this->arrivals->size());
-
-	if (max_departures > _settings_client.gui.max_departures) {
-		max_departures = _settings_client.gui.max_departures;
-	}
+	uint max_departures = std::min<uint>(this->vscroll->GetPosition() + this->vscroll->GetCapacity(), this->GetScrollbarCapacity());
 
 	const int small_font_size = _settings_client.gui.departure_larger_font ? GetCharacterHeight(FS_NORMAL) : GetCharacterHeight(FS_SMALL);
 
@@ -686,26 +1007,15 @@ void DeparturesWindow<Twaypoint>::DrawDeparturesListItems(const Rect &r) const
 	GfxFillRect(r.left + 1, r.top, r.right - 1, r.bottom, PC_BLACK);
 
 	/* Nothing selected? Then display the information text. */
-	bool none_selected[2] = {true, true};
+	bool no_vehs_selected = true;
 	for (uint i = 0; i < 4; ++i) {
 		if (this->show_types[i]) {
-			none_selected[0] = false;
+			no_vehs_selected = false;
 			break;
 		}
 	}
 
-	if (_settings_client.gui.departure_show_both) {
-		none_selected[1] = false;
-	} else {
-		for (uint i = 0; i < 2; ++i) {
-			if (this->departure_types[i]) {
-				none_selected[1] = false;
-				break;
-			}
-		}
-	}
-
-	if (none_selected[0] || none_selected[1]) {
+	if (no_vehs_selected) {
 		DrawString(text_left, text_right, y + 1, STR_DEPARTURES_NONE_SELECTED);
 		return;
 	}
@@ -717,10 +1027,15 @@ void DeparturesWindow<Twaypoint>::DrawDeparturesListItems(const Rect &r) const
 	}
 
 	/* Find the maximum possible width of the departure time and "Expt <time>" fields. */
-	int time_width = cached_date_width;
+	int time_width = (this->mode == DM_COMBINED) ? cached_date_combined_width : cached_date_width;
 
-	if (!_settings_client.gui.departure_show_both) {
-		time_width += (departure_types[0] && departure_types[1] ? cached_date_arrow_width : 0);
+	int arrival_time_width = 0;
+	if (this->show_arrival_times && _settings_time.time_in_minutes) {
+		arrival_time_width = cached_date_width;
+	}
+
+	if (this->mode == DM_SEPARATE) {
+		time_width += cached_date_arrow_width;
 	}
 
 	/* Vehicle type icon */
@@ -729,11 +1044,10 @@ void DeparturesWindow<Twaypoint>::DrawDeparturesListItems(const Rect &r) const
 	/* Find the maximum width of the status field */
 	int status_width = cached_status_width;
 
-	const StringID size_prefix = _settings_client.gui.departure_larger_font ? STR_JUST_STRING2 : STR_DEPARTURES_TINY;
+	const FontSize calling_font_size = _settings_client.gui.departure_larger_font ? FS_NORMAL : FS_SMALL;
 
 	/* Find the width of the "Calling at:" field. */
-	SetDParam(0, STR_DEPARTURES_CALLING_AT);
-	int calling_at_width = (GetStringBoundingBox(size_prefix)).width;
+	int calling_at_width = (GetStringBoundingBox(STR_DEPARTURES_CALLING_AT, calling_font_size)).width;
 
 	/* Find the maximum company name width. */
 	int toc_width = _settings_client.gui.departure_show_company ? this->toc_width : 0;
@@ -753,13 +1067,13 @@ void DeparturesWindow<Twaypoint>::DrawDeparturesListItems(const Rect &r) const
 	for (uint i = 0; i < max_departures; ++i) {
 		const Departure *d;
 
-		if (arrival == this->arrivals->size()) {
-			d = (*(this->departures))[departure++];
-		} else if (departure == this->departures->size()) {
-			d = (*(this->arrivals))[arrival++];
+		if (arrival == this->arrivals.size()) {
+			d = this->departures[departure++].get();
+		} else if (departure == this->departures.size()) {
+			d = this->arrivals[arrival++].get();
 		} else {
-			d = (*(this->departures))[departure];
-			const Departure *a = (*(this->arrivals))[arrival];
+			d = this->departures[departure].get();
+			const Departure *a = this->arrivals[arrival].get();
 
 			if (a->scheduled_tick < d->scheduled_tick) {
 				d = a;
@@ -773,22 +1087,52 @@ void DeparturesWindow<Twaypoint>::DrawDeparturesListItems(const Rect &r) const
 			continue;
 		}
 
-		if (d->terminus == INVALID_STATION) continue;
+		if (!d->terminus.IsValid()) continue;
 
-		StringID time_str;
-		if (_settings_client.gui.departure_show_both) {
-			time_str = STR_DEPARTURES_TIME_BOTH;
-			SetDParam(0, STR_JUST_TT_TIME_ABS);
-			SetDParam(1, d->scheduled_tick - (d->scheduled_waiting_time > 0 ? d->scheduled_waiting_time : d->order->GetWaitTime()));
-			SetDParam(2, STR_JUST_TT_TIME_ABS);
-			SetDParam(3, d->scheduled_tick);
-		} else {
-			time_str = (departure_types[0] && departure_types[1]) ? (d->type == D_DEPARTURE ? STR_DEPARTURES_TIME_DEP : STR_DEPARTURES_TIME_ARR) : STR_DEPARTURES_TIME;
-			SetDParam(0, STR_JUST_TT_TIME_ABS);
-			SetDParam(1, d->scheduled_tick);
+		if (time_width > 0) {
+			StringID time_str;
+			TextColour time_colour;
+			int offset = 0;
+			switch (d->show_as) {
+				default:
+					time_colour = TC_ORANGE;
+					break;
+
+				case DSA_VIA:
+					time_colour = TC_SILVER;
+					break;
+
+				case DSA_NO_LOAD:
+					time_colour = TC_YELLOW;
+					break;
+			}
+			if (this->mode == DM_COMBINED && d->EffectiveWaitingTime() != Departure::MISSING_WAIT_TICKS) {
+				time_str = STR_DEPARTURES_TIME_BOTH;
+				SetDParam(0, time_colour);
+				SetDParam(1, STR_JUST_TT_TIME_ABS);
+				SetDParam(2, d->scheduled_tick - d->EffectiveWaitingTime());
+				SetDParam(3, time_colour);
+				SetDParam(4, STR_JUST_TT_TIME_ABS);
+				SetDParam(5, d->scheduled_tick);
+			} else {
+				if (this->mode == DM_COMBINED) {
+					time_str = STR_DEPARTURES_TIME_DEP;
+					offset = time_width - (cached_date_width + cached_date_arrow_width);
+				} else if (this->mode == DM_SEPARATE) {
+					time_str = (d->type == D_DEPARTURE) ? STR_DEPARTURES_TIME_DEP : STR_DEPARTURES_TIME_ARR;
+				} else {
+					time_str = STR_DEPARTURES_TIME;
+				}
+				SetDParam(0, time_colour);
+				SetDParam(1, STR_JUST_TT_TIME_ABS);
+				SetDParam(2, d->scheduled_tick);
+			}
+			if (ltr) {
+				DrawString(     text_left + offset, text_left + time_width, y + 1, time_str);
+			} else {
+				DrawString(text_right - time_width,             text_right, y + 1, time_str);
+			}
 		}
-		ltr ? DrawString(              text_left, text_left + time_width, y + 1, time_str)
-			: DrawString(text_right - time_width,             text_right, y + 1, time_str);
 
 		if (_settings_client.gui.departure_show_vehicle_type) {
 			StringID type = STR_DEPARTURES_TYPE_TRAIN;
@@ -820,10 +1164,12 @@ void DeparturesWindow<Twaypoint>::DrawDeparturesListItems(const Rect &r) const
 		/* The icons to show with the destination and via stations. */
 		StringID icon = STR_DEPARTURES_STATION_NONE;
 
-		if (_settings_client.gui.departure_destination_type) {
-			Station *t = Station::Get(d->terminus.station);
+		if (_settings_client.gui.departure_destination_type && d->terminus.target.IsStationID()) {
+			Station *t = Station::GetIfValid(d->terminus.target.GetStationID());
 
-			if (t->facilities & FACIL_DOCK &&
+			if (t == nullptr) {
+				/* No icon change */
+			} else if (t->facilities & FACIL_DOCK &&
 					t->facilities & FACIL_AIRPORT &&
 					d->vehicle->type != VEH_SHIP &&
 					d->vehicle->type != VEH_AIRCRAFT) {
@@ -839,21 +1185,35 @@ void DeparturesWindow<Twaypoint>::DrawDeparturesListItems(const Rect &r) const
 
 		StationID via = d->via;
 		StationID via2 = d->via2;
-		if (via == d->terminus.station || via == this->station) {
+		if (d->terminus.target.MatchesStationID(via) || this->source.StationMatches(via)) {
 			via = via2;
 			via2 = INVALID_STATION;
 		}
-		if (via2 == d->terminus.station || via2 == this->station) via2 = INVALID_STATION;
+		if (d->terminus.target.MatchesStationID(via2) || this->source.StationMatches(via2)) via2 = INVALID_STATION;
+
+		/* Arrival time */
+		if (arrival_time_width != 0 && d->terminus.scheduled_tick != 0) {
+			SetDParam(0, TC_ORANGE);
+			SetDParam(1, STR_JUST_TT_TIME_ABS);
+			SetDParam(2, d->terminus.scheduled_tick);
+			if (ltr) {
+				const int left = text_left + time_width + type_width + ScaleGUITrad(6);
+				DrawString(left, left + arrival_time_width, y + 1, STR_DEPARTURES_TIME);
+			} else {
+				const int right = text_right - time_width - type_width - ScaleGUITrad(6);
+				DrawString(right - arrival_time_width, right, y + 1, STR_DEPARTURES_TIME);
+			}
+		}
 
 		/* Destination */
 		{
-			const int dest_left = ltr ? text_left + time_width + type_width + ScaleGUITrad(6) : text_left + PadWidth(toc_width) + PadWidth(group_width) + PadWidth(veh_width) + PadWidth(status_width);
-			const int dest_right = ltr ? text_right - PadWidth(toc_width) - PadWidth(group_width) - PadWidth(veh_width) - PadWidth(status_width) : text_right - time_width - type_width - ScaleGUITrad(6);
+			const int dest_left = ltr ? text_left + time_width + type_width + PadWidth(arrival_time_width) + ScaleGUITrad(6) : text_left + PadWidth(toc_width) + PadWidth(group_width) + PadWidth(veh_width) + PadWidth(status_width);
+			const int dest_right = ltr ? text_right - PadWidth(toc_width) - PadWidth(group_width) - PadWidth(veh_width) - PadWidth(status_width) : text_right - time_width - type_width - PadWidth(arrival_time_width) - ScaleGUITrad(6);
 
 			if (via == INVALID_STATION) {
 				/* Only show the terminus. */
-				SetDParam(0, d->terminus.station);
-				SetDParam(1, icon);
+				FillCallingAtTargetDParam(0, d, d->terminus.target);
+				SetDParam(3, icon);
 				DrawString(dest_left, dest_right, y + 1, STR_DEPARTURES_TERMINUS);
 			} else {
 				auto set_via_dparams = [&](uint offset) {
@@ -891,16 +1251,16 @@ void DeparturesWindow<Twaypoint>::DrawDeparturesListItems(const Rect &r) const
 					SetDParam(offset, SPECSTR_TEMP_START);
 				};
 				/* Show the terminus and the via station. */
-				SetDParam(0, d->terminus.station);
-				SetDParam(1, icon);
-				set_via_dparams(2);
+				FillCallingAtTargetDParam(0, d, d->terminus.target);
+				SetDParam(3, icon);
+				set_via_dparams(4);
 				int text_width = (GetStringBoundingBox(STR_DEPARTURES_TERMINUS_VIA_STATION)).width;
 
 				if (dest_left + text_width < dest_right) {
 					/* They will both fit, so show them both. */
-					SetDParam(0, d->terminus.station);
-					SetDParam(1, icon);
-					set_via_dparams(2);
+					FillCallingAtTargetDParam(0, d, d->terminus.target);
+					SetDParam(3, icon);
+					set_via_dparams(4);
 					DrawString(dest_left, dest_right, y + 1, STR_DEPARTURES_TERMINUS_VIA_STATION);
 				} else {
 					/* They won't both fit, so switch between showing the terminus and the via station approximately every 4 seconds. */
@@ -908,8 +1268,8 @@ void DeparturesWindow<Twaypoint>::DrawDeparturesListItems(const Rect &r) const
 						set_via_dparams(0);
 						DrawString(dest_left, dest_right, y + 1, STR_DEPARTURES_VIA);
 					} else {
-						SetDParam(0, d->terminus.station);
-						SetDParam(1, icon);
+						FillCallingAtTargetDParam(0, d, d->terminus.target);
+						SetDParam(3, icon);
 						DrawString(dest_left, dest_right, y + 1, STR_DEPARTURES_TERMINUS_VIA);
 					}
 					this->scroll_refresh = true;
@@ -925,22 +1285,27 @@ void DeparturesWindow<Twaypoint>::DrawDeparturesListItems(const Rect &r) const
 			if (d->status == D_ARRIVED) {
 				/* The vehicle has arrived. */
 				DrawString(status_left, status_right, y + 1, STR_DEPARTURES_ARRIVED);
-			} else if(d->status == D_CANCELLED) {
+			} else if (d->status == D_CANCELLED) {
 				/* The vehicle has been cancelled. */
 				DrawString(status_left, status_right, y + 1, STR_DEPARTURES_CANCELLED);
-			} else{
+			} else if (d->status == D_SCHEDULED) {
+				/* Display as scheduled. */
+				DrawString(status_left, status_right, y + 1, STR_DEPARTURES_SCHEDULED);
+			} else {
 				if (d->lateness <= TimetableAbsoluteDisplayUnitSize() && d->scheduled_tick > now_date) {
 					/* We have no evidence that the vehicle is late, so assume it is on time. */
 					DrawString(status_left, status_right, y + 1, STR_DEPARTURES_ON_TIME);
 				} else {
-					if ((d->scheduled_tick + d->lateness) < now_date) {
+					StateTicks expected_arrival = d->scheduled_tick + d->lateness;
+					if (d->type == D_DEPARTURE) expected_arrival -= d->EffectiveWaitingTime();
+					if (expected_arrival < now_date) {
 						/* The vehicle was expected to have arrived by now, even if we knew it was going to be late. */
 						/* We assume that the train stays at least a day at a station so it won't accidentally be marked as delayed for a fraction of a day. */
 						DrawString(status_left, status_right, y + 1, STR_DEPARTURES_DELAYED);
 					} else {
 						/* The vehicle is expected to be late and is not yet due to arrive. */
 						SetDParam(0, STR_JUST_TT_TIME_ABS);
-						SetDParam(1, d->scheduled_tick + d->lateness);
+						SetDParam(1, expected_arrival);
 						DrawString(status_left, status_right, y + 1, STR_DEPARTURES_EXPECTED);
 					}
 				}
@@ -977,9 +1342,11 @@ void DeparturesWindow<Twaypoint>::DrawDeparturesListItems(const Rect &r) const
 		int bottom_y = y + this->entry_height - small_font_size - (_settings_client.gui.departure_larger_font ? 1 : 3);
 
 		/* Calling at */
-		SetDParam(0, STR_DEPARTURES_CALLING_AT);
-		ltr ? DrawString(                    text_left,  text_left + calling_at_width, bottom_y, size_prefix)
-			: DrawString(text_right - calling_at_width,                    text_right, bottom_y, size_prefix);
+		if (ltr) {
+			DrawString(                    text_left,  text_left + calling_at_width, bottom_y, STR_DEPARTURES_CALLING_AT, TC_FROMSTRING, SA_LEFT, false, calling_font_size);
+		} else {
+			DrawString(text_right - calling_at_width,                    text_right, bottom_y, STR_DEPARTURES_CALLING_AT, TC_FROMSTRING, SA_LEFT, false, calling_font_size);
+		}
 
 		/* List of stations */
 		/* RTL languages can be handled in the language file, e.g. by having the following: */
@@ -987,52 +1354,62 @@ void DeparturesWindow<Twaypoint>::DrawDeparturesListItems(const Rect &r) const
 		/* STR_DEPARTURES_CALLING_AT_LAST_STATION :{STATION} & {RAW_STRING}*/
 		std::string buffer;
 
+		/* Uses 4 or 5 parameters */
+		auto fill_calling_at_dparam = [&](size_t n, const CallAt &c) {
+			if (c.scheduled_tick != 0 && arrival_time_width > 0) {
+				SetDParam(n, STR_DEPARTURES_CALLING_AT_STATION_WITH_TIME);
+				n++;
+			}
+			FillCallingAtTargetDParam(n, d, c.target);
+			SetDParam(n + 3, c.scheduled_tick);
+		};
+
 		if (d->calling_at.size() != 0) {
-			SetDParam(0, (d->calling_at[0]).station);
-			std::string calling_at_buffer = GetString(STR_DEPARTURES_CALLING_AT_FIRST_STATION);
+			fill_calling_at_dparam(0, d->calling_at[0]);
+			std::string calling_at_buffer = GetString(STR_JUST_STRING4);
 
-			StationID continues_to = INVALID_STATION;
+			const CallAt *continues_to = nullptr;
 
-			if (d->calling_at[0].station == d->terminus.station && d->calling_at.size() > 1) {
-				continues_to = d->calling_at[d->calling_at.size() - 1].station;
+			if (d->calling_at[0].target == d->terminus.target && d->calling_at.size() > 1) {
+				continues_to = &(d->calling_at[d->calling_at.size() - 1]);
 			} else if (d->calling_at.size() > 1) {
 				/* There's more than one stop. */
 
 				uint i;
 				/* For all but the last station, write out ", <station>". */
 				for (i = 1; i < d->calling_at.size() - 1; ++i) {
-					StationID s = d->calling_at[i].station;
-					if (s == d->terminus.station) {
-						continues_to = d->calling_at[d->calling_at.size() - 1].station;
+					CallAtTargetID target = d->calling_at[i].target;
+					if (target == d->terminus.target) {
+						continues_to = &(d->calling_at[d->calling_at.size() - 1]);
 						break;
 					}
 					SetDParamStr(0, std::move(calling_at_buffer));
-					SetDParam(1, s);
+					fill_calling_at_dparam(1, d->calling_at[i]);
 					calling_at_buffer = GetString(STR_DEPARTURES_CALLING_AT_STATION);
 				}
 
 				/* Finally, finish off with " and <station>". */
 				SetDParamStr(0, std::move(calling_at_buffer));
-				SetDParam(1, d->calling_at[i].station);
+				fill_calling_at_dparam(1, d->calling_at[i]);
 				calling_at_buffer = GetString(STR_DEPARTURES_CALLING_AT_LAST_STATION);
 			}
 
-			SetDParamStr(1, std::move(calling_at_buffer));
-			if (continues_to == INVALID_STATION) {
-				SetDParam(0, STR_DEPARTURES_CALLING_AT_LIST);
+			SetDParamStr(0, std::move(calling_at_buffer));
+			if (continues_to == nullptr) {
+				buffer = GetString(STR_DEPARTURES_CALLING_AT_LIST);
 			} else {
-				SetDParam(0, STR_DEPARTURES_CALLING_AT_LIST_SMART_TERMINUS);
-				SetDParam(2, continues_to);
+				fill_calling_at_dparam(1, *continues_to);
+				buffer = GetString(STR_DEPARTURES_CALLING_AT_LIST_SMART_TERMINUS);
 			}
-			buffer = GetString(size_prefix);
+
 		}
 
 		int list_width = (GetStringBoundingBox(buffer, _settings_client.gui.departure_larger_font ? FS_NORMAL : FS_SMALL)).width;
 
 		/* Draw the whole list if it will fit. Otherwise scroll it. */
 		if (list_width < text_right - (text_left + calling_at_width + 2)) {
-			ltr ? DrawString(text_left + calling_at_width + 2,                        text_right, bottom_y, buffer)
-				: DrawString(                       text_left, text_right - calling_at_width - 2, bottom_y, buffer);
+			ltr ? DrawString(text_left + calling_at_width + 2,                        text_right, bottom_y, buffer, TC_FROMSTRING, SA_LEFT, false, calling_font_size)
+				: DrawString(                       text_left, text_right - calling_at_width - 2, bottom_y, buffer, TC_FROMSTRING, SA_LEFT, false, calling_font_size);
 		} else {
 			this->scroll_refresh = true;
 
@@ -1051,8 +1428,8 @@ void DeparturesWindow<Twaypoint>::DrawDeparturesListItems(const Rect &r) const
 				? text_right - (elapsed_scroll_px % (list_width + text_right - text_left))
 				:  text_left + (elapsed_scroll_px % (list_width + text_right - text_left));
 
-			ltr ? DrawString(       pos, INT16_MAX, 0, buffer, TC_FROMSTRING,  SA_LEFT | SA_FORCE)
-				: DrawString(-INT16_MAX,       pos, 0, buffer, TC_FROMSTRING, SA_RIGHT | SA_FORCE);
+			ltr ? DrawString(       pos, INT16_MAX, 0, buffer, TC_FROMSTRING,  SA_LEFT | SA_FORCE, false, calling_font_size)
+				: DrawString(-INT16_MAX,       pos, 0, buffer, TC_FROMSTRING, SA_RIGHT | SA_FORCE, false, calling_font_size);
 		}
 
 		y += this->entry_height;

@@ -287,7 +287,6 @@ enum Commands {
 	CMD_BUILD_OBJECT,                 ///< build an object
 	CMD_PURCHASE_LAND_AREA,           ///< purchase an area of landscape
 	CMD_BUILD_OBJECT_AREA,            ///< build an area of objects
-	CMD_BUILD_HOUSE,                  ///< build a house
 	CMD_BUILD_TUNNEL,                 ///< build a tunnel
 
 	CMD_REMOVE_FROM_RAIL_STATION,     ///< remove a (rectangle of) tiles from a rail station
@@ -386,6 +385,7 @@ enum Commands {
 	CMD_TOWN_SET_TEXT,                ///< set the custom text of a town
 	CMD_EXPAND_TOWN,                  ///< expand a town
 	CMD_DELETE_TOWN,                  ///< delete a town
+	CMD_PLACE_HOUSE,                  ///< place a house
 
 	CMD_ORDER_REFIT,                  ///< change the refit information of an order (for "goto depot" )
 	CMD_CLONE_ORDER,                  ///< clone (and share) an order
@@ -399,6 +399,7 @@ enum Commands {
 
 	CMD_CREATE_SUBSIDY,               ///< create a new subsidy
 	CMD_COMPANY_CTRL,                 ///< used in multiplayer to create a new companies etc.
+	CMD_COMPANY_ALLOW_LIST_CTRL,      ///< Used in multiplayer to add/remove a client's public key to/from the company's allow list.
 	CMD_CUSTOM_NEWS_ITEM,             ///< create a custom news message
 	CMD_CREATE_GOAL,                  ///< create a new goal
 	CMD_REMOVE_GOAL,                  ///< remove a goal
@@ -496,6 +497,9 @@ enum Commands {
 	CMD_DELETE_TRACERESTRICT_SLOT,    ///< delete a tracerestrict slot
 	CMD_ADD_VEHICLE_TRACERESTRICT_SLOT,    ///< add a vehicle to a tracerestrict slot
 	CMD_REMOVE_VEHICLE_TRACERESTRICT_SLOT, ///< remove a vehicle from a tracerestrict slot
+	CMD_CREATE_TRACERESTRICT_SLOT_GROUP,   ///< create a tracerestrict slot group
+	CMD_ALTER_TRACERESTRICT_SLOT_GROUP,    ///< alter a tracerestrict slot group
+	CMD_DELETE_TRACERESTRICT_SLOT_GROUP,   ///< delete a tracerestrict slot group
 	CMD_CREATE_TRACERESTRICT_COUNTER, ///< create a tracerestrict counter
 	CMD_ALTER_TRACERESTRICT_COUNTER,  ///< alter a tracerestrict counter
 	CMD_DELETE_TRACERESTRICT_COUNTER, ///< delete a tracerestrict counter
@@ -522,6 +526,7 @@ enum Commands {
 	CMD_SCHEDULED_DISPATCH_ADJUST,              ///< scheduled dispatch adjust time offsets in schedule
 	CMD_SCHEDULED_DISPATCH_SWAP_SCHEDULES,      ///< scheduled dispatch swap schedules in order
 	CMD_SCHEDULED_DISPATCH_SET_SLOT_FLAGS,      ///< scheduled dispatch set flags of dispatch slot
+	CMD_SCHEDULED_DISPATCH_RENAME_TAG,          ///< scheduled dispatch rename departure tag
 
 	CMD_ADD_PLAN,
 	CMD_ADD_PLAN_LINE,
@@ -596,7 +601,7 @@ static_assert(CMD_END <= CMD_ID_MASK + 1);
  *
  * This enumeration defines flags for the _command_proc_table.
  */
-enum CommandFlags {
+enum CommandFlags : uint16_t {
 	CMD_SERVER    =  0x001, ///< the command can only be initiated by the server
 	CMD_SPECTATOR =  0x002, ///< the command may be initiated by a spectator
 	CMD_OFFLINE   =  0x004, ///< the command cannot be executed in a multiplayer game; single-player only
@@ -608,12 +613,17 @@ enum CommandFlags {
 	CMD_DEITY     =  0x100, ///< the command may be executed by COMPANY_DEITY
 	CMD_STR_CTRL  =  0x200, ///< the command's string may contain control strings
 	CMD_NO_EST    =  0x400, ///< the command is never estimated.
-	CMD_PROCEX    =  0x800, ///< the command proc function has extended parameters
 	CMD_SERVER_NS = 0x1000, ///< the command can only be initiated by the server (this is not executed in spectator mode)
 	CMD_LOG_AUX   = 0x2000, ///< the command should be logged in the auxiliary log instead of the main log
 	CMD_P1_TILE   = 0x4000, ///< use p1 for money text and error tile
 };
 DECLARE_ENUM_AS_BIT_SET(CommandFlags)
+
+enum CommandArgMode : uint8_t {
+	CMD_ARG_STD,
+	CMD_ARG_EX,
+	CMD_ARG_AUX,
+};
 
 /** Types of commands we have. */
 enum CommandType {
@@ -660,6 +670,7 @@ struct CommandAuxiliaryBase;
  */
 typedef CommandCost CommandProc(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint32_t p2, const char *text);
 typedef CommandCost CommandProcEx(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint32_t p2, uint64_t p3, const char *text, const CommandAuxiliaryBase *aux_data);
+typedef CommandCost CommandProcAux(TileIndex tile, DoCommandFlag flags, const CommandAuxiliaryBase *aux_data);
 
 /**
  * Define a command with the flags which belongs to it.
@@ -671,21 +682,33 @@ struct Command {
 	union {
 		CommandProc *proc;      ///< The procedure to actually execute
 		CommandProcEx *procex;  ///< The procedure to actually execute, extended parameters
+		CommandProcAux *procaux;  ///< The procedure to actually execute, only auxiliary parameter
 	};
 	const char *name;   ///< A human readable name for the procedure
 	CommandFlags flags; ///< The (command) flags to that apply to this command
 	CommandType type;   ///< The type of command.
+	CommandArgMode mode; ///< The command argument mode
 
 	Command(CommandProc *proc, const char *name, CommandFlags flags, CommandType type)
-			: proc(proc), name(name), flags(flags & ~CMD_PROCEX), type(type) {}
+			: proc(proc), name(name), flags(flags), type(type), mode(CMD_ARG_STD) {}
 	Command(CommandProcEx *procex, const char *name, CommandFlags flags, CommandType type)
-			: procex(procex), name(name), flags(flags | CMD_PROCEX), type(type) {}
+			: procex(procex), name(name), flags(flags), type(type), mode(CMD_ARG_EX) {}
+	Command(CommandProcAux *procaux, const char *name, CommandFlags flags, CommandType type)
+			: procaux(procaux), name(name), flags(flags), type(type), mode(CMD_ARG_AUX) {}
 
 	inline CommandCost Execute(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint32_t p2, uint64_t p3, const char *text, const CommandAuxiliaryBase *aux_data) const {
-		if (this->flags & CMD_PROCEX) {
-			return this->procex(tile, flags, p1, p2, p3, text, aux_data);
-		} else {
-			return this->proc(tile, flags, p1, p2, text);
+		switch (this->mode) {
+			case CMD_ARG_STD:
+				return this->proc(tile, flags, p1, p2, text);
+
+			case CMD_ARG_EX:
+				return this->procex(tile, flags, p1, p2, p3, text, aux_data);
+
+			case CMD_ARG_AUX:
+				return this->procaux(tile, flags, aux_data);
+
+			default:
+				NOT_REACHED();
 		}
 	}
 };
@@ -710,14 +733,21 @@ typedef void CommandCallback(const CommandCost &result, TileIndex tile, uint32_t
 
 struct CommandSerialisationBuffer;
 
+struct CommandAuxiliaryDeserialisationSrc {
+	std::span<const uint8_t> src;
+	std::string &debug_summary;
+};
+
 struct CommandAuxiliaryBase {
 	virtual ~CommandAuxiliaryBase() {}
 
 	virtual CommandAuxiliaryBase *Clone() const = 0;
 
-	virtual std::optional<std::span<const uint8_t>> GetDeserialisationSrc() const = 0;
+	virtual std::optional<CommandAuxiliaryDeserialisationSrc> GetDeserialisationSrc() const = 0;
 
-	virtual void Serialise(CommandSerialisationBuffer &buffer) const = 0;
+	virtual void Serialise(struct BufferSerialisationRef buffer) const = 0;
+
+	virtual std::string GetDebugSummary() const { return {}; }
 };
 
 struct CommandAuxiliaryPtr : public std::unique_ptr<CommandAuxiliaryBase>
@@ -743,22 +773,36 @@ private:
 };
 
 /**
- * Structure for buffering the build command when selecting a station to join.
+ * Struct representation of a command call (excluding callback)
  */
-struct CommandContainer {
+struct BaseCommandContainer {
+	uint32_t cmd;                    ///< command being executed.
 	TileIndex tile;                  ///< tile command being executed on.
 	uint32_t p1;                     ///< parameter p1.
 	uint32_t p2;                     ///< parameter p2.
-	uint32_t cmd;                    ///< command being executed.
 	uint64_t p3;                     ///< parameter p3. (here for alignment)
-	CommandCallback *callback;       ///< any callback function executed upon successful completion of the command.
 	std::string text;                ///< possible text sent for name changes etc.
 	CommandAuxiliaryPtr aux_data;    ///< Auxiliary command data
+
+	void SerialiseBaseCommandContainer(struct BufferSerialisationRef b) const;
+	const char *DeserialiseBaseCommandContainer(struct DeserialisationBuffer &b, bool allow_str_ctrl);
 };
+
+/**
+ * Struct representation of a command call (including callback)
+ */
+struct CommandContainer : public BaseCommandContainer {
+	CommandCallback *callback;       ///< any callback function executed upon successful completion of the command.
+};
+
+inline BaseCommandContainer NewBaseCommandContainerBasic(TileIndex tile, uint32_t p1, uint32_t p2, uint32_t cmd)
+{
+	return { cmd, tile, p1, p2, 0, {}, nullptr };
+}
 
 inline CommandContainer NewCommandContainerBasic(TileIndex tile, uint32_t p1, uint32_t p2, uint32_t cmd, CommandCallback *callback = nullptr)
 {
-	return { tile, p1, p2, cmd, 0, callback, {}, nullptr };
+	return { NewBaseCommandContainerBasic(tile, p1, p2, cmd), callback };
 }
 
 #endif /* COMMAND_TYPE_H */

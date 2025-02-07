@@ -84,14 +84,9 @@ void MoveWaypointsToBaseStations()
 		/* As of version 17, we recalculate the custom graphic ID of waypoints
 		 * from the GRF ID / station index. */
 		for (OldWaypoint &wp : _old_waypoints) {
-			StationClass *stclass = StationClass::Get(STAT_CLASS_WAYP);
-			for (uint i = 0; i < stclass->GetSpecCount(); i++) {
-				const StationSpec *statspec = stclass->GetSpec(i);
-				if (statspec != nullptr && statspec->grf_prop.grffile->grfid == wp.grfid && statspec->grf_prop.local_id == wp.localidx) {
-					wp.spec = statspec;
-					break;
-				}
-			}
+			const auto specs = StationClass::Get(STAT_CLASS_WAYP)->Specs();
+			auto found = std::ranges::find_if(specs, [&wp](const StationSpec *spec) { return spec != nullptr && spec->grf_prop.grfid == wp.grfid && spec->grf_prop.local_id == wp.localidx; });
+			if (found != std::end(specs)) wp.spec = *found;
 		}
 	}
 
@@ -103,10 +98,10 @@ void MoveWaypointsToBaseStations()
 		/* Sometimes waypoint (sign) locations became disconnected from their actual location in
 		 * the map array. If this is the case, try to locate the actual location in the map array */
 		if (!IsTileType(t, MP_RAILWAY) || GetRailTileType(t) != 2 /* RAIL_TILE_WAYPOINT */ || _m[t].m2 != wp.index) {
-			DEBUG(sl, 0, "Found waypoint tile %u with invalid position", t);
+			Debug(sl, 0, "Found waypoint tile {:#X} with invalid position", t);
 			for (t = 0; t < MapSize(); t++) {
 				if (IsTileType(t, MP_RAILWAY) && GetRailTileType(t) == 2 /* RAIL_TILE_WAYPOINT */ && _m[t].m2 == wp.index) {
-					DEBUG(sl, 0, "Found actual waypoint position at %u", t);
+					Debug(sl, 0, "Found actual waypoint position at {:#X}", t);
 					break;
 				}
 			}
@@ -146,7 +141,7 @@ void MoveWaypointsToBaseStations()
 	for (OrderList *ol : OrderList::Iterate()) {
 		if (ol->GetFirstSharedVehicle()->type != VEH_TRAIN) continue;
 
-		for (Order *o = ol->GetFirstOrder(); o != nullptr; o = o->next) UpdateWaypointOrder(o);
+		for (Order *o : ol->Orders()) UpdateWaypointOrder(o);
 	}
 
 	for (Vehicle *v : Vehicle::IterateType(VEH_TRAIN)) {
@@ -223,7 +218,7 @@ static void Ptrs_WAYP()
 }
 
 static const ChunkHandler waypoint_chunk_handlers[] = {
-	{ 'CHKP', nullptr, Load_WAYP, Ptrs_WAYP, nullptr, CH_ARRAY },
+	{ 'CHKP', nullptr, Load_WAYP, Ptrs_WAYP, nullptr, CH_READONLY },
 };
 
 extern const ChunkHandlerTable _waypoint_chunk_handlers(waypoint_chunk_handlers);

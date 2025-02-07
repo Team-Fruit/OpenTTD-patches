@@ -12,70 +12,74 @@
 
 #include "tile_type.h"
 
-#include <functional>
-#include <vector>
+#if !defined(DISABLE_SCOPE_INFO)
 
-struct Vehicle;
-struct BaseStation;
-struct Window;
+struct ScopeStackRecord {
+	using ScopeStackFunctor = void (*)(ScopeStackRecord *, struct format_target &);
 
-#ifdef USE_SCOPE_INFO
+	ScopeStackFunctor functor;
+	ScopeStackRecord *next;
+};
 
-extern std::vector<std::function<int(char *, const char *)>> _scope_stack;
+extern ScopeStackRecord *_scope_stack_head;
 
-struct scope_info_func_obj {
-	scope_info_func_obj(std::function<int(char *, const char *)> func)
+template <typename T>
+struct FunctorScopeStackRecord : public ScopeStackRecord {
+private:
+	T func;
+
+public:
+	FunctorScopeStackRecord(T func) : func(std::move(func))
 	{
-		_scope_stack.emplace_back(std::move(func));
+		this->functor = [](ScopeStackRecord *record, struct format_target &buffer) {
+			FunctorScopeStackRecord *self = static_cast<FunctorScopeStackRecord *>(record);
+			self->func(buffer);
+		};
+		this->next = _scope_stack_head;
+		_scope_stack_head = this;
 	}
 
-	scope_info_func_obj(const scope_info_func_obj &copysrc) = delete;
+	FunctorScopeStackRecord(const FunctorScopeStackRecord &copysrc) = delete;
 
-	~scope_info_func_obj()
+	~FunctorScopeStackRecord()
 	{
-		_scope_stack.pop_back();
+		_scope_stack_head = this->next;
 	}
 };
 
-int WriteScopeLog(char *buf, const char *last);
-
-#define SCOPE_INFO_PASTE(a, b) a ## b
+void WriteScopeLog(struct format_target &buffer);
 
 /**
- * This creates a lambda in the current scope with the specified capture which outputs the given args as a format string.
- * This lambda is then captured by reference in a std::function which is pushed onto the scope stack
+ * This creates a lambda in the current scope with the specified capture which outputs the given args as a fmt format string.
+ * This lambda is then captured by pointer in a ScopeStackRecord which is pushed onto the scope stack
  * The scope stack is popped at the end of the scope
  */
 #define SCOPE_INFO_FMT(capture, ...) \
-	auto SCOPE_INFO_PASTE(_sc_lm_, __LINE__) = capture (char *buf, const char *last) { \
-		return seprintf(buf, last, __VA_ARGS__); \
-	}; \
-	scope_info_func_obj SCOPE_INFO_PASTE(_sc_obj_, __LINE__) ([&](char *buf, const char *last) -> int { \
-		return SCOPE_INFO_PASTE(_sc_lm_, __LINE__) (buf, last); \
+	FunctorScopeStackRecord _sc_lm_ ## __LINE__ (capture (struct format_target &buffer) { \
+		buffer.format(__VA_ARGS__); \
 	});
 
-#else /* USE_SCOPE_INFO */
+#else /* defined(DISABLE_SCOPE_INFO) */
 
 #define SCOPE_INFO_FMT(...) { }
 
-#endif /* USE_SCOPE_INFO */
+#endif /* DISABLE_SCOPE_INFO */
 
-/**
- * This is a set of helper functions to print useful info from within a SCOPE_INFO_FMT statement.
- * The use of a struct is so that when used as an argument to SCOPE_INFO_FMT/seprintf/etc, the buffer lives
- * on the stack with a lifetime which lasts until the end of the statement.
- * This avoids needing to call malloc(), which is technically unsafe within the crash logger signal handler,
- * writing directly into the seprintf buffer, or the use of a separate static buffer.
- */
-struct scope_dumper {
-	const char *CompanyInfo(int company_id);
-	const char *VehicleInfo(const Vehicle *v);
-	const char *StationInfo(const BaseStation *st);
-	const char *TileInfo(TileIndex tile);
-	const char *WindowInfo(const Window *w);
+template <typename TAG, typename T>
+struct GeneralFmtDumper : public fmt_formattable {
+	T value;
+	GeneralFmtDumper(T value) : value(value) {}
 
-private:
-	char buffer[512];
+	void fmt_format_value(struct format_target &output) const;
 };
+
+
+struct DumpTileInfoTag{};
+
+using CompanyInfoDumper = GeneralFmtDumper<struct Company, int>;
+using VehicleInfoDumper = GeneralFmtDumper<struct Vehicle, const struct Vehicle *>;
+using StationInfoDumper = GeneralFmtDumper<struct BaseStation, const struct BaseStation *>;
+using TileInfoDumper = GeneralFmtDumper<DumpTileInfoTag, TileIndex>;
+using WindowInfoDumper = GeneralFmtDumper<struct Window, const struct Window *>;
 
 #endif /* SCOPE_INFO_H */

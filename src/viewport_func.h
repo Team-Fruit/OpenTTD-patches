@@ -45,9 +45,7 @@ void MarkWholeNonMapViewportsDirty();
 void MarkAllViewportOverlayStationLinksDirty(const Station *st);
 void MarkViewportLineDirty(Viewport * const vp, const Point from_pt, const Point to_pt, const int block_radius, ViewportMarkDirtyFlags flags);
 void MarkTileLineDirty(const TileIndex from_tile, const TileIndex to_tile, ViewportMarkDirtyFlags flags);
-void MarkDirtyFocusedRoutePaths(const Vehicle *veh);
-void CheckMarkDirtyViewportRoutePaths(const Vehicle *veh);
-void CheckMarkDirtyViewportRoutePaths();
+void HandleViewportRoutePathFocusChange(const Window *old, const Window *focused);
 void AddFixedViewportRoutePath(VehicleID veh);
 void RemoveFixedViewportRoutePath(VehicleID veh);
 void ChangeFixedViewportRoutePath(VehicleID from, VehicleID to);
@@ -175,8 +173,8 @@ inline void SetViewportCatchmentSpecializedStation(const Waypoint *st, bool sel)
 }
 
 void MarkBridgeDirty(TileIndex begin, TileIndex end, DiagDirection direction, uint bridge_height, ViewportMarkDirtyFlags flags = VMDF_NONE);
-void MarkBridgeDirty(TileIndex tile, ViewportMarkDirtyFlags flags = VMDF_NONE);
-void MarkBridgeOrTunnelDirty(TileIndex tile, ViewportMarkDirtyFlags flags = VMDF_NONE);
+void MarkBridgeDirty(TileIndex tile, TileIndex end, ViewportMarkDirtyFlags flags = VMDF_NONE);
+void MarkBridgeOrTunnelDirty(TileIndex tile, TileIndex end, ViewportMarkDirtyFlags flags = VMDF_NONE);
 void MarkBridgeOrTunnelDirtyOnReservationChange(TileIndex tile, ViewportMarkDirtyFlags flags = VMDF_NONE);
 
 bool IsViewportMouseHoverActive();

@@ -3,6 +3,7 @@
  */
 
 #include "../../../stdafx.h"
+#include "../../../core/format.hpp"
 
 #include <squirrel.h>
 #include "sqpcheader.h"
@@ -17,8 +18,6 @@
 #include "sqfuncstate.h"
 #include "sqclass.h"
 
-#include "../../../string_func.h"
-
 #include "../../../safeguards.h"
 
 bool sq_aux_gettypedarg(HSQUIRRELVM v,SQInteger idx,SQObjectType type,SQObjectPtr **o)
@@ -26,7 +25,7 @@ bool sq_aux_gettypedarg(HSQUIRRELVM v,SQInteger idx,SQObjectType type,SQObjectPt
 	*o = &stack_get(v,idx);
 	if(type(**o) != type){
 		SQObjectPtr oval = v->PrintObjVal(**o);
-		v->Raise_Error("wrong argument type, expected '%s' got '%.50s'",IdType2Name(type),_stringval(oval));
+		v->Raise_Error(fmt::format("wrong argument type, expected '{}' got '{:.50s}'",IdType2Name(type),_stringval(oval)));
 		return false;
 	}
 	return true;
@@ -47,9 +46,9 @@ SQInteger sq_aux_throwobject(HSQUIRRELVM v,SQObjectPtr &e)
 
 SQInteger sq_aux_invalidtype(HSQUIRRELVM v,SQObjectType type)
 {
-	char buf[100];
-	seprintf(buf, lastof(buf), "unexpected type %s", IdType2Name(type));
-	return sq_throwerror(v, buf);
+	fmt::memory_buffer buf;
+	fmt::format_to(std::back_inserter(buf), "unexpected type {}", IdType2Name(type));
+	return sq_throwerror(v, buf.data(), buf.size());
 }
 
 HSQUIRRELVM sq_open(SQInteger initialstacksize)

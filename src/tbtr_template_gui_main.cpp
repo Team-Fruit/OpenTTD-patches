@@ -39,14 +39,12 @@
 #include "window_func.h"
 #include "window_gui.h"
 #include "zoom_func.h"
-#include "group_gui_list.h"
+#include "group_gui.h"
 
 #include "tbtr_template_gui_main.h"
 #include "tbtr_template_gui_create.h"
 #include "tbtr_template_vehicle.h"
-
-#include <iostream>
-#include <stdio.h>
+#include "tbtr_template_vehicle_func.h"
 
 #include "safeguards.h"
 
@@ -99,7 +97,7 @@ enum TemplateReplaceWindowWidgets {
 	TRW_WIDGET_SEL_TMPL_DISPLAY_CREATE,
 };
 
-static constexpr NWidgetPart _widgets[] = {
+static constexpr NWidgetPart _template_replace_widgets[] = {
 	// Title bar
 	NWidget(NWID_HORIZONTAL),
 		NWidget(WWT_CLOSEBOX, COLOUR_GREY),
@@ -111,7 +109,7 @@ static constexpr NWidgetPart _widgets[] = {
 	//Top Matrix
 	NWidget(NWID_VERTICAL),
 		NWidget(WWT_PANEL, COLOUR_GREY),
-			NWidget(WWT_TEXT, COLOUR_GREY, TRW_WIDGET_INSET_GROUPS), SetPadding(2, 2, 2, 2), SetResize(1, 0), SetDataTip(STR_TMPL_MAINGUI_DEFINEDGROUPS, STR_NULL),
+			NWidget(WWT_TEXT, INVALID_COLOUR, TRW_WIDGET_INSET_GROUPS), SetPadding(2, 2, 2, 2), SetResize(1, 0), SetDataTip(STR_TMPL_MAINGUI_DEFINEDGROUPS, STR_NULL),
 		EndContainer(),
 		NWidget(NWID_HORIZONTAL),
 			NWidget(WWT_MATRIX, COLOUR_GREY, TRW_WIDGET_TOP_MATRIX), SetMinimalSize(216, 0), SetFill(1, 1), SetDataTip(0x1, STR_NULL), SetResize(1, 0), SetScrollbar(TRW_WIDGET_TOP_SCROLLBAR),
@@ -121,7 +119,7 @@ static constexpr NWidgetPart _widgets[] = {
 	// Template Display
 	NWidget(NWID_VERTICAL),
 		NWidget(WWT_PANEL, COLOUR_GREY),
-			NWidget(WWT_TEXT, COLOUR_GREY, TRW_WIDGET_INSET_TEMPLATES), SetPadding(2, 2, 2, 2), SetResize(1, 0), SetDataTip(STR_TMPL_AVAILABLE_TEMPLATES, STR_NULL),
+			NWidget(WWT_TEXT, INVALID_COLOUR, TRW_WIDGET_INSET_TEMPLATES), SetPadding(2, 2, 2, 2), SetResize(1, 0), SetDataTip(STR_TMPL_AVAILABLE_TEMPLATES, STR_NULL),
 		EndContainer(),
 		NWidget(NWID_HORIZONTAL),
 			NWidget(WWT_MATRIX, COLOUR_GREY, TRW_WIDGET_BOTTOM_MATRIX), SetMinimalSize(216, 0), SetFill(1, 1), SetDataTip(0x1, STR_NULL), SetResize(1, 1), SetScrollbar(TRW_WIDGET_MIDDLE_SCROLLBAR),
@@ -131,7 +129,7 @@ static constexpr NWidgetPart _widgets[] = {
 	// Info Area
 	NWidget(NWID_VERTICAL),
 		NWidget(WWT_PANEL, COLOUR_GREY),
-			NWidget(WWT_TEXT, COLOUR_GREY, TRW_WIDGET_TMPL_INFO_INSET), SetPadding(2, 2, 2, 2), SetResize(1, 0), SetDataTip(STR_TMPL_TEMPLATE_INFO, STR_NULL),
+			NWidget(WWT_TEXT, INVALID_COLOUR, TRW_WIDGET_TMPL_INFO_INSET), SetPadding(2, 2, 2, 2), SetResize(1, 0), SetDataTip(STR_TMPL_TEMPLATE_INFO, STR_NULL),
 		EndContainer(),
 		NWidget(NWID_HORIZONTAL),
 			NWidget(WWT_PANEL, COLOUR_GREY, TRW_WIDGET_TMPL_INFO_PANEL), SetMinimalSize(216,120), SetResize(1,0), SetScrollbar(TRW_WIDGET_BOTTOM_SCROLLBAR), EndContainer(),
@@ -169,7 +167,7 @@ static constexpr NWidgetPart _widgets[] = {
 		NWidget(NWID_HORIZONTAL),
 			NWidget(WWT_PUSHTXTBTN, COLOUR_GREY, TRW_WIDGET_START), SetMinimalSize(150, 12), SetDataTip(STR_TMPL_RPL_START, STR_TMPL_RPL_START_TOOLTIP),
 			NWidget(WWT_PANEL, COLOUR_GREY, TRW_WIDGET_TRAIN_FLUFF_LEFT), SetMinimalSize(15, 12), EndContainer(),
-			NWidget(WWT_DROPDOWN, COLOUR_GREY, TRW_WIDGET_TRAIN_RAILTYPE_DROPDOWN), SetMinimalSize(150, 12), SetDataTip(0x0, STR_REPLACE_HELP_RAILTYPE), SetResize(1, 0),
+			NWidget(WWT_DROPDOWN, COLOUR_GREY, TRW_WIDGET_TRAIN_RAILTYPE_DROPDOWN), SetMinimalSize(150, 12), SetDataTip(0x0, STR_REPLACE_RAILTYPE_TOOLTIP), SetResize(1, 0),
 			NWidget(WWT_PANEL, COLOUR_GREY, TRW_WIDGET_TRAIN_FLUFF_RIGHT), SetMinimalSize(16, 12), EndContainer(),
 			NWidget(WWT_PUSHTXTBTN, COLOUR_GREY, TRW_WIDGET_STOP), SetMinimalSize(150, 12), SetDataTip(STR_TMPL_RPL_STOP, STR_TMPL_RPL_STOP_TOOLTIP),
 			NWidget(WWT_RESIZEBOX, COLOUR_GREY),
@@ -177,14 +175,14 @@ static constexpr NWidgetPart _widgets[] = {
 	EndContainer(),
 };
 
-static WindowDesc _replace_rail_vehicle_desc(__FILE__, __LINE__,
+static WindowDesc _template_replace_desc(__FILE__, __LINE__,
 	WDP_AUTO,
-	"template replace window",
+	"template_replace",
 	456, 156,
 	WC_TEMPLATEGUI_MAIN,
 	WC_NONE,                     // parent window class
 	WDF_CONSTRUCTION,
-	std::begin(_widgets), std::end(_widgets)
+	_template_replace_widgets
 );
 
 enum {
@@ -198,8 +196,6 @@ private:
 
 	GUIGroupList groups;          ///< List of groups
 
-	std::vector<int> indents; ///< Indentation levels
-
 	int bottom_matrix_item_size = 0;
 
 	int details_height;           ///< Minimal needed height of the details panels (found so far).
@@ -207,7 +203,6 @@ private:
 	Scrollbar *vscroll[3];
 	// listing/sorting continued
 	GUITemplateList templates;
-	GUITemplateList::SortFunction **template_sorter_funcs;
 
 	int selected_template_index;
 	int selected_group_index;
@@ -221,11 +216,8 @@ private:
 	uint old_text_width = 0;
 
 public:
-	TemplateReplaceWindow(WindowDesc *wdesc) : Window(wdesc)
+	TemplateReplaceWindow(WindowDesc &wdesc) : Window(wdesc)
 	{
-		// listing/sorting
-		templates.SetSortFuncs(this->template_sorter_funcs);
-
 		this->sel_railtype = INVALID_RAILTYPE;
 
 		this->details_height = 10 * GetCharacterHeight(FS_NORMAL) + WidgetDimensions::scaled.framerect.Vertical();
@@ -260,18 +252,18 @@ public:
 		this->Window::Close();
 	}
 
-	virtual void UpdateWidgetSize(WidgetID widget, Dimension *size, const Dimension &padding, Dimension *fill, Dimension *resize) override
+	virtual void UpdateWidgetSize(WidgetID widget, Dimension &size, const Dimension &padding, Dimension &fill, Dimension &resize) override
 	{
 		switch (widget) {
 			case TRW_WIDGET_TOP_MATRIX:
-				resize->height = GetCharacterHeight(FS_NORMAL) + WidgetDimensions::scaled.matrix.Vertical();
-				size->height = 8 * resize->height;
+				resize.height = GetCharacterHeight(FS_NORMAL) + WidgetDimensions::scaled.matrix.Vertical();
+				size.height = 8 * resize.height;
 				break;
 			case TRW_WIDGET_BOTTOM_MATRIX: {
 				int base_resize = GetCharacterHeight(FS_NORMAL) + WidgetDimensions::scaled.matrix.Vertical();
 				int target_resize = WidgetDimensions::scaled.matrix.top + GetCharacterHeight(FS_NORMAL) + ScaleGUITrad(GetVehicleHeight(VEH_TRAIN));
-				this->bottom_matrix_item_size = resize->height = CeilT<int>(target_resize, base_resize);
-				size->height = 4 * resize->height;
+				this->bottom_matrix_item_size = resize.height = CeilT<int>(target_resize, base_resize);
+				size.height = 4 * resize.height;
 
 				int gap = ScaleGUITrad(TRW_GAP);
 
@@ -286,7 +278,7 @@ public:
 				/* use buy cost width as nominal width for name field */
 				uint left_side = ScaleGUITrad(TRW_LEFT_OFFSET) + this->buy_cost_width * 2;
 				uint right_side = this->refit_text_width + this->depot_text_width + this->remainder_text_width + this->old_text_width + ScaleGUITrad(TRW_RIGHT_OFFSET);
-				size->width = std::max(size->width, left_side + gap + right_side);
+				size.width = std::max(size.width, left_side + gap + right_side);
 				break;
 			}
 			case TRW_WIDGET_TRAIN_RAILTYPE_DROPDOWN: {
@@ -299,15 +291,15 @@ public:
 				}
 				d.width += padding.width;
 				d.height += padding.height;
-				*size = maxdim(*size, d);
+				size = maxdim(size, d);
 				break;
 			}
 			case TRW_WIDGET_TMPL_CONFIG_HEADER:
-				size->height = GetCharacterHeight(FS_NORMAL) + WidgetDimensions::scaled.framerect.Vertical();
+				size.height = GetCharacterHeight(FS_NORMAL) + WidgetDimensions::scaled.framerect.Vertical();
 				break;
 			case TRW_WIDGET_TMPL_BUTTONS_CONFIG_RIGHTPANEL:
 			case TRW_WIDGET_TMPL_BUTTONS_EDIT_RIGHTPANEL:
-				size->width = std::max(size->width, NWidgetLeaf::GetResizeBoxDimension().width);
+				size.width = std::max(size.width, NWidgetLeaf::GetResizeBoxDimension().width);
 				break;
 		}
 	}
@@ -520,7 +512,7 @@ public:
 				if ((this->selected_template_index >= 0) && (this->selected_template_index < (int)this->templates.size()) &&
 						(this->selected_group_index >= 0) && (this->selected_group_index < (int)this->groups.size())) {
 					uint32_t tv_index = ((this->templates)[selected_template_index])->index;
-					int current_group_index = (this->groups)[this->selected_group_index]->index;
+					int current_group_index = (this->groups)[this->selected_group_index].group->index;
 
 					DoCommandP(0, current_group_index, tv_index, CMD_ISSUE_TEMPLATE_REPLACEMENT, nullptr);
 					this->UpdateButtonState();
@@ -532,7 +524,7 @@ public:
 					return;
 				}
 
-				int current_group_index = (this->groups)[this->selected_group_index]->index;
+				int current_group_index = (this->groups)[this->selected_group_index].group->index;
 
 				DoCommandP(0, current_group_index, 0, CMD_DELETE_TEMPLATE_REPLACEMENT, nullptr);
 				this->UpdateButtonState();
@@ -595,11 +587,11 @@ public:
 		this->SetDirty();
 	}
 
-	void OnQueryTextFinished(char *str) override
+	void OnQueryTextFinished(std::optional<std::string> str) override
 	{
-		if (str != nullptr && (this->selected_template_index >= 0) && (this->selected_template_index < (int)this->templates.size()) && !editInProgress) {
+		if (str.has_value() && (this->selected_template_index >= 0) && (this->selected_template_index < (int)this->templates.size()) && !editInProgress) {
 			const TemplateVehicle *tmp = this->templates[this->selected_template_index];
-			DoCommandP(0, tmp->index, 0, CMD_RENAME_TMPL_REPLACE | CMD_MSG(STR_TMPL_CANT_RENAME), nullptr, str);
+			DoCommandP(0, tmp->index, 0, CMD_RENAME_TMPL_REPLACE | CMD_MSG(STR_TMPL_CANT_RENAME), nullptr, str->c_str());
 		}
 	}
 
@@ -617,36 +609,13 @@ public:
 		return -1;
 	}
 
-	void AddParents(GUIGroupList *source, GroupID parent, int indent)
-	{
-		for (const Group *g : *source) {
-			if (g->parent == parent) {
-				this->groups.push_back(g);
-				this->indents.push_back(indent);
-				AddParents(source, g->index, indent + 1);
-			}
-		}
-	}
-
 	void BuildGroupList()
 	{
 		if (!this->groups.NeedRebuild()) return;
 
 		this->groups.clear();
-		this->indents.clear();
 
-		GUIGroupList list;
-
-		for (const Group *g : Group::Iterate()) {
-			if (g->owner == this->owner && g->vehicle_type == VEH_TRAIN) {
-				list.push_back(g);
-			}
-		}
-
-		list.ForceResort();
-		SortGUIGroupList(list);
-
-		AddParents(&list, INVALID_GROUP, 0);
+		BuildGuiGroupList(this->groups, false, this->owner, VEH_TRAIN);
 
 		this->groups.shrink_to_fit();
 		this->groups.RebuildDone();
@@ -671,7 +640,8 @@ public:
 
 		/* Then treat all groups defined by/for the current company */
 		for (int i = this->vscroll[0]->GetPosition(); i < max; ++i) {
-			const Group *g = (this->groups)[i];
+			const GUIGroupListItem &item = (this->groups)[i];
+			const Group *g = item.group;
 			GroupID g_id = g->index;
 
 			/* Fill the background of the current cell in a darker tone for the currently selected template */
@@ -694,7 +664,7 @@ public:
 
 			SetDParam(0, g_id);
 			StringID str = STR_GROUP_NAME;
-			draw_text(left + ScaleGUITrad(4 + this->indents[i] * 10), col1 - ScaleGUITrad(4), str, TC_BLACK, SA_LEFT);
+			draw_text(left + ScaleGUITrad(4 + item.indent * 10), col1 - ScaleGUITrad(4), str, TC_BLACK, SA_LEFT);
 
 			const TemplateID tid = GetTemplateIDByGroupIDRecursive(g_id);
 			const TemplateID tid_self = GetTemplateIDByGroupID(g_id);
@@ -720,7 +690,7 @@ public:
 			/* Draw the number of trains that still need to be treated by the currently selected template replacement */
 			if (tid != INVALID_TEMPLATE) {
 				const TemplateVehicle *tv = TemplateVehicle::Get(tid);
-				const uint num_trains = CountsTrainsNeedingTemplateReplacement(g_id, tv);
+				const uint num_trains = CountTrainsNeedingTemplateReplacement(g_id, tv);
 				SetDParam(0, num_trains > 0 ? TC_ORANGE : TC_GREY);
 				SetDParam(1, num_trains);
 				draw_text(col2 + ScaleGUITrad(4), right - ScaleGUITrad(4), STR_TMPL_NUM_TRAINS_NEED_RPL, num_trains > 0 ? TC_BLACK : TC_GREY, SA_RIGHT);
@@ -932,7 +902,7 @@ public:
 
 		GroupID g_id = -1;
 		if (group_ok) {
-			const Group *g = (this->groups)[this->selected_group_index];
+			const Group *g = (this->groups)[this->selected_group_index].group;
 			g_id = g->index;
 		}
 
@@ -959,7 +929,7 @@ public:
 void ShowTemplateReplaceWindow()
 {
 	if (BringWindowToFrontById(WC_TEMPLATEGUI_MAIN, 0) == nullptr) {
-		new TemplateReplaceWindow(&_replace_rail_vehicle_desc);
+		new TemplateReplaceWindow(_template_replace_desc);
 	}
 }
 

@@ -36,7 +36,7 @@ static const uint IMPLICIT_ORDER_ONLY_CAP = 32;
 static const int32_t INVALID_SCHEDULED_DISPATCH_OFFSET = INT32_MIN;
 
 /** Order types. It needs to be 8bits, because we save and load it as such */
-enum OrderType : byte {
+enum OrderType : uint8_t {
 	OT_BEGIN         = 0,
 	OT_NOTHING       = 0,
 	OT_GOTO_STATION  = 1,
@@ -55,12 +55,14 @@ enum OrderType : byte {
 	OT_END
 };
 
-enum OrderSlotSubType : byte {
+using OrderTypeMask = uint16_t;
+
+enum OrderSlotSubType : uint8_t {
 	OSST_RELEASE               = 0,
 	OSST_TRY_ACQUIRE           = 1,
 };
 
-enum OrderLabelSubType : byte {
+enum OrderLabelSubType : uint8_t {
 	OLST_TEXT                  = 0,
 	OLST_DEPARTURES_VIA        = 1,
 	OLST_DEPARTURES_REMOVE_VIA = 2,
@@ -186,12 +188,18 @@ enum OrderConditionVariable {
 	OCV_TIME_DATE,          ///< Skip based on current time/date
 	OCV_TIMETABLE,          ///< Skip based on timetable state
 	OCV_DISPATCH_SLOT,      ///< Skip based on scheduled dispatch slot state
+	OCV_CARGO_WAITING_AMOUNT_PERCENTAGE, ///< Skip based on the amount of a specific cargo waiting at station, relative to the vehicle capacity
 	OCV_END
 };
 
 inline bool ConditionVariableHasStationID(OrderConditionVariable ocv)
 {
-	return ocv == OCV_CARGO_WAITING || ocv == OCV_CARGO_ACCEPTANCE || ocv == OCV_FREE_PLATFORMS || ocv == OCV_CARGO_WAITING_AMOUNT;
+	return ocv == OCV_CARGO_WAITING || ocv == OCV_CARGO_ACCEPTANCE || ocv == OCV_FREE_PLATFORMS || ocv == OCV_CARGO_WAITING_AMOUNT || ocv == OCV_CARGO_WAITING_AMOUNT_PERCENTAGE;
+}
+
+inline bool ConditionVariableTestsCargoWaitingAmount(OrderConditionVariable ocv)
+{
+	return ocv == OCV_CARGO_WAITING_AMOUNT || ocv == OCV_CARGO_WAITING_AMOUNT_PERCENTAGE;
 }
 
 /**
@@ -213,7 +221,7 @@ enum OrderConditionComparator {
 /**
  * Enumeration for the data to set in #CmdModifyOrder.
  */
-enum ModifyOrderFlags {
+enum ModifyOrderFlags : uint8_t {
 	MOF_NON_STOP,        ///< Passes an OrderNonStopFlags.
 	MOF_STOP_LOCATION,   ///< Passes an OrderStopLocation.
 	MOF_UNLOAD,          ///< Passes an OrderUnloadType.
@@ -224,6 +232,7 @@ enum ModifyOrderFlags {
 	MOF_COND_VALUE,      ///< The value to set the condition to.
 	MOF_COND_VALUE_2,    ///< The secondary value to set the condition to.
 	MOF_COND_VALUE_3,    ///< The tertiary value to set the condition to.
+	MOF_COND_VALUE_4,    ///< The quaternary value to set the condition to.
 	MOF_COND_STATION_ID, ///< The station ID to set the condition to.
 	MOF_COND_DESTINATION,///< Change the destination of a conditional order.
 	MOF_WAYPOINT_FLAGS,  ///< Change the waypoint flags
@@ -239,7 +248,7 @@ enum ModifyOrderFlags {
 	MOF_DEPARTURES_SUBTYPE, ///< Change the label departures subtype
 	MOF_END
 };
-template <> struct EnumPropsT<ModifyOrderFlags> : MakeEnumPropsT<ModifyOrderFlags, byte, MOF_NON_STOP, MOF_END, MOF_END, 8> {};
+template <> struct EnumPropsT<ModifyOrderFlags> : MakeEnumPropsT<ModifyOrderFlags, uint8_t, MOF_NON_STOP, MOF_END, MOF_END, 8> {};
 
 /**
  * Depot action to switch to when doing a #MOF_DEPOT_ACTION.
@@ -270,10 +279,49 @@ enum OrderTimetableConditionMode {
 	OTCM_END
 };
 
+/**
+ * Condition value field for OCV_DISPATCH_SLOT
+ *  0                   1
+ *  0 1 2 3 4 5 6 7 8 9 0
+ * +-+-+-+-+-+-+-+-+-+-+-+
+ * | |Src|         |Mode |
+ * | |   |         |     |
+ * +-+-+-+-+-+-+-+-+-+-+-+
+ *
+ * Mode = ODCM_FIRST_LAST
+ *  0                   1
+ *  0 1 2 3 4 5 6 7 8 9 0
+ * +-+-+-+-+-+-+-+-+-+-+-+
+ * |X|Src|         |Mode |
+ * | |   |         |     |
+ * +-+-+-+-+-+-+-+-+-+-+-+
+ *  |
+ * First/last slot bit
+ *
+ * Mode = OCDM_TAG
+ *  0                   1
+ *  0 1 2 3 4 5 6 7 8 9 0
+ * +-+-+-+-+-+-+-+-+-+-+-+
+ * | |Src| |Tag|   |Mode |
+ * | |   | |   |   |     |
+ * +-+-+-+-+-+-+-+-+-+-+-+
+ *           |
+ *           Slot tag
+*/
+
 enum OrderDispatchConditionBits {
-	ODCB_LAST_DISPATCHED     = 1,
+	ODCB_SRC_START           = 1,
+	ODCB_SRC_COUNT           = 2,
 	ODCB_MODE_START          = 8,
 	ODCB_MODE_COUNT          = 3,
+};
+
+enum OrderDispatchConditionSources : uint8_t {
+	ODCS_BEGIN               = 0,
+	ODCS_NEXT                = 0,
+	ODCS_LAST                = 1,
+	ODCS_VEH                 = 2,
+	ODCS_END,
 };
 
 enum OrderDispatchConditionModes : uint8_t {
@@ -293,7 +341,7 @@ enum OrderDispatchTagConditionBits {
 /**
  * Enumeration for the data to set in #CmdChangeTimetable.
  */
-enum ModifyTimetableFlags {
+enum ModifyTimetableFlags : uint8_t {
 	MTF_WAIT_TIME,    ///< Set wait time.
 	MTF_TRAVEL_TIME,  ///< Set travel time.
 	MTF_TRAVEL_SPEED, ///< Set max travel speed.
@@ -303,17 +351,18 @@ enum ModifyTimetableFlags {
 	MTF_ASSIGN_SCHEDULE, ///< Assign a dispatch schedule.
 	MTF_END
 };
-template <> struct EnumPropsT<ModifyTimetableFlags> : MakeEnumPropsT<ModifyTimetableFlags, byte, MTF_WAIT_TIME, MTF_END, MTF_END, 3> {};
+template <> struct EnumPropsT<ModifyTimetableFlags> : MakeEnumPropsT<ModifyTimetableFlags, uint8_t, MTF_WAIT_TIME, MTF_END, MTF_END, 3> {};
 
 
 /** Clone actions. */
-enum CloneOptions {
+enum CloneOptions : uint8_t {
 	CO_SHARE   = 0,
 	CO_COPY    = 1,
 	CO_UNSHARE = 2
 };
 
 struct Order;
+struct OrderPoolItem;
 struct OrderList;
 
 #endif /* ORDER_TYPE_H */

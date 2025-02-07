@@ -14,11 +14,14 @@
 #include "rail_type.h"
 #include "road_type.h"
 #include "fileio_type.h"
-#include "debug.h"
+#include "newgrf_text_type.h"
+#include "newgrf_act5.h"
 #include "core/bitmath_func.hpp"
 #include "core/alloc_type.hpp"
+#include "core/format.hpp"
 #include "core/mem_func.hpp"
 #include "3rdparty/cpp-btree/btree_map.h"
+#include "3rdparty/robin_hood/robin_hood.h"
 #include <bitset>
 #include <vector>
 
@@ -107,11 +110,11 @@ enum GrfSpecFeature : uint8_t {
 static const uint32_t INVALID_GRFID = 0xFFFFFFFF;
 
 struct GRFLabel {
-	byte label;
+	uint8_t label;
 	uint32_t nfo_line;
 	size_t pos;
 
-	GRFLabel(byte label, uint32_t nfo_line, size_t pos) : label(label), nfo_line(nfo_line), pos(pos) {}
+	GRFLabel(uint8_t label, uint32_t nfo_line, size_t pos) : label(label), nfo_line(nfo_line), pos(pos) {}
 };
 
 enum GRFPropertyMapFallbackMode {
@@ -237,21 +240,6 @@ struct GRFVariableMapEntry {
 	uint32_t output_param = 0;
 };
 
-/** The type of action 5 type. */
-enum Action5BlockType {
-	A5BLOCK_FIXED,                ///< Only allow replacing a whole block of sprites. (TTDP compatible)
-	A5BLOCK_ALLOW_OFFSET,         ///< Allow replacing any subset by specifiing an offset.
-	A5BLOCK_INVALID,              ///< unknown/not-implemented type
-};
-/** Information about a single action 5 type. */
-struct Action5Type {
-	Action5BlockType block_type;  ///< How is this Action5 type processed?
-	SpriteID sprite_base;         ///< Load the sprites starting from this sprite.
-	uint16_t min_sprites;         ///< If the Action5 contains less sprites, the whole block will be ignored.
-	uint16_t max_sprites;         ///< If the Action5 contains more sprites, only the first max_sprites sprites will be used.
-	const char *name;             ///< Name for error messages.
-};
-
 struct Action5TypeRemapDefinition {
 	const char *name; // nullptr indicates the end of the list
 	const Action5Type info;
@@ -327,7 +315,7 @@ struct NewSignalStyle;
 struct GRFFile : ZeroedMemoryAllocator {
 	std::string filename;
 	uint32_t grfid;
-	byte grf_version;
+	uint8_t grf_version;
 
 	uint sound_offset;
 	uint16_t num_sounds;
@@ -348,8 +336,7 @@ struct GRFFile : ZeroedMemoryAllocator {
 	std::vector<GRFVariableMapEntry> grf_variable_remaps;
 	std::vector<std::unique_ptr<const char, FreeDeleter>> remap_unknown_property_names;
 
-	std::array<uint32_t, 0x80> param;
-	uint param_end;  ///< one more than the highest set parameter
+	std::vector<uint32_t> param;
 
 	std::vector<GRFLabel> labels;                   ///< List of labels
 
@@ -357,17 +344,17 @@ struct GRFFile : ZeroedMemoryAllocator {
 	std::array<uint8_t, NUM_CARGO> cargo_map{};     ///< Inverse cargo translation table (CargoID -> local ID)
 
 	std::vector<RailTypeLabel> railtype_list;       ///< Railtype translation table
-	RailType railtype_map[RAILTYPE_END];
+	std::array<RailType, RAILTYPE_END> railtype_map{};
 
 	std::vector<RoadTypeLabel> roadtype_list;       ///< Roadtype translation table (road)
-	RoadType roadtype_map[ROADTYPE_END];
+	std::array<RoadType, ROADTYPE_END> roadtype_map{};
 
 	std::vector<RoadTypeLabel> tramtype_list;       ///< Roadtype translation table (tram)
-	RoadType tramtype_map[ROADTYPE_END];
+	std::array<RoadType, ROADTYPE_END> tramtype_map{};
 
 	CanalProperties canal_local_properties[CF_END]; ///< Canal properties as set by this NewGRF
 
-	struct LanguageMap *language_map; ///< Mappings related to the languages.
+	robin_hood::unordered_node_map<uint8_t, LanguageMap> language_map; ///< Mappings related to the languages.
 
 	int traininfo_vehicle_pitch;  ///< Vertical offset for drawing train images in depot GUI and vehicle details
 	uint traininfo_vehicle_width; ///< Width (in pixels) of a 8/8 train vehicle in depot GUI and vehicle details
@@ -382,28 +369,26 @@ struct GRFFile : ZeroedMemoryAllocator {
 	uint32_t observed_feature_tests;         ///< Observed feature test bits (see: GRFFeatureTestObservationFlag)
 
 	const SpriteGroup *new_signals_group;    ///< New signals sprite group
-	byte new_signal_ctrl_flags;              ///< Ctrl flags for new signals
-	byte new_signal_extra_aspects;           ///< Number of extra aspects for new signals
+	uint8_t new_signal_ctrl_flags;           ///< Ctrl flags for new signals
+	uint8_t new_signal_extra_aspects;        ///< Number of extra aspects for new signals
 	uint16_t new_signal_style_mask;          ///< New signal styles usable with this GRF
 	NewSignalStyle *current_new_signal_style; ///< Current new signal style being defined by this GRF
 
 	const SpriteGroup *new_rocks_group;      ///< New landscape rocks group
-	byte new_landscape_ctrl_flags;           ///< Ctrl flags for new landscape
+	uint8_t new_landscape_ctrl_flags;        ///< Ctrl flags for new landscape
 
-	byte ctrl_flags;                         ///< General GRF control flags
+	uint8_t ctrl_flags;                      ///< General GRF control flags
 
 	btree::btree_map<uint16_t, uint> string_map; ///< Map of local GRF string ID to string ID
 
 	GRFFile(const struct GRFConfig *config);
-	~GRFFile();
 
 	/** Get GRF Parameter with range checking */
 	uint32_t GetParam(uint number) const
 	{
 		/* Note: We implicitly test for number < this->param.size() and return 0 for invalid parameters.
 		 *       In fact this is the more important test, as param is zeroed anyway. */
-		assert(this->param_end <= this->param.size());
-		return (number < this->param_end) ? this->param[number] : 0;
+		return (number < std::size(this->param)) ? this->param[number] : 0;
 	}
 };
 
@@ -434,7 +419,7 @@ struct GRFLoadedFeatures {
  */
 inline bool HasGrfMiscBit(GrfMiscBit bit)
 {
-	extern byte _misc_grf_features;
+	extern uint8_t _misc_grf_features;
 	return HasBit(_misc_grf_features, bit);
 }
 
@@ -442,17 +427,24 @@ inline bool HasGrfMiscBit(GrfMiscBit bit)
 extern GRFLoadedFeatures _loaded_newgrf_features;
 
 void LoadNewGRFFile(struct GRFConfig *config, GrfLoadingStage stage, Subdirectory subdir, bool temporary);
-void LoadNewGRF(uint load_index, uint num_baseset);
+void LoadNewGRF(SpriteID load_index, uint num_baseset);
 void ReloadNewGRFData(); // in saveload/afterload.cpp
 void ResetNewGRFData();
 void ResetPersistentNewGRFData();
 
-#define grfmsg(severity, ...) if ((severity) == 0 || _debug_grf_level >= (severity)) _intl_grfmsg(severity, __VA_ARGS__)
-void CDECL _intl_grfmsg(int severity, const char *str, ...) WARN_FORMAT(2, 3);
+template <typename... T>
+void GrfMsgIntl(int severity, fmt::format_string<T...> msg, T&&... args)
+{
+	extern void GrfInfoVFmt(int severity, fmt::string_view msg, fmt::format_args args);
+	GrfInfoVFmt(severity, msg, fmt::make_format_args(args...));
+}
 
-bool GetGlobalVariable(byte param, uint32_t *value, const GRFFile *grffile);
+#define GrfMsg(severity, format_string, ...) do { if ((severity) == 0 || GetDebugLevel(DebugLevelID::grf) >= (severity)) GrfMsgIntl(severity, FMT_STRING(format_string) __VA_OPT__(,) __VA_ARGS__); } while(false)
+
+bool GetGlobalVariable(uint8_t param, uint32_t *value, const GRFFile *grffile);
 
 StringID MapGRFStringID(uint32_t grfid, StringID str);
+StringID MapGRFStringID(const struct GRFFile *grf, StringID str);
 void ShowNewGRFError();
 uint CountSelectedGRFs(GRFConfig *grfconf);
 
@@ -463,11 +455,26 @@ struct GrfSpecFeatureRef {
 	uint8_t raw_byte;
 };
 
-const char *GetFeatureString(GrfSpecFeatureRef feature);
-const char *GetFeatureString(GrfSpecFeature feature);
+struct GetFeatureStringFormatter : public fmt_formattable {
+	GrfSpecFeatureRef feature;
+
+	GetFeatureStringFormatter(GrfSpecFeatureRef feature) : feature(feature) {}
+
+	void fmt_format_value(struct format_target &output) const;
+};
+
+GetFeatureStringFormatter GetFeatureString(GrfSpecFeatureRef feature);
+GetFeatureStringFormatter GetFeatureString(GrfSpecFeature feature);
 
 void InitGRFGlobalVars();
 
 const char *GetExtendedVariableNameById(int id);
+
+struct NewGRFLabelDumper {
+	const char *Label(uint32_t label);
+
+private:
+	char buffer[12];
+};
 
 #endif /* NEWGRF_H */

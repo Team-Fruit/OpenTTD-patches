@@ -19,10 +19,10 @@
 
 template <typename Tobj>
 struct TileAnimationFrameAnimationHelper {
-	static byte Get(Tobj *obj, TileIndex tile) { return GetAnimationFrame(tile); }
-	static bool Set(Tobj *obj, TileIndex tile, byte frame)
+	static uint8_t Get(Tobj *obj, TileIndex tile) { return GetAnimationFrame(tile); }
+	static bool Set(Tobj *obj, TileIndex tile, uint8_t frame)
 	{
-		byte prev = GetAnimationFrame(tile);
+		uint8_t prev = GetAnimationFrame(tile);
 		if (frame != prev) {
 			SetAnimationFrame(tile, frame);
 			return true;
@@ -60,7 +60,7 @@ struct AnimationBase {
 		if (HasBit(spec->callback_mask, Tbase::cbm_animation_speed)) {
 			uint16_t callback = GetCallback(Tbase::cb_animation_speed, 0, 0, spec, obj, tile, extra_data);
 			if (callback != CALLBACK_FAILED) {
-				if (callback >= 0x100 && spec->grf_prop.grffile->grf_version >= 8) ErrorUnknownCallbackResult(spec->grf_prop.grffile->grfid, Tbase::cb_animation_speed, callback);
+				if (callback >= 0x100 && spec->grf_prop.grffile->grf_version >= 8) ErrorUnknownCallbackResult(spec->grf_prop.grfid, Tbase::cb_animation_speed, callback);
 				animation_speed = Clamp(callback & 0xFF, 0, 16);
 			}
 		}
@@ -149,6 +149,25 @@ struct AnimationBase {
 					break;
 				}
 				AddAnimatedTile(tile, changed);
+				break;
+		}
+
+		/* If the lower 7 bits of the upper byte of the callback
+		 * result are not empty, it is a sound effect. */
+		if (GB(callback, 8, 7) != 0 && _settings_client.sound.ambient) PlayTileSound(spec->grf_prop.grffile, GB(callback, 8, 7), tile);
+	}
+
+	static void ChangeAnimationFrameSoundOnly(CallbackID cb, const Tspec *spec, Tobj *obj, TileIndex tile, uint32_t random_bits, uint32_t trigger, Textra extra_data = 0)
+	{
+		uint16_t callback = GetCallback(cb, random_bits, trigger, spec, obj, tile, extra_data);
+		if (callback == CALLBACK_FAILED) return;
+
+		switch (callback & 0xFF) {
+			case 0xFF:
+				DeleteAnimatedTile(tile);
+				break;
+
+			default:
 				break;
 		}
 

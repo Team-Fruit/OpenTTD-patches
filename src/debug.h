@@ -10,12 +10,12 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
-#include "cpu.h"
-#include <chrono>
+#include "core/format.hpp"
+#include <array>
 #include <string>
 
 /* Debugging messages policy:
- * These should be the severities used for direct DEBUG() calls
+ * These should be the severities used for direct Debug() calls
  * maximum debugging level should be 10 if really deep, deep
  * debugging is needed.
  * (there is room for exceptions, but you have to have a good cause):
@@ -28,92 +28,78 @@
  * 6.. - extremely detailed spamming
  */
 
-/**
- * Output a line of debugging information.
- * @param name Category
- * @param level Debugging level, higher levels means more detailed information.
- */
-#define DEBUG(name, level, ...) do { if ((level) == 0 || _debug_ ## name ## _level >= (level)) debug(#name, level, __VA_ARGS__); } while (false)
-
-extern int _debug_driver_level;
-extern int _debug_grf_level;
-extern int _debug_map_level;
-extern int _debug_misc_level;
-extern int _debug_net_level;
-extern int _debug_sprite_level;
-extern int _debug_oldloader_level;
-extern int _debug_npf_level;
-extern int _debug_yapf_level;
-extern int _debug_fontcache_level;
-extern int _debug_script_level;
-extern int _debug_sl_level;
-extern int _debug_gamelog_level;
-extern int _debug_desync_level;
-extern int _debug_yapfdesync_level;
-extern int _debug_console_level;
-extern int _debug_linkgraph_level;
-extern int _debug_sound_level;
-extern int _debug_command_level;
+enum class DebugLevelID : uint8_t {
+	driver,
+	grf,
+	map,
+	misc,
+	net,
+	sprite,
+	oldloader,
+	yapf,
+	fontcache,
+	script,
+	sl,
+	gamelog,
+	desync,
+	yapfdesync,
+	console,
+	linkgraph,
+	sound,
+	command,
 #ifdef RANDOM_DEBUG
-extern int _debug_random_level;
-extern int _debug_statecsum_level;
+	random,
+	statecsum,
 #endif
+	END,
+};
+static constexpr uint DebugLevelCount = static_cast<uint>(DebugLevelID::END);
+
+extern std::array<int8_t, DebugLevelCount> _debug_levels;
+
+inline int8_t GetDebugLevel(DebugLevelID id) {
+	return _debug_levels[static_cast<uint>(id)];
+}
+
+const char *GetDebugLevelName(DebugLevelID id);
+
+template <typename... T>
+void DebugIntl(DebugLevelID dbg, int8_t level, fmt::format_string<T...> msg, T&&... args)
+{
+	extern void DebugIntlVFmt(DebugLevelID dbg, int8_t level, fmt::string_view msg, fmt::format_args args);
+	DebugIntlVFmt(dbg, level, msg, fmt::make_format_args(args...));
+}
+
+/**
+ * Ouptut a line of debugging information.
+ * @param name The category of debug information.
+ * @param level The maximum debug level this message should be shown at. When the debug level for this category is set lower, then the message will not be shown.
+ * @param format_string The formatting string of the message.
+ */
+#define Debug(name, level, format_string, ...) do { if ((level) == 0 || GetDebugLevel(DebugLevelID::name) >= (level)) DebugIntl(DebugLevelID::name, level, FMT_STRING(format_string) __VA_OPT__(,) __VA_ARGS__); } while (false)
 
 extern const char *_savegame_DBGL_data;
 extern std::string _loadgame_DBGL_data;
 extern bool _save_DBGC_data;
 extern std::string _loadgame_DBGC_data;
 
-void CDECL debug(const char *dbg, int level, const char *format, ...) WARN_FORMAT(3, 4);
-void debug_print(const char *dbg, int level, const char *buf);
+void CDECL debug(DebugLevelID dbg, int8_t level, const char *format, ...) WARN_FORMAT(3, 4);
+void debug_print(DebugLevelID dbg, int8_t level, std::string_view msg);
 
-char *DumpDebugFacilityNames(char *buf, char *last);
-void SetDebugString(const char *s, void (*error_func)(const char *));
+void DumpDebugFacilityNames(struct format_target &output);
+void SetDebugString(const char *s, void (*error_func)(std::string));
 std::string GetDebugString();
 
 /* Shorter form for passing filename and linenumber */
 #define FILE_LINE __FILE__, __LINE__
 
-/** TicToc profiling.
- * Usage:
- * static TicToc::State state("A name", 1);
- * TicToc tt(state);
- * --Do your code--
- */
-struct TicToc {
-	/** Persistent state for TicToc profiling. */
-	struct State {
-		const std::string_view name;
-		const uint32_t max_count;
-		uint32_t count = 0;
-		uint64_t chrono_sum = 0;
+void ShowInfoI(std::string_view str);
 
-		constexpr State(std::string_view name, uint32_t max_count) : name(name), max_count(max_count) { }
-	};
-
-	State &state;
-	std::chrono::high_resolution_clock::time_point chrono_start; ///< real time count.
-
-	inline TicToc(State &state) : state(state), chrono_start(std::chrono::high_resolution_clock::now()) { }
-
-	inline ~TicToc()
-	{
-		this->state.chrono_sum += (std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - this->chrono_start)).count();
-		if (++this->state.count == this->state.max_count) {
-			this->PrintAndReset();
-		}
-	}
-
-private:
-	void PrintAndReset();
-};
-
-void ShowInfoI(const char *str);
-void CDECL ShowInfoF(const char *str, ...) WARN_FORMAT(1, 2);
-
-inline void ShowInfoI(const std::string &str)
+template <typename... T>
+void ShowInfo(fmt::format_string<T...> msg, T&&... args)
 {
-	ShowInfoI(str.c_str());
+	extern void ShowInfoVFmt(fmt::string_view msg, fmt::format_args args);
+	ShowInfoVFmt(msg, fmt::make_format_args(args...));
 }
 
 struct log_prefix {
@@ -123,13 +109,32 @@ private:
 	char buffer[24];
 };
 
-const char *GetLogPrefix();
-
 void ClearDesyncMsgLog();
 void LogDesyncMsg(std::string msg);
-char *DumpDesyncMsgLog(char *buffer, const char *last);
+void DumpDesyncMsgLog(struct format_target &buffer);
 
 void DebugSendRemoteMessages();
 void DebugReconsiderSendRemoteMessages();
+
+template <typename... T>
+[[noreturn]] void AssertMsgError(int line, const char *file, const char *expr, fmt::format_string<T...> msg, T&&... args)
+{
+	[[noreturn]] extern void AssertMsgErrorVFmt(int line, const char *file, const char *expr, fmt::string_view msg, fmt::format_args args);
+	AssertMsgErrorVFmt(line, file, expr, msg, fmt::make_format_args(args...));
+}
+template <typename... T>
+[[noreturn]] void AssertMsgTileError(int line, const char *file, const char *expr, uint32_t tile, fmt::format_string<T...> msg, T&&... args)
+{
+	[[noreturn]] extern void AssertMsgTileErrorVFmt(int line, const char *file, const char *expr, uint32_t tile, fmt::string_view msg, fmt::format_args args);
+	AssertMsgTileErrorVFmt(line, file, expr, tile, msg, fmt::make_format_args(args...));
+}
+
+#if !defined(NDEBUG) || defined(WITH_ASSERT)
+#	define assert_msg(expression, ...) do { if (unlikely(!(expression))) AssertMsgError(__LINE__, __FILE__, #expression, __VA_ARGS__); } while (false)
+#	define assert_msg_tile(expression, tile, ...) do { if (unlikely(!(expression))) AssertMsgTileError(__LINE__, __FILE__, #expression, tile, __VA_ARGS__); } while (false)
+#else
+#	define assert_msg(expression, ...)
+#	define assert_msg_tile(expression, tile, ...)
+#endif
 
 #endif /* DEBUG_H */

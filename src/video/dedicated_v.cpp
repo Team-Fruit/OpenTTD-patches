@@ -10,6 +10,7 @@
 #include "../stdafx.h"
 
 #include "../gfx_func.h"
+#include "../error_func.h"
 #include "../network/network.h"
 #include "../network/network_internal.h"
 #include "../console_func.h"
@@ -71,12 +72,12 @@ static void CreateWindowsConsoleThread()
 	/* Create event to signal when console input is ready */
 	_hInputReady = CreateEvent(nullptr, false, false, nullptr);
 	_hWaitForInputHandling = CreateEvent(nullptr, false, false, nullptr);
-	if (_hInputReady == nullptr || _hWaitForInputHandling == nullptr) usererror("Cannot create console event!");
+	if (_hInputReady == nullptr || _hWaitForInputHandling == nullptr) UserError("Cannot create console event!");
 
 	_hThread = CreateThread(nullptr, 0, (LPTHREAD_START_ROUTINE)CheckForConsoleInput, nullptr, 0, &dwThreadId);
-	if (_hThread == nullptr) usererror("Cannot create console thread!");
+	if (_hThread == nullptr) UserError("Cannot create console thread!");
 
-	DEBUG(driver, 2, "Windows console thread started");
+	Debug(driver, 2, "Windows console thread started");
 }
 
 static void CloseWindowsConsoleThread()
@@ -84,7 +85,7 @@ static void CloseWindowsConsoleThread()
 	CloseHandle(_hThread);
 	CloseHandle(_hInputReady);
 	CloseHandle(_hWaitForInputHandling);
-	DEBUG(driver, 2, "Windows console thread shut down");
+	Debug(driver, 2, "Windows console thread shut down");
 }
 
 #endif
@@ -108,7 +109,7 @@ const char *VideoDriver_Dedicated::Start(const StringList &)
 	this->UpdateAutoResolution();
 
 	int bpp = BlitterFactory::GetCurrentBlitter()->GetScreenDepth();
-	_dedicated_video_mem = (bpp == 0) ? nullptr : MallocT<byte>(static_cast<size_t>(_cur_resolution.width) * _cur_resolution.height * (bpp / 8));
+	_dedicated_video_mem = (bpp == 0) ? nullptr : MallocT<uint8_t>(static_cast<size_t>(_cur_resolution.width) * _cur_resolution.height * (bpp / 8));
 
 	_screen.width  = _screen.pitch = _cur_resolution.width;
 	_screen.height = _cur_resolution.height;
@@ -130,7 +131,7 @@ const char *VideoDriver_Dedicated::Start(const StringList &)
 	_CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
 #endif
 
-	DEBUG(driver, 1, "Loading dedicated server");
+	Debug(driver, 1, "Loading dedicated server");
 	return nullptr;
 }
 
@@ -221,7 +222,6 @@ void VideoDriver_Dedicated::MainLoop()
 		if (!_dedicated_forks) DedicatedHandleKeyInput();
 		this->DrainCommandQueue();
 
-		ChangeGameSpeed(_ddc_fastforward);
 		this->Tick();
 		this->SleepTillNextTick();
 	}

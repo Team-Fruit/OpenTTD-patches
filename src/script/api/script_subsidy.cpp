@@ -46,22 +46,20 @@
 {
 	if (!IsAwarded(subsidy_id)) return ScriptCompany::COMPANY_INVALID;
 
-	return (ScriptCompany::CompanyID)((byte)::Subsidy::Get(subsidy_id)->awarded);
+	return (ScriptCompany::CompanyID)((uint8_t)::Subsidy::Get(subsidy_id)->awarded);
 }
 
 /* static */ ScriptDate::Date ScriptSubsidy::GetExpireDate(SubsidyID subsidy_id)
 {
 	if (!IsValidSubsidy(subsidy_id)) return ScriptDate::DATE_INVALID;
 
-	int year = ScriptDate::GetYear(ScriptDate::GetCurrentDate());
-	int month = ScriptDate::GetMonth(ScriptDate::GetCurrentDate());
+	EconTime::YearMonthDay ymd = EconTime::CurYMD();
+	ymd.day = 1;
+	auto m = ymd.month + ::Subsidy::Get(subsidy_id)->remaining;
+	ymd.month = (m - 1) % 12 + 1;
+	ymd.year += YearDelta{(m - 1) / 12};
 
-	month += ::Subsidy::Get(subsidy_id)->remaining;
-
-	year += (month - 1) / 12;
-	month = ((month - 1) % 12) + 1;
-
-	return ScriptDate::GetDate(year, month, 1);
+	return (ScriptDate::Date)EconTime::ConvertYMDToDate(ymd.year, ymd.month, ymd.day).base();
 }
 
 /* static */ CargoID ScriptSubsidy::GetCargoType(SubsidyID subsidy_id)

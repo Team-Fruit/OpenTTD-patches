@@ -229,6 +229,7 @@ STR_UNITS_HEIGHT_SI                                             :{DECIMAL} ม.
 
 
 
+
 # Common window strings
 STR_LIST_FILTER_TITLE                                           :{BLACK}คำกรอง:
 STR_LIST_FILTER_OSKTITLE                                        :{BLACK}ใส่คำกรอง
@@ -360,20 +361,20 @@ STR_TOOLBAR_TOOLTIP_LAND_BLOCK_INFORMATION                      :{BLACK}ข้�
 STR_TOOLBAR_TOOLTIP_SWITCH_TOOLBAR                              :{BLACK}เปลี่ยนกล่องเครื่องมือ
 
 # Extra tooltips for the scenario editor toolbar
-STR_SCENEDIT_TOOLBAR_TOOLTIP_SAVE_SCENARIO_LOAD_SCENARIO        :{BLACK}บันทึกฉาก, โหลดฉาก, ยกเลิกการแก้ไขฉาก, ออก
+STR_SCENEDIT_TOOLBAR_SAVE_SCENARIO_LOAD_SCENARIO_TOOLTIP        :{BLACK}บันทึกฉาก, โหลดฉาก, ยกเลิกการแก้ไขฉาก, ออก
 STR_SCENEDIT_TOOLBAR_OPENTTD                                    :{YELLOW}OpenTTD
 STR_SCENEDIT_TOOLBAR_SCENARIO_EDITOR                            :{YELLOW}โปรแกรมแก้ไขแผนที่
-STR_SCENEDIT_TOOLBAR_TOOLTIP_MOVE_THE_STARTING_DATE_BACKWARD    :{BLACK}เลื่อนวันที่เริ่มต้นย้อนไป 1 ปี
-STR_SCENEDIT_TOOLBAR_TOOLTIP_MOVE_THE_STARTING_DATE_FORWARD     :{BLACK}เลือนวันที่เริ่มต้นไปอีก 1 ปี
-STR_SCENEDIT_TOOLBAR_TOOLTIP_SET_DATE                           :{BLACK}คลิกเพื่อใส่ปีเริ่มต้น
-STR_SCENEDIT_TOOLBAR_TOOLTIP_DISPLAY_MAP_TOWN_DIRECTORY         :{BLACK}แสดงแผนที่และทำเนียบชื่อเมือง
-STR_SCENEDIT_TOOLBAR_LANDSCAPE_GENERATION                       :{BLACK}สร้างภูมิประเทศ
-STR_SCENEDIT_TOOLBAR_TOWN_GENERATION                            :{BLACK}สร้างเมือง
-STR_SCENEDIT_TOOLBAR_INDUSTRY_GENERATION                        :{BLACK}สร้างอุตสาหกรรม
-STR_SCENEDIT_TOOLBAR_ROAD_CONSTRUCTION                          :{BLACK}สร้างถนน
-STR_SCENEDIT_TOOLBAR_PLANT_TREES                                :{BLACK}ปลูกต้นไม้. กด Shift เพื่อเปิด-ปิดสิ่งปลูกสร้าง/แสดงการประเมินค่าใช้จ่าย
-STR_SCENEDIT_TOOLBAR_PLACE_SIGN                                 :{BLACK}ปักป้าย
-STR_SCENEDIT_TOOLBAR_PLACE_OBJECT                               :{BLACK}วางวัตถุ. กด Shift เพื่อปิด-เปิดสิ่งปลูกสร้าง/แสดงการประเมินค่าใช้จ่าย
+STR_SCENEDIT_TOOLBAR_MOVE_THE_STARTING_DATE_BACKWARD_TOOLTIP    :{BLACK}เลื่อนวันที่เริ่มต้นย้อนไป 1 ปี
+STR_SCENEDIT_TOOLBAR_MOVE_THE_STARTING_DATE_FORWARD_TOOLTIP     :{BLACK}เลือนวันที่เริ่มต้นไปอีก 1 ปี
+STR_SCENEDIT_TOOLBAR_SET_DATE_TOOLTIP                           :{BLACK}คลิกเพื่อใส่ปีเริ่มต้น
+STR_SCENEDIT_TOOLBAR_DISPLAY_MAP_TOWN_DIRECTORY_TOOLTIP         :{BLACK}แสดงแผนที่และทำเนียบชื่อเมือง
+STR_SCENEDIT_TOOLBAR_LANDSCAPE_GENERATION_TOOLTIP               :{BLACK}สร้างภูมิประเทศ
+STR_SCENEDIT_TOOLBAR_TOWN_GENERATION_TOOLTIP                    :{BLACK}สร้างเมือง
+STR_SCENEDIT_TOOLBAR_INDUSTRY_GENERATION_TOOLTIP                :{BLACK}สร้างอุตสาหกรรม
+STR_SCENEDIT_TOOLBAR_ROAD_CONSTRUCTION_TOOLTIP                  :{BLACK}สร้างถนน
+STR_SCENEDIT_TOOLBAR_PLANT_TREES_TOOLTIP                        :{BLACK}ปลูกต้นไม้. กด Shift เพื่อเปิด-ปิดสิ่งปลูกสร้าง/แสดงการประเมินค่าใช้จ่าย
+STR_SCENEDIT_TOOLBAR_PLACE_SIGN_TOOLTIP                         :{BLACK}ปักป้าย
+STR_SCENEDIT_TOOLBAR_PLACE_OBJECT_TOOLTIP                       :{BLACK}วางวัตถุ. กด Shift เพื่อปิด-เปิดสิ่งปลูกสร้าง/แสดงการประเมินค่าใช้จ่าย
 
 # Scenario editor file menu
 ###length 7
@@ -384,6 +385,7 @@ STR_SCENEDIT_FILE_MENU_LOAD_HEIGHTMAP                           :โหลดแ
 STR_SCENEDIT_FILE_MENU_QUIT_EDITOR                              :ออกจากโปรแกรมแก้ไขแผนที่
 STR_SCENEDIT_FILE_MENU_SEPARATOR                                :
 STR_SCENEDIT_FILE_MENU_QUIT                                     :ออก
+
 
 # Settings menu
 ###length 16
@@ -562,6 +564,7 @@ STR_GRAPH_CARGO_TOOLTIP_DISABLE_ALL                             :{BLACK}ไม�
 STR_GRAPH_CARGO_PAYMENT_TOGGLE_CARGO                            :{BLACK}เปิด/ปิด กราฟสำหรับประเภทของสินค้า
 STR_GRAPH_CARGO_PAYMENT_CARGO                                   :{TINY_FONT}{BLACK}{STRING}
 
+
 STR_GRAPH_PERFORMANCE_DETAIL_TOOLTIP                            :{BLACK}แสดงรายละเอียดความพึงพอใจของผู้ใช้บริการ
 
 # Graph key window
@@ -721,7 +724,7 @@ STR_SMALLMAP_LEGENDA_DESERT                                     :{TINY_FONT}{BLA
 STR_SMALLMAP_LEGENDA_SNOW                                       :{TINY_FONT}{BLACK}หิมะ
 
 STR_SMALLMAP_TOOLTIP_TOGGLE_TOWN_NAMES_ON_OFF                   :{BLACK}เปิด/ปิด ชื่อเมืองบนแผนที่
-STR_SMALLMAP_CENTER                                             :{BLACK}ให้จุดที่อยู่ ณ ปัจจุบันมาแสดงตำแหน่งในแผนที่ย่อ
+STR_SMALLMAP_CENTER_TOOLTIP                                     :{BLACK}ให้จุดที่อยู่ ณ ปัจจุบันมาแสดงตำแหน่งในแผนที่ย่อ
 STR_SMALLMAP_INDUSTRY                                           :{TINY_FONT}{STRING} ({NUM})
 STR_SMALLMAP_LINKSTATS                                          :{TINY_FONT}{STRING}
 STR_SMALLMAP_COMPANY                                            :{TINY_FONT}{COMPANY}
@@ -849,9 +852,9 @@ STR_NEWS_EXCLUSIVE_RIGHTS_TITLE                                 :{BIG_FONT}{BLAC
 # Extra view window
 STR_EXTRA_VIEWPORT_TITLE                                        :{WHITE}มุมมอง {COMMA}
 STR_EXTRA_VIEW_MOVE_VIEW_TO_MAIN                                :{BLACK}คัดลอกไปยังมุมมอง
-STR_EXTRA_VIEW_MOVE_VIEW_TO_MAIN_TT                             :{BLACK}คัดลอกตำแหน่งของมุมมองหลังมายังมุมมองนี้
+STR_EXTRA_VIEW_MOVE_VIEW_TO_MAIN_TOOLTIP                        :{BLACK}คัดลอกตำแหน่งของมุมมองหลังมายังมุมมองนี้
 STR_EXTRA_VIEW_MOVE_MAIN_TO_VIEW                                :{BLACK}วางจากมุมมอง
-STR_EXTRA_VIEW_MOVE_MAIN_TO_VIEW_TT                             :{BLACK}วางตำแหน่งจากมุมมองนี้ไปยังมุมมองหลัก
+STR_EXTRA_VIEW_MOVE_MAIN_TO_VIEW_TOOLTIP                        :{BLACK}วางตำแหน่งจากมุมมองนี้ไปยังมุมมองหลัก
 
 # Game options window
 STR_GAME_OPTIONS_CAPTION                                        :{WHITE}ตัวเลือกเกม
@@ -941,6 +944,7 @@ STR_GAME_OPTIONS_BASE_SFX_DESCRIPTION_TOOLTIP                   :{BLACK}ปร�
 STR_GAME_OPTIONS_BASE_MUSIC                                     :{BLACK}ชุดเพลงประกอบพื้นฐาน
 STR_GAME_OPTIONS_BASE_MUSIC_TOOLTIP                             :{BLACK}เลือกเพลงประกอบพื้นฐานเพื่อใช้งาน
 STR_GAME_OPTIONS_BASE_MUSIC_DESCRIPTION_TOOLTIP                 :{BLACK}ข้อมูลเพิ่มเติมเกี่ยวกับชุดเพลงประกอบพื้นฐาน
+
 
 
 
@@ -1292,6 +1296,7 @@ STR_CONFIG_SETTING_WARN_INCOME_LESS                             :เตือน
 ###length 2
 STR_CONFIG_SETTING_WARN_INCOME_LESS_HELPTEXT                    :เมื่อเปิดใช้งาน จะแสดงข้อความแจ้งเตือนเมื่อพาหนะไม่สามารถทำกำไรได้เมื่อครบกำหนดสิ้นปี
 
+
 STR_CONFIG_SETTING_NEVER_EXPIRE_VEHICLES                        :ยานพาหนะไม่หมดอายุ: {STRING}
 STR_CONFIG_SETTING_NEVER_EXPIRE_VEHICLES_HELPTEXT               :เมื่อเปิดใช้งาน พาหนะทั้งหมดจะยังสามารถซื้อได้ตลอดไปหลังจากหมดช่วงระยะเวลา
 
@@ -1575,7 +1580,8 @@ STR_CONFIG_SETTING_SERVINT_AIRCRAFT                             :ตั้งค
 STR_CONFIG_SETTING_SERVINT_AIRCRAFT_HELPTEXT                    :ตั้งค่าแรกเริ่มสำหรับการเข้าซ่อมบำรุงสำหรับอากาศยาน เป็นหน่วยวัน หรือหากเลือกการตั้งค่าโดยคิดจากเปอร์เซนต์ของประสิทธิภาพ จะเปลี่ยนไปใช้่หน่วยเปอร์เซนต์แทน
 STR_CONFIG_SETTING_SERVINT_SHIPS                                :ตั้งค่าแรกเริ่มสำหรับการเข้าซ่อมบำรุงของพาหนะทางน้ำ: {STRING}
 STR_CONFIG_SETTING_SERVINT_SHIPS_HELPTEXT                       :ตั้งค่าแรกเริ่มสำหรับการเข้าซ่อมบำรุงสำหรับพาหนะทางน้ำ เป็นหน่วยวัน หรือหากเลือกการตั้งค่าโดยคิดจากเปอร์เซนต์ของประสิทธิ์ภาพ จะเปลี่ยนไปใช้่หน่วยเปอร์เซนต์แทน
-STR_CONFIG_SETTING_SERVINT_VALUE                                :{COMMA} วัน/%
+###length 3
+
 ###setting-zero-is-special
 STR_CONFIG_SETTING_SERVINT_DISABLED                             :ไม่ตั้ง
 
@@ -1838,17 +1844,8 @@ STR_CONFIG_SETTING_ENVIRONMENT_CARGODIST                        :การกร
 STR_CONFIG_SETTING_AI                                           :คู่แข่ง
 STR_CONFIG_SETTING_AI_NPC                                       :ผู้เล่นคอมพิวเตอร์
 
-STR_CONFIG_SETTING_PATHFINDER_FOR_TRAINS                        :ตัวค้นหาเส้นทางสำหรับรถไฟ: {STRING}
-STR_CONFIG_SETTING_PATHFINDER_FOR_TRAINS_HELPTEXT               :การหาค้นหาเส้นทางของขบวนรถไฟ
-STR_CONFIG_SETTING_PATHFINDER_FOR_ROAD_VEHICLES                 :ตัวค้นหาเส้นทางสำหรับรถยนต์: {STRING}
-STR_CONFIG_SETTING_PATHFINDER_FOR_ROAD_VEHICLES_HELPTEXT        :การค้นหาเส้นทางของยานพาหนะทางบก
-STR_CONFIG_SETTING_PATHFINDER_FOR_SHIPS                         :ตัวค้นหาเส้นทางสำหรับเรือ: {STRING}
-STR_CONFIG_SETTING_PATHFINDER_FOR_SHIPS_HELPTEXT                :การค้นหาเส้นทางของยานพาหนะทางน้ำ
 STR_CONFIG_SETTING_REVERSE_AT_SIGNALS                           :หมุนกลับขบวนอัตโนมัติที่เสาอาณัติสัญญาณ: {STRING}
 STR_CONFIG_SETTING_REVERSE_AT_SIGNALS_HELPTEXT                  :อนุญาตให้ขบวนรถไฟกลับขบวนที่เสาอาณัติสัญญาณเมื่อมีการรอสัญญาณอนุญาตเป็นเวลานาน
-###length 2
-STR_CONFIG_SETTING_PATHFINDER_NPF                               :NPF
-STR_CONFIG_SETTING_PATHFINDER_YAPF                              :YAPF {BLUE}(แนะนำ)
 
 STR_CONFIG_SETTING_QUERY_CAPTION                                :{WHITE}เปลี่ยนค่าการตั้งค่า
 
@@ -2001,9 +1998,9 @@ STR_FACE_SAVE                                                   :{BLACK}บั�
 STR_FACE_SAVE_TOOLTIP                                           :{BLACK}บันทึกใบหน้าโปรด
 STR_FACE_SAVE_DONE                                              :{WHITE}ใบหน้านี้จะถูกบันทึกเป็นใบหน้าโปรดในไฟล์การตั้งค่าของ OpenTTD
 STR_FACE_EUROPEAN                                               :{BLACK}ยุโรป
-STR_FACE_SELECT_EUROPEAN                                        :{BLACK}เลือกใบหน้ายุโรป
+STR_FACE_EUROPEAN_TOOLTIP                                       :{BLACK}เลือกใบหน้ายุโรป
 STR_FACE_AFRICAN                                                :{BLACK}แอฟริกัน
-STR_FACE_SELECT_AFRICAN                                         :{BLACK}เลือกใบหน้าแอฟริกัน
+STR_FACE_AFRICAN_TOOLTIP                                        :{BLACK}เลือกใบหน้าแอฟริกัน
 STR_FACE_YES                                                    :ใช่
 STR_FACE_NO                                                     :ไม่
 STR_FACE_MOUSTACHE_EARRING_TOOLTIP                              :{BLACK}เปิดใช้งานหนวด
@@ -2056,7 +2053,7 @@ STR_NETWORK_SERVER_LIST_INFO_ICONS_TOOLTIP                      :{BLACK}ภา�
 
 STR_NETWORK_SERVER_LIST_CLICK_GAME_TO_SELECT                    :{BLACK}คลิกที่เกมจากรายการเพื่อเลือก
 STR_NETWORK_SERVER_LIST_LAST_JOINED_SERVER                      :{BLACK}เซิร์ฟเวอร์ที่เข้าร่วมล่าสุด:
-STR_NETWORK_SERVER_LIST_CLICK_TO_SELECT_LAST                    :{BLACK}คลิกเพื่อเลือกเซิร์ฟเวอร์ที่เล่นล่าสุด
+STR_NETWORK_SERVER_LIST_CLICK_TO_SELECT_LAST_TOOLTIP            :{BLACK}คลิกเพื่อเลือกเซิร์ฟเวอร์ที่เล่นล่าสุด
 
 STR_NETWORK_SERVER_LIST_GAME_INFO                               :{SILVER}ข้อมูลเกม
 STR_NETWORK_SERVER_LIST_CLIENTS                                 :{SILVER}ลูกข่าย: {WHITE}{COMMA} / {COMMA} - {COMMA} / {COMMA}
@@ -2126,7 +2123,6 @@ STR_NETWORK_CONNECTING_SPECIAL_2                                :{BLACK}รว�
 STR_NETWORK_CONNECTION_DISCONNECT                               :{BLACK}ตัดการเชื่อมต่อ
 
 STR_NETWORK_NEED_GAME_PASSWORD_CAPTION                          :{WHITE}เซิฟเวอร์มีการป้องกัน กรุณากรอกพาสเวิร์ด
-STR_NETWORK_NEED_COMPANY_PASSWORD_CAPTION                       :{WHITE}บริษัทมีการป้องกัน. กรุณากรอกพาสเวิร์ด
 
 # Network company list added strings
 STR_NETWORK_COMPANY_LIST_CLIENT_LIST                            :รายชื่อผู้เล่นที่ออนไลน์
@@ -2151,7 +2147,6 @@ STR_NETWORK_CLIENT_LIST_SERVER_CONNECTION_TYPE_STUN             :{BLACK}Behind N
 STR_NETWORK_CLIENT_LIST_SERVER_CONNECTION_TYPE_TURN             :{BLACK}ทางรีเลย์
 
 STR_NETWORK_CLIENT_LIST_ADMIN_COMPANY_RESET                     :ลบ
-STR_NETWORK_CLIENT_LIST_ADMIN_COMPANY_UNLOCK                    :ปลดล็อครหัสผ่าน
 
 STR_NETWORK_CLIENT_LIST_ASK_CLIENT_KICK                         :{YELLOW}คุณแน่ใจว่าจะเตะผู้เล่น '{STRING}' ใช่มั้ย?
 STR_NETWORK_CLIENT_LIST_ASK_CLIENT_BAN                          :{YELLOW}คุณแน่ใจหรือไม่ที่จะแบนผู้เล่น '{STRING}' คนนี้?
@@ -2163,19 +2158,9 @@ STR_NETWORK_ASK_RELAY_YES_ONCE                                  :{BLACK}ใช�
 
 STR_NETWORK_SPECTATORS                                          :ผู้ชม
 
-# Network set password
-STR_COMPANY_PASSWORD_CANCEL                                     :{BLACK}ไม่ทำการเก็บพาสเวิร์ดที่กรอกไว้แล้ว
-STR_COMPANY_PASSWORD_OK                                         :{BLACK}ตั้งพาสเวิร์ดของบริษัทใหม่
-STR_COMPANY_PASSWORD_CAPTION                                    :{WHITE}พาสเวิร์ดของบริษัท
-STR_COMPANY_PASSWORD_MAKE_DEFAULT                               :{BLACK}พาสเวิร์ดตั้งต้นของบริษัท
-STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}ใช้พาสเวิร์ดของบริษัทนี้เป็นพาสเวิร์ดตั้งต้นของบริษัทใหม่
-
 # Network company info join/password
 STR_COMPANY_VIEW_JOIN                                           :{BLACK}เข้าร่วม
 STR_COMPANY_VIEW_JOIN_TOOLTIP                                   :{BLACK}เข้าร่วมและเล่นเป็นบริษัทนี้
-STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}พาสเวิร์ด
-STR_COMPANY_VIEW_PASSWORD_TOOLTIP                               :{BLACK}รหัสผ่านป้องกันบริษัทของคุณจากผู้เล่นที่ไม่ได้รับอนุญาตให้เข้าร่วม
-STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}ตั้งพาสเวิร์ดของบริษัท
 
 # Network chat
 STR_NETWORK_CHAT_SEND                                           :{BLACK}ส่ง
@@ -2217,7 +2202,7 @@ STR_NETWORK_ERROR_INVALID_CLIENT_NAME                           :{WHITE}ชื�
 STR_NETWORK_ERROR_CLIENT_GUI_LOST_CONNECTION_CAPTION            :{WHITE}การเชื่อมต่อล้มเหลว
 STR_NETWORK_ERROR_CLIENT_GUI_LOST_CONNECTION                    :{WHITE}{NUM} วินาทีสุดท้ายไม่มีข้อมูลส่งถึงเครื่องแม่ข่าย
 
-###length 21
+###length 23
 STR_NETWORK_ERROR_CLIENT_GENERAL                                :การผิดพลาดทั่วไป
 STR_NETWORK_ERROR_CLIENT_DESYNC                                 :desync ผิดพลาด
 STR_NETWORK_ERROR_CLIENT_SAVEGAME                               :ไม่สามารถโหลดแผนที่ได้
@@ -2417,7 +2402,6 @@ STR_BUILD_DEPOT_TRAIN_ORIENTATION_TOOLTIP                       :{BLACK}เล�
 
 # Rail waypoint construction window
 STR_WAYPOINT_CAPTION                                            :{WHITE}จุดตรวจ
-STR_WAYPOINT_GRAPHICS_TOOLTIP                                   :{BLACK}เลือกชนิดของจุดตรวจ
 
 # Rail station construction window
 STR_STATION_BUILD_RAIL_CAPTION                                  :{WHITE}ตัวเลือกของสถานีรถไฟ
@@ -2430,8 +2414,9 @@ STR_STATION_BUILD_PLATFORM_LENGTH_TOOLTIP                       :{BLACK}เล�
 STR_STATION_BUILD_DRAG_DROP                                     :{BLACK}ลากและวาง
 STR_STATION_BUILD_DRAG_DROP_TOOLTIP                             :{BLACK}สร้างสถานีโดยใช้การลากและวาง
 
-STR_STATION_BUILD_STATION_CLASS_TOOLTIP                         :{BLACK}เลือกชนิดของสถานีที่จะแสดง
-STR_STATION_BUILD_STATION_TYPE_TOOLTIP                          :{BLACK}เลือกชนิดของสถานีที่จะสร้าง
+
+
+
 
 STR_STATION_CLASS_DFLT                                          :สถานีมาตรฐาน
 STR_STATION_CLASS_WAYP                                          :จุดตรวจ
@@ -2564,8 +2549,6 @@ STR_LANDSCAPING_TOOLTIP_PURCHASE_LAND                           :{BLACK}ซื�
 
 # Object construction window
 STR_OBJECT_BUILD_CAPTION                                        :{WHITE}การเลือกวัตถุ
-STR_OBJECT_BUILD_TOOLTIP                                        :{BLACK}เลือกวัตถุเพื่อสร้าง กด Shift เพื่อสลับระหว่างสิ่งปลูกสร้างและการแสดงมูลค่าโดยประมาณ
-STR_OBJECT_BUILD_CLASS_TOOLTIP                                  :{BLACK}เลือกชนิดของวัตถุที่จะสร้าง
 STR_OBJECT_BUILD_PREVIEW_TOOLTIP                                :{BLACK}ตัวอย่างวัตถุ
 STR_OBJECT_BUILD_SIZE                                           :{BLACK}ขนาด: {GOLD}{NUM} x {NUM} ช่อง
 
@@ -2606,7 +2589,7 @@ STR_FOUND_TOWN_RANDOM_TOWNS_TOOLTIP                             :{BLACK}สุ�
 
 STR_FOUND_TOWN_NAME_TITLE                                       :{YELLOW}ชื่อเมือง:
 STR_FOUND_TOWN_NAME_EDITOR_TITLE                                :{BLACK}ใส่ชื่อเมือง
-STR_FOUND_TOWN_NAME_EDITOR_HELP                                 :{BLACK}คลิกเพื่อใส่ชื่อเมือง
+STR_FOUND_TOWN_NAME_EDITOR_TOOLTIP                              :{BLACK}คลิกเพื่อใส่ชื่อเมือง
 STR_FOUND_TOWN_NAME_RANDOM_BUTTON                               :{BLACK}สุ่มชื่อ
 STR_FOUND_TOWN_NAME_RANDOM_TOOLTIP                              :{BLACK}สุ่มสร้างชื่อใหม่
 
@@ -2620,7 +2603,7 @@ STR_FOUND_TOWN_CITY                                             :{BLACK}เม�
 STR_FOUND_TOWN_CITY_TOOLTIP                                     :{BLACK}เมืองใหญ่ขยายตัวเร็วกว่าเมืองเล็ก{}เลือกค่านี้ เมืองที่สร้างจะใหญ่ขึ้นเมื่อสร้างใหม่
 
 STR_FOUND_TOWN_ROAD_LAYOUT                                      :{YELLOW}รูปแบบถนนของเมือง:
-STR_FOUND_TOWN_SELECT_TOWN_ROAD_LAYOUT                          :{BLACK}เลือกรูปแบบถนนสำหรับเมืองนี้
+STR_FOUND_TOWN_SELECT_LAYOUT_TOOLTIP                            :{BLACK}เลือกรูปแบบถนนสำหรับเมืองนี้
 STR_FOUND_TOWN_SELECT_LAYOUT_ORIGINAL                           :{BLACK}ดั้งเดิม
 STR_FOUND_TOWN_SELECT_LAYOUT_BETTER_ROADS                       :{BLACK}ถนนดีขึ้น
 STR_FOUND_TOWN_SELECT_LAYOUT_2X2_GRID                           :{BLACK}ตาราง 2x2
@@ -2823,7 +2806,7 @@ STR_SAVELOAD_SAVE_SCENARIO                                      :{WHITE}บั�
 STR_SAVELOAD_LOAD_SCENARIO                                      :{WHITE}โหลดแผนที่
 STR_SAVELOAD_LOAD_HEIGHTMAP                                     :{WHITE}โหลดแผนที่ระดับสูง
 STR_SAVELOAD_SAVE_HEIGHTMAP                                     :{WHITE}บันทึกแผนที่จำลองเสมือนจริง
-STR_SAVELOAD_HOME_BUTTON                                        :{BLACK}กดที่นี่เพื่อเข้าสู่ตำแหน่งบันทึกเกม/โหลดเกมที่ใช้อยู่
+STR_SAVELOAD_HOME_BUTTON_TOOLTIP                                :{BLACK}กดที่นี่เพื่อเข้าสู่ตำแหน่งบันทึกเกม/โหลดเกมที่ใช้อยู่
 STR_SAVELOAD_BYTES_FREE                                         :{BLACK}{BYTES} ฟรี
 STR_SAVELOAD_LIST_TOOLTIP                                       :{BLACK}แสดงไดรฟ์, โฟลเดอร์, และไฟล์เซฟ
 STR_SAVELOAD_EDITBOX_TOOLTIP                                    :{BLACK}ชื่อที่กำลังถูกเลือกสำหรับเซฟเกม
@@ -2855,9 +2838,9 @@ STR_MAPGEN_TOWN_NAME_DROPDOWN_TOOLTIP                           :{BLACK}เล�
 STR_MAPGEN_DATE                                                 :{BLACK}วันที่:
 STR_MAPGEN_NUMBER_OF_INDUSTRIES                                 :{BLACK}จำนวนอุตสาหกรรม:
 STR_MAPGEN_HEIGHTMAP_HEIGHT                                     :{BLACK}จุดที่พีคมากที่สุด:
-STR_MAPGEN_HEIGHTMAP_HEIGHT_UP                                  :{BLACK}เพิ่มขนาดความสูงที่สุดของยอดเขาบนแผนที่
-STR_MAPGEN_HEIGHTMAP_HEIGHT_DOWN                                :{BLACK}ลดขนาดความสูงที่สุดของยอดเขาบนแผนที่
-STR_MAPGEN_SNOW_COVERAGE_UP                                     :{BLACK}เพิ่มการครอบคลุมหิมะไปถึงสิบเปอร์เซ็นต์
+STR_MAPGEN_HEIGHTMAP_HEIGHT_UP_TOOLTIP                          :{BLACK}เพิ่มขนาดความสูงที่สุดของยอดเขาบนแผนที่
+STR_MAPGEN_HEIGHTMAP_HEIGHT_DOWN_TOOLTIP                        :{BLACK}ลดขนาดความสูงที่สุดของยอดเขาบนแผนที่
+STR_MAPGEN_SNOW_COVERAGE_UP_TOOLTIP                             :{BLACK}เพิ่มการครอบคลุมหิมะไปถึงสิบเปอร์เซ็นต์
 STR_MAPGEN_DESERT_COVERAGE                                      :{BLACK}การปกคลุมของทะเลทราย:
 STR_MAPGEN_TERRAIN_TYPE                                         :{BLACK}ประเภทภูมิประเทศ:
 STR_MAPGEN_SEA_LEVEL                                            :{BLACK}ระดับทะเล:
@@ -2916,8 +2899,8 @@ STR_SE_MAPGEN_FLAT_WORLD                                        :{WHITE}ที�
 STR_SE_MAPGEN_FLAT_WORLD_TOOLTIP                                :{BLACK}สร้างที่ราบ
 STR_SE_MAPGEN_RANDOM_LAND                                       :{WHITE}สุ่มพื้นดิน
 STR_SE_MAPGEN_FLAT_WORLD_HEIGHT                                 :{BLACK}ระดับความสูงของพื้นราบ:
-STR_SE_MAPGEN_FLAT_WORLD_HEIGHT_DOWN                            :{BLACK}ปรับเปลี่ยนความสูงพื้นราบลงมา 1 ระดับ
-STR_SE_MAPGEN_FLAT_WORLD_HEIGHT_UP                              :{BLACK}ปรับเปลี่ยนความสูงพื้นราบขึ้นไป 1 ระดับ
+STR_SE_MAPGEN_FLAT_WORLD_HEIGHT_DOWN_TOOLTIP                    :{BLACK}ปรับเปลี่ยนความสูงพื้นราบลงมา 1 ระดับ
+STR_SE_MAPGEN_FLAT_WORLD_HEIGHT_UP_TOOLTIP                      :{BLACK}ปรับเปลี่ยนความสูงพื้นราบขึ้นไป 1 ระดับ
 
 STR_SE_MAPGEN_FLAT_WORLD_HEIGHT_QUERY_CAPT                      :{WHITE}เปลี่ยนความสูงของพื้นราบ
 
@@ -2930,13 +2913,15 @@ STR_GENERATION_PROGRESS                                         :{WHITE}{NUM}% �
 STR_GENERATION_PROGRESS_NUM                                     :{BLACK}{NUM} / {NUM}
 STR_GENERATION_WORLD_GENERATION                                 :{BLACK}เครื่องมือสร้างแผนที่
 STR_GENERATION_RIVER_GENERATION                                 :{BLACK}สร้างแม่น้ำ
-STR_GENERATION_TREE_GENERATION                                  :{BLACK}สร้างต้นไม่
-STR_GENERATION_OBJECT_GENERATION                                :{BLACK}สร้างวัตถุ
 STR_GENERATION_CLEARING_TILES                                   :{BLACK}สร้างพื้นหิน
+STR_GENERATION_OBJECT_GENERATION                                :{BLACK}สร้างวัตถุ
+STR_GENERATION_TREE_GENERATION                                  :{BLACK}สร้างต้นไม่
 STR_GENERATION_SETTINGUP_GAME                                   :{BLACK}ตั้งค่าให้กับเกม
 STR_GENERATION_PREPARING_TILELOOP                               :{BLACK}Running tile-loop
 STR_GENERATION_PREPARING_SCRIPT                                 :{BLACK}Running script
 STR_GENERATION_PREPARING_GAME                                   :{BLACK}กำลังเตรียมพร้อมสำหรับเกม
+
+
 
 # NewGRF settings
 STR_NEWGRF_SETTINGS_CAPTION                                     :{WHITE}กำหนดค่า NewGRF
@@ -3014,7 +2999,6 @@ STR_NEWGRF_INSPECT_CAPTION_OBJECT_AT_RAIL_TYPE                  :ประเภ
 STR_NEWGRF_INSPECT_QUERY_CAPTION                                :{WHITE}NewGRF ตัวแปร 60+x parameter (hexadecimal)
 
 # Sprite aligner window
-STR_SPRITE_ALIGNER_CAPTION                                      :{WHITE}Aligning sprite {COMMA} ({STRING})
 STR_SPRITE_ALIGNER_NEXT_BUTTON                                  :{BLACK}sprite ถัดไป
 STR_SPRITE_ALIGNER_NEXT_TOOLTIP                                 :{BLACK}เคลื่อนไปยัง sprite ปกติอันถัดไป โดยข้าม pseudo/recolour/font และวกกลับเมื่อถึงจุดสิ้นสุด
 STR_SPRITE_ALIGNER_GOTO_BUTTON                                  :{BLACK}ไปยัง sprite
@@ -3119,7 +3103,6 @@ STR_EDIT_SIGN_PREVIOUS_SIGN_TOOLTIP                             :{BLACK}ไป�
 STR_EDIT_SIGN_SIGN_OSKTITLE                                     :{BLACK}กรอกชื่อสำหรับป้าย
 
 # Town directory window
-STR_TOWN_DIRECTORY_CAPTION                                      :{WHITE}เมือง
 STR_TOWN_DIRECTORY_NONE                                         :{ORANGE}- ไม่มี -
 STR_TOWN_DIRECTORY_TOWN                                         :{ORANGE}{TOWN}{BLACK} ({COMMA})
 STR_TOWN_DIRECTORY_CITY                                         :{ORANGE}{TOWN}{YELLOW} (เมือง){BLACK} ({COMMA})
@@ -3238,12 +3221,12 @@ STR_STORY_BOOK_INVALID_GOAL_REF                                 :{RED}จุด�
 
 # Station list window
 STR_STATION_LIST_TOOLTIP                                        :{BLACK}ชื่อสถานี - กดที่ชื่อเพื่อไปยังจุดกึ่งกลาง
-STR_STATION_LIST_USE_CTRL_TO_SELECT_MORE                        :{BLACK}กด Crtl เพื่อเลือกมากกว่า 1 รายการ
+STR_STATION_LIST_USE_CTRL_TO_SELECT_MORE_TOOLTIP                :{BLACK}กด Crtl เพื่อเลือกมากกว่า 1 รายการ
 STR_STATION_LIST_CAPTION                                        :{WHITE}{COMPANY} - {COMMA} สถานี
 STR_STATION_LIST_STATION                                        :{YELLOW}{STATION} {STATION_FEATURES}
 STR_STATION_LIST_WAYPOINT                                       :{YELLOW}{WAYPOINT}
 STR_STATION_LIST_NONE                                           :{YELLOW}- ไม่มี -
-STR_STATION_LIST_SELECT_ALL_FACILITIES                          :{BLACK}เลือกทั้งหมด
+STR_STATION_LIST_SELECT_ALL_FACILITIES_TOOLTIP                  :{BLACK}เลือกทั้งหมด
 
 # Station view window
 STR_STATION_VIEW_CAPTION                                        :{WHITE}{STATION} {STATION_FEATURES}
@@ -3312,7 +3295,7 @@ STR_WAYPOINT_VIEW_CAPTION                                       :{WHITE}{WAYPOIN
 STR_WAYPOINT_VIEW_CENTER_TOOLTIP                                :{BLACK}จุดศูนย์กลางมุมมองสถานี
 STR_WAYPOINT_VIEW_CHANGE_WAYPOINT_NAME                          :{BLACK}เปลี่ยนชื่อ Waypoint
 STR_BUOY_VIEW_CENTER_TOOLTIP                                    :{BLACK}จุดศูนย์กลางมุมมองสถานี
-STR_BUOY_VIEW_CHANGE_BUOY_NAME                                  :{BLACK}เปลี่ยนชื่อทุ่มลอยน้ำ
+STR_BUOY_VIEW_RENAME_TOOLTIP                                    :{BLACK}เปลี่ยนชื่อทุ่มลอยน้ำ
 
 STR_EDIT_WAYPOINT_NAME                                          :{WHITE}เปลี่ยนชื่อ Waypoint
 
@@ -3371,7 +3354,7 @@ STR_COMPANY_VIEW_BUILD_HQ_TOOLTIP                               :{BLACK}สร�
 STR_COMPANY_VIEW_VIEW_HQ_BUTTON                                 :{BLACK}ไปยังที่ทำการบริษัท
 STR_COMPANY_VIEW_VIEW_HQ_TOOLTIP                                :{BLACK}เคลื่อนย้ายไปยังที่ทำการบริษัท
 STR_COMPANY_VIEW_RELOCATE_HQ                                    :{BLACK}ย้ายที่ตั้งที่ทำการบริษัท
-STR_COMPANY_VIEW_RELOCATE_COMPANY_HEADQUARTERS                  :{BLACK}ย้ายที่ตั้งที่ทำการบริษัท
+STR_COMPANY_VIEW_RELOCATE_HQ_TOOLTIP                            :{BLACK}ย้ายที่ตั้งที่ทำการบริษัท
 STR_COMPANY_VIEW_INFRASTRUCTURE_BUTTON                          :{BLACK}รายละเอียด
 STR_COMPANY_VIEW_INFRASTRUCTURE_TOOLTIP                         :{BLACK}ดูรายละเอียดเกี่ยวกับโครงสร้างพื้นฐาน
 STR_COMPANY_VIEW_GIVE_MONEY_BUTTON                              :{BLACK}ให้เงินสนับสนุน
@@ -3404,11 +3387,10 @@ STR_COMPANY_INFRASTRUCTURE_VIEW_STATIONS                        :{WHITE}ชิ�
 STR_COMPANY_INFRASTRUCTURE_VIEW_AIRPORTS                        :{WHITE}ท่าอากาศยาน
 
 # Industry directory
-STR_INDUSTRY_DIRECTORY_CAPTION                                  :{WHITE}อุตสาหกรรม
 STR_INDUSTRY_DIRECTORY_NONE                                     :{ORANGE}- ไม่มี -
 STR_INDUSTRY_DIRECTORY_ITEM_NOPROD                              :{ORANGE}{INDUSTRY}
 STR_INDUSTRY_DIRECTORY_ITEM_PROD3                               :{ORANGE}{INDUSTRY} {STRING}, {STRING}, {STRING}
-STR_INDUSTRY_DIRECTORY_LIST_CAPTION                             :{BLACK}ชื่อของอุตสาหกรรม - คลิ๊กที่ชื่อเพื่อไปยังจุดศูนย์กลาง
+STR_INDUSTRY_DIRECTORY_LIST_TOOLTIP                             :{BLACK}ชื่อของอุตสาหกรรม - คลิ๊กที่ชื่อเพื่อไปยังจุดศูนย์กลาง
 STR_INDUSTRY_DIRECTORY_PRODUCED_CARGO_FILTER                    :{BLACK}ผลผลิตที่ได้: {SILVER}{STRING}
 STR_INDUSTRY_DIRECTORY_FILTER_NONE                              :ไม่มี
 
@@ -3646,10 +3628,10 @@ STR_DEPOT_CLONE_SHIP                                            :{BLACK}คั�
 STR_DEPOT_CLONE_AIRCRAFT                                        :{BLACK}คัดลอกอากาศยาน
 
 ###length VEHICLE_TYPES
-STR_DEPOT_CLONE_TRAIN_DEPOT_INFO                                :{BLACK}กดเพื่อซื้อแบบคัดลอกขบวนรถไฟทั้งขบวน
-STR_DEPOT_CLONE_ROAD_VEHICLE_DEPOT_INFO                         :{BLACK}กดเพื่อซื้อแบบคัดลอกยานพาหนะ
-STR_DEPOT_CLONE_SHIP_DEPOT_INFO                                 :{BLACK}กดเพื่อซื้อแบบคัดลอกยานพาหนะทางน้ำ
-STR_DEPOT_CLONE_AIRCRAFT_INFO_HANGAR_WINDOW                     :{BLACK}กดเพื่อซื้อแบบคัดลอกอากาศยาน
+STR_DEPOT_CLONE_TRAIN_DEPOT_TOOLTIP                             :{BLACK}กดเพื่อซื้อแบบคัดลอกขบวนรถไฟทั้งขบวน
+STR_DEPOT_CLONE_ROAD_VEHICLE_DEPOT_TOOLTIP                      :{BLACK}กดเพื่อซื้อแบบคัดลอกยานพาหนะ
+STR_DEPOT_CLONE_SHIP_DEPOT_TOOLTIP                              :{BLACK}กดเพื่อซื้อแบบคัดลอกยานพาหนะทางน้ำ
+STR_DEPOT_CLONE_AIRCRAFT_HANGAR_TOOLTIP                         :{BLACK}กดเพื่อซื้อแบบคัดลอกอากาศยาน
 
 ###length VEHICLE_TYPES
 STR_DEPOT_TRAIN_LOCATION_TOOLTIP                                :{BLACK}กดเพื่อไปยังจุดศูนย์กลางของโรงซ่อมบำรุง
@@ -3705,28 +3687,28 @@ STR_REPLACE_VEHICLE_ROAD_VEHICLE                                :ยานพา
 STR_REPLACE_VEHICLE_SHIP                                        :ยานพาหนะทางน้ำ
 STR_REPLACE_VEHICLE_AIRCRAFT                                    :อากาศยาน
 
-STR_REPLACE_HELP_LEFT_ARRAY                                     :{BLACK}เลือกประเภทของรถจักรที่จะแทนที่
-STR_REPLACE_HELP_RIGHT_ARRAY                                    :{BLACK}เลือกประเภทของพาหนะที่จะแทนที่ทางซ้ายมือ
+STR_REPLACE_LEFT_ARRAY_TOOLTIP                                  :{BLACK}เลือกประเภทของรถจักรที่จะแทนที่
+STR_REPLACE_RIGHT_ARRAY_TOOLTIP                                 :{BLACK}เลือกประเภทของพาหนะที่จะแทนที่ทางซ้ายมือ
 
 STR_REPLACE_VEHICLES_START                                      :{BLACK}เริ่มต้นการแทนที่ยานพาหนะ
 STR_REPLACE_VEHICLES_NOW                                        :แทนที่ยานพาหนะทั้งหมดเดี๋ยวนี้
 STR_REPLACE_VEHICLES_WHEN_OLD                                   :แทนที่เฉพาะยานพาหนะที่เก่าแล้ว
-STR_REPLACE_HELP_START_BUTTON                                   :{BLACK}กดเพื่อเริ่มต้นการแทนที่ยานพาหนะตามที่เลือกไว้ในรายการ
+STR_REPLACE_START_BUTTON_TOOLTIP                                :{BLACK}กดเพื่อเริ่มต้นการแทนที่ยานพาหนะตามที่เลือกไว้ในรายการ
 STR_REPLACE_NOT_REPLACING                                       :{BLACK}ไม่เปลี่ยน
 STR_REPLACE_NOT_REPLACING_VEHICLE_SELECTED                      :{BLACK}ไม่มียานพาหนะที่เลือกไว้
 STR_REPLACE_REPLACING_WHEN_OLD                                  :{ENGINE} เมื่อเก่า
 STR_REPLACE_VEHICLES_STOP                                       :{BLACK}หยุดการแทนที่ยานพาหนะ
-STR_REPLACE_HELP_STOP_BUTTON                                    :{BLACK}กดเพื่อเริ่มหยุดการแทนที่ยานพาหนะตามที่เลือกไว้ในรายการ
+STR_REPLACE_STOP_BUTTON_TOOLTIP                                 :{BLACK}กดเพื่อเริ่มหยุดการแทนที่ยานพาหนะตามที่เลือกไว้ในรายการ
 
-STR_REPLACE_ENGINE_WAGON_SELECT_HELP                            :{BLACK}สลับระหว่างหน้าต่างการแทนที่ของรถจักรและรถพ่วง
+STR_REPLACE_ENGINE_WAGON_SELECT_TOOLTIP                         :{BLACK}สลับระหว่างหน้าต่างการแทนที่ของรถจักรและรถพ่วง
 STR_REPLACE_ENGINES                                             :รถจักร
 STR_REPLACE_WAGONS                                              :รถพ่วง
 
 ###length 2
-STR_REPLACE_HELP_RAILTYPE                                       :{BLACK}เลือกประเภทของรถจักรและรถพ่วงที่จะแทนที่ใหม่
+STR_REPLACE_RAILTYPE_TOOLTIP                                    :{BLACK}เลือกประเภทของรถจักรและรถพ่วงที่จะแทนที่ใหม่
 ###next-name-looks-similar
 
-STR_REPLACE_HELP_REPLACE_INFO_TAB                               :{BLACK}แสดงพาหนะที่จะแทนที่ทางด้านซ้าย
+STR_REPLACE_REPLACE_INFO_TAB_TOOLTIP                            :{BLACK}แสดงพาหนะที่จะแทนที่ทางด้านซ้าย
 STR_REPLACE_RAIL_VEHICLES                                       :ยานพาหนะประเภทรถไฟ
 STR_REPLACE_ELRAIL_VEHICLES                                     :ยานพาหนะที่ใช้ไฟฟ้า
 STR_REPLACE_MONORAIL_VEHICLES                                   :ยานพาหนะประเภทรถไฟรางเดี่ยว
@@ -3736,7 +3718,7 @@ STR_REPLACE_ROAD_VEHICLES                                       :ถนนสำ
 STR_REPLACE_TRAM_VEHICLES                                       :รถราง
 
 STR_REPLACE_REMOVE_WAGON                                        :{BLACK}แทนที่รถจักรและรถพ่วง({STRING}): {ORANGE}{STRING}
-STR_REPLACE_REMOVE_WAGON_HELP                                   :{BLACK}ทำให้การแทนที่ขบวนรถไฟทำให้ความยาวของขบวนยังเท่าเดิม
+STR_REPLACE_REMOVE_WAGON_TOOLTIP                                :{BLACK}ทำให้การแทนที่ขบวนรถไฟทำให้ความยาวของขบวนยังเท่าเดิม
 STR_REPLACE_REMOVE_WAGON_GROUP_HELP                             :{STRING}. Ctrl+Click ที่กลุ่มที่เลือกไว้ สามารถเปิดกลุ่มย่อยได้ด้วยเช่นกัน
 
 # Vehicle view
@@ -3807,12 +3789,7 @@ STR_VEHICLE_STATUS_CANNOT_REACH_WAYPOINT_VEL                    :{LTBLUE}ไม�
 STR_VEHICLE_STATUS_CANNOT_REACH_DEPOT_SERVICE_VEL               :{LTBLUE}ไม่สามารถวาง {DEPOT}ได้ {VELOCITY}
 
 # Vehicle stopped/started animations
-###length 2
-STR_VEHICLE_COMMAND_STOPPED_SMALL                               :{TINY_FONT}{RED}หยุด
 STR_VEHICLE_COMMAND_STOPPED                                     :{RED}หยุด
-
-###length 2
-STR_VEHICLE_COMMAND_STARTED_SMALL                               :{TINY_FONT}{GREEN}เริ่ม
 STR_VEHICLE_COMMAND_STARTED                                     :{GREEN}เริ่ม
 
 # Vehicle details
@@ -4215,25 +4192,16 @@ STR_TEXTFILE_LICENCE_CAPTION                                    :{WHITE}{STRING}
 
 
 # Vehicle loading indicators
-STR_PERCENT_UP_SMALL                                            :{TINY_FONT}{WHITE}{NUM}%{UP_ARROW}
 STR_PERCENT_UP                                                  :{WHITE}{NUM}%{UP_ARROW}
-STR_PERCENT_DOWN_SMALL                                          :{TINY_FONT}{WHITE}{NUM}%{DOWN_ARROW}
 STR_PERCENT_DOWN                                                :{WHITE}{NUM}%{DOWN_ARROW}
-STR_PERCENT_UP_DOWN_SMALL                                       :{TINY_FONT}{WHITE}{NUM}%{UP_ARROW}{DOWN_ARROW}
 STR_PERCENT_UP_DOWN                                             :{WHITE}{NUM}%{UP_ARROW}{DOWN_ARROW}
-STR_PERCENT_NONE_SMALL                                          :{TINY_FONT}{WHITE}{NUM}%
 STR_PERCENT_NONE                                                :{WHITE}{NUM}%
 
 # Income 'floats'
-STR_INCOME_FLOAT_COST_SMALL                                     :{TINY_FONT}{RED}รายจ่าย: {CURRENCY_LONG}
 STR_INCOME_FLOAT_COST                                           :{RED}รายจ่าย: {CURRENCY_LONG}
-STR_INCOME_FLOAT_INCOME_SMALL                                   :{TINY_FONT}{GREEN}รายได้: {CURRENCY_LONG}
 STR_INCOME_FLOAT_INCOME                                         :{GREEN}รายได้: {CURRENCY_LONG}
-STR_FEEDER_TINY                                                 :{TINY_FONT}{YELLOW}ส่งต่อ: {CURRENCY_LONG}
 STR_FEEDER                                                      :{YELLOW}ส่งต่อ: {CURRENCY_LONG}
-STR_FEEDER_INCOME_TINY                                          :{TINY_FONT}{YELLOW}ส่งต่อ: {CURRENCY_LONG}{WHITE} / {GREEN}รายได้: {CURRENCY_LONG}
 STR_FEEDER_INCOME                                               :{YELLOW}ส่งต่อ: {CURRENCY_LONG}{WHITE} / {GREEN}รายได้: {CURRENCY_LONG}
-STR_FEEDER_COST_TINY                                            :{TINY_FONT}{YELLOW}ส่งต่อ: {CURRENCY_LONG}{WHITE} / {RED}รายจ่าย: {CURRENCY_LONG}
 STR_FEEDER_COST                                                 :{YELLOW}ส่งต่อ: {CURRENCY_LONG}{WHITE} / {RED}รายจ่าย: {CURRENCY_LONG}
 STR_MESSAGE_ESTIMATED_COST                                      :{WHITE}มูลค่าประมาณการ: {CURRENCY_LONG}
 STR_MESSAGE_ESTIMATED_INCOME                                    :{WHITE}รายได้ประมาณการ: {CURRENCY_LONG}
@@ -4242,9 +4210,7 @@ STR_MESSAGE_ESTIMATED_INCOME                                    :{WHITE}รา�
 STR_ERROR_SAVE_STILL_IN_PROGRESS                                :{WHITE}ขณะนี้กำลังบันทึก,{}โปรดรอจนกว่าจะเสร็จ!
 STR_ERROR_AUTOSAVE_FAILED                                       :{WHITE}บันทึกอัตโนมัติล้มเหลว!!!
 STR_ERROR_UNABLE_TO_READ_DRIVE                                  :{BLACK}ไม่สามารถอ่านข้อมูลได้
-STR_ERROR_GAME_SAVE_FAILED                                      :{WHITE}บันทึกเกมล้มเหลว!!!{}{STRING}
 STR_ERROR_UNABLE_TO_DELETE_FILE                                 :{WHITE}ไม่สามารถทำการลบไฟล์
-STR_ERROR_GAME_LOAD_FAILED                                      :{WHITE}โหลดเกมล้มเหลว{}{STRING}
 STR_GAME_SAVELOAD_ERROR_BROKEN_INTERNAL_ERROR                   :ข้อผิดพลาดจากภายใน: {STRING}
 STR_GAME_SAVELOAD_ERROR_BROKEN_SAVEGAME                         :เกมที่บันทึกไว้ เสีย - {STRING}
 STR_GAME_SAVELOAD_ERROR_TOO_NEW_SAVEGAME                        :เกมที่บันทึกไว้ สำหรับเวอร์ชันใหม่
@@ -4603,6 +4569,7 @@ STR_ERROR_NO_VEHICLES_AVAILABLE_AT_ALL                          :{WHITE}ไม�
 STR_ERROR_NO_VEHICLES_AVAILABLE_AT_ALL_EXPLANATION              :{WHITE}เปลี่ยนการกำหนดค่าสำหรับ NewGRF
 STR_ERROR_NO_VEHICLES_AVAILABLE_YET                             :{WHITE}ยังไม่มียานพาหานะให้เลือก
 STR_ERROR_NO_VEHICLES_AVAILABLE_YET_EXPLANATION                 :{WHITE}เริ่มเกมหลังจาก {DATE_SHORT} หรือเลือกใช้งาน NewGRF ของยานพาหนะที่จัดเตรียมไว้ก่อนหน้านี้
+
 
 # Specific vehicle errors
 STR_ERROR_CAN_T_MAKE_TRAIN_PASS_SIGNAL                          :{WHITE}ไม่สามารถสั่งให้รถไฟวิ่งผ่านเสาอาณัติสัญญาณที่แสดงท่า "ห้าม"...

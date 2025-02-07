@@ -12,7 +12,9 @@
 #ifndef NETWORK_CORE_TCP_CONTENT_TYPE_H
 #define NETWORK_CORE_TCP_CONTENT_TYPE_H
 
+#include "../../string_type.h"
 #include "../../3rdparty/md5/md5.h"
+#include <optional>
 #include <vector>
 
 /** The values in the enum are important; they are used as database 'keys' */
@@ -78,7 +80,7 @@ struct ContentInfo {
 
 	bool IsSelected() const;
 	bool IsValid() const;
-	const char *GetTextfile(TextfileType type) const;
+	std::optional<std::string> GetTextfile(TextfileType type) const;
 };
 
 #endif /* NETWORK_CORE_TCP_CONTENT_TYPE_H */

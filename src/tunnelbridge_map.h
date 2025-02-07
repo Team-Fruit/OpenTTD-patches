@@ -369,7 +369,7 @@ inline bool IsTunnelBridgeWithSignalSimulation(TileIndex t)
 /**
  * Is this a tunnel/bridge entrance tile with signal?
  * Tunnel bridge signal simulation has allways bit 5 on at entrance.
- * @param t the tile that might be a tunnel/bridge.
+ * @param t the tunnel/bridge tile.
  * @pre IsTileType(t, MP_TUNNELBRIDGE)
  * @return true if and only if this tile is a tunnel/bridge entrance.
  */
@@ -392,7 +392,7 @@ inline bool IsTunnelBridgeSignalSimulationEntranceTile(TileIndex t)
 
 /**
  * Is this a tunnel/bridge entrance tile with signal only?
- * @param t the tile that might be a tunnel/bridge.
+ * @param t the tunnel/bridge tile.
  * @pre IsTileType(t, MP_TUNNELBRIDGE)
  * @return true if and only if this tile is a tunnel/bridge entrance only.
  */
@@ -404,7 +404,7 @@ inline bool IsTunnelBridgeSignalSimulationEntranceOnly(TileIndex t)
 
 /**
  * Is this a tunnel/bridge exit?
- * @param t the tile that might be a tunnel/bridge.
+ * @param t the tunnel/bridge tile.
  * @pre IsTileType(t, MP_TUNNELBRIDGE)
  * @return true if and only if this tile is a tunnel/bridge exit.
  */
@@ -426,7 +426,7 @@ inline bool IsTunnelBridgeSignalSimulationExitTile(TileIndex t)
 
 /**
  * Is this a tunnel/bridge exit only?
- * @param t the tile that might be a tunnel/bridge.
+ * @param t the tunnel/bridge tile.
  * @pre IsTileType(t, MP_TUNNELBRIDGE)
  * @return true if and only if this tile is a tunnel/bridge exit only.
  */
@@ -481,7 +481,7 @@ inline SignalState GetTunnelBridgeExitSignalState(TileIndex t)
 inline void SetTunnelBridgeEntranceSignalState(TileIndex t, SignalState state)
 {
 	assert_tile(IsTunnelBridgeSignalSimulationEntrance(t), t);
-	SB(_me[t].m6, 0, 1, (state == SIGNAL_STATE_GREEN) ? 1 : 0);
+	AssignBit(_me[t].m6, 0, state == SIGNAL_STATE_GREEN);
 }
 
 /**
@@ -493,7 +493,7 @@ inline void SetTunnelBridgeEntranceSignalState(TileIndex t, SignalState state)
 inline void SetTunnelBridgeExitSignalState(TileIndex t, SignalState state)
 {
 	assert_tile(IsTunnelBridgeSignalSimulationExit(t), t);
-	SB(_me[t].m6, 7, 1, (state == SIGNAL_STATE_GREEN) ? 1 : 0);
+	AssignBit(_me[t].m6, 7, state == SIGNAL_STATE_GREEN);
 }
 
 inline bool IsTunnelBridgeSemaphore(TileIndex t)
@@ -505,7 +505,7 @@ inline bool IsTunnelBridgeSemaphore(TileIndex t)
 inline void SetTunnelBridgeSemaphore(TileIndex t, bool is_semaphore)
 {
 	assert_tile(IsTunnelBridgeWithSignalSimulation(t), t);
-	SB(_me[t].m6, 1, 1, is_semaphore ? 1 : 0);
+	AssignBit(_me[t].m6, 1, is_semaphore);
 }
 
 inline bool IsTunnelBridgePBS(TileIndex t)
@@ -522,7 +522,7 @@ inline bool IsTunnelBridgeEffectivelyPBS(TileIndex t)
 inline void SetTunnelBridgePBS(TileIndex t, bool is_pbs)
 {
 	assert_tile(IsTunnelBridgeWithSignalSimulation(t), t);
-	SB(_me[t].m6, 6, 1, is_pbs ? 1 : 0);
+	AssignBit(_me[t].m6, 6, is_pbs);
 }
 
 inline uint8_t GetTunnelBridgeEntranceSignalAspect(TileIndex t)
@@ -578,7 +578,7 @@ inline bool IsTunnelBridgeRestrictedSignal(TileIndex tile)
 inline void SetTunnelBridgeRestrictedSignal(TileIndex tile, bool is_restricted)
 {
 	assert_tile(IsTunnelBridgeWithSignalSimulation(tile), tile);
-	SB(_m[tile].m3, 6, 1, is_restricted);
+	AssignBit(_m[tile].m3, 6, is_restricted);
 }
 
 inline Trackdir GetTunnelBridgeExitTrackdir(TileIndex t, DiagDirection tunnel_bridge_dir)
@@ -601,17 +601,22 @@ inline Trackdir GetTunnelBridgeEntranceTrackdir(TileIndex t)
 	return GetTunnelBridgeEntranceTrackdir(t, GetTunnelBridgeDirection(t));
 }
 
-inline void SetTunnelBridgeSignalStyle(TileIndex t, TileIndex end, uint8_t style)
+inline bool HasTunnelBridgeNonZeroSignalStyle(TileIndex t)
 {
-	if (style == 0 && !HasBit(_m[t].m3, 7)) return;
+	return HasBit(_m[t].m3, 7);
+}
 
-	extern void SetTunnelBridgeSignalStyleExtended(TileIndex t, TileIndex end, uint8_t style);
-	SetTunnelBridgeSignalStyleExtended(t, end, style);
+inline void SetTunnelBridgeSignalStyle(TileIndex t, uint8_t style)
+{
+	if (style == 0 && !HasTunnelBridgeNonZeroSignalStyle(t)) return;
+
+	extern void SetTunnelBridgeSignalStyleExtended(TileIndex t, uint8_t style);
+	SetTunnelBridgeSignalStyleExtended(t, style);
 }
 
 inline uint8_t GetTunnelBridgeSignalStyle(TileIndex t)
 {
-	if (likely(!HasBit(_m[t].m3, 7))) return 0;
+	if (likely(!HasTunnelBridgeNonZeroSignalStyle(t))) return 0;
 
 	if (IsTunnel(t)) {
 		extern uint8_t GetTunnelSignalStyleExtended(TileIndex t);
@@ -620,6 +625,37 @@ inline uint8_t GetTunnelBridgeSignalStyle(TileIndex t)
 		extern uint8_t GetBridgeSignalStyleExtended(TileIndex t);
 		return GetBridgeSignalStyleExtended(t);
 	}
+}
+
+inline bool GetTunnelBridgeSignalSpecialPropagationFlag(TileIndex t)
+{
+	dbg_assert_tile(IsRailTunnelBridgeTile(t), t);
+	return HasBit(_m[t].m1, 5);
+}
+
+inline void SetTunnelBridgeSignalSpecialPropagationFlag(TileIndex t, bool special)
+{
+	dbg_assert_tile(IsRailTunnelBridgeTile(t), t);
+	AssignBit(_m[t].m1, 5, special);
+}
+
+inline bool IsTunnelBridgeCombinedNormalShuntSignalStyle(TileIndex t)
+{
+	dbg_assert_tile(IsRailTunnelBridgeTile(t), t);
+	return HasBit(_m[t].m1, 6);
+}
+
+inline void SetTunnelBridgeCombinedNormalShuntSignalStyle(TileIndex t, bool combined_normal_shunt)
+{
+	dbg_assert_tile(IsRailTunnelBridgeTile(t), t);
+	AssignBit(_m[t].m1, 6, combined_normal_shunt);
+}
+
+inline uint8_t GetTunnelBridgeExitSignalAspectForInternalPropagation(TileIndex t)
+{
+	uint8_t aspect = GetTunnelBridgeExitSignalAspect(t);
+	if (aspect > 0 && IsTunnelBridgeCombinedNormalShuntSignalStyle(t)) aspect--;
+	return aspect;
 }
 
 void AddRailTunnelBridgeInfrastructure(Company *c, TileIndex begin, TileIndex end);

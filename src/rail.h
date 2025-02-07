@@ -21,6 +21,7 @@
 #include "signal_type.h"
 #include "rail_map.h"
 #include "settings_type.h"
+#include "debug_dbg_assert.h"
 #include <vector>
 
 /** Railtype flag bit numbers. */
@@ -212,12 +213,12 @@ public:
 	/**
 	 * Original railtype number to use when drawing non-newgrf railtypes, or when drawing stations.
 	 */
-	byte fallback_railtype;
+	uint8_t fallback_railtype;
 
 	/**
 	 * Multiplier for curve maximum speed advantage
 	 */
-	byte curve_speed;
+	uint8_t curve_speed;
 
 	/**
 	 * Bit mask of rail type flags
@@ -227,7 +228,7 @@ public:
 	/**
 	 * Bit mask of rail type control flags
 	 */
-	byte ctrl_flags;
+	uint8_t ctrl_flags;
 
 	/**
 	 * Signal extra aspects
@@ -267,7 +268,7 @@ public:
 	/**
 	 * Colour on mini-map
 	 */
-	byte map_colour;
+	uint8_t map_colour;
 
 	/**
 	 * Introduction date.
@@ -292,7 +293,7 @@ public:
 	/**
 	 * The sorting order of this railtype for the toolbar dropdown.
 	 */
-	byte sorting_order;
+	uint8_t sorting_order;
 
 	/**
 	 * NewGRF providing the Action3 for the railtype. nullptr if not available.
@@ -331,7 +332,7 @@ public:
 inline const RailTypeInfo *GetRailTypeInfo(RailType railtype)
 {
 	extern RailTypeInfo _railtypes[RAILTYPE_END];
-	dbg_assert_msg(railtype < RAILTYPE_END, "%u", railtype);
+	dbg_assert_msg(railtype < RAILTYPE_END, "{}", railtype);
 	return &_railtypes[railtype];
 }
 
@@ -339,9 +340,9 @@ inline const RailTypeInfo *GetRailTypeInfo(RailType railtype)
  * Checks if an engine of the given RailType can drive on a tile with a given
  * RailType. This would normally just be an equality check, but for electric
  * rails (which also support non-electric engines).
- * @return Whether the engine can drive on this tile.
  * @param  enginetype The RailType of the engine we are considering.
  * @param  tiletype   The RailType of the tile we are considering.
+ * @return Whether the engine can drive on this tile.
  */
 inline bool IsCompatibleRail(RailType enginetype, RailType tiletype)
 {
@@ -352,9 +353,9 @@ inline bool IsCompatibleRail(RailType enginetype, RailType tiletype)
  * Checks if an engine of the given RailType got power on a tile with a given
  * RailType. This would normally just be an equality check, but for electric
  * rails (which also support non-electric engines).
- * @return Whether the engine got power on this tile.
  * @param  enginetype The RailType of the engine we are considering.
  * @param  tiletype   The RailType of the tile we are considering.
+ * @return Whether the engine got power on this tile.
  */
 inline bool HasPowerOnRail(RailType enginetype, RailType tiletype)
 {
@@ -398,12 +399,12 @@ inline bool Rail90DegTurnDisallowedTilesFromDiagDir(TileIndex t1, TileIndex t2, 
 
 inline bool Rail90DegTurnDisallowedAdjacentTiles(TileIndex t1, TileIndex t2, bool def = _settings_game.pf.forbid_90_deg)
 {
-	return Rail90DegTurnDisallowedTilesFromDiagDir(t1, t2, DiagdirBetweenTiles(t1, t2));
+	return Rail90DegTurnDisallowedTilesFromDiagDir(t1, t2, DiagdirBetweenTiles(t1, t2), def);
 }
 
 inline bool Rail90DegTurnDisallowedTilesFromTrackdir(TileIndex t1, TileIndex t2, Trackdir t1_td, bool def = _settings_game.pf.forbid_90_deg)
 {
-	return Rail90DegTurnDisallowedTilesFromDiagDir(t1, t2, TrackdirToExitdir(t1_td));
+	return Rail90DegTurnDisallowedTilesFromDiagDir(t1, t2, TrackdirToExitdir(t1_td), def);
 }
 
 /**

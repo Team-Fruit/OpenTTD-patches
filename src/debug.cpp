@@ -8,15 +8,16 @@
 /** @file debug.cpp Handling of printing debug messages. */
 
 #include "stdafx.h"
-#include <stdarg.h>
 #include "console_func.h"
+#include "core/math_func.hpp"
 #include "debug.h"
-#include "debug_fmt.h"
+#include "debug_tictoc.h"
 #include "string_func.h"
 #include "fileio_func.h"
 #include "settings_type.h"
 #include "date_func.h"
 #include "thread.h"
+#include "map_func.h"
 #include <array>
 #include <mutex>
 
@@ -33,41 +34,20 @@
 #endif
 
 #include "safeguards.h"
+#undef vsnprintf // Required for debug implementation
 
 /** Element in the queue of debug messages that have to be passed to either NetworkAdminConsole or IConsolePrint.*/
 struct QueuedDebugItem {
-	std::string category; ///< The used debug category.
-	int level;            ///< The used debug level.
-	std::string message;  ///< The actual formatted message.
+	DebugLevelID category; ///< The used debug category.
+	int8_t level;          ///< The used debug level.
+	std::string message;   ///< The actual formatted message.
 };
 std::atomic<bool> _debug_remote_console; ///< Whether we need to send data to either NetworkAdminConsole or IConsolePrint.
 std::mutex _debug_remote_console_mutex; ///< Mutex to guard the queue of debug messages for either NetworkAdminConsole or IConsolePrint.
 std::vector<QueuedDebugItem> _debug_remote_console_queue; ///< Queue for debug messages to be passed to NetworkAdminConsole or IConsolePrint.
 std::vector<QueuedDebugItem> _debug_remote_console_queue_spare; ///< Spare queue to swap with _debug_remote_console_queue.
 
-int _debug_driver_level;
-int _debug_grf_level;
-int _debug_map_level;
-int _debug_misc_level;
-int _debug_net_level;
-int _debug_sprite_level;
-int _debug_oldloader_level;
-int _debug_npf_level;
-int _debug_yapf_level;
-int _debug_fontcache_level;
-int _debug_script_level;
-int _debug_sl_level;
-int _debug_gamelog_level;
-int _debug_desync_level;
-int _debug_yapfdesync_level;
-int _debug_console_level;
-int _debug_linkgraph_level;
-int _debug_sound_level;
-int _debug_command_level;
-#ifdef RANDOM_DEBUG
-int _debug_random_level;
-int _debug_statecsum_level;
-#endif
+std::array<int8_t, DebugLevelCount> _debug_levels;
 
 const char *_savegame_DBGL_data = nullptr;
 std::string _loadgame_DBGL_data;
@@ -76,62 +56,143 @@ std::string _loadgame_DBGC_data;
 
 uint32_t _misc_debug_flags;
 
-struct DebugLevel {
-	const char *name;
-	int *level;
+std::array<const char *, DebugLevelCount> _debug_level_names {
+	"driver",
+	"grf",
+	"map",
+	"misc",
+	"net",
+	"sprite",
+	"oldloader",
+	"yapf",
+	"fontcache",
+	"script",
+	"sl",
+	"gamelog",
+	"desync",
+	"yapfdesync",
+	"console",
+	"linkgraph",
+	"sound",
+	"command",
+#ifdef RANDOM_DEBUG
+	"random",
+	"statecsum",
+#endif
 };
 
-#define DEBUG_LEVEL(x) { #x, &_debug_##x##_level }
-	static const DebugLevel debug_level[] = {
-	DEBUG_LEVEL(driver),
-	DEBUG_LEVEL(grf),
-	DEBUG_LEVEL(map),
-	DEBUG_LEVEL(misc),
-	DEBUG_LEVEL(net),
-	DEBUG_LEVEL(sprite),
-	DEBUG_LEVEL(oldloader),
-	DEBUG_LEVEL(npf),
-	DEBUG_LEVEL(yapf),
-	DEBUG_LEVEL(fontcache),
-	DEBUG_LEVEL(script),
-	DEBUG_LEVEL(sl),
-	DEBUG_LEVEL(gamelog),
-	DEBUG_LEVEL(desync),
-	DEBUG_LEVEL(yapfdesync),
-	DEBUG_LEVEL(console),
-	DEBUG_LEVEL(linkgraph),
-	DEBUG_LEVEL(sound),
-	DEBUG_LEVEL(command),
-#ifdef RANDOM_DEBUG
-	DEBUG_LEVEL(random),
-	DEBUG_LEVEL(statecsum),
-#endif
-	};
-#undef DEBUG_LEVEL
+const char *GetDebugLevelName(DebugLevelID id) { return _debug_level_names[static_cast<uint>(id)]; }
 
 /**
  * Dump the available debug facility names in the help text.
- * @param buf Start address for storing the output.
- * @param last Last valid address for storing the output.
- * @return Next free position in the output.
+ * @param output Where to store the output.
  */
-char *DumpDebugFacilityNames(char *buf, char *last)
+void DumpDebugFacilityNames(format_target &output)
 {
-	size_t length = 0;
-	for (const DebugLevel *i = debug_level; i != endof(debug_level); ++i) {
-		if (length == 0) {
-			buf = strecpy(buf, "List of debug facility names:\n", last);
+	bool written = false;
+	for (uint i = 0; i < DebugLevelCount; i++) {
+		if (!written) {
+			output.append("List of debug facility names:\n");
 		} else {
-			buf = strecpy(buf, ", ", last);
-			length += 2;
+			output.append(", ");
 		}
-		buf = strecpy(buf, i->name, last);
-		length += strlen(i->name);
+		output.append(_debug_level_names[i]);
+		written = true;
 	}
-	if (length > 0) {
-		buf = strecpy(buf, "\n\n", last);
+	output.append("\n\n");
+}
+
+void DebugIntlSetup(fmt::memory_buffer &buf, DebugLevelID dbg, int8_t level)
+{
+#ifdef RANDOM_DEBUG
+	if (dbg == DebugLevelID::random || dbg == DebugLevelID::statecsum) {
+		return;
 	}
-	return buf;
+#endif
+	fmt::format_to(std::back_inserter(buf), FMT_STRING("{}dbg: [{}:{}] "), log_prefix().GetLogPrefix(), GetDebugLevelName(dbg), level);
+}
+
+void debug_print_intl(DebugLevelID dbg, int8_t level, const char *buf, size_t prefix_size)
+{
+
+	if (dbg == DebugLevelID::desync) {
+		static std::optional<FileHandle> f = FioFOpenFile("commands-out.log", "wb", AUTOSAVE_DIR);
+		if (f.has_value()) {
+			fprintf(*f, "%s%s", log_prefix().GetLogPrefix(true), buf + prefix_size);
+			fflush(*f);
+		}
+#ifdef RANDOM_DEBUG
+	} else if (dbg == DebugLevelID::random || dbg == DebugLevelID::statecsum) {
+#if defined(UNIX) && defined(__GLIBC__)
+		static bool have_inited = false;
+		static std::optional<FileHandle> f;
+
+		if (!have_inited) {
+			have_inited = true;
+			unsigned int num = 0;
+			int pid = getpid();
+			for(;;) {
+				std::string fn = fmt::format("random-out-{}-{}.log", pid, num);
+				f = FioFOpenFile(fn.c_str(), "wx", AUTOSAVE_DIR);
+				if (!f.has_value() && errno == EEXIST) {
+					num++;
+					continue;
+				}
+				break;
+			}
+		}
+#else
+		static std::optional<FileHandle> f = FioFOpenFile("random-out.log", "wb", AUTOSAVE_DIR);
+#endif
+		if (f.has_value()) {
+			fputs(buf + prefix_size, *f);
+			return;
+		}
+#endif
+	}
+
+	/* do not write desync messages to the console on Windows platforms, as they do
+	 * not seem able to handle text direction change characters in a console without
+	 * crashing, and NetworkTextMessage includes these */
+#if defined(_WIN32)
+	if (dbg != DebugLevelID::desync) {
+		fputs(buf, stderr);
+	}
+#else
+	fputs(buf, stderr);
+#endif
+
+	if (_debug_remote_console.load()) {
+		/* Only add to the queue when there is at least one consumer of the data, exclude added newline. */
+		std::string_view msg = { buf + prefix_size, strlen(buf + prefix_size) - 1 };
+		if (IsNonGameThread()) {
+			std::lock_guard<std::mutex> lock(_debug_remote_console_mutex);
+			_debug_remote_console_queue.push_back({ dbg, level, std::string{msg} });
+		} else {
+			NetworkAdminConsole(GetDebugLevelName(dbg), msg);
+			if (_settings_client.gui.developer >= 2) IConsolePrint(CC_DEBUG, "dbg: [{}:{}] {}", GetDebugLevelName(dbg), level, msg);
+		}
+	}
+}
+
+void debug_print_partial_buffer(DebugLevelID dbg, int8_t level, fmt::memory_buffer &buf, size_t prefix_size)
+{
+	buf.push_back('\n');
+	buf.push_back('\0');
+
+	str_strip_colours(buf.data() + prefix_size);
+	debug_print_intl(dbg, level, buf.data(), prefix_size);
+}
+
+void DebugIntlVFmt(DebugLevelID dbg, int8_t level, fmt::string_view msg, fmt::format_args args)
+{
+	fmt::memory_buffer buf{};
+
+	DebugIntlSetup(buf, dbg, level);
+	size_t prefix_size = buf.size();
+
+	fmt::vformat_to(std::back_inserter(buf), msg, args);
+	debug_print_partial_buffer(dbg, level, buf, prefix_size);
 }
 
 /**
@@ -140,89 +201,15 @@ char *DumpDebugFacilityNames(char *buf, char *last)
  * @param level Debug level.
  * @param buf Text line to output.
  */
-void debug_print(const char *dbg, int level, const char *buf)
+void debug_print(DebugLevelID dbg, int8_t level, std::string_view msg)
 {
+	fmt::memory_buffer buf{};
 
-	if (strcmp(dbg, "desync") == 0) {
-		static FILE *f = FioFOpenFile("commands-out.log", "wb", AUTOSAVE_DIR);
-		if (f != nullptr) {
-			fprintf(f, "%s%s\n", log_prefix().GetLogPrefix(true), buf);
-			fflush(f);
-		}
-#ifdef RANDOM_DEBUG
-	} else if (strcmp(dbg, "random") == 0 || strcmp(dbg, "statecsum") == 0) {
-#if defined(UNIX) && defined(__GLIBC__)
-		static bool have_inited = false;
-		static FILE *f = nullptr;
+	DebugIntlSetup(buf, dbg, level);
+	size_t prefix_size = buf.size();
 
-		if (!have_inited) {
-			have_inited = true;
-			unsigned int num = 0;
-			int pid = getpid();
-			for(;;) {
-				std::string fn = stdstr_fmt("random-out-%d-%u.log", pid, num);
-				f = FioFOpenFile(fn.c_str(), "wx", AUTOSAVE_DIR);
-				if (f == nullptr && errno == EEXIST) {
-					num++;
-					continue;
-				}
-				break;
-			}
-		}
-#else
-		static FILE *f = FioFOpenFile("random-out.log", "wb", AUTOSAVE_DIR);
-#endif
-		if (f != nullptr) {
-			fprintf(f, "%s\n", buf);
-			return;
-		}
-#endif
-	}
-
-	char buffer[512];
-	seprintf(buffer, lastof(buffer), "%sdbg: [%s:%d] %s\n", log_prefix().GetLogPrefix(), dbg, level, buf);
-
-	str_strip_colours(buffer);
-
-	/* do not write desync messages to the console on Windows platforms, as they do
-	 * not seem able to handle text direction change characters in a console without
-	 * crashing, and NetworkTextMessage includes these */
-#if defined(_WIN32)
-	if (strcmp(dbg, "desync") != 0) {
-		fputs(buffer, stderr);
-	}
-#else
-	fputs(buffer, stderr);
-#endif
-
-	if (_debug_remote_console.load()) {
-		/* Only add to the queue when there is at least one consumer of the data. */
-		if (IsNonGameThread()) {
-			std::lock_guard<std::mutex> lock(_debug_remote_console_mutex);
-			_debug_remote_console_queue.push_back({ dbg, level, buf });
-		} else {
-			NetworkAdminConsole(dbg, buf);
-			if (_settings_client.gui.developer >= 2) IConsolePrintF(CC_DEBUG, "dbg: [%s:%d] %s", dbg, level, buf);
-		}
-	}
-}
-
-/**
- * Output a debug line.
- * @note Do not call directly, use the #DEBUG macro instead.
- * @param dbg Debug category.
- * @param format Text string a la printf, with optional arguments.
- */
-void CDECL debug(const char *dbg, int level, const char *format, ...)
-{
-	char buf[1024];
-
-	va_list va;
-	va_start(va, format);
-	vseprintf(buf, lastof(buf), format, va);
-	va_end(va);
-
-	debug_print(dbg, level, buf);
+	buf.append(msg.data(), msg.data() + msg.size());
+	debug_print_partial_buffer(dbg, level, buf, prefix_size);
 }
 
 /**
@@ -232,24 +219,22 @@ void CDECL debug(const char *dbg, int level, const char *format, ...)
  * @param s Text describing the wanted debugging levels.
  * @param error_func The function to call if a parse error occurs.
  */
-void SetDebugString(const char *s, void (*error_func)(const char *))
+void SetDebugString(const char *s, void (*error_func)(std::string))
 {
 	int v;
 	char *end;
 	const char *t;
 
 	/* Store planned changes into map during parse */
-	std::map<const char *, int> new_levels;
+	std::map<DebugLevelID, int> new_levels;
 
 	/* Global debugging level? */
 	if (*s >= '0' && *s <= '9') {
-		const DebugLevel *i;
-
 		v = std::strtoul(s, &end, 0);
 		s = end;
 
-		for (i = debug_level; i != endof(debug_level); ++i) {
-			new_levels[i->name] = v;
+		for (uint i = 0; i < DebugLevelCount; i++) {
+			new_levels[static_cast<DebugLevelID>(i)] = v;
 		}
 	}
 
@@ -263,10 +248,10 @@ void SetDebugString(const char *s, void (*error_func)(const char *))
 		while (*s >= 'a' && *s <= 'z') s++;
 
 		/* check debugging levels */
-		const DebugLevel *found = nullptr;
-		for (const DebugLevel *i = debug_level; i != endof(debug_level); ++i) {
-			if (s == t + strlen(i->name) && strncmp(t, i->name, s - t) == 0) {
-				found = i;
+		DebugLevelID found = DebugLevelID::END;
+		for (uint i = 0; i < DebugLevelCount; i++) {
+			if (s == t + strlen(_debug_level_names[i]) && strncmp(t, _debug_level_names[i], s - t) == 0) {
+				found = static_cast<DebugLevelID>(i);
 				break;
 			}
 		}
@@ -274,22 +259,17 @@ void SetDebugString(const char *s, void (*error_func)(const char *))
 		if (*s == '=') s++;
 		v = std::strtoul(s, &end, 0);
 		s = end;
-		if (found != nullptr) {
-			new_levels[found->name] = v;
+		if (found != DebugLevelID::END) {
+			new_levels[found] = v;
 		} else {
-			char buf[1024];
-			seprintf(buf, lastof(buf), "Unknown debug level '%*s'", (int)(s - t), t);
-			error_func(buf);
+			error_func(fmt::format("Unknown debug level '{}'", std::string_view(t, s - t)));
 			return;
 		}
 	}
 
 	/* Apply the changes after parse is successful */
-	for (const DebugLevel *i = debug_level; i != endof(debug_level); ++i) {
-		const auto &nl = new_levels.find(i->name);
-		if (nl != new_levels.end()) {
-			*i->level = nl->second;
-		}
+	for (const auto &it : new_levels) {
+		_debug_levels[static_cast<uint>(it.first)] = ClampTo<int8_t>(it.second);
 	}
 }
 
@@ -300,11 +280,11 @@ void SetDebugString(const char *s, void (*error_func)(const char *))
  */
 std::string GetDebugString()
 {
-	std::string result;
-	for (size_t i = 0; i < lengthof(debug_level); i++) {
-		result += stdstr_fmt("%s%s=%d", i == 0 ? "" : ", ", debug_level[i].name, *(debug_level[i].level));
+	auto buffer = fmt::memory_buffer();
+	for (uint i = 0; i < DebugLevelCount; i++) {
+		fmt::format_to(std::back_inserter(buffer), "{}{}={}", buffer.size() == 0 ? "" : ", ", _debug_levels[i], _debug_level_names[i]);
 	}
-	return result;
+	return fmt::to_string(buffer);
 }
 
 /**
@@ -357,25 +337,24 @@ struct DesyncMsgLog {
 	}
 
 	template <typename F>
-	char *Dump(char *buffer, const char *last, const char *prefix, F handler)
+	void Dump(format_target &buffer, const char *prefix, F handler)
 	{
-		if (!this->count) return buffer;
+		if (this->count == 0) return;
 
 		const unsigned int count = std::min<unsigned int>(this->count, (uint)this->log.size());
 		unsigned int log_index = (this->next + (uint)this->log.size() - count) % (uint)this->log.size();
 		unsigned int display_num = this->count - count;
 
-		buffer += seprintf(buffer, last, "%s:\n Showing most recent %u of %u messages\n", prefix, count, this->count);
+		buffer.format("{}:\n Showing most recent {} of {} messages\n", prefix, count, this->count);
 
 		for (unsigned int i = 0 ; i < count; i++) {
 			const DesyncMsgLogEntry &entry = this->log[log_index];
 
-			buffer += handler(display_num, buffer, last, entry);
+			handler(display_num, buffer, entry);
 			log_index = (log_index + 1) % this->log.size();
 			display_num++;
 		}
-		buffer += seprintf(buffer, last, "\n");
-		return buffer;
+		buffer.push_back('\n');
 	}
 };
 
@@ -387,17 +366,16 @@ void ClearDesyncMsgLog()
 	_desync_msg_log.Clear();
 }
 
-char *DumpDesyncMsgLog(char *buffer, const char *last)
+void DumpDesyncMsgLog(format_target &buffer)
 {
-	buffer = _desync_msg_log.Dump(buffer, last, "Desync Msg Log", [](int display_num, char *buffer, const char *last, const DesyncMsgLogEntry &entry) -> int {
+	_desync_msg_log.Dump(buffer, "Desync Msg Log", [](int display_num, format_target &buffer, const DesyncMsgLogEntry &entry) {
 		EconTime::YearMonthDay ymd = EconTime::ConvertDateToYMD(entry.date);
-		return seprintf(buffer, last, "%5u | %4i-%02i-%02i, %2i, %3i | %s\n", display_num, ymd.year.base(), ymd.month + 1, ymd.day, entry.date_fract, entry.tick_skip_counter, entry.msg.c_str());
+		buffer.format("{:5} | {:4}-{:02}-{:02}, {:2}, {:3} | {}\n", display_num, ymd.year, ymd.month + 1, ymd.day, entry.date_fract, entry.tick_skip_counter, entry.msg);
 	});
-	buffer = _remote_desync_msg_log.Dump(buffer, last, "Remote Client Desync Msg Log", [](int display_num, char *buffer, const char *last, const DesyncMsgLogEntry &entry) -> int {
+	_remote_desync_msg_log.Dump(buffer, "Remote Client Desync Msg Log", [](int display_num, format_target &buffer, const DesyncMsgLogEntry &entry) {
 		EconTime::YearMonthDay ymd = EconTime::ConvertDateToYMD(entry.date);
-		return seprintf(buffer, last, "%5u | Client %5u | %4i-%02i-%02i, %2i, %3i | %s\n", display_num, entry.src_id, ymd.year.base(), ymd.month + 1, ymd.day, entry.date_fract, entry.tick_skip_counter, entry.msg.c_str());
+		buffer.format("{:5} | Client {:5} | {:4}-{:02}-{:02}, {:2}, {:3} | {}\n", display_num, entry.src_id, ymd.year, ymd.month + 1, ymd.day, entry.date_fract, entry.tick_skip_counter, entry.msg);
 	});
-	return buffer;
 }
 
 void LogDesyncMsg(std::string msg)
@@ -435,8 +413,8 @@ void DebugSendRemoteMessages()
 	}
 
 	for (auto &item : _debug_remote_console_queue_spare) {
-		NetworkAdminConsole(item.category.c_str(), item.message.c_str());
-		if (_settings_client.gui.developer >= 2) IConsolePrintF(CC_DEBUG, "dbg: [%s:%d] %s", item.category.c_str(), item.level, item.message.c_str());
+		NetworkAdminConsole(GetDebugLevelName(item.category), item.message.c_str());
+		if (_settings_client.gui.developer >= 2) IConsolePrint(CC_DEBUG, "dbg: [{}:{}] {}", GetDebugLevelName(item.category), item.level, item.message);
 	}
 
 	_debug_remote_console_queue_spare.clear();
@@ -470,4 +448,30 @@ void TicToc::PrintAndReset()
 	Debug(misc, 0, "[{}] {} us [avg: {:.1f} us]", this->state.name, this->state.chrono_sum, this->state.chrono_sum / static_cast<double>(this->state.count));
 	this->state.count = 0;
 	this->state.chrono_sum = 0;
+}
+
+[[noreturn]] void AssertMsgErrorVFmt(int line, const char *file, const char *expr, fmt::string_view msg, fmt::format_args args)
+{
+	format_buffer out;
+	out.vformat(msg, args);
+
+	assert_str_error(line, file, expr, out);
+}
+
+[[noreturn]] void AssertMsgTileErrorVFmt(int line, const char *file, const char *expr, uint32_t tile, fmt::string_view msg, fmt::format_args args)
+{
+	format_buffer out;
+	DumpTileInfo(out, tile);
+	out.append(", ");
+	out.vformat(msg, args);
+
+	assert_str_error(line, file, expr, out);
+}
+
+void assert_tile_error(int line, const char *file, const char *expr, uint32_t tile)
+{
+	format_buffer out;
+	DumpTileInfo(out, tile);
+
+	assert_str_error(line, file, expr, out);
 }

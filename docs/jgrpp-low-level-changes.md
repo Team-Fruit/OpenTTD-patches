@@ -15,7 +15,6 @@ This document does not describe the player-visible changes/additions described i
 * Support using sigaction and sigaltstack for more information and correct handling of stack overflow crashes (Unix).
 * Attempt to log stack overflow and heap corruption exceptions (Windows).
 * Demangle C++ symbols (Unix).
-* Attempt to handle crashes which occur within the crashlog handler, by skipping or only partially writing the faulting section.
 * Emit a "crash" log, savegame and screenshot on multiplayer desync.
 * Add crash/desync information to output screenshot and savegame files.
 * Multiplayer server and client exchange desync logs after a desync occurs.
@@ -79,16 +78,16 @@ This document does not describe the player-visible changes/additions described i
 * Various deques and queues have been replaced with ring buffers.
 * Remove mutexes from SmallStack, only used from the main thread.
 * Add a third parameter p3, and an auxiliary data mechanism to DoCommand/CommandContainer.
-* Add a free bitmap for pool slots.
 * Maintain free list for text effect entries.
 * Many fields have been widened.
 * Change underlying data structures for ScriptList, create reverse mapping on demand instead of unconditionally.
 * Split GoodsEntry structure.
+* Use row-aligned bitmap for BitmapTileArea.
 
 ### Vehicles
 
 * Cache the sprite_seq bounds.
-* Index the order list in a vector.
+* Change OrderList and OrderBackup to use a std::vector for Orders, remove use of linked lists for orders and use of order pool.
 * Observe the operation of the NewGRF when getting the vehicle image/sprite, and elide further calls to the NewGRF if it can be determined that the result will be the same.
 * Update train/road vehicle image/sprite on demand (i.e. when on screen) when image is continuously updated by GRF.
 * Add consist flag for the case where no vehicles in consist are on a slope.
@@ -103,8 +102,6 @@ This document does not describe the player-visible changes/additions described i
 * Paginate UDP packets longer than the MTU across multiple packets.
 * Use larger "packets" where useful in TCP connections.
 * Send vehicle caches from network server to clients to avoid desyncs caused by non-deterministic NewGRFs.
-* Change network protocol to send server/join and rcon passwords in an encrypted form (key exchange) instead of in clear text.
-* Encrypt the contents of rcon messages to the server and any responses.
 
 ### Sprites/blitter
 
@@ -122,7 +119,7 @@ This document does not describe the player-visible changes/additions described i
 * Change FlowStat from an RB-tree to a flat map with small-object optimisation.
 * Change FlowStatMap from an RB-tree to a B-tree indexed vector.
 * Change LinkGraph::EdgeMatrix to a sparse storage format.
-* Replace MCF Dijkstra RB-tree with B-tree.
+* Replace MCF Dijkstra RB-tree queue with std::vector-based heap.
 * Reduce performance issues when deleting stale links with refit to any cargo.
 * Dynamically adjust accuracy parameters in MCF 1st pass to avoid computing large numbers of excessively small flows.
 
@@ -133,7 +130,6 @@ This document does not describe the player-visible changes/additions described i
 ### Save and load
 
 * Feature versioning, see readme and code.
-* Extend gamelog to not truncate version strings.
 * Save/load the map in a single chunk, such that it can be saved/loaded in one pass.
 * Various other changes to savegame format and settings handling, see readme and code for details.
 * Replace read/write accessors and buffering.
@@ -170,8 +166,6 @@ This document does not describe the player-visible changes/additions described i
 
 * Use multiple threads for NewGRF scan MD5 calculations, on multi-CPU machines.
 * Avoid redundant re-scans for AI and game script files.
-* Avoid iterating vehicle list to release disaster vehicles if there are none.
-* Avoid quadratic behaviour in updating station nearby lists in RecomputeCatchmentForAll.
 
 ### Command line
 

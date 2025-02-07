@@ -117,17 +117,17 @@ DEFINE_POOL_METHOD(inline void *)::AllocateItem(size_t size, size_t index, Pool:
 	Titem *item;
 	if (Tcache && this->alloc_cache != nullptr) {
 		dbg_assert(sizeof(Titem) == size);
-		item = (Titem *)this->alloc_cache;
+		item = reinterpret_cast<Titem *>(this->alloc_cache);
 		this->alloc_cache = this->alloc_cache->next;
 		if (Tzero) {
 			/* Explicitly casting to (void *) prevents a clang warning -
 			 * we are actually memsetting a (not-yet-constructed) object */
-			memset((void *)item, 0, sizeof(Titem));
+			memset(static_cast<void *>(item), 0, sizeof(Titem));
 		}
 	} else if (Tzero) {
-		item = (Titem *)CallocT<byte>(size);
+		item = reinterpret_cast<Titem *>(CallocT<uint8_t>(size));
 	} else {
-		item = (Titem *)MallocT<byte>(size);
+		item = reinterpret_cast<Titem *>(MallocT<uint8_t>(size));
 	}
 	this->data[index] = Tops::PutPtr(item, param);
 	SetBit(this->free_bitmap[index / 64], index % 64);
@@ -139,7 +139,7 @@ DEFINE_POOL_METHOD(inline void *)::AllocateItem(size_t size, size_t index, Pool:
  * Allocates new item
  * @param size size of item
  * @return pointer to allocated item
- * @note error() on failure! (no free item)
+ * @note FatalError() on failure! (no free item)
  */
 DEFINE_POOL_METHOD(void *)::GetNew(size_t size, Pool::ParamType param)
 {
@@ -150,7 +150,8 @@ DEFINE_POOL_METHOD(void *)::GetNew(size_t size, Pool::ParamType param)
 	this->checked--;
 #endif /* WITH_FULL_ASSERTS */
 	if (index == NO_FREE_ITEM) {
-		error("%s: no more free items", this->name);
+		[[noreturn]] extern void PoolNoMoreFreeItemsError(const char *name);
+		PoolNoMoreFreeItemsError(this->name);
 	}
 
 	this->first_free = index + 1;
@@ -162,20 +163,20 @@ DEFINE_POOL_METHOD(void *)::GetNew(size_t size, Pool::ParamType param)
  * @param size size of item
  * @param index index of item
  * @return pointer to allocated item
- * @note SlErrorCorruptFmt() on failure! (index out of range or already used)
+ * @note SlErrorCorrupt() on failure! (index out of range or already used)
  */
 DEFINE_POOL_METHOD(void *)::GetNew(size_t size, size_t index, Pool::ParamType param)
 {
-	[[noreturn]] extern void SlErrorCorruptFmt(const char *format, ...);
-
-	if (index >= Tmax_size) {
-		SlErrorCorruptFmt("%s index " PRINTF_SIZE " out of range (" PRINTF_SIZE ")", this->name, index, Tmax_size);
+	if (unlikely(index >= Tmax_size)) {
+		[[noreturn]] extern void PoolOutOfRangeError(const char *name, size_t index, size_t max_size);
+		PoolOutOfRangeError(this->name, index, Tmax_size);
 	}
 
 	if (index >= this->size) this->ResizeFor(index);
 
-	if (this->data[index] != Tops::NullValue()) {
-		SlErrorCorruptFmt("%s index " PRINTF_SIZE " already in use", this->name, index);
+	if (unlikely(this->data[index] != Tops::NullValue())) {
+		[[noreturn]] extern void PoolIndexAlreadyInUseError(const char *name, size_t index);
+		PoolIndexAlreadyInUseError(this->name, index);
 	}
 
 	return this->AllocateItem(size, index, param);
@@ -192,7 +193,7 @@ DEFINE_POOL_METHOD(void)::FreeItem(size_t index)
 	dbg_assert(index < this->size);
 	dbg_assert(this->data[index] != Tops::NullValue());
 	if (Tcache) {
-		AllocCache *ac = (AllocCache *)this->data[index];
+		AllocCache *ac = reinterpret_cast<AllocCache *>(this->data[index]);
 		ac->next = this->alloc_cache;
 		this->alloc_cache = ac;
 	} else {

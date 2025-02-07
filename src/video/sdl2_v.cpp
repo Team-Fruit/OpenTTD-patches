@@ -13,6 +13,7 @@
 #include "../blitter/factory.hpp"
 #include "../thread.h"
 #include "../progress.h"
+#include "../core/format.hpp"
 #include "../core/random_func.hpp"
 #include "../core/math_func.hpp"
 #include "../core/mem_func.hpp"
@@ -54,14 +55,14 @@ void InputLoop();
 #if defined(WITH_FCITX)
 static SDL_Window *_fcitx_sdl_window;
 static bool _fcitx_mode = false;
-static char _fcitx_service_name[64];
-static char _fcitx_ic_name[64];
+static std::string _fcitx_service_name;
+static std::string _fcitx_ic_name;
 static DBusConnection *_fcitx_dbus_session_conn = nullptr;
 static bool _suppress_text_event = false;
 
 static void FcitxICMethod(const char *method)
 {
-	DBusMessage *msg = dbus_message_new_method_call(_fcitx_service_name, _fcitx_ic_name, "org.fcitx.Fcitx.InputContext", method);
+	DBusMessage *msg = dbus_message_new_method_call(_fcitx_service_name.c_str(), _fcitx_ic_name.c_str(), "org.fcitx.Fcitx.InputContext", method);
 	if (!msg) return;
 	dbus_connection_send(_fcitx_dbus_session_conn, msg, NULL);
 	dbus_connection_flush(_fcitx_dbus_session_conn);
@@ -128,7 +129,7 @@ static void FcitxInit()
 		return;
 	}
 	dbus_connection_set_exit_on_disconnect(_fcitx_dbus_session_conn, false);
-	seprintf(_fcitx_service_name, lastof(_fcitx_service_name), "org.fcitx.Fcitx-%d", GetXDisplayNum());
+	_fcitx_service_name = fmt::format("org.fcitx.Fcitx-{}", GetXDisplayNum());
 
 	auto guard = scope_guard([]() {
 		if (!_fcitx_mode) FcitxDeinit();
@@ -137,7 +138,7 @@ static void FcitxInit()
 	int pid = getpid();
 	int id = -1;
 	uint32_t enable, hk1sym, hk1state, hk2sym, hk2state;
-	DBusMessage *msg = dbus_message_new_method_call(_fcitx_service_name, "/inputmethod", "org.fcitx.Fcitx.InputMethod", "CreateICv3");
+	DBusMessage *msg = dbus_message_new_method_call(_fcitx_service_name.c_str(), "/inputmethod", "org.fcitx.Fcitx.InputMethod", "CreateICv3");
 	if (!msg) return;
 	auto guard1 = scope_guard([&]() {
 		dbus_message_unref(msg);
@@ -153,13 +154,13 @@ static void FcitxInit()
 
 	if (id < 0) return;
 
-	seprintf(_fcitx_ic_name, lastof(_fcitx_ic_name), "/inputcontext_%d", id);
+	_fcitx_ic_name = fmt::format("/inputcontext_{}", id);
 	dbus_bus_add_match(_fcitx_dbus_session_conn, "type='signal', interface='org.fcitx.Fcitx.InputContext'", nullptr);
 	dbus_connection_add_filter(_fcitx_dbus_session_conn, &FcitxDBusMessageFilter, nullptr, nullptr);
 	dbus_connection_flush(_fcitx_dbus_session_conn);
 
 	uint32_t caps = CAPACITY_PREEDIT;
-	DBusMessage *msg2 = dbus_message_new_method_call(_fcitx_service_name, _fcitx_ic_name, "org.fcitx.Fcitx.InputContext", "SetCapacity");
+	DBusMessage *msg2 = dbus_message_new_method_call(_fcitx_service_name.c_str(), _fcitx_ic_name.c_str(), "org.fcitx.Fcitx.InputContext", "SetCapacity");
 	if (!msg2) return;
 	auto guard3 = scope_guard([&]() {
 		dbus_message_unref(msg2);
@@ -191,7 +192,7 @@ static bool FcitxProcessKey()
 	int type = FCITX_PRESS_KEY;
 	uint32_t event_time = 0;
 
-	DBusMessage *msg = dbus_message_new_method_call(_fcitx_service_name, _fcitx_ic_name, "org.fcitx.Fcitx.InputContext", "ProcessKeyEvent");
+	DBusMessage *msg = dbus_message_new_method_call(_fcitx_service_name.c_str(), _fcitx_ic_name.c_str(), "org.fcitx.Fcitx.InputContext", "ProcessKeyEvent");
 	if (!msg) return false;
 	auto guard1 = scope_guard([&]() {
 		dbus_message_unref(msg);
@@ -222,7 +223,7 @@ static void FcitxFocusChange(bool focused)
 static void FcitxSYSWMEVENT(const SDL_SysWMEvent &event)
 {
 	if (_fcitx_last_keycode != 0 || _fcitx_last_keysym != 0) {
-		DEBUG(misc, 0, "Passing pending keypress to Fcitx");
+		Debug(misc, 0, "Passing pending keypress to Fcitx");
 		FcitxProcessKey();
 	}
 	_fcitx_last_keycode = _fcitx_last_keysym = 0;
@@ -280,7 +281,7 @@ static void FindResolutions()
 			SDL_GetDisplayMode(display, i, &mode);
 
 			if (mode.w < 640 || mode.h < 480) continue;
-			if (std::find(_resolutions.begin(), _resolutions.end(), Dimension(mode.w, mode.h)) != _resolutions.end()) continue;
+			if (std::ranges::find(_resolutions, Dimension(mode.w, mode.h)) != _resolutions.end()) continue;
 			_resolutions.emplace_back(mode.w, mode.h);
 		}
 	}
@@ -299,7 +300,7 @@ static void GetAvailableVideoMode(uint *w, uint *h)
 	if (!_fullscreen || _resolutions.empty()) return;
 
 	/* Is the wanted mode among the available modes? */
-	if (std::find(_resolutions.begin(), _resolutions.end(), Dimension(*w, *h)) != _resolutions.end()) return;
+	if (std::ranges::find(_resolutions, Dimension(*w, *h)) != _resolutions.end()) return;
 
 	/* Use the closest possible resolution */
 	uint best = 0;
@@ -328,7 +329,7 @@ static uint FindStartupDisplay(uint startup_display)
 	for (int display = 0; display < num_displays; ++display) {
 		SDL_Rect r;
 		if (SDL_GetDisplayBounds(display, &r) == 0 && IsInsideBS(mx, r.x, r.w) && IsInsideBS(my, r.y, r.h)) {
-			DEBUG(driver, 1, "SDL2: Mouse is at (%d, %d), use display %d (%d, %d, %d, %d)", mx, my, display, r.x, r.y, r.w, r.h);
+			Debug(driver, 1, "SDL2: Mouse is at ({}, {}), use display {} ({}, {}, {}, {})", mx, my, display, r.x, r.y, r.w, r.h);
 			return display;
 		}
 	}
@@ -379,7 +380,7 @@ bool VideoDriver_SDL_Base::CreateMainWindow(uint w, uint h, uint flags)
 #endif
 
 	if (this->sdl_window == nullptr) {
-		DEBUG(driver, 0, "SDL2: Couldn't allocate a window to draw on: %s", SDL_GetError());
+		Debug(driver, 0, "SDL2: Couldn't allocate a window to draw on: {}", SDL_GetError());
 		return false;
 	}
 
@@ -403,7 +404,7 @@ bool VideoDriver_SDL_Base::CreateMainWindow(uint w, uint h, uint flags)
 bool VideoDriver_SDL_Base::CreateMainSurface(uint w, uint h, bool resize)
 {
 	GetAvailableVideoMode(&w, &h);
-	DEBUG(driver, 1, "SDL2: using mode %ux%u", w, h);
+	Debug(driver, 1, "SDL2: using mode {}x{}", w, h);
 
 	if (!this->CreateMainWindow(w, h)) return false;
 	if (resize) SDL_SetWindowSize(this->sdl_window, w, h);
@@ -459,7 +460,7 @@ static void SetTextInputRect()
 		}
 		x += winrect.x;
 		y += winrect.y;
-		DBusMessage *msg = dbus_message_new_method_call(_fcitx_service_name, _fcitx_ic_name, "org.fcitx.Fcitx.InputContext", "SetCursorRect");
+		DBusMessage *msg = dbus_message_new_method_call(_fcitx_service_name.c_str(), _fcitx_ic_name.c_str(), "org.fcitx.Fcitx.InputContext", "SetCursorRect");
 		if (!msg) return;
 		auto guard = scope_guard([&]() {
 			dbus_message_unref(msg);
@@ -518,18 +519,24 @@ std::vector<int> VideoDriver_SDL_Base::GetListOfMonitorRefreshRates()
 }
 
 struct SDLVkMapping {
-	SDL_Keycode vk_from;
-	byte vk_count;
-	byte map_to;
-	bool unprintable;
+	const SDL_Keycode vk_from;
+	const uint8_t vk_count;
+	const uint8_t map_to;
+	const bool unprintable;
+
+	constexpr SDLVkMapping(SDL_Keycode vk_first, SDL_Keycode vk_last, uint8_t map_first, [[maybe_unused]] uint8_t map_last, bool unprintable)
+		: vk_from(vk_first), vk_count(vk_last - vk_first + 1), map_to(map_first), unprintable(unprintable)
+	{
+		assert((vk_last - vk_first) == (map_last - map_first));
+	}
 };
 
-#define AS(x, z) {x, 0, z, false}
-#define AM(x, y, z, w) {x, (byte)(y - x), z, false}
-#define AS_UP(x, z) {x, 0, z, true}
-#define AM_UP(x, y, z, w) {x, (byte)(y - x), z, true}
+#define AS(x, z) {x, x, z, z, false}
+#define AM(x, y, z, w) {x, y, z, w, false}
+#define AS_UP(x, z) {x, x, z, z, true}
+#define AM_UP(x, y, z, w) {x, y, z, w, true}
 
-static const SDLVkMapping _vk_mapping[] = {
+static constexpr SDLVkMapping _vk_mapping[] = {
 	/* Pageup stuff + up/down */
 	AS_UP(SDLK_PAGEUP,   WKC_PAGEUP),
 	AS_UP(SDLK_PAGEDOWN, WKC_PAGEDOWN),
@@ -560,7 +567,16 @@ static const SDLVkMapping _vk_mapping[] = {
 	AM_UP(SDLK_F1, SDLK_F12, WKC_F1, WKC_F12),
 
 	/* Numeric part. */
-	AM(SDLK_KP_0, SDLK_KP_9, '0', '9'),
+	AS(SDLK_KP_1,        '1'),
+	AS(SDLK_KP_2,        '2'),
+	AS(SDLK_KP_3,        '3'),
+	AS(SDLK_KP_4,        '4'),
+	AS(SDLK_KP_5,        '5'),
+	AS(SDLK_KP_6,        '6'),
+	AS(SDLK_KP_7,        '7'),
+	AS(SDLK_KP_8,        '8'),
+	AS(SDLK_KP_9,        '9'),
+	AS(SDLK_KP_0,        '0'),
 	AS(SDLK_KP_DIVIDE,   WKC_NUM_DIV),
 	AS(SDLK_KP_MULTIPLY, WKC_NUM_MUL),
 	AS(SDLK_KP_MINUS,    WKC_NUM_MINUS),
@@ -585,14 +601,13 @@ static const SDLVkMapping _vk_mapping[] = {
 
 static uint ConvertSdlKeyIntoMy(SDL_Keysym *sym, char32_t *character)
 {
-	const SDLVkMapping *map;
 	uint key = 0;
 	bool unprintable = false;
 
-	for (map = _vk_mapping; map != endof(_vk_mapping); ++map) {
-		if ((uint)(sym->sym - map->vk_from) <= map->vk_count) {
-			key = sym->sym - map->vk_from + map->map_to;
-			unprintable = map->unprintable;
+	for (const auto &map : _vk_mapping) {
+		if (IsInsideBS(sym->sym, map.vk_from, map.vk_count)) {
+			key = sym->sym - map.vk_from + map.map_to;
+			unprintable = map.unprintable;
 			break;
 		}
 	}
@@ -625,12 +640,11 @@ static uint ConvertSdlKeyIntoMy(SDL_Keysym *sym, char32_t *character)
  */
 static uint ConvertSdlKeycodeIntoMy(SDL_Keycode kc)
 {
-	const SDLVkMapping *map;
 	uint key = 0;
 
-	for (map = _vk_mapping; map != endof(_vk_mapping); ++map) {
-		if ((uint)(kc - map->vk_from) <= map->vk_count) {
-			key = kc - map->vk_from + map->map_to;
+	for (const auto &map : _vk_mapping) {
+		if (IsInsideBS(kc, map.vk_from, map.vk_count)) {
+			key = kc - map.vk_from + map.map_to;
 			break;
 		}
 	}
@@ -673,13 +687,25 @@ bool VideoDriver_SDL_Base::PollEvent()
 			break;
 		}
 
-		case SDL_MOUSEWHEEL:
+		case SDL_MOUSEWHEEL: {
 			if (ev.wheel.y > 0) {
 				_cursor.wheel--;
 			} else if (ev.wheel.y < 0) {
 				_cursor.wheel++;
 			}
+
+			/* Handle 2D scrolling. */
+			const float SCROLL_BUILTIN_MULTIPLIER = 14.0f;
+#if SDL_VERSION_ATLEAST(2, 18, 0)
+			_cursor.v_wheel -= ev.wheel.preciseY * SCROLL_BUILTIN_MULTIPLIER * _settings_client.gui.scrollwheel_multiplier;
+			_cursor.h_wheel += ev.wheel.preciseX * SCROLL_BUILTIN_MULTIPLIER * _settings_client.gui.scrollwheel_multiplier;
+#else
+			_cursor.v_wheel -= static_cast<float>(ev.wheel.y * SCROLL_BUILTIN_MULTIPLIER * _settings_client.gui.scrollwheel_multiplier);
+			_cursor.h_wheel += static_cast<float>(ev.wheel.x * SCROLL_BUILTIN_MULTIPLIER * _settings_client.gui.scrollwheel_multiplier);
+#endif
+			_cursor.wheel_moved = true;
 			break;
+		}
 
 		case SDL_MOUSEBUTTONDOWN:
 			if (_rightclick_emulate && SDL_GetModState() & KMOD_CTRL) {
@@ -854,7 +880,7 @@ const char *VideoDriver_SDL_Base::Initialize()
 	if (error != nullptr) return error;
 
 	FindResolutions();
-	DEBUG(driver, 2, "Resolution for display: %ux%u", _cur_resolution.width, _cur_resolution.height);
+	Debug(driver, 2, "Resolution for display: {}x{}", _cur_resolution.width, _cur_resolution.height);
 
 	return nullptr;
 }
@@ -875,6 +901,10 @@ const char *VideoDriver_SDL_Base::Start(const StringList &param)
 	}
 #endif
 
+#ifdef SDL_HINT_APP_NAME
+	SDL_SetHint(SDL_HINT_APP_NAME, "OpenTTD");
+#endif
+
 	this->startup_display = FindStartupDisplay(GetDriverParamInt(param, "display", -1));
 
 	if (!CreateMainSurface(_cur_resolution.width, _cur_resolution.height, false)) {
@@ -882,7 +912,7 @@ const char *VideoDriver_SDL_Base::Start(const StringList &param)
 	}
 
 	const char *dname = SDL_GetCurrentVideoDriver();
-	DEBUG(driver, 1, "SDL2: using driver '%s'", dname);
+	Debug(driver, 1, "SDL2: using driver '{}'", dname);
 
 	this->driver_info = this->GetName();
 	this->driver_info += " (";
@@ -1010,20 +1040,20 @@ bool VideoDriver_SDL_Base::ToggleFullscreen(bool fullscreen)
 		/* Find fullscreen window size */
 		SDL_DisplayMode dm;
 		if (SDL_GetCurrentDisplayMode(SDL_GetWindowDisplayIndex(this->sdl_window), &dm) < 0) {
-			DEBUG(driver, 0, "SDL_GetCurrentDisplayMode() failed: %s", SDL_GetError());
+			Debug(driver, 0, "SDL_GetCurrentDisplayMode() failed: {}", SDL_GetError());
 		} else {
 			SDL_SetWindowSize(this->sdl_window, dm.w, dm.h);
 		}
 	}
 
-	DEBUG(driver, 1, "SDL2: Setting %s", fullscreen ? "fullscreen" : "windowed");
+	Debug(driver, 1, "SDL2: Setting {}", fullscreen ? "fullscreen" : "windowed");
 	int ret = SDL_SetWindowFullscreen(this->sdl_window, fullscreen ? SDL_WINDOW_FULLSCREEN : 0);
 	if (ret == 0) {
 		/* Switching resolution succeeded, set fullscreen value of window. */
 		_fullscreen = fullscreen;
 		if (!fullscreen) SDL_SetWindowSize(this->sdl_window, w, h);
 	} else {
-		DEBUG(driver, 0, "SDL_SetWindowFullscreen() failed: %s", SDL_GetError());
+		Debug(driver, 0, "SDL_SetWindowFullscreen() failed: {}", SDL_GetError());
 	}
 
 	this->InvalidateGameOptionsWindow();

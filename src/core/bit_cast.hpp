@@ -10,13 +10,13 @@
 #ifndef BIT_CAST_HPP
 #define BIT_CAST_HPP
 
+#include <type_traits>
+
 #ifdef __cpp_lib_bit_cast
 
 #include <bit>
 
 #else
-
-#include <type_traits>
 
 namespace std {
 template <typename To, typename From>
@@ -31,5 +31,29 @@ constexpr To bit_cast(const From& from) noexcept
 }
 
 #endif
+
+template <typename To, typename From>
+constexpr To bit_cast_to_storage(const From& from) noexcept
+{
+	static_assert(std::is_trivially_constructible_v<To>);
+	static_assert(std::is_trivially_copyable_v<From>);
+	static_assert(sizeof(To) >= sizeof(From));
+
+	To to{};
+	memcpy(&to, &from, sizeof(From));
+	return to;
+}
+
+template <typename To, typename From>
+constexpr To bit_cast_from_storage(const From& from) noexcept
+{
+	static_assert(std::is_trivially_constructible_v<To>);
+	static_assert(std::is_trivially_copyable_v<From>);
+	static_assert(sizeof(To) <= sizeof(From));
+
+	To to{};
+	memcpy(&to, &from, sizeof(To));
+	return to;
+}
 
 #endif /* BIT_CAST_HPP */

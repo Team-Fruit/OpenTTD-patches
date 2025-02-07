@@ -18,6 +18,7 @@
 #include "core/arena_alloc.hpp"
 
 #include "3rdparty/cpp-btree/btree_map.h"
+#include "3rdparty/robin_hood/robin_hood.h"
 #include <bitset>
 #include <vector>
 
@@ -68,19 +69,18 @@ public:
 	std::vector<const SpriteGroup *> spritegroups;
 
 	/* VarAction2 temporary storage variable tracking */
-	btree::btree_map<const SpriteGroup *, VarAction2GroupVariableTracking *> group_temp_store_variable_tracking;
-	UniformArenaAllocator<sizeof(VarAction2GroupVariableTracking), 1024> group_temp_store_variable_tracking_storage;
-	btree::btree_map<const SpriteGroup *, VarAction2ProcedureAnnotation *> procedure_annotations;
-	UniformArenaAllocator<sizeof(VarAction2ProcedureAnnotation), 1024> procedure_annotations_storage;
-	btree::btree_map<const DeterministicSpriteGroup *, std::vector<DeterministicSpriteGroupAdjust> *> inlinable_adjust_groups;
-	UniformArenaAllocator<sizeof(std::vector<DeterministicSpriteGroupAdjust>), 1024> inlinable_adjust_groups_storage;
+	robin_hood::unordered_flat_map<const SpriteGroup *, VarAction2GroupVariableTracking *> group_temp_store_variable_tracking;
+	BumpAllocContainer<VarAction2GroupVariableTracking, 1024> group_temp_store_variable_tracking_storage;
+	robin_hood::unordered_flat_map<const SpriteGroup *, VarAction2ProcedureAnnotation *> procedure_annotations;
+	BumpAllocContainer<VarAction2ProcedureAnnotation, 1024> procedure_annotations_storage;
+	robin_hood::unordered_map<const DeterministicSpriteGroup *, std::vector<DeterministicSpriteGroupAdjust>> inlinable_adjust_groups;
 	std::vector<DeterministicSpriteGroup *> dead_store_elimination_candidates;
 
 	VarAction2GroupVariableTracking *GetVarAction2GroupVariableTracking(const SpriteGroup *group, bool make_new)
 	{
 		if (make_new) {
 			VarAction2GroupVariableTracking *&ptr = this->group_temp_store_variable_tracking[group];
-			if (!ptr) ptr = new (this->group_temp_store_variable_tracking_storage.Allocate()) VarAction2GroupVariableTracking();
+			if (ptr == nullptr) ptr = this->group_temp_store_variable_tracking_storage.New();
 			return ptr;
 		} else {
 			auto iter = this->group_temp_store_variable_tracking.find(group);
@@ -92,8 +92,8 @@ public:
 	std::pair<VarAction2ProcedureAnnotation *, bool> GetVarAction2ProcedureAnnotation(const SpriteGroup *group)
 	{
 		VarAction2ProcedureAnnotation *&ptr = this->procedure_annotations[group];
-		if (!ptr) {
-			ptr = new (this->procedure_annotations_storage.Allocate()) VarAction2ProcedureAnnotation();
+		if (ptr == nullptr) {
+			ptr = this->procedure_annotations_storage.New();
 			return std::make_pair(ptr, true);
 		} else {
 			return std::make_pair(ptr, false);
@@ -103,12 +103,10 @@ public:
 	std::vector<DeterministicSpriteGroupAdjust> *GetInlinableGroupAdjusts(const DeterministicSpriteGroup *group, bool make_new)
 	{
 		if (make_new) {
-			std::vector<DeterministicSpriteGroupAdjust> *&ptr = this->inlinable_adjust_groups[group];
-			if (!ptr) ptr = new (this->inlinable_adjust_groups_storage.Allocate()) std::vector<DeterministicSpriteGroupAdjust>();
-			return ptr;
+			return &this->inlinable_adjust_groups[group];
 		} else {
 			auto iter = this->inlinable_adjust_groups.find(group);
-			if (iter != this->inlinable_adjust_groups.end()) return iter->second;
+			if (iter != this->inlinable_adjust_groups.end()) return &iter->second;
 			return nullptr;
 		}
 	}
@@ -126,14 +124,10 @@ public:
 		this->spritegroups.clear();
 
 		this->group_temp_store_variable_tracking.clear();
-		this->group_temp_store_variable_tracking_storage.EmptyArena();
+		this->group_temp_store_variable_tracking_storage.clear();
 		this->procedure_annotations.clear();
-		this->procedure_annotations_storage.EmptyArena();
-		for (auto iter : this->inlinable_adjust_groups) {
-			iter.second->~vector<DeterministicSpriteGroupAdjust>();
-		}
+		this->procedure_annotations_storage.clear();
 		this->inlinable_adjust_groups.clear();
-		this->inlinable_adjust_groups_storage.EmptyArena();
 		this->dead_store_elimination_candidates.clear();
 	}
 
@@ -145,7 +139,7 @@ public:
 	 * @param numsets Number of sets to define.
 	 * @param numents Number of sprites per set to define.
 	 */
-	void AddSpriteSets(byte feature, SpriteID first_sprite, uint first_set, uint numsets, uint numents)
+	void AddSpriteSets(uint8_t feature, SpriteID first_sprite, uint first_set, uint numsets, uint numents)
 	{
 		assert(feature < GSF_END);
 		for (uint i = 0; i < numsets; i++) {
@@ -161,53 +155,68 @@ public:
 	 * @return true if there are any valid sets.
 	 * @note Spritesets with zero sprites are valid to allow callback-failures.
 	 */
-	bool HasValidSpriteSets(byte feature) const
+	bool HasValidSpriteSets(uint8_t feature) const
 	{
 		assert(feature < GSF_END);
 		return !this->spritesets[feature].empty();
 	}
 
+	struct SpriteSetInfo {
+	private:
+		SpriteSet info;
+
+	public:
+		SpriteSetInfo() : info({ 0, UINT_MAX }) {}
+		SpriteSetInfo(SpriteSet info) : info(info) {}
+
+		/**
+		 * Check whether this set is defined.
+		 * @return true if the set is valid.
+		 * @note Spritesets with zero sprites are valid to allow callback-failures.
+		 */
+		bool IsValid() const { return this->info.num_sprites != UINT_MAX; }
+
+		/**
+		 * Returns the first sprite of this spriteset.
+		 * @return First sprite of the set.
+		 */
+		SpriteID GetSprite() const
+		{
+			assert(this->IsValid());
+			return this->info.sprite;
+		}
+
+		/**
+		 * Returns the number of sprites in this spriteset
+		 * @return Number of sprites in the set.
+		 */
+		uint GetNumEnts() const
+		{
+			assert(this->IsValid());
+			return this->info.num_sprites;
+		}
+	};
+
 	/**
-	 * Check whether a specific set is defined.
+	 * Get information for a specific set is defined.
 	 * @param feature GrfSpecFeature to check.
 	 * @param set Set to check.
-	 * @return true if the set is valid.
+	 * @return Sprite set information.
 	 * @note Spritesets with zero sprites are valid to allow callback-failures.
 	 */
-	bool IsValidSpriteSet(byte feature, uint set) const
+	SpriteSetInfo GetSpriteSetInfo(uint8_t feature, uint set) const
 	{
 		assert(feature < GSF_END);
-		return this->spritesets[feature].find(set) != this->spritesets[feature].end();
-	}
-
-	/**
-	 * Returns the first sprite of a spriteset.
-	 * @param feature GrfSpecFeature to query.
-	 * @param set Set to query.
-	 * @return First sprite of the set.
-	 */
-	SpriteID GetSprite(byte feature, uint set) const
-	{
-		assert(IsValidSpriteSet(feature, set));
-		return this->spritesets[feature].find(set)->second.sprite;
-	}
-
-	/**
-	 * Returns the number of sprites in a spriteset
-	 * @param feature GrfSpecFeature to query.
-	 * @param set Set to query.
-	 * @return Number of sprites in the set.
-	 */
-	uint GetNumEnts(byte feature, uint set) const
-	{
-		assert(IsValidSpriteSet(feature, set));
-		return this->spritesets[feature].find(set)->second.num_sprites;
+		auto iter = this->spritesets[feature].find(set);
+		return iter != this->spritesets[feature].end() ? SpriteSetInfo(iter->second) : SpriteSetInfo();
 	}
 };
 
+using SpriteSetInfo = GrfProcessingState::SpriteSetInfo;
+
 extern GrfProcessingState _cur;
 
-enum VarAction2AdjustInferenceFlags {
+enum VarAction2AdjustInferenceFlags : uint16_t {
 	VA2AIF_NONE                  = 0x00,
 
 	VA2AIF_SIGNED_NON_NEGATIVE   = 0x01,
@@ -221,13 +230,14 @@ enum VarAction2AdjustInferenceFlags {
 	VA2AIF_PREV_SCMP_DEC         = 0x100,
 
 	VA2AIF_PREV_MASK             = VA2AIF_PREV_TERNARY | VA2AIF_PREV_MASK_ADJUST | VA2AIF_PREV_STORE_TMP | VA2AIF_PREV_SCMP_DEC,
+	VA2AIF_STORE_SAVE_MASK       = VA2AIF_SIGNED_NON_NEGATIVE | VA2AIF_ONE_OR_ZERO | VA2AIF_HAVE_CONSTANT | VA2AIF_MUL_BOOL,
 };
 DECLARE_ENUM_AS_BIT_SET(VarAction2AdjustInferenceFlags)
 
 struct VarAction2TempStoreInferenceVarSource {
-	DeterministicSpriteGroupAdjustType type;
 	uint16_t variable;
-	byte shift_num;
+	DeterministicSpriteGroupAdjustType type;
+	uint8_t shift_num;
 	uint32_t parameter;
 	uint32_t and_mask;
 	uint32_t add_val;
@@ -236,9 +246,12 @@ struct VarAction2TempStoreInferenceVarSource {
 
 struct VarAction2TempStoreInference {
 	VarAction2AdjustInferenceFlags inference = VA2AIF_NONE;
+	const uint8_t var_index;
 	uint32_t store_constant = 0;
 	VarAction2TempStoreInferenceVarSource var_source;
 	uint version = 0;
+
+	VarAction2TempStoreInference(uint8_t var_index) : var_index(var_index) {}
 };
 
 struct VarAction2InferenceBackup {
@@ -248,9 +261,44 @@ struct VarAction2InferenceBackup {
 };
 
 struct VarAction2OptimiseState {
+	struct TempStoreState {
+	private:
+		std::vector<VarAction2TempStoreInference> storage;
+		std::vector<std::pair<uint8_t, uint8_t>> storage_index;
+
+	public:
+		VarAction2TempStoreInference *begin() { return this->storage.data(); }
+		VarAction2TempStoreInference *end() { return this->storage.data() + this->storage.size(); }
+
+		VarAction2TempStoreInference *find(uint8_t var)
+		{
+			for (const auto &it : this->storage_index) {
+				if (it.first == var) return &this->storage[it.second];
+			}
+			return nullptr;
+		}
+
+		VarAction2TempStoreInference &operator[](uint8_t var)
+		{
+			VarAction2TempStoreInference *ptr = this->find(var);
+			if (ptr != nullptr) return *ptr;
+
+			this->storage_index.emplace_back(var, static_cast<uint8_t>(this->storage.size()));
+			return this->storage.emplace_back(var);
+		}
+
+		void clear()
+		{
+			this->storage.clear();
+			this->storage_index.clear();
+		}
+	};
+
+	static TempStoreState temp_store_cache;
+
 	VarAction2AdjustInferenceFlags inference = VA2AIF_NONE;
 	uint32_t current_constant = 0;
-	btree::btree_map<uint8_t, VarAction2TempStoreInference> temp_stores;
+	TempStoreState temp_stores;
 	VarAction2InferenceBackup inference_backup;
 	VarAction2GroupVariableTracking *var_tracking = nullptr;
 	bool seen_procedure_call = false;
@@ -268,6 +316,22 @@ struct VarAction2OptimiseState {
 		}
 		return this->var_tracking;
 	}
+
+	VarAction2OptimiseState()
+	{
+		this->temp_stores = std::move(temp_store_cache);
+		this->temp_stores.clear();
+	}
+
+	~VarAction2OptimiseState()
+	{
+		temp_store_cache = std::move(this->temp_stores);
+	}
+
+	static void ReleaseCaches()
+	{
+		TempStoreState tmp = std::move(temp_store_cache);
+	}
 };
 
 inline void OptimiseVarAction2PreCheckAdjust(VarAction2OptimiseState &state, const DeterministicSpriteGroupAdjust &adjust)
@@ -280,12 +344,27 @@ inline void OptimiseVarAction2PreCheckAdjust(VarAction2OptimiseState &state, con
 struct VarAction2AdjustInfo {
 	GrfSpecFeature feature;
 	GrfSpecFeature scope_feature;
-	byte varsize;
+	uint8_t varsize;
 };
+
+struct DeterministicSpriteGroupShadowCopy {
+	std::vector<DeterministicSpriteGroupAdjust> adjusts;
+	std::vector<DeterministicSpriteGroupRange> ranges;
+	const SpriteGroup *default_group;
+	bool calculated_result;
+};
+
+struct RandomizedSpriteGroupShadowCopy {
+	std::vector<const SpriteGroup *> groups;
+};
+
+extern robin_hood::unordered_node_map<const DeterministicSpriteGroup *, DeterministicSpriteGroupShadowCopy> _deterministic_sg_shadows;
+extern robin_hood::unordered_flat_map<const RandomizedSpriteGroup *, RandomizedSpriteGroupShadowCopy> _randomized_sg_shadows;
 
 const SpriteGroup *PruneTargetSpriteGroup(const SpriteGroup *result);
 void OptimiseVarAction2Adjust(VarAction2OptimiseState &state, const VarAction2AdjustInfo info, DeterministicSpriteGroup *group, DeterministicSpriteGroupAdjust &adjust);
 void OptimiseVarAction2DeterministicSpriteGroup(VarAction2OptimiseState &state, const VarAction2AdjustInfo info, DeterministicSpriteGroup *group, std::vector<DeterministicSpriteGroupAdjust> &saved_adjusts);
 void HandleVarAction2OptimisationPasses();
+void ReleaseVarAction2OptimisationCaches();
 
 #endif /* NEWGRF_INTERNAL_H */

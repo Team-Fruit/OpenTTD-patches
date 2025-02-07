@@ -23,8 +23,6 @@ STR_TRANSPARENT_LOADING_TOOLTIP                                 :{BLACK}Пера
 
 # Programmable Pre-Signals
 
-#House construction window (for SE only)
-
 #Town select window (for SE only)
 
 STR_MAPGEN_SNOW_LINE_HEIGHT                                     :{BLACK}Вышыня сьнегавой лініі:
@@ -45,8 +43,8 @@ STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_SERVICE_VEL_END            :{LTBLUE}Абс�
 
 STR_ORDERS_GO_TO_TOOLTIP_EXTRA                                  :{BLACK}Уставіць новае заданьне перад вылучаным, або ў канец сьпісу. Ctrl дадае на станцыях «поўная пагрузка любым грузам», на пунктах шляху - «без прыпынку», на дэпо - «абслугоўваньне». «Агульныя заданьні» або Ctrl дазваляюць гэтаму транспарту мець агульныя заданьні з вылучаным транспартам. Пстрычка па транспарце капіюе заданьнi гэтага транспарту. Заданьне «ў дэпо» адключае аўтаматычнае абслугоўваньне гэтага транспарту.
 
-STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :П:
-STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :А:
+STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :П:{SPACE}{SPACE}
+STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :А:{SPACE}{SPACE}
 
 # Cargo type orders Window
 
@@ -83,3 +81,19 @@ STR_ERROR_CAN_T_SELL_25_SHARE_IN                                :{WHITE}Нема
 STR_ERROR_PROTECTED                                             :{WHITE}Гэтая кампанія яшчэ не выпускае акцыі...
 
 STR_CONFIG_SETTING_CYCLE_SIGNAL_PBS                             :толькі маршрутныя (PMS)
+
+STR_WARNING_PASSWORD_SECURITY                                   :{YELLOW}Увага: адміністратары сервера могуць убачыць ваш пароль.
+STR_NETWORK_NEED_COMPANY_PASSWORD_CAPTION                       :{WHITE}Кампанія абароненая. Увядзіце пароль
+STR_NETWORK_CLIENT_LIST_ADMIN_COMPANY_UNLOCK                    :Скінуць пароль
+STR_NETWORK_CLIENT_LIST_ASK_COMPANY_UNLOCK                      :{YELLOW}Скінуць пароль у кампаніі «{COMPANY}»?
+
+# Network set password
+STR_COMPANY_PASSWORD_CANCEL                                     :{BLACK}Не захоўваць уведзены пароль
+STR_COMPANY_PASSWORD_OK                                         :{BLACK}Даць кампаніі новы пароль
+STR_COMPANY_PASSWORD_CAPTION                                    :{WHITE}Пароль кампаніі
+STR_COMPANY_PASSWORD_MAKE_DEFAULT                               :{BLACK}Пароль кампаніі па змоўчаньні
+STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}Выкарыстоўваць пароль гэтай кампаніі як пароль па змоўчаньні для новых кампаніяў
+
+STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}Пароль
+STR_COMPANY_VIEW_PASSWORD_TOOLTIP                               :{BLACK}Абараніць вашу кампанію паролем, каб неаўтарызаваныя карыстальнікі не маглі далучыцца
+STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}Усталяваць пароль кампаніі

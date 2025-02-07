@@ -102,8 +102,8 @@ static CommandCost TerraformTileHeight(TerraformerState *ts, TileIndex tile, int
 	assert(tile < MapSize());
 
 	/* Check range of destination height */
-	if (height < 0) return_cmd_error(STR_ERROR_ALREADY_AT_SEA_LEVEL);
-	if (height > _settings_game.construction.map_height_limit) return_cmd_error(STR_ERROR_TOO_HIGH);
+	if (height < 0) return CommandCost(STR_ERROR_ALREADY_AT_SEA_LEVEL);
+	if (height > _settings_game.construction.map_height_limit) return CommandCost(STR_ERROR_TOO_HIGH);
 
 	/*
 	 * Check if the terraforming has any effect.
@@ -138,37 +138,23 @@ static CommandCost TerraformTileHeight(TerraformerState *ts, TileIndex tile, int
 	total_cost.AddCost(_price[PR_TERRAFORM]);
 
 	/* Recurse to neighboured corners if height difference is larger than 1 */
-	{
-		const TileIndexDiffC *ttm;
+	for (DiagDirection dir = DIAGDIR_BEGIN; dir < DIAGDIR_END; dir++) {
+		TileIndex neighbour_tile = AddTileIndexDiffCWrap(tile, TileIndexDiffCByDiagDir(dir));
 
-		TileIndex orig_tile = tile;
-		static const TileIndexDiffC _terraform_tilepos[] = {
-			{ 1,  0}, // move to tile in SE
-			{-2,  0}, // undo last move, and move to tile in NW
-			{ 1,  1}, // undo last move, and move to tile in SW
-			{ 0, -2}  // undo last move, and move to tile in NE
-		};
+		/* Not using IsValidTile as we want to also change MP_VOID tiles, which IsValidTile excludes. */
+		if (neighbour_tile == INVALID_TILE) continue;
 
-		for (ttm = _terraform_tilepos; ttm != endof(_terraform_tilepos); ttm++) {
-			tile += ToTileIndexDiff(*ttm);
+		/* Get TileHeight of neighboured tile as of current terraform progress */
+		int r = TerraformGetHeightOfTile(ts, neighbour_tile);
+		int height_diff = height - r;
 
-			if (tile >= MapSize()) continue;
-			/* Make sure we don't wrap around the map */
-			if (Delta(TileX(orig_tile), TileX(tile)) == MapSizeX() - 1) continue;
-			if (Delta(TileY(orig_tile), TileY(tile)) == MapSizeY() - 1) continue;
-
-			/* Get TileHeight of neighboured tile as of current terraform progress */
-			int r = TerraformGetHeightOfTile(ts, tile);
-			int height_diff = height - r;
-
-			/* Is the height difference to the neighboured corner greater than 1? */
-			if (abs(height_diff) > 1) {
-				/* Terraform the neighboured corner. The resulting height difference should be 1. */
-				height_diff += (height_diff < 0 ? 1 : -1);
-				CommandCost cost = TerraformTileHeight(ts, tile, r + height_diff);
-				if (cost.Failed()) return cost;
-				total_cost.AddCost(cost);
-			}
+		/* Is the height difference to the neighboured corner greater than 1? */
+		if (abs(height_diff) > 1) {
+			/* Terraform the neighboured corner. The resulting height difference should be 1. */
+			height_diff += (height_diff < 0 ? 1 : -1);
+			CommandCost cost = TerraformTileHeight(ts, neighbour_tile, r + height_diff);
+			if (cost.Failed()) return cost;
+			total_cost.AddCost(cost);
 		}
 	}
 
@@ -310,7 +296,7 @@ CommandCost CmdTerraformLand(TileIndex tile, DoCommandFlag flags, uint32_t p1, u
 
 	Company *c = Company::GetIfValid(_current_company);
 	if (c != nullptr && GB(c->terraform_limit, 16, 16) < ts.tile_to_new_height.size()) {
-		return_cmd_error(STR_ERROR_TERRAFORM_LIMIT_REACHED);
+		return CommandCost(STR_ERROR_TERRAFORM_LIMIT_REACHED);
 	}
 
 	if (flags & DC_EXEC) {
@@ -365,7 +351,7 @@ CommandCost CmdLevelLand(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint3
 	}
 
 	/* Check range of destination height */
-	if (h > _settings_game.construction.map_height_limit) return_cmd_error((oldh == 0) ? STR_ERROR_ALREADY_AT_SEA_LEVEL : STR_ERROR_TOO_HIGH);
+	if (h > _settings_game.construction.map_height_limit) return CommandCost((oldh == 0) ? STR_ERROR_ALREADY_AT_SEA_LEVEL : STR_ERROR_TOO_HIGH);
 
 	Money money = GetAvailableMoneyForCommand();
 	CommandCost cost(EXPENSES_CONSTRUCTION);
@@ -374,7 +360,7 @@ CommandCost CmdLevelLand(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint3
 
 	const Company *c = Company::GetIfValid(_current_company);
 	int limit = (c == nullptr ? INT32_MAX : GB(c->terraform_limit, 16, 16));
-	if (limit == 0) return_cmd_error(STR_ERROR_TERRAFORM_LIMIT_REACHED);
+	if (limit == 0) return CommandCost(STR_ERROR_TERRAFORM_LIMIT_REACHED);
 
 	OrthogonalOrDiagonalTileIterator iter(tile, p1, HasBit(p2, 0));
 	for (; *iter != INVALID_TILE; ++iter) {

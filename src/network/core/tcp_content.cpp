@@ -49,11 +49,11 @@ bool ContentInfo::IsValid() const
 /**
  * Search a textfile file next to this file in the content list.
  * @param type The type of the textfile to search for.
- * @return The filename for the textfile, \c nullptr otherwise.
+ * @return The filename for the textfile.
  */
-const char *ContentInfo::GetTextfile(TextfileType type) const
+std::optional<std::string> ContentInfo::GetTextfile(TextfileType type) const
 {
-	if (this->state == INVALID) return nullptr;
+	if (this->state == INVALID) return std::nullopt;
 	const char *tmp;
 	switch (this->type) {
 		default: NOT_REACHED();
@@ -88,7 +88,7 @@ const char *ContentInfo::GetTextfile(TextfileType type) const
 			tmp = FindScenario(this, true);
 			break;
 	}
-	if (tmp == nullptr) return nullptr;
+	if (tmp == nullptr) return std::nullopt;
 	return ::GetTextfile(type, GetContentInfoSubDir(this->type), tmp);
 }
 
@@ -113,9 +113,9 @@ bool NetworkContentSocketHandler::HandlePacket(Packet &p)
 
 		default:
 			if (this->HasClientQuit()) {
-				DEBUG(net, 0, "[tcp/content] Received invalid packet type %d", type);
+				Debug(net, 0, "[tcp/content] Received invalid packet type {}", type);
 			} else {
-				DEBUG(net, 0, "[tcp/content] Received illegal packet");
+				Debug(net, 0, "[tcp/content] Received illegal packet");
 			}
 			return false;
 	}
@@ -165,7 +165,7 @@ bool NetworkContentSocketHandler::ReceivePackets()
  */
 bool NetworkContentSocketHandler::ReceiveInvalidPacket(PacketContentType type)
 {
-	DEBUG(net, 0, "[tcp/content] Received illegal packet type %d", type);
+	Debug(net, 0, "[tcp/content] Received illegal packet type {}", type);
 	return false;
 }
 

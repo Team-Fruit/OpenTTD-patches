@@ -12,6 +12,7 @@
 #include "clear_map.h"
 #include "company_func.h"
 #include "company_base.h"
+#include "house.h"
 #include "gui.h"
 #include "window_gui.h"
 #include "window_func.h"
@@ -30,10 +31,15 @@
 #include "object.h"
 #include "hotkeys.h"
 #include "engine_base.h"
+#include "engine_override.h"
 #include "terraform_gui.h"
 #include "cheat_func.h"
-#include "town_gui.h"
 #include "zoom_func.h"
+#include "road_gui.h"
+#include "town.h"
+#include "dropdown_common_type.h"
+#include "dropdown_func.h"
+#include "core/geometry_func.hpp"
 
 #include "widgets/terraform_widget.h"
 
@@ -111,25 +117,25 @@ static bool IsQueryConfirmIndustryOrRailStationInArea(TileIndex start_tile, Tile
 	if (_settings_client.gui.demolish_confirm_mode == DCM_OFF) return false;
 
 	OrthogonalOrDiagonalTileIterator tile_iterator(end_tile, start_tile, diagonal);
-
-	bool destroying_industry_or_station = false;
-
 	for (; *tile_iterator != INVALID_TILE; ++tile_iterator) {
-		if ((_cheats.magic_bulldozer.value && IsTileType(*tile_iterator, MP_INDUSTRY)) ||
-				(_settings_client.gui.demolish_confirm_mode == DCM_INDUSTRY_RAIL_STATION && IsRailStationTile(*tile_iterator))) {
-			destroying_industry_or_station = true;
-			break;
+		TileIndex tile = *tile_iterator;
+		if (_cheats.magic_bulldozer.value && IsTileType(tile, MP_INDUSTRY)) {
+			return true;
+		}
+		if (_settings_client.gui.demolish_confirm_mode == DCM_INDUSTRY_RAIL_STATION && IsRailStationTile(tile)) {
+			/* Only warn when attempting to remove own stations */
+			if (GetTileOwner(tile) == _local_company) return true;
 		}
 	}
 
-	return destroying_industry_or_station;
+	return false;
 }
 
 static CommandContainer _demolish_area_command;
 
-static void DemolishAreaConfirmationCallback(Window*, bool confirmed) {
+static void DemolishAreaConfirmationCallback(Window *, bool confirmed) {
 	if (confirmed) {
-		DoCommandP(&_demolish_area_command);
+		DoCommandP(_demolish_area_command);
 	}
 }
 
@@ -205,7 +211,7 @@ static void PlaceProc_Measure(TileIndex tile)
 struct TerraformToolbarWindow : Window {
 	int last_user_action; ///< Last started user action.
 
-	TerraformToolbarWindow(WindowDesc *desc, WindowNumber window_number) : Window(desc)
+	TerraformToolbarWindow(WindowDesc &desc, WindowNumber window_number) : Window(desc)
 	{
 		/* This is needed as we like to have the tree available on OnInit. */
 		this->CreateNestedTree();
@@ -217,7 +223,7 @@ struct TerraformToolbarWindow : Window {
 	{
 		/* Don't show the place object button when there are no objects to place. */
 		NWidgetStacked *show_object = this->GetWidget<NWidgetStacked>(WID_TT_SHOW_PLACE_OBJECT);
-		show_object->SetDisplayedPlane(ObjectClass::HasUIClass() ? 0 : SZSP_NONE);
+		show_object->SetDisplayedPlane(ShouldShowBuildObjectPicker() ? 0 : SZSP_NONE);
 		SetWidgetDisabledState(WID_TT_BUY_LAND, _settings_game.construction.purchase_land_permitted == 0);
 	}
 
@@ -382,7 +388,6 @@ static Hotkey terraform_hotkeys[] = {
 	Hotkey('R' | WKC_SHIFT, "ruler", WID_TT_MEASUREMENT_TOOL),
 	Hotkey('O', "placesign", WID_TT_PLACE_SIGN),
 	Hotkey('P', "placeobject", WID_TT_PLACE_OBJECT),
-	HOTKEY_LIST_END
 };
 HotkeyList TerraformToolbarWindow::hotkeys("terraform", terraform_hotkeys, TerraformToolbarGlobalHotkeys);
 
@@ -407,14 +412,14 @@ static constexpr NWidgetPart _nested_terraform_widgets[] = {
 		NWidget(WWT_IMGBTN, COLOUR_DARK_GREEN, WID_TT_BUY_LAND), SetMinimalSize(22, 22),
 								SetFill(0, 1), SetDataTip(SPR_IMG_BUY_LAND, STR_LANDSCAPING_TOOLTIP_PURCHASE_LAND),
 		NWidget(WWT_PUSHIMGBTN, COLOUR_DARK_GREEN, WID_TT_PLANT_TREES), SetMinimalSize(22, 22),
-								SetFill(0, 1), SetDataTip(SPR_IMG_PLANTTREES, STR_SCENEDIT_TOOLBAR_PLANT_TREES),
+								SetFill(0, 1), SetDataTip(SPR_IMG_PLANTTREES, STR_SCENEDIT_TOOLBAR_PLANT_TREES_TOOLTIP),
 		NWidget(WWT_IMGBTN, COLOUR_DARK_GREEN, WID_TT_MEASUREMENT_TOOL), SetMinimalSize(22,22),
 								SetFill(0, 1), SetDataTip(SPR_IMG_QUERY, STR_LANDSCAPING_TOOLTIP_RULER_TOOL),
 		NWidget(WWT_IMGBTN, COLOUR_DARK_GREEN, WID_TT_PLACE_SIGN), SetMinimalSize(22, 22),
-								SetFill(0, 1), SetDataTip(SPR_IMG_SIGN, STR_SCENEDIT_TOOLBAR_PLACE_SIGN),
+								SetFill(0, 1), SetDataTip(SPR_IMG_SIGN, STR_SCENEDIT_TOOLBAR_PLACE_SIGN_TOOLTIP),
 		NWidget(NWID_SELECTION, INVALID_COLOUR, WID_TT_SHOW_PLACE_OBJECT),
 			NWidget(WWT_PUSHIMGBTN, COLOUR_DARK_GREEN, WID_TT_PLACE_OBJECT), SetMinimalSize(22, 22),
-								SetFill(0, 1), SetDataTip(SPR_IMG_TRANSMITTER, STR_SCENEDIT_TOOLBAR_PLACE_OBJECT),
+								SetFill(0, 1), SetDataTip(SPR_IMG_TRANSMITTER, STR_SCENEDIT_TOOLBAR_PLACE_OBJECT_TOOLTIP),
 		EndContainer(),
 	EndContainer(),
 };
@@ -423,7 +428,7 @@ static WindowDesc _terraform_desc(__FILE__, __LINE__,
 	WDP_MANUAL, "toolbar_landscape", 0, 0,
 	WC_SCEN_LAND_GEN, WC_NONE,
 	WDF_CONSTRUCTION,
-	std::begin(_nested_terraform_widgets), std::end(_nested_terraform_widgets),
+	_nested_terraform_widgets,
 	&TerraformToolbarWindow::hotkeys
 );
 
@@ -438,13 +443,13 @@ Window *ShowTerraformToolbar(Window *link)
 
 	Window *w;
 	if (link == nullptr) {
-		w = AllocateWindowDescFront<TerraformToolbarWindow>(&_terraform_desc, 0);
+		w = AllocateWindowDescFront<TerraformToolbarWindow>(_terraform_desc, 0);
 		return w;
 	}
 
 	/* Delete the terraform toolbar to place it again. */
 	CloseWindowById(WC_SCEN_LAND_GEN, 0, true);
-	w = AllocateWindowDescFront<TerraformToolbarWindow>(&_terraform_desc, 0);
+	w = AllocateWindowDescFront<TerraformToolbarWindow>(_terraform_desc, 0);
 	/* Align the terraform toolbar under the main toolbar. */
 	w->top -= w->height;
 	w->SetDirty();
@@ -456,7 +461,7 @@ Window *ShowTerraformToolbar(Window *link)
 	return w;
 }
 
-static byte _terraform_size = 1;
+static uint8_t _terraform_size = 1;
 
 /**
  * Raise/Lower a bigger chunk of land at the same time in the editor. When
@@ -506,6 +511,156 @@ static void CommonRaiseLowerBigLand(TileIndex tile, int mode)
 	}
 }
 
+static RoadType _selected_public_road_type = INVALID_ROADTYPE; ///< Public road type. This is static to preserve the selected road type between window openings.
+
+void ClearPublicRoadsWindowSelectedPublicRoadsType()
+{
+	_selected_public_road_type = INVALID_ROADTYPE;
+}
+
+/** Public roads selector and builder mini-window. */
+struct PublicRoadsWindow : Window {
+
+	PublicRoadsWindow(WindowDesc &desc, WindowNumber window_number) : Window(desc)
+	{
+		this->CreateNestedTree();
+		this->FinishInitNested(window_number);
+	}
+
+	void OnInit() override
+	{
+		if (_selected_public_road_type == INVALID_ROADTYPE) _selected_public_road_type = GetTownRoadType();
+	}
+
+	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
+	{
+		switch (widget) {
+			case WID_PR_PUBLIC_ROADS: { // Build public roads
+				extern void GeneratePublicRoads(PublicRoadsConstruction build_mode, RoadType road_type);
+				PublicRoadsConstruction build_mode = _settings_game.game_creation.build_public_roads;
+				if (build_mode == PRC_NONE) build_mode = PRC_WITH_CURVES;
+				RoadType road_type = _selected_public_road_type;
+				ScheduleExecuteWithGenerateWorld([=]() {
+					GeneratePublicRoads(build_mode, road_type);
+				});
+				break;
+			}
+
+			case WID_PR_PUBLIC_ROADS_TYPE_LABEL: // Don't crash when you click on the label
+				break;
+
+			case WID_PR_PUBLIC_ROADS_TYPE_DROPDOWN: { // Select public road type
+				auto road_types = GetScenRoadTypeDropDownList(RTTB_ROAD, true);
+				auto road_types_list = DropDownList{};
+				auto town_road = GetTownRoadType();
+				// check if the town road is an available road type
+				bool has_town_road = false;
+				for (auto rt_iter = road_types.begin(); rt_iter < road_types.end(); rt_iter++) {
+					if ((RoadType)rt_iter->get()->result == town_road) {
+						has_town_road = true;
+						break;
+					}
+				}
+				if (!has_town_road) {
+					// taken from GetScenRoadTypeDropDownList()
+					const RoadTypeInfo *rti = GetRoadTypeInfo(town_road);
+					SetDParam(0, rti->strings.name);
+					SetDParam(1, rti->max_speed / 2);
+					StringID str = rti->max_speed > 0 ? STR_TOOLBAR_RAILTYPE_VELOCITY : STR_JUST_STRING;
+					road_types.push_back(MakeDropDownListIconItem(GetSpriteSize(rti->gui_sprites.build_x_road), rti->gui_sprites.build_x_road, PAL_NONE, str, town_road, false));
+				}
+
+				ShowDropDownList(this, std::move(road_types), _selected_public_road_type, widget);
+				break;
+			}
+		}
+	}
+
+	void OnDropdownSelect(WidgetID widget, int index) override
+	{
+		if (widget == WID_PR_PUBLIC_ROADS_TYPE_DROPDOWN) {
+			_selected_public_road_type = (RoadType)index;
+		}
+
+		this->SetDirty();
+	}
+
+	void OnInvalidateData(int data = 0, bool gui_scope = true) override
+	{
+		if (!gui_scope) return;
+
+		this->ReInit();
+	}
+
+	void DrawWidget(const Rect &r, WidgetID widget) const override
+	{
+		switch (widget) {
+			case WID_PR_PUBLIC_ROADS_TYPE_DROPDOWN:
+			{
+				// instead of using a string put the dropdownlist entry in there instead
+				// @see DropdownWindow::DrawWidget()
+				const RoadTypeInfo *rti = GetRoadTypeInfo(_selected_public_road_type);
+
+				Dimension d = { 0, 0 };
+				d = maxdim(d, GetSpriteSize(rti->gui_sprites.build_x_road));
+				SetDParam(0, rti->strings.name);
+				SetDParam(1, rti->max_speed / 2);
+				StringID str = rti->max_speed > 0 ? STR_TOOLBAR_RAILTYPE_VELOCITY : STR_JUST_STRING;
+
+				auto item = MakeDropDownListIconItem(d, rti->gui_sprites.build_x_road, PAL_NONE, str, _selected_public_road_type);
+				auto item_height = item->Height();
+
+				Rect ir = r.Shrink(WidgetDimensions::scaled.dropdownlist);
+				int y = ir.top;
+				Rect full{ ir.left, y, ir.right, y + (int)item_height - 1 };
+				item->Draw(full, full.Shrink(WidgetDimensions::scaled.dropdowntext, RectPadding::zero), false, this->GetWidget<NWidgetCore>(widget)->colour);
+				break;
+			}
+		}
+	}
+
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
+	{
+		if (widget != WID_PR_PUBLIC_ROADS_TYPE_DROPDOWN) return;
+
+		// max height of each roadtype
+		auto entries = GetScenRoadTypeDropDownList(RTTB_ROAD, true);
+		for (auto e = entries.begin(); e < entries.end(); e++)
+			size.height = std::max(size.height, e->get()->Height());
+		// just use the width of the dropdown list
+		auto d = GetDropDownListDimension(entries);
+		size.width = std::max(size.width, d.width + padding.width);
+	}
+};
+
+static constexpr NWidgetPart _nested_scen_edit_public_roads_widgets[] = {
+	NWidget(NWID_HORIZONTAL),
+		NWidget(WWT_CLOSEBOX, COLOUR_DARK_GREEN),
+		NWidget(WWT_CAPTION, COLOUR_DARK_GREEN), SetDataTip(STR_TERRAFORM_PUBLIC_ROADS_GENERATION_CAPTION, STR_TOOLTIP_WINDOW_TITLE_DRAG_THIS),
+		NWidget(WWT_SHADEBOX, COLOUR_DARK_GREEN),
+		NWidget(WWT_STICKYBOX, COLOUR_DARK_GREEN),
+	EndContainer(),
+	NWidget(WWT_PANEL, COLOUR_DARK_GREEN),
+			NWidget(WWT_LABEL, INVALID_COLOUR, WID_PR_PUBLIC_ROADS_TYPE_LABEL), SetMinimalSize(160, 12), SetDataTip(STR_TERRAFORM_PUBLIC_ROADS_TYPE, STR_NULL), SetFill(1, 0), SetPadding(1, 2, 0, 2),
+			NWidget(WWT_DROPDOWN, COLOUR_GREY, WID_PR_PUBLIC_ROADS_TYPE_DROPDOWN), SetMinimalSize(160, 24), SetDataTip(STR_EMPTY, STR_NULL), SetPadding(1, 2, 0, 2),
+			NWidget(WWT_PUSHTXTBTN, COLOUR_GREY, WID_PR_PUBLIC_ROADS), SetMinimalSize(160, 12),
+				SetFill(1, 0), SetDataTip(STR_TERRAFORM_PUBLIC_ROADS, STR_TERRAFORM_PUBLIC_ROADS_TOOLTIP), SetPadding(1, 2, 0, 2),
+			NWidget(NWID_SPACER), SetMinimalSize(0, 2),
+	EndContainer(),
+};
+
+static WindowDesc _public_roads_window_desc(__FILE__, __LINE__,
+	WDP_AUTO, "public_roads_window", 0, 0,
+	WC_SCEN_PUBLIC_ROADS, WC_NONE,
+	WDF_CONSTRUCTION,
+	_nested_scen_edit_public_roads_widgets
+);
+
+Window *ShowEditorPublicRoadsWindow()
+{
+	return AllocateWindowDescFront<PublicRoadsWindow>(_public_roads_window_desc, 0);
+}
+
 static const int8_t _multi_terraform_coords[][2] = {
 	{  0, -2},
 	{  4,  0}, { -4,  0}, {  0,  2},
@@ -542,21 +697,18 @@ static constexpr NWidgetPart _nested_scen_edit_land_gen_widgets[] = {
 											SetFill(0, 1), SetDataTip(SPR_IMG_DESERT, STR_TERRAFORM_TOOLTIP_DEFINE_DESERT_AREA),
 			EndContainer(),
 			NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_ETT_PLACE_OBJECT), SetMinimalSize(23, 22),
-										SetFill(0, 1), SetDataTip(SPR_IMG_TRANSMITTER, STR_SCENEDIT_TOOLBAR_PLACE_OBJECT),
-			NWidget(NWID_SPACER), SetFill(1, 0),
-			NWidget(WWT_IMGBTN, COLOUR_GREY, WID_ETT_PLACE_HOUSE), SetMinimalSize(23, 22),
-										SetFill(0, 1), SetDataTip(SPR_IMG_TOWN, STR_SCENEDIT_TOOLBAR_PLACE_HOUSE),
+										SetFill(0, 1), SetDataTip(SPR_IMG_TRANSMITTER, STR_SCENEDIT_TOOLBAR_PLACE_OBJECT_TOOLTIP),
 			NWidget(NWID_SPACER), SetFill(1, 0),
 		EndContainer(),
 		NWidget(NWID_HORIZONTAL),
 			NWidget(NWID_SPACER), SetFill(1, 0),
-			NWidget(WWT_EMPTY, COLOUR_DARK_GREEN, WID_ETT_DOTS), SetMinimalSize(59, 31), SetDataTip(STR_EMPTY, STR_NULL),
+			NWidget(WWT_EMPTY, INVALID_COLOUR, WID_ETT_DOTS), SetMinimalSize(59, 31), SetDataTip(STR_EMPTY, STR_NULL),
 			NWidget(NWID_SPACER), SetFill(1, 0),
 			NWidget(NWID_VERTICAL),
 				NWidget(NWID_SPACER), SetFill(0, 1),
-				NWidget(WWT_IMGBTN, COLOUR_GREY, WID_ETT_INCREASE_SIZE), SetMinimalSize(12, 12), SetDataTip(SPR_ARROW_UP, STR_TERRAFORM_TOOLTIP_INCREASE_SIZE_OF_LAND_AREA),
+				NWidget(WWT_IMGBTN, COLOUR_GREY, WID_ETT_INCREASE_SIZE), SetAspect(WidgetDimensions::ASPECT_UP_DOWN_BUTTON), SetDataTip(SPR_ARROW_UP, STR_TERRAFORM_TOOLTIP_INCREASE_SIZE_OF_LAND_AREA),
 				NWidget(NWID_SPACER), SetMinimalSize(0, 1),
-				NWidget(WWT_IMGBTN, COLOUR_GREY, WID_ETT_DECREASE_SIZE), SetMinimalSize(12, 12), SetDataTip(SPR_ARROW_DOWN, STR_TERRAFORM_TOOLTIP_DECREASE_SIZE_OF_LAND_AREA),
+				NWidget(WWT_IMGBTN, COLOUR_GREY, WID_ETT_DECREASE_SIZE), SetAspect(WidgetDimensions::ASPECT_UP_DOWN_BUTTON), SetDataTip(SPR_ARROW_DOWN, STR_TERRAFORM_TOOLTIP_DECREASE_SIZE_OF_LAND_AREA),
 				NWidget(NWID_SPACER), SetFill(0, 1),
 			EndContainer(),
 			NWidget(NWID_SPACER), SetMinimalSize(2, 0),
@@ -566,10 +718,6 @@ static constexpr NWidgetPart _nested_scen_edit_land_gen_widgets[] = {
 								SetFill(1, 0), SetDataTip(STR_TERRAFORM_SE_NEW_WORLD, STR_TERRAFORM_TOOLTIP_GENERATE_RANDOM_LAND), SetPadding(0, 2, 0, 2),
 		NWidget(WWT_TEXTBTN, COLOUR_GREY, WID_ETT_RESET_LANDSCAPE), SetMinimalSize(160, 12),
 								SetFill(1, 0), SetDataTip(STR_TERRAFORM_RESET_LANDSCAPE, STR_TERRAFORM_RESET_LANDSCAPE_TOOLTIP), SetPadding(1, 2, 0, 2),
-		NWidget(NWID_SELECTION, INVALID_COLOUR, WID_ETT_SHOW_PUBLIC_ROADS),
-			NWidget(WWT_TEXTBTN, COLOUR_GREY, WID_ETT_PUBLIC_ROADS), SetMinimalSize(160, 12),
-									SetFill(1, 0), SetDataTip(STR_TERRAFORM_PUBLIC_ROADS, STR_TERRAFORM_PUBLIC_ROADS_TOOLTIP), SetPadding(1, 2, 0, 2),
-		EndContainer(),
 		NWidget(NWID_SPACER), SetMinimalSize(0, 2),
 	EndContainer(),
 };
@@ -611,7 +759,7 @@ static void ResetLandscapeConfirmationCallback(Window *, bool confirmed)
 struct ScenarioEditorLandscapeGenerationWindow : Window {
 	int last_user_action; ///< Last started user action.
 
-	ScenarioEditorLandscapeGenerationWindow(WindowDesc *desc, WindowNumber window_number) : Window(desc)
+	ScenarioEditorLandscapeGenerationWindow(WindowDesc &desc, WindowNumber window_number) : Window(desc)
 	{
 		this->CreateNestedTree();
 		this->SetButtonStates();
@@ -628,12 +776,12 @@ struct ScenarioEditorLandscapeGenerationWindow : Window {
 		}
 	}
 
-	void UpdateWidgetSize(WidgetID widget, Dimension *size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension *fill, [[maybe_unused]] Dimension *resize) override
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
 	{
 		if (widget != WID_ETT_DOTS) return;
 
-		size->width  = std::max<uint>(size->width,  ScaleGUITrad(59));
-		size->height = std::max<uint>(size->height, ScaleGUITrad(31));
+		size.width  = std::max<uint>(size.width,  ScaleGUITrad(59));
+		size.height = std::max<uint>(size.height, ScaleGUITrad(31));
 	}
 
 	void DrawWidget(const Rect &r, WidgetID widget) const override
@@ -692,10 +840,6 @@ struct ScenarioEditorLandscapeGenerationWindow : Window {
 				ShowBuildObjectPicker();
 				break;
 
-			case WID_ETT_PLACE_HOUSE: // Place house button
-				ShowBuildHousePicker();
-				break;
-
 			case WID_ETT_INCREASE_SIZE:
 			case WID_ETT_DECREASE_SIZE: { // Increase/Decrease terraform size
 				int size = (widget == WID_ETT_INCREASE_SIZE) ? 1 : -1;
@@ -718,12 +862,6 @@ struct ScenarioEditorLandscapeGenerationWindow : Window {
 			case WID_ETT_RESET_LANDSCAPE: // Reset landscape
 				ShowQuery(STR_QUERY_RESET_LANDSCAPE_CAPTION, STR_RESET_LANDSCAPE_CONFIRMATION_TEXT, nullptr, ResetLandscapeConfirmationCallback);
 				break;
-
-			case WID_ETT_PUBLIC_ROADS: { // Build public roads
-				extern void GeneratePublicRoads();
-				GeneratePublicRoads();
-				break;
-			}
 
 			default: NOT_REACHED();
 		}
@@ -814,8 +952,6 @@ struct ScenarioEditorLandscapeGenerationWindow : Window {
 	{
 		NWidgetStacked *show_desert = this->GetWidget<NWidgetStacked>(WID_ETT_SHOW_PLACE_DESERT);
 		show_desert->SetDisplayedPlane(_settings_game.game_creation.landscape == LT_TROPIC ? 0 : SZSP_NONE);
-		NWidgetStacked *show_public_roads = this->GetWidget<NWidgetStacked>(WID_ETT_SHOW_PUBLIC_ROADS);
-		show_public_roads->SetDisplayedPlane(_settings_game.game_creation.build_public_roads != 0 ? 0 : SZSP_NONE);
 	}
 
 	static HotkeyList hotkeys;
@@ -842,8 +978,6 @@ static Hotkey terraform_editor_hotkeys[] = {
 	Hotkey('R', "rocky", WID_ETT_PLACE_ROCKS),
 	Hotkey('T', "desert", WID_ETT_PLACE_DESERT),
 	Hotkey('O', "object", WID_ETT_PLACE_OBJECT),
-	Hotkey('H', "house", WID_ETT_PLACE_HOUSE),
-	HOTKEY_LIST_END
 };
 
 HotkeyList ScenarioEditorLandscapeGenerationWindow::hotkeys("terraform_editor", terraform_editor_hotkeys, TerraformToolbarEditorGlobalHotkeys);
@@ -852,7 +986,7 @@ static WindowDesc _scen_edit_land_gen_desc(__FILE__, __LINE__,
 	WDP_AUTO, "toolbar_landscape_scen", 0, 0,
 	WC_SCEN_LAND_GEN, WC_NONE,
 	WDF_CONSTRUCTION,
-	std::begin(_nested_scen_edit_land_gen_widgets), std::end(_nested_scen_edit_land_gen_widgets),
+	_nested_scen_edit_land_gen_widgets,
 	&ScenarioEditorLandscapeGenerationWindow::hotkeys
 );
 
@@ -862,5 +996,5 @@ static WindowDesc _scen_edit_land_gen_desc(__FILE__, __LINE__,
  */
 Window *ShowEditorTerraformToolbar()
 {
-	return AllocateWindowDescFront<ScenarioEditorLandscapeGenerationWindow>(&_scen_edit_land_gen_desc, 0);
+	return AllocateWindowDescFront<ScenarioEditorLandscapeGenerationWindow>(_scen_edit_land_gen_desc, 0);
 }

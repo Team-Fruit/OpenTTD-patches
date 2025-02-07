@@ -13,7 +13,6 @@
 #include "timetable.h"
 #include "news_func.h"
 #include "company_func.h"
-#include "pathfinder/npf/npf_func.h"
 #include "depot_base.h"
 #include "station_base.h"
 #include "newgrf_engine.h"
@@ -221,12 +220,7 @@ static void CheckIfShipNeedsService(Vehicle *v)
 		return;
 	}
 
-	uint max_distance;
-	switch (_settings_game.pf.pathfinder_for_ships) {
-		case VPF_NPF:  max_distance = _settings_game.pf.npf.maximum_go_to_depot_penalty  / NPF_TILE_LENGTH;  break;
-		case VPF_YAPF: max_distance = _settings_game.pf.yapf.maximum_go_to_depot_penalty / YAPF_TILE_LENGTH; break;
-		default: NOT_REACHED();
-	}
+	uint max_distance = _settings_game.pf.yapf.maximum_go_to_depot_penalty / YAPF_TILE_LENGTH;
 
 	const Depot *depot = FindClosestShipDepot(v, max_distance);
 
@@ -431,13 +425,7 @@ static Vehicle *EnsureNoMovingShipProc(Vehicle *v, void *)
 static bool CheckReverseShip(const Ship *v, Trackdir *trackdir = nullptr)
 {
 	/* Ask pathfinder for best direction */
-	bool reverse = false;
-	switch (_settings_game.pf.pathfinder_for_ships) {
-		case VPF_NPF: reverse = NPFShipCheckReverse(v, trackdir); break;
-		case VPF_YAPF: reverse = YapfShipCheckReverse(v, trackdir); break;
-		default: NOT_REACHED();
-	}
-	return reverse;
+	return YapfShipCheckReverse(v, trackdir);
 }
 
 static bool CheckShipLeaveDepot(Ship *v)
@@ -553,8 +541,8 @@ static uint ShipAccelerate(Vehicle *v)
 	const uint advance_speed = v->GetAdvanceSpeed(speed);
 	const uint number_of_steps = (advance_speed + v->progress) / v->GetAdvanceDistance();
 	const uint remainder = (advance_speed + v->progress) % v->GetAdvanceDistance();
-	dbg_assert(remainder <= std::numeric_limits<byte>::max());
-	v->progress = static_cast<byte>(remainder);
+	dbg_assert(remainder <= std::numeric_limits<uint8_t>::max());
+	v->progress = static_cast<uint8_t>(remainder);
 	return number_of_steps;
 }
 
@@ -587,14 +575,11 @@ static void ShipArrivesAt(const Vehicle *v, Station *st)
  *
  * @param v Ship to navigate
  * @param tile Tile, the ship is about to enter
- * @param enterdir Direction of entering
  * @param tracks Available track choices on \a tile
  * @return Track to choose, or INVALID_TRACK when to reverse.
  */
-static Track ChooseShipTrack(Ship *v, TileIndex tile, DiagDirection enterdir, TrackBits tracks)
+static Track ChooseShipTrack(Ship *v, TileIndex tile, TrackBits tracks)
 {
-	dbg_assert(IsValidDiagDirection(enterdir));
-
 	bool path_found = true;
 	Track track;
 
@@ -619,13 +604,9 @@ static Track ChooseShipTrack(Ship *v, TileIndex tile, DiagDirection enterdir, Tr
 			v->cached_path.clear();
 		}
 
-		switch (_settings_game.pf.pathfinder_for_ships) {
-			case VPF_NPF: track = NPFShipChooseTrack(v, path_found); break;
-			case VPF_YAPF: track = YapfShipChooseTrack(v, tile, enterdir, tracks, path_found, v->cached_path); break;
-			default: NOT_REACHED();
-		}
+		track = YapfShipChooseTrack(v, tile, path_found, v->cached_path);
 	}
-	DEBUG_UPDATESTATECHECKSUM("ChooseShipTrack: v: %u, path_found: %d, track: %d", v->index, path_found, track);
+	DEBUG_UPDATESTATECHECKSUM("ChooseShipTrack: v: {}, path_found: {}, track: {}", v->index, path_found, track);
 	UpdateStateChecksum((((uint64_t) v->index) << 32) | (path_found << 16) | track);
 
 	v->HandlePathfindingResult(path_found);
@@ -647,8 +628,8 @@ static inline TrackBits GetAvailShipTracks(TileIndex tile, DiagDirection dir)
 
 /** Structure for ship sub-coordinate data for moving into a new tile via a Diagdir onto a Track. */
 struct ShipSubcoordData {
-	byte x_subcoord; ///< New X sub-coordinate on the new tile
-	byte y_subcoord; ///< New Y sub-coordinate on the new tile
+	uint8_t x_subcoord; ///< New X sub-coordinate on the new tile
+	uint8_t y_subcoord; ///< New Y sub-coordinate on the new tile
 	Direction dir;   ///< New Direction to move in on the new track
 };
 /** Ship sub-coordinate data for moving into a new tile via a Diagdir onto a Track.
@@ -1065,7 +1046,7 @@ static void ShipController(Ship *v)
 				}
 
 				/* Choose a direction, and continue if we find one */
-				Track track = ChooseShipTrack(v, gp.new_tile, diagdir, tracks);
+				Track track = ChooseShipTrack(v, gp.new_tile, tracks);
 				if (track == INVALID_TRACK) return ReverseShip(v);
 
 				/* Try to avoid collision and keep distance between ships. */
@@ -1116,14 +1097,14 @@ static void ShipController(Ship *v)
 				v->y_pos = gp.y;
 				v->UpdatePosition();
 				if ((v->vehstatus & VS_HIDDEN) == 0) v->UpdateViewport(true, false);
-				return;
+				continue;
 			}
 			/* Bridge exit */
 			if (_settings_game.vehicle.ship_collision_avoidance && gp.new_tile != TileVirtXY(v->x_pos, v->y_pos)) HandleSpeedOnAqueduct(v, gp.new_tile, v->tile);
 
 			/* Ship is back on the bridge head, we need to consume its path
 			 * cache entry here as we didn't have to choose a ship track. */
-			 if (!v->cached_path.empty()) v->cached_path.pop_front();
+			if (!v->cached_path.empty()) v->cached_path.pop_front();
 		}
 
 		/* update image of ship, as well as delta XY */
@@ -1137,7 +1118,7 @@ static void ShipController(Ship *v)
 
 bool Ship::Tick()
 {
-	DEBUG_UPDATESTATECHECKSUM("Ship::Tick: v: %u, x: %d, y: %d", this->index, this->x_pos, this->y_pos);
+	DEBUG_UPDATESTATECHECKSUM("Ship::Tick: v: {}, x: {}, y: {}", this->index, this->x_pos, this->y_pos);
 	UpdateStateChecksum((((uint64_t) this->x_pos) << 32) | this->y_pos);
 	if (!((this->vehstatus & VS_STOPPED) || this->IsWaitingInDepot())) this->running_ticks++;
 
@@ -1214,8 +1195,8 @@ CommandCost CmdBuildShip(TileIndex tile, DoCommandFlag flags, const Engine *e, V
 
 		if (e->flags & ENGINE_EXCLUSIVE_PREVIEW) SetBit(v->vehicle_flags, VF_BUILT_AS_PROTOTYPE);
 		v->SetServiceIntervalIsPercent(Company::Get(_current_company)->settings.vehicle.servint_ispercent);
-		SB(v->vehicle_flags, VF_AUTOMATE_TIMETABLE, 1, Company::Get(_current_company)->settings.vehicle.auto_timetable_by_default);
-		SB(v->vehicle_flags, VF_TIMETABLE_SEPARATION, 1, Company::Get(_current_company)->settings.vehicle.auto_separation_by_default);
+		AssignBit(v->vehicle_flags, VF_AUTOMATE_TIMETABLE, Company::Get(_current_company)->settings.vehicle.auto_timetable_by_default);
+		AssignBit(v->vehicle_flags, VF_TIMETABLE_SEPARATION, Company::Get(_current_company)->settings.vehicle.auto_separation_by_default);
 
 		v->InvalidateNewGRFCacheOfChain();
 

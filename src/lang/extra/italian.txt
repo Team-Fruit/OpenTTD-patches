@@ -26,8 +26,6 @@ STR_LINKGRAPH_STATS_TOOLTIP_CAPACITY                            :{}Capacità: {C
 
 # Programmable Pre-Signals
 
-#House construction window (for SE only)
-
 #Town select window (for SE only)
 
 STR_MAPGEN_SNOW_LINE_HEIGHT                                     :{BLACK}Altezza delle nevi:
@@ -53,8 +51,8 @@ STR_VEHICLE_STATUS_CANNOT_REACH_DEPOT_SERVICE_VEL_END           :{LTBLUE}Impossi
 
 STR_ORDERS_GO_TO_TOOLTIP_EXTRA                                  :{BLACK}Inserisci un nuovo ordine prima dell'ordine evidenziato o aggiungi alla fine della lista. CTRL+Clic su una stazione per 'carico completo di qualsiasi carico', su un punto di passaggio per invertire l'impostazione 'non-stop di default', o su un deposito per 'servizio'. Clic su un altro veicolo per copiare i suoi ordini o CTRL+Clic per condividere gli ordini. Un ordine di deposito disabilita la manutenzione automatica del veicolo.
 
-STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :A:
-STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :P:
+STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :A:{SPACE}{SPACE}
+STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :P:{SPACE}{SPACE}
 
 # Cargo type orders Window
 
@@ -93,3 +91,19 @@ STR_ERROR_CAN_T_SELL_25_SHARE_IN                                :{WHITE}Impossib
 STR_ERROR_PROTECTED                                             :{WHITE}Questa compagnia non è abbastanza vecchia per scambiare azioni...
 
 STR_CONFIG_SETTING_CYCLE_SIGNAL_PBS                             :Solo segnali di percorso
+
+STR_WARNING_PASSWORD_SECURITY                                   :{YELLOW}Attenzione: gli amministratori del server potrebbero leggere il testo inserito qui.
+STR_NETWORK_NEED_COMPANY_PASSWORD_CAPTION                       :{WHITE}Compagnia protetta. Inserire la password
+STR_NETWORK_CLIENT_LIST_ADMIN_COMPANY_UNLOCK                    :Sblocco con password
+STR_NETWORK_CLIENT_LIST_ASK_COMPANY_UNLOCK                      :{YELLOW}Sei sicuro di voler reimpostare la password della compagnia '{COMPANY}'?
+
+# Network set password
+STR_COMPANY_PASSWORD_CANCEL                                     :{BLACK}Non salvare la password inserita
+STR_COMPANY_PASSWORD_OK                                         :{BLACK}Assegna la nuova password alla compagnia
+STR_COMPANY_PASSWORD_CAPTION                                    :{WHITE}Password della compagnia
+STR_COMPANY_PASSWORD_MAKE_DEFAULT                               :{BLACK}Password predefinita compagnia
+STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}Usa questa password come predefinita per le nuove compagnie
+
+STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}Password
+STR_COMPANY_VIEW_PASSWORD_TOOLTIP                               :{BLACK}Protegge la compagnia con una password per impedire ad utenti non autorizzati di accedervi
+STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}Imposta password compagnia

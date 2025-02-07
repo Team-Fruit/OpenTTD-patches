@@ -158,20 +158,24 @@ uint16_t OverrideManagerBase::GetSubstituteID(uint16_t entity_id) const
  */
 void HouseOverrideManager::SetEntitySpec(const HouseSpec *hs)
 {
-	HouseID house_id = this->AddEntityID(hs->grf_prop.local_id, hs->grf_prop.grffile->grfid, hs->grf_prop.subst_id);
+	HouseID house_id = this->AddEntityID(hs->grf_prop.local_id, hs->grf_prop.grfid, hs->grf_prop.subst_id);
 
 	if (house_id == this->invalid_id) {
-		grfmsg(1, "House.SetEntitySpec: Too many houses allocated. Ignoring.");
+		GrfMsg(1, "House.SetEntitySpec: Too many houses allocated. Ignoring.");
 		return;
 	}
 
-	*HouseSpec::Get(house_id) = *hs;
+	auto &house_specs = HouseSpec::Specs();
+
+	/* Now that we know we can use the given id, copy the spec to its final destination. */
+	if (house_id >= house_specs.size()) house_specs.resize(house_id + 1);
+	house_specs[house_id] = *hs;
 
 	/* Now add the overrides. */
 	for (int i = 0; i < this->max_offset; i++) {
 		HouseSpec *overridden_hs = HouseSpec::Get(i);
 
-		if (this->entity_overrides[i] != hs->grf_prop.local_id || this->grfid_overrides[i] != hs->grf_prop.grffile->grfid) continue;
+		if (this->entity_overrides[i] != hs->grf_prop.local_id || this->grfid_overrides[i] != hs->grf_prop.grfid) continue;
 
 		overridden_hs->grf_prop.override = house_id;
 		this->entity_overrides[i] = this->invalid_id;
@@ -218,7 +222,7 @@ uint16_t IndustryOverrideManager::AddEntityID(uint16_t grf_local_id, uint32_t gr
 		/* This industry must be one that is not available(enabled), mostly because of climate.
 		 * And it must not already be used by a grf (grffile == nullptr).
 		 * So reserve this slot here, as it is the chosen one */
-		if (!inds->enabled && inds->grf_prop.grffile == nullptr) {
+		if (!inds->enabled && !inds->grf_prop.HasGrfFile()) {
 			EntityIDMapping *map = &this->mappings[id];
 
 			if (map->entity_id == 0 && map->grfid == 0) {
@@ -243,19 +247,19 @@ uint16_t IndustryOverrideManager::AddEntityID(uint16_t grf_local_id, uint32_t gr
 void IndustryOverrideManager::SetEntitySpec(IndustrySpec *inds)
 {
 	/* First step : We need to find if this industry is already specified in the savegame data. */
-	IndustryType ind_id = this->GetID(inds->grf_prop.local_id, inds->grf_prop.grffile->grfid);
+	IndustryType ind_id = this->GetID(inds->grf_prop.local_id, inds->grf_prop.grfid);
 
 	if (ind_id == this->invalid_id) {
 		/* Not found.
 		 * Or it has already been overridden, so you've lost your place.
 		 * Or it is a simple substitute.
 		 * We need to find a free available slot */
-		ind_id = this->AddEntityID(inds->grf_prop.local_id, inds->grf_prop.grffile->grfid, inds->grf_prop.subst_id);
+		ind_id = this->AddEntityID(inds->grf_prop.local_id, inds->grf_prop.grfid, inds->grf_prop.subst_id);
 		inds->grf_prop.override = this->invalid_id;  // make sure it will not be detected as overridden
 	}
 
 	if (ind_id == this->invalid_id) {
-		grfmsg(1, "Industry.SetEntitySpec: Too many industries allocated. Ignoring.");
+		GrfMsg(1, "Industry.SetEntitySpec: Too many industries allocated. Ignoring.");
 		return;
 	}
 
@@ -267,10 +271,10 @@ void IndustryOverrideManager::SetEntitySpec(IndustrySpec *inds)
 
 void IndustryTileOverrideManager::SetEntitySpec(const IndustryTileSpec *its)
 {
-	IndustryGfx indt_id = this->AddEntityID(its->grf_prop.local_id, its->grf_prop.grffile->grfid, its->grf_prop.subst_id);
+	IndustryGfx indt_id = this->AddEntityID(its->grf_prop.local_id, its->grf_prop.grfid, its->grf_prop.subst_id);
 
 	if (indt_id == this->invalid_id) {
-		grfmsg(1, "IndustryTile.SetEntitySpec: Too many industry tiles allocated. Ignoring.");
+		GrfMsg(1, "IndustryTile.SetEntitySpec: Too many industry tiles allocated. Ignoring.");
 		return;
 	}
 
@@ -280,7 +284,7 @@ void IndustryTileOverrideManager::SetEntitySpec(const IndustryTileSpec *its)
 	for (int i = 0; i < this->max_offset; i++) {
 		IndustryTileSpec *overridden_its = &_industry_tile_specs[i];
 
-		if (this->entity_overrides[i] != its->grf_prop.local_id || this->grfid_overrides[i] != its->grf_prop.grffile->grfid) continue;
+		if (this->entity_overrides[i] != its->grf_prop.local_id || this->grfid_overrides[i] != its->grf_prop.grfid) continue;
 
 		overridden_its->grf_prop.override = indt_id;
 		overridden_its->enabled = false;
@@ -298,18 +302,18 @@ void IndustryTileOverrideManager::SetEntitySpec(const IndustryTileSpec *its)
 void ObjectOverrideManager::SetEntitySpec(ObjectSpec *spec)
 {
 	/* First step : We need to find if this object is already specified in the savegame data. */
-	ObjectType type = this->GetID(spec->grf_prop.local_id, spec->grf_prop.grffile->grfid);
+	ObjectType type = this->GetID(spec->grf_prop.local_id, spec->grf_prop.grfid);
 
 	if (type == this->invalid_id) {
 		/* Not found.
 		 * Or it has already been overridden, so you've lost your place.
 		 * Or it is a simple substitute.
 		 * We need to find a free available slot */
-		type = this->AddEntityID(spec->grf_prop.local_id, spec->grf_prop.grffile->grfid, OBJECT_TRANSMITTER);
+		type = this->AddEntityID(spec->grf_prop.local_id, spec->grf_prop.grfid, OBJECT_TRANSMITTER);
 	}
 
 	if (type == this->invalid_id) {
-		grfmsg(1, "Object.SetEntitySpec: Too many objects allocated. Ignoring.");
+		GrfMsg(1, "Object.SetEntitySpec: Too many objects allocated. Ignoring.");
 		return;
 	}
 
@@ -403,7 +407,7 @@ uint32_t GetTerrainType(TileIndex tile, TileContext context)
  * @param axis Axis of a railways station.
  * @return The tile at the offset.
  */
-TileIndex GetNearbyTile(byte parameter, TileIndex tile, bool signed_offsets, Axis axis)
+TileIndex GetNearbyTile(uint8_t parameter, TileIndex tile, bool signed_offsets, Axis axis)
 {
 	int8_t x = GB(parameter, 0, 4);
 	int8_t y = GB(parameter, 4, 4);
@@ -443,7 +447,7 @@ uint32_t GetNearbyTileInformation(TileIndex tile, bool grf_version8, uint32_t ma
 	}
 	if (mask & 0xFE00) {
 		/* Return 0 if the tile is a land tile */
-		byte terrain_type = (HasTileWaterClass(tile) ? (GetWaterClass(tile) + 1) & 3 : 0) << 5 | GetTerrainType(tile) << 2 | (tile_type == MP_WATER ? 1 : 0) << 1;
+		uint8_t terrain_type = (HasTileWaterClass(tile) ? (GetWaterClass(tile) + 1) & 3 : 0) << 5 | GetTerrainType(tile) << 2 | (tile_type == MP_WATER ? 1 : 0) << 1;
 		result |= terrain_type << 8;
 	}
 	if (mask & 0xFF00FF) {
@@ -478,7 +482,7 @@ CommandCost GetErrorMessageFromLocationCallbackResult(uint16_t cb_res, const GRF
 	CommandCost res;
 
 	if (cb_res < 0x400) {
-		res = CommandCost(GetGRFStringID(grffile->grfid, 0xD000 + cb_res));
+		res = CommandCost(GetGRFStringID(grffile, 0xD000 + cb_res));
 	} else {
 		switch (cb_res) {
 			case 0x400: return res; // No error.
@@ -523,12 +527,12 @@ void ErrorUnknownCallbackResult(uint32_t grfid, uint16_t cbid, uint16_t cb_res)
 
 	SetDParamStr(0, grfconfig->GetName());
 	std::string buffer = GetString(STR_NEWGRF_BUGGY);
-	DEBUG(grf, 0, "%s", strip_leading_colours(buffer));
+	Debug(grf, 0, "{}", strip_leading_colours(buffer));
 
 	SetDParam(1, cbid);
 	SetDParam(2, cb_res);
 	buffer = GetString(STR_NEWGRF_BUGGY_UNKNOWN_CALLBACK_RESULT);
-	DEBUG(grf, 0, "%s", strip_leading_colours(buffer));
+	Debug(grf, 0, "{}", strip_leading_colours(buffer));
 }
 
 /**

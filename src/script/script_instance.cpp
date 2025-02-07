@@ -44,7 +44,7 @@ ScriptStorage::~ScriptStorage()
  * @param error_msg Is this an error message?
  * @param message The actual message text.
  */
-static void PrintFunc(bool error_msg, const SQChar *message)
+static void PrintFunc(bool error_msg, const std::string &message)
 {
 	/* Convert to OpenTTD internal capable string */
 	ScriptController::Print(error_msg, message);
@@ -138,8 +138,7 @@ bool ScriptInstance::LoadCompatibilityScripts(const std::string &api_version, Su
 		this->allow_text_param_mismatch = true;
 	}
 
-	char script_name[32];
-	seprintf(script_name, lastof(script_name), "compat_%s.nut", api_version.c_str());
+	std::string script_name = fmt::format("compat_{}.nut", api_version);
 	for (Searchpath sp : _valid_searchpaths) {
 		std::string buf = FioGetDirectory(sp, dir);
 		buf += script_name;
@@ -148,7 +147,7 @@ bool ScriptInstance::LoadCompatibilityScripts(const std::string &api_version, Su
 		if (this->engine->LoadScript(buf)) return true;
 
 		ScriptLog::Error("Failed to load API compatibility script");
-		DEBUG(script, 0, "Error compiling / running API compatibility script: %s", buf.c_str());
+		Debug(script, 0, "Error compiling / running API compatibility script: {}", buf);
 		return false;
 	}
 
@@ -167,9 +166,7 @@ bool ScriptInstance::LoadCompatibilityScripts(const std::string &api_version, Su
 			break;
 	}
 
-	char not_found_msg[128];
-	seprintf(not_found_msg, lastof(not_found_msg), "API compatibility script not found: %s%s", script_name, message_suffix);
-	ScriptLog::Warning(not_found_msg);
+	ScriptLog::Warning(fmt::format("API compatibility script not found: {}{}", script_name, message_suffix));
 	return true;
 }
 
@@ -193,7 +190,7 @@ void ScriptInstance::Continue()
 
 void ScriptInstance::Died()
 {
-	DEBUG(script, 0, "The script died unexpectedly.");
+	Debug(script, 0, "The script died unexpectedly.");
 	this->is_dead = true;
 	this->in_shutdown = true;
 
@@ -408,7 +405,7 @@ ScriptLogTypes::LogData &ScriptInstance::GetLogData()
 				ScriptLog::Error("Maximum string length is 254 chars. No data saved.");
 				return false;
 			}
-			SlWriteByte((byte)len);
+			SlWriteByte((uint8_t)len);
 			SlArray(const_cast<char *>(buf), len, SLE_CHAR);
 			return true;
 		}
@@ -561,7 +558,7 @@ bool ScriptInstance::IsPaused()
 
 /* static */ bool ScriptInstance::LoadObjects(ScriptData *data)
 {
-	byte type = SlReadByte();
+	uint8_t type = SlReadByte();
 	switch (type) {
 		case SQSL_INT: {
 			int64_t value;
@@ -571,7 +568,7 @@ bool ScriptInstance::IsPaused()
 		}
 
 		case SQSL_STRING: {
-			byte len = SlReadByte();
+			uint8_t len = SlReadByte();
 			static char buf[std::numeric_limits<decltype(len)>::max()];
 			SlArray(buf, len, SLE_CHAR);
 			if (data != nullptr) data->push_back(StrMakeValid(std::string_view(buf, len)));
@@ -586,7 +583,7 @@ bool ScriptInstance::IsPaused()
 		}
 
 		case SQSL_BOOL: {
-			byte sl_byte = SlReadByte();
+			uint8_t sl_byte = SlReadByte();
 			if (data != nullptr) data->push_back((SQBool)(sl_byte != 0));
 			return true;
 		}
@@ -607,60 +604,54 @@ bool ScriptInstance::IsPaused()
 
 /* static */ bool ScriptInstance::LoadObjects(HSQUIRRELVM vm, ScriptData *data)
 {
-	ScriptDataVariant value = data->front();
+	ScriptDataVariant value = std::move(data->front());
 	data->pop_front();
 
-	if (std::holds_alternative<SQInteger>(value)) {
-		sq_pushinteger(vm, std::get<SQInteger>(value));
-		return true;
-	}
+	struct visitor {
+		HSQUIRRELVM vm;
+		ScriptData *data;
 
-	if (std::holds_alternative<std::string>(value)) {
-		sq_pushstring(vm, std::get<std::string>(value), -1);
-		return true;
-	}
+		bool operator()(const SQInteger &value) { sq_pushinteger(this->vm, value); return true; }
+		bool operator()(const std::string &value) { sq_pushstring(this->vm, value, -1); return true; }
+		bool operator()(const SQBool &value) { sq_pushbool(this->vm, value); return true; }
+		bool operator()(const SQSaveLoadType &type)
+		{
+			switch (type) {
+				case SQSL_ARRAY:
+					sq_newarray(this->vm, 0);
+					while (LoadObjects(this->vm, this->data)) {
+						sq_arrayappend(this->vm, -2);
+						/* The value is popped from the stack by squirrel. */
+					}
+					return true;
 
-	if (std::holds_alternative<SQBool>(value)) {
-		sq_pushbool(vm, std::get<SQBool>(value));
-		return true;
-	}
+				case SQSL_TABLE:
+					sq_newtable(this->vm);
+					while (LoadObjects(this->vm, this->data)) {
+						LoadObjects(this->vm, this->data);
+						sq_rawset(this->vm, -3);
+						/* The key (-2) and value (-1) are popped from the stack by squirrel. */
+					}
+					return true;
 
-	switch (std::get<SQSaveLoadType>(value)) {
-		case SQSL_ARRAY: {
-			sq_newarray(vm, 0);
-			while (LoadObjects(vm, data)) {
-				sq_arrayappend(vm, -2);
-				/* The value is popped from the stack by squirrel. */
+				case SQSL_NULL:
+					sq_pushnull(this->vm);
+					return true;
+
+				case SQSL_ARRAY_TABLE_END:
+					return false;
+
+				default: NOT_REACHED();
 			}
-			return true;
 		}
+	};
 
-		case SQSL_TABLE: {
-			sq_newtable(vm);
-			while (LoadObjects(vm, data)) {
-				LoadObjects(vm, data);
-				sq_rawset(vm, -3);
-				/* The key (-2) and value (-1) are popped from the stack by squirrel. */
-			}
-			return true;
-		}
-
-		case SQSL_NULL: {
-			sq_pushnull(vm);
-			return true;
-		}
-
-		case SQSL_ARRAY_TABLE_END: {
-			return false;
-		}
-
-		default: NOT_REACHED();
-	}
+	return std::visit(visitor{vm, data}, value);
 }
 
 /* static */ void ScriptInstance::LoadEmpty()
 {
-	byte sl_byte = SlReadByte();
+	uint8_t sl_byte = SlReadByte();
 	/* Check if there was anything saved at all. */
 	if (sl_byte == 0) return;
 
@@ -674,7 +665,7 @@ bool ScriptInstance::IsPaused()
 		return nullptr;
 	}
 
-	byte sl_byte = SlReadByte();
+	uint8_t sl_byte = SlReadByte();
 	/* Check if there was anything saved at all. */
 	if (sl_byte == 0) return nullptr;
 
@@ -700,7 +691,7 @@ void ScriptInstance::LoadOnStack(ScriptData *data)
 		LoadObjects(vm, data);
 		this->is_save_data_on_stack = true;
 	} catch (Script_FatalError &e) {
-		ScriptLog::Warning(fmt::format("Loading failed: {}", e.GetErrorMessage()).c_str());
+		ScriptLog::Warning(fmt::format("Loading failed: {}", e.GetErrorMessage()));
 		/* Discard partially loaded savegame data and version. */
 		sq_settop(vm, top);
 	}
@@ -772,7 +763,7 @@ bool ScriptInstance::DoCommandCallback(const CommandCost &result, TileIndex tile
 	ScriptObject::ActiveInstance active(this);
 
 	if (!ScriptObject::CheckLastCommand(tile, p1, p2, p3, cmd)) {
-		DEBUG(script, 1, "DoCommandCallback terminating a script, last command does not match expected command");
+		Debug(script, 1, "DoCommandCallback terminating a script, last command does not match expected command");
 		return false;
 	}
 

@@ -56,6 +56,7 @@ void ShowSaveLoadDialog(AbstractFileType abstract_filetype, SaveLoadOperation fo
 void FiosGetSavegameList(SaveLoadOperation fop, bool show_dirs, FileList &file_list);
 void FiosGetScenarioList(SaveLoadOperation fop, bool show_dirs, FileList &file_list);
 void FiosGetHeightmapList(SaveLoadOperation fop, bool show_dirs, FileList &file_list);
+void FiosGetTownDataList(SaveLoadOperation fop, bool show_dirs, FileList &file_list);
 
 bool FiosBrowseTo(const FiosItem *item);
 
@@ -76,14 +77,16 @@ const char *FindScenario(const ContentInfo *ci, bool md5sum);
  * A savegame name automatically numbered.
  */
 struct FiosNumberedSaveName {
-	FiosNumberedSaveName(const std::string &prefix);
+	FiosNumberedSaveName(std::string_view prefix);
 	std::string Filename();
 	std::string FilenameUsingMaxSaves(int max_saves);
-	std::string FilenameUsingNumber(int num, const char *suffix) const;
+	void FilenameUsingNumber(struct format_target &buffer, int num, const char *suffix) const;
 	std::string Extension();
 	int GetLastNumber() const { return this->number; }
+	std::string_view GetSavePath() const { return this->save_path; }
 private:
 	std::string prefix;
+	std::string save_path;
 	int number;
 };
 

@@ -50,6 +50,8 @@ struct NewSignalStyle {
 	PalSpriteID signals[SIGTYPE_END][2][2];
 };
 extern std::array<NewSignalStyle, MAX_NEW_SIGNAL_STYLES> _new_signal_styles;
+extern uint8_t _default_signal_style_lookahead_extra_aspects;
+
 struct NewSignalStyleMapping {
 	uint32_t grfid = 0;
 	uint8_t grf_local_id = 0;
@@ -82,7 +84,7 @@ struct NewSignalsScopeResolver : public ScopeResolver {
 	}
 
 	uint32_t GetRandomBits() const override;
-	uint32_t GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra *extra) const override;
+	uint32_t GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra &extra) const override;
 };
 
 /** Resolver object for rail types. */

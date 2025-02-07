@@ -66,6 +66,8 @@ inline StringID MakeStringID(StringTab tab, uint index)
 
 std::string GetString(StringID string);
 const char *GetStringPtr(StringID string);
+void AppendStringInPlace(std::string &result, StringID string);
+void AppendStringInPlace(struct format_buffer &result, StringID string);
 uint32_t GetStringGRFID(StringID string);
 
 uint ConvertKmhishSpeedToDisplaySpeed(uint speed, VehicleType type);
@@ -110,9 +112,14 @@ void SetDParamMaxValue(size_t n, T max_value, uint min_count = 0, FontSize size 
 void SetDParamStr(size_t n, const char *str);
 void SetDParamStr(size_t n, std::string str);
 
+inline void SetDParamStr(size_t n, std::string_view str)
+{
+	SetDParamStr(n, std::string{str});
+}
+
 void CopyInDParam(const std::span<const StringParameterBackup> backup, uint offset = 0);
 void CopyOutDParam(std::vector<StringParameterBackup> &backup, size_t num);
-bool HaveDParamChanged(const std::vector<StringParameterBackup> &backup);
+bool HaveDParamChanged(const std::span<const StringParameterBackup> backup);
 
 /**
  * Get the current string parameter at index \a n from the global string parameter array.
@@ -128,6 +135,7 @@ extern TextDirection _current_text_dir; ///< Text direction of the currently sel
 
 void InitializeLanguagePacks();
 const char *GetCurrentLanguageIsoCode();
+std::string_view GetListSeparator();
 
 /**
  * A searcher for missing glyphs.

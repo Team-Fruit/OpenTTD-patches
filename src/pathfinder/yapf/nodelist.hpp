@@ -10,99 +10,95 @@
 #ifndef NODELIST_HPP
 #define NODELIST_HPP
 
-#include "../../misc/array.hpp"
+#include "../../core/arena_alloc.hpp"
 #include "../../misc/hashtable.hpp"
 #include "../../misc/binaryheap.hpp"
 
 /**
  * Hash table based node list multi-container class.
- *  Implements open list, closed list and priority queue for A-star
- *  path finder.
+ *  Implements open list, closed list and priority queue for A-star pathfinder.
  */
-template <class Titem_, int Thash_bits_open_, int Thash_bits_closed_>
-class CNodeList_HashTableT {
+template <class Titem>
+class NodeList {
 public:
-	typedef Titem_ Titem;                                        ///< Make #Titem_ visible from outside of class.
-	typedef typename Titem_::Key Key;                            ///< Make Titem_::Key a property of this class.
-	typedef SmallArray<Titem_, 65536, 256> CItemArray;           ///< Type that we will use as item container.
-	typedef CHashTableT<Titem_, Thash_bits_open_  > COpenList;   ///< How pointers to open nodes will be stored.
-	typedef CHashTableT<Titem_, Thash_bits_closed_> CClosedList; ///< How pointers to closed nodes will be stored.
-	typedef CBinaryHeapT<Titem_> CPriorityQueue;                 ///< How the priority queue will be managed.
+	using Item = Titem;
+	using Key = typename Titem::Key;
 
 protected:
-	CItemArray      m_arr;        ///< Here we store full item data (Titem_).
-	COpenList       m_open;       ///< Hash table of pointers to open item data.
-	CClosedList     m_closed;     ///< Hash table of pointers to closed item data.
-	CPriorityQueue  m_open_queue; ///< Priority queue of pointers to open item data.
-	Titem          *m_new_node;   ///< New open node under construction.
+	BumpAllocContainer<Titem, 4096> items; ///< Here we store full item data (Titem).
+	HashTable<Titem> open_nodes;           ///< Hash table of pointers to open item data.
+	HashTable<Titem> closed_nodes;         ///< Hash table of pointers to closed item data.
+	CBinaryHeapT<Titem> open_queue;        ///< Priority queue of pointers to open item data.
+	Titem *new_node;                       ///< New open node under construction.
 
 public:
 	/** default constructor */
-	CNodeList_HashTableT() : m_open_queue(2048)
+	NodeList() : open_queue(2048)
 	{
-		m_new_node = nullptr;
-	}
-
-	/** destructor */
-	~CNodeList_HashTableT()
-	{
+		this->new_node = nullptr;
 	}
 
 	/** return number of open nodes */
 	inline int OpenCount()
 	{
-		return m_open.Count();
+		return (int)this->open_nodes.Count();
 	}
 
 	/** return number of closed nodes */
 	inline int ClosedCount()
 	{
-		return m_closed.Count();
+		return (int)this->closed_nodes.Count();
 	}
 
-	/** allocate new data item from m_arr */
-	inline Titem_ *CreateNewNode()
+	/** return the total number of nodes. */
+	inline int TotalCount()
 	{
-		if (m_new_node == nullptr) m_new_node = m_arr.AppendC();
-		return m_new_node;
+		return this->items.Length();
+	}
+
+	/** allocate new data item from items */
+	inline Titem &CreateNewNode()
+	{
+		if (this->new_node == nullptr) this->new_node = this->items.New();
+		return *this->new_node;
 	}
 
 	/** Notify the nodelist that we don't want to discard the given node. */
-	inline void FoundBestNode(Titem_ &item)
+	inline void FoundBestNode(Titem &item)
 	{
-		/* for now it is enough to invalidate m_new_node if it is our given node */
-		if (&item == m_new_node) {
-			m_new_node = nullptr;
+		/* for now it is enough to invalidate new_node if it is our given node */
+		if (&item == this->new_node) {
+			this->new_node = nullptr;
 		}
 		/* TODO: do we need to store best nodes found in some extra list/array? Probably not now. */
 	}
 
-	/** insert given item as open node (into m_open and m_open_queue) */
-	inline void InsertOpenNode(Titem_ &item)
+	/** insert given item as open node (into open_nodes and open_queue) */
+	inline void InsertOpenNode(Titem &item)
 	{
-		dbg_assert(m_closed.Find(item.GetKey()) == nullptr);
-		m_open.Push(item);
-		m_open_queue.Include(&item);
-		if (&item == m_new_node) {
-			m_new_node = nullptr;
+		dbg_assert(this->closed_nodes.Find(item.GetKey()) == nullptr);
+		this->open_nodes.Push(item);
+		this->open_queue.Include(&item);
+		if (&item == this->new_node) {
+			this->new_node = nullptr;
 		}
 	}
 
 	/** return the best open node */
-	inline Titem_ *GetBestOpenNode()
+	inline Titem *GetBestOpenNode()
 	{
-		if (!m_open_queue.IsEmpty()) {
-			return m_open_queue.Begin();
+		if (!this->open_queue.IsEmpty()) {
+			return this->open_queue.Begin();
 		}
 		return nullptr;
 	}
 
 	/** remove and return the best open node */
-	inline Titem_ *PopBestOpenNode()
+	inline Titem *PopBestOpenNode()
 	{
-		if (!m_open_queue.IsEmpty()) {
-			Titem_ *item = m_open_queue.Shift();
-			m_open.Pop(*item);
+		if (!this->open_queue.IsEmpty()) {
+			Titem *item = this->open_queue.Shift();
+			this->open_nodes.Pop(*item);
 			return item;
 		}
 		return nullptr;
@@ -110,66 +106,53 @@ public:
 
 	inline void DequeueBestOpenNode()
 	{
-		dbg_assert(!m_open_queue.IsEmpty());
-		m_open_queue.Shift();
+		dbg_assert(!this->open_queue.IsEmpty());
+		this->open_queue.Shift();
 	}
 
-	inline void ReenqueueOpenNode(Titem_ &item)
+	inline void ReenqueueOpenNode(Titem &item)
 	{
-		m_open_queue.Include(&item);
+		this->open_queue.Include(&item);
 	}
 
-	inline Titem_& PopAlreadyDequeuedOpenNode(const Key &key)
+	inline Titem &PopAlreadyDequeuedOpenNode(const Key &key)
 	{
-		return m_open.Pop(key);
+		return this->open_nodes.Pop(key);
 	}
 
 	/** return the open node specified by a key or nullptr if not found */
-	inline Titem_ *FindOpenNode(const Key &key)
+	inline Titem *FindOpenNode(const Key &key)
 	{
-		Titem_ *item = m_open.Find(key);
-		return item;
+		return this->open_nodes.Find(key);
 	}
 
 	/** remove and return the open node specified by a key */
-	inline Titem_ &PopOpenNode(const Key &key)
+	inline Titem &PopOpenNode(const Key &key)
 	{
-		Titem_ &item = m_open.Pop(key);
-		uint idxPop = m_open_queue.FindIndex(item);
-		m_open_queue.Remove(idxPop);
+		Titem &item = this->open_nodes.Pop(key);
+		size_t index = this->open_queue.FindIndex(item);
+		this->open_queue.Remove(index);
 		return item;
 	}
 
 	/** close node */
-	inline void InsertClosedNode(Titem_ &item)
+	inline void InsertClosedNode(Titem &item)
 	{
-		dbg_assert(m_open.Find(item.GetKey()) == nullptr);
-		m_closed.Push(item);
+		dbg_assert(this->open_nodes.Find(item.GetKey()) == nullptr);
+		this->closed_nodes.Push(item);
 	}
 
 	/** return the closed node specified by a key or nullptr if not found */
-	inline Titem_ *FindClosedNode(const Key &key)
+	inline Titem *FindClosedNode(const Key &key)
 	{
-		Titem_ *item = m_closed.Find(key);
-		return item;
-	}
-
-	/** The number of items. */
-	inline int TotalCount()
-	{
-		return m_arr.Length();
-	}
-
-	/** Get a particular item. */
-	inline Titem_ &ItemAt(int idx)
-	{
-		return m_arr[idx];
+		return this->closed_nodes.Find(key);
 	}
 
 	/** Helper for creating output of this array. */
-	template <class D> void Dump(D &dmp) const
+	template <class D>
+	void Dump(D &dmp) const
 	{
-		dmp.WriteStructT("m_arr", &m_arr);
+		dmp.WriteStructT("data", &this->items);
 	}
 };
 

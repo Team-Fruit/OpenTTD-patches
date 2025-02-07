@@ -162,7 +162,7 @@ void BuildObject(ObjectType type, TileIndex tile, CompanyID owner, Town *town, u
 	if (HasBit(spec->callback_mask, CBM_OBJ_COLOUR)) {
 		uint16_t res = GetObjectCallback(CBID_OBJECT_COLOUR, o->colour, 0, spec, o, tile);
 		if (res != CALLBACK_FAILED) {
-			if (res >= 0x100) ErrorUnknownCallbackResult(spec->grf_prop.grffile->grfid, CBID_OBJECT_COLOUR, res);
+			if (res >= 0x100) ErrorUnknownCallbackResult(spec->grf_prop.grfid, CBID_OBJECT_COLOUR, res);
 			o->colour = GB(res, 0, 8);
 		}
 	}
@@ -222,7 +222,7 @@ void UpdateCompanyHQ(TileIndex tile, uint score)
 {
 	if (tile == INVALID_TILE) return;
 
-	byte val = 0;
+	uint8_t val = 0;
 	if (score >= 170) val++;
 	if (score >= 350) val++;
 	if (score >= 520) val++;
@@ -282,18 +282,18 @@ CommandCost CmdBuildObject(TileIndex tile, DoCommandFlag flags, uint32_t p1, uin
 	if ((spec->flags & OBJECT_FLAG_ONLY_IN_GAME) != 0 && (_generating_world || _game_mode != GM_NORMAL || _current_company > MAX_COMPANIES)) return CMD_ERROR;
 	if (view >= spec->views) return CMD_ERROR;
 
-	if (!Object::CanAllocateItem()) return_cmd_error(STR_ERROR_TOO_MANY_OBJECTS);
-	if (Town::GetNumItems() == 0) return_cmd_error(STR_ERROR_MUST_FOUND_TOWN_FIRST);
+	if (!Object::CanAllocateItem()) return CommandCost(STR_ERROR_TOO_MANY_OBJECTS);
+	if (Town::GetNumItems() == 0) return CommandCost(STR_ERROR_MUST_FOUND_TOWN_FIRST);
 
 	int size_x = GB(spec->size, HasBit(view, 0) ? 4 : 0, 4);
 	int size_y = GB(spec->size, HasBit(view, 0) ? 0 : 4, 4);
 	TileArea ta(tile, size_x, size_y);
 	for (TileIndex t : ta) {
-		if (!IsValidTile(t)) return_cmd_error(STR_ERROR_TOO_CLOSE_TO_EDGE_OF_MAP_SUB); // Might be off the map
+		if (!IsValidTile(t)) return CommandCost(STR_ERROR_TOO_CLOSE_TO_EDGE_OF_MAP_SUB); // Might be off the map
 	}
 
 	if (type == OBJECT_OWNED_LAND) {
-		if (_settings_game.construction.purchase_land_permitted == 0) return_cmd_error(STR_PURCHASE_LAND_NOT_PERMITTED);
+		if (_settings_game.construction.purchase_land_permitted == 0) return CommandCost(STR_PURCHASE_LAND_NOT_PERMITTED);
 		/* Owned land is special as it can be placed on any slope. */
 		cost.AddCost(DoCommand(tile, 0, 0, flags, CMD_LANDSCAPE_CLEAR));
 	} else {
@@ -304,7 +304,7 @@ CommandCost CmdBuildObject(TileIndex tile, DoCommandFlag flags, uint32_t p1, uin
 		bool allow_ground = (spec->flags & OBJECT_FLAG_NOT_ON_LAND) == 0;
 		for (TileIndex t : ta) {
 			if (HasTileWaterGround(t)) {
-				if (!allow_water) return_cmd_error(STR_ERROR_CAN_T_BUILD_ON_WATER);
+				if (!allow_water) return CommandCost(STR_ERROR_CAN_T_BUILD_ON_WATER);
 				if (!IsWaterTile(t)) {
 					/* Normal water tiles don't have to be cleared. For all other tile types clear
 					 * the tile but leave the water. */
@@ -318,7 +318,7 @@ CommandCost CmdBuildObject(TileIndex tile, DoCommandFlag flags, uint32_t p1, uin
 					cost.AddCost(EnsureNoVehicleOnGround(t));
 				}
 			} else {
-				if (!allow_ground) return_cmd_error(STR_ERROR_MUST_BE_BUILT_ON_WATER);
+				if (!allow_ground) return CommandCost(STR_ERROR_MUST_BE_BUILT_ON_WATER);
 				/* For non-water tiles, we'll have to clear it before building. */
 
 				/* When relocating HQ, allow it to be relocated (partial) on itself. */
@@ -374,7 +374,7 @@ CommandCost CmdBuildObject(TileIndex tile, DoCommandFlag flags, uint32_t p1, uin
 			if (IsBridgeAbove(t) && (
 					!(spec->flags & OBJECT_FLAG_ALLOW_UNDER_BRIDGE) ||
 					(GetTileMaxZ(t) + spec->height >= GetBridgeHeight(GetSouthernBridgeEnd(t))))) {
-				return_cmd_error(STR_ERROR_MUST_DEMOLISH_BRIDGE_FIRST);
+				return CommandCost(STR_ERROR_MUST_DEMOLISH_BRIDGE_FIRST);
 			}
 		}
 	}
@@ -385,7 +385,7 @@ CommandCost CmdBuildObject(TileIndex tile, DoCommandFlag flags, uint32_t p1, uin
 	switch (type) {
 		case OBJECT_TRANSMITTER:
 		case OBJECT_LIGHTHOUSE:
-			if (!IsTileFlat(tile)) return_cmd_error(STR_ERROR_FLAT_LAND_REQUIRED);
+			if (!IsTileFlat(tile)) return CommandCost(STR_ERROR_FLAT_LAND_REQUIRED);
 			build_object_size = 1;
 			break;
 
@@ -393,11 +393,11 @@ CommandCost CmdBuildObject(TileIndex tile, DoCommandFlag flags, uint32_t p1, uin
 			if (IsTileType(tile, MP_OBJECT) &&
 					IsTileOwner(tile, _current_company) &&
 					IsObjectType(tile, OBJECT_OWNED_LAND)) {
-				return_cmd_error(STR_ERROR_YOU_ALREADY_OWN_IT);
+				return CommandCost(STR_ERROR_YOU_ALREADY_OWN_IT);
 			}
 			c = Company::GetIfValid(_current_company);
 			if (c != nullptr && (int)GB(c->purchase_land_limit, 16, 16) < 1) {
-				return_cmd_error(STR_ERROR_PURCHASE_LAND_LIMIT_REACHED);
+				return CommandCost(STR_ERROR_PURCHASE_LAND_LIMIT_REACHED);
 			}
 			break;
 
@@ -405,7 +405,7 @@ CommandCost CmdBuildObject(TileIndex tile, DoCommandFlag flags, uint32_t p1, uin
 			Company *c = Company::Get(_current_company);
 			if (c->location_of_HQ != INVALID_TILE) {
 				/* Don't relocate HQ on the same location. */
-				if (c->location_of_HQ == tile) return_cmd_error(STR_ERROR_ALREADY_BUILT);
+				if (c->location_of_HQ == tile) return CommandCost(STR_ERROR_ALREADY_BUILT);
 				/* We need to persuade a bit harder to remove the old HQ. */
 				_current_company = OWNER_WATER;
 				cost.AddCost(ClearTile_Object(c->location_of_HQ, flags));
@@ -434,7 +434,7 @@ CommandCost CmdBuildObject(TileIndex tile, DoCommandFlag flags, uint32_t p1, uin
 	if (build_object_size > 0) {
 		c = Company::GetIfValid(_current_company);
 		if (c != nullptr && (int)GB(c->build_object_limit, 16, 16) < build_object_size) {
-			return_cmd_error(STR_ERROR_BUILD_OBJECT_LIMIT_REACHED);
+			return CommandCost(STR_ERROR_BUILD_OBJECT_LIMIT_REACHED);
 		}
 	}
 
@@ -465,8 +465,8 @@ CommandCost CmdBuildObject(TileIndex tile, DoCommandFlag flags, uint32_t p1, uin
 CommandCost CmdPurchaseLandArea(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint32_t p2, const char *text)
 {
 	if (p1 >= MapSize()) return CMD_ERROR;
-	if (_settings_game.construction.purchase_land_permitted == 0) return_cmd_error(STR_PURCHASE_LAND_NOT_PERMITTED);
-	if (_settings_game.construction.purchase_land_permitted != 2) return_cmd_error(STR_PURCHASE_LAND_NOT_PERMITTED_BULK);
+	if (_settings_game.construction.purchase_land_permitted == 0) return CommandCost(STR_PURCHASE_LAND_NOT_PERMITTED);
+	if (_settings_game.construction.purchase_land_permitted != 2) return CommandCost(STR_PURCHASE_LAND_NOT_PERMITTED_BULK);
 
 	Money money = GetAvailableMoneyForCommand();
 	CommandCost cost(EXPENSES_CONSTRUCTION);
@@ -521,7 +521,7 @@ CommandCost CmdPurchaseLandArea(TileIndex tile, DoCommandFlag flags, uint32_t p1
 CommandCost CmdBuildObjectArea(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint32_t p2, const char *text)
 {
 	if (p1 >= MapSize()) return CMD_ERROR;
-	if (!_settings_game.construction.build_object_area_permitted) return_cmd_error(STR_BUILD_OBJECT_NOT_PERMITTED_BULK);
+	if (!_settings_game.construction.build_object_area_permitted) return CommandCost(STR_BUILD_OBJECT_NOT_PERMITTED_BULK);
 
 	ObjectType type = (ObjectType)GB(p2, 3, 16);
 	if (type >= ObjectSpec::Count()) return CMD_ERROR;
@@ -748,10 +748,10 @@ static CommandCost ClearTile_Object(TileIndex tile, DoCommandFlag flags)
 	if (_current_company != OWNER_WATER) {
 		if ((flags & DC_NO_WATER) && IsTileOnWater(tile)) {
 			/* There is water under the object, treat it as water tile. */
-			return_cmd_error(STR_ERROR_CAN_T_BUILD_ON_WATER);
+			return CommandCost(STR_ERROR_CAN_T_BUILD_ON_WATER);
 		} else if (!(spec->flags & OBJECT_FLAG_AUTOREMOVE) && (flags & DC_AUTO)) {
 			/* No automatic removal by overbuilding stuff. */
-			return_cmd_error(type == OBJECT_HQ ? STR_ERROR_COMPANY_HEADQUARTERS_IN : STR_ERROR_OBJECT_IN_THE_WAY);
+			return CommandCost(type == OBJECT_HQ ? STR_ERROR_COMPANY_HEADQUARTERS_IN : STR_ERROR_OBJECT_IN_THE_WAY);
 		} else if (_game_mode == GM_EDITOR) {
 			/* No further limitations for the editor. */
 		} else if (GetTileOwner(tile) == OWNER_NONE) {
@@ -759,11 +759,11 @@ static CommandCost ClearTile_Object(TileIndex tile, DoCommandFlag flags)
 			if (!_cheats.magic_bulldozer.value && (spec->flags & OBJECT_FLAG_CANNOT_REMOVE) != 0) return CMD_ERROR;
 		} else if (CheckTileOwnership(tile).Failed()) {
 			/* We don't own it!. */
-			return_cmd_error(STR_ERROR_OWNED_BY);
+			return CommandCost(STR_ERROR_OWNED_BY);
 		} else if ((spec->flags & OBJECT_FLAG_CANNOT_REMOVE) != 0 && (spec->flags & OBJECT_FLAG_AUTOREMOVE) == 0) {
 			/* In the game editor or with cheats we can remove, otherwise we can't. */
 			if (!_cheats.magic_bulldozer.value) {
-				if (type == OBJECT_HQ) return_cmd_error(STR_ERROR_COMPANY_HEADQUARTERS_IN);
+				if (type == OBJECT_HQ) return CommandCost(STR_ERROR_COMPANY_HEADQUARTERS_IN);
 				return CMD_ERROR;
 			}
 
@@ -808,7 +808,7 @@ static CommandCost ClearTile_Object(TileIndex tile, DoCommandFlag flags)
 	return cost;
 }
 
-static void AddAcceptedCargo_Object(TileIndex tile, CargoArray &acceptance, CargoTypes *always_accepted)
+static void AddAcceptedCargo_Object(TileIndex tile, CargoArray &acceptance, CargoTypes &always_accepted)
 {
 	if (!IsObjectType(tile, OBJECT_HQ)) return;
 
@@ -823,7 +823,7 @@ static void AddAcceptedCargo_Object(TileIndex tile, CargoArray &acceptance, Carg
 	CargoID pass = GetCargoIDByLabel(CT_PASSENGERS);
 	if (IsValidCargoID(pass)) {
 		acceptance[pass] += std::max(1U, level);
-		SetBit(*always_accepted, pass);
+		SetBit(always_accepted, pass);
 	}
 
 	/* Top town building generates 4, HQ can make up to 8. The
@@ -833,7 +833,7 @@ static void AddAcceptedCargo_Object(TileIndex tile, CargoArray &acceptance, Carg
 	CargoID mail = GetCargoIDByLabel(CT_MAIL);
 	if (IsValidCargoID(mail)) {
 		acceptance[mail] += std::max(1U, level / 2);
-		SetBit(*always_accepted, mail);
+		SetBit(always_accepted, mail);
 	}
 }
 
@@ -855,8 +855,8 @@ static void GetTileDesc_Object(TileIndex tile, TileDesc *td)
 	td->owner[0] = GetTileOwner(tile);
 	td->build_date = Object::GetByTile(tile)->build_date;
 
-	if (spec->grf_prop.grffile != nullptr) {
-		td->grf = GetGRFConfig(spec->grf_prop.grffile->grfid)->GetName();
+	if (spec->grf_prop.HasGrfFile()) {
+		td->grf = GetGRFConfig(spec->grf_prop.grfid)->GetName();
 	}
 }
 
@@ -1173,6 +1173,10 @@ static void ChangeTileOwner_Object(TileIndex tile, Owner old_owner, Owner new_ow
 	ObjectType type = GetObjectType(tile);
 	if ((type == OBJECT_OWNED_LAND || type >= NEW_OBJECT_OFFSET) && new_owner != INVALID_OWNER) {
 		SetTileOwner(tile, new_owner);
+		if (GetWaterClass(tile) == WATER_CLASS_CANAL) {
+			Company::Get(old_owner)->infrastructure.water--;
+			Company::Get(new_owner)->infrastructure.water++;
+		}
 	} else if (type == OBJECT_STATUE) {
 		Town *t = Object::GetByTile(tile)->town;
 		ClrBit(t->statues, old_owner);
@@ -1210,11 +1214,25 @@ static CommandCost TerraformTile_Object(TileIndex tile, DoCommandFlag flags, int
 {
 	ObjectType type = GetObjectType(tile);
 
+	auto update_water_class = [&]() {
+		if (GetWaterClass(tile) == WATER_CLASS_CANAL) {
+			Company *c = Company::GetIfValid(GetTileOwner(tile));
+			if (c != nullptr) {
+				c->infrastructure.water--;
+				DirtyCompanyInfrastructureWindows(c->index);
+			}
+		}
+		SetWaterClass(tile, WATER_CLASS_INVALID);
+	};
+
 	if (type == OBJECT_OWNED_LAND) {
 		/* Owned land remains unsold */
 		CommandCost ret = CheckTileOwnership(tile);
 		if (ret.Succeeded()) {
-			if (flags & DC_EXEC) SetObjectGroundTypeDensity(tile, OBJECT_GROUND_GRASS, 0);
+			if (flags & DC_EXEC) {
+				SetObjectGroundTypeDensity(tile, OBJECT_GROUND_GRASS, 0);
+				update_water_class();
+			}
 			return CommandCost();
 		}
 	} else if (AutoslopeEnabled() && type != OBJECT_TRANSMITTER && type != OBJECT_LIGHTHOUSE) {
@@ -1224,6 +1242,7 @@ static CommandCost TerraformTile_Object(TileIndex tile, DoCommandFlag flags, int
 			if (flags & DC_EXEC) {
 				SetObjectFoundationType(tile, tileh_new, type, spec);
 				if (spec->ctrl_flags & OBJECT_CTRL_FLAG_USE_LAND_GROUND) SetObjectGroundTypeDensity(tile, OBJECT_GROUND_GRASS, 0);
+				update_water_class();
 			}
 		};
 
@@ -1275,3 +1294,16 @@ extern const TileTypeProcs _tile_type_object_procs = {
 	GetFoundation_Object,        // get_foundation_proc
 	TerraformTile_Object,        // terraform_tile_proc
 };
+
+TileIndex FindMissingObjectTile()
+{
+	for (TileIndex t = 0; t < MapSize(); t++) {
+		if (IsTileType(t, MP_OBJECT)) {
+			const Object *obj = Object::GetByTile(t);
+			const ObjectSpec *spec = ObjectSpec::Get(obj->type);
+			if (!spec->IsEnabled()) return t;
+		}
+	}
+
+	return INVALID_TILE;
+}

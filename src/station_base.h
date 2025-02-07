@@ -50,8 +50,7 @@ struct ExtraStationNameInfo {
 	uint16_t flags;
 };
 
-extern std::array<ExtraStationNameInfo, MAX_EXTRA_STATION_NAMES> _extra_station_names;
-extern uint _extra_station_names_used;
+extern std::vector<ExtraStationNameInfo> _extra_station_names;
 extern uint8_t _extra_station_names_probability;
 
 class FlowStatMap;
@@ -96,10 +95,9 @@ public:
 
 	/**
 	 * Invalid constructor. This can't be called as a FlowStat must not be
-	 * empty. However, the constructor must be defined and reachable for
-	 * FlowStat to be used in a std::map.
+	 * empty.
 	 */
-	inline FlowStat() {NOT_REACHED();}
+	FlowStat() = delete;
 
 	/**
 	 * Create a FlowStat with an initial entry.
@@ -146,6 +144,16 @@ private:
 
 	iterator erase_item(iterator iter, uint flow_reduction);
 
+	inline void MoveCommon(FlowStat &&other) noexcept
+	{
+		this->storage = std::move(other.storage);
+		this->count = other.count;
+		other.count = 0; // Take ownership of any storage ptr
+		this->unrestricted = other.unrestricted;
+		this->origin = other.origin;
+		this->flags = other.flags;
+	}
+
 	inline void CopyCommon(const FlowStat &other)
 	{
 		this->count = other.count;
@@ -167,9 +175,7 @@ public:
 
 	inline FlowStat(FlowStat &&other) noexcept
 	{
-		this->count = 0;
-		this->SwapShares(other);
-		this->origin = other.origin;
+		this->MoveCommon(std::move(other));
 	}
 
 	inline ~FlowStat()
@@ -186,8 +192,8 @@ public:
 
 	inline FlowStat &operator=(FlowStat &&other) noexcept
 	{
-		this->SwapShares(other);
-		this->origin = other.origin;
+		this->clear();
+		this->MoveCommon(std::move(other));
 		return *this;
 	}
 
@@ -242,7 +248,7 @@ public:
 
 	void ReleaseShare(StationID st);
 
-	void ScaleToMonthly(uint runtime);
+	void ScaleToMonthly(uint runtime, uint8_t day_length_factor);
 
 	/**
 	 * Return total amount of unrestricted shares.
@@ -326,7 +332,7 @@ public:
 	/* for save/load use only */
 	inline void SetRawFlags(uint16_t flags)
 	{
-		this->flags = flags;;
+		this->flags = flags;
 	}
 
 private:
@@ -586,18 +592,18 @@ struct GoodsEntry {
 		max_waiting_cargo(0)
 	{}
 
-	byte status; ///< Status of this cargo, see #GoodsEntryStatus.
+	uint8_t status; ///< Status of this cargo, see #GoodsEntryStatus.
 
 	/**
 	 * Number of rating-intervals (up to 255) since the last vehicle tried to load this cargo.
 	 * The unit used is STATION_RATING_TICKS.
 	 * This does not imply there was any cargo to load.
 	 */
-	byte time_since_pickup;
+	uint8_t time_since_pickup;
 
-	byte last_vehicle_type;
+	uint8_t last_vehicle_type;
 
-	byte rating;            ///< %Station rating for this cargo.
+	uint8_t rating;         ///< %Station rating for this cargo.
 
 	/**
 	 * Maximum speed (up to 255) of the last vehicle that tried to load this cargo.
@@ -608,15 +614,15 @@ struct GoodsEntry {
 	 *  - Ships: 0.5 * km-ish/h
 	 *  - Aircraft: 8 * mph
 	 */
-	byte last_speed;
+	uint8_t last_speed;
 
 	/**
 	 * Age in years (up to 255) of the last vehicle that tried to load this cargo.
 	 * This does not imply there was any cargo to load.
 	 */
-	byte last_age;
+	uint8_t last_age;
 
-	byte amount_fract;      ///< Fractional part of the amount in the cargo list
+	uint8_t amount_fract;   ///< Fractional part of the amount in the cargo list
 
 	std::unique_ptr<GoodsEntryData> data;
 
@@ -716,6 +722,11 @@ struct GoodsEntry {
 	{
 		return this->data != nullptr ? this->data->flows : _empty_flows;
 	}
+
+	void RemoveDataIfUnused()
+	{
+		if (this->data != nullptr && this->data->MayBeRemoved()) this->data.reset();
+	}
 };
 
 /** All airport-related information. Only valid if tile != INVALID_TILE. */
@@ -723,8 +734,8 @@ struct Airport : public TileArea {
 	Airport() : TileArea(INVALID_TILE, 0, 0) {}
 
 	uint64_t flags;     ///< stores which blocks on the airport are taken. was 16 bit earlier on, then 32
-	byte type;          ///< Type of this airport, @see AirportTypes
-	byte layout;        ///< Airport layout number.
+	uint8_t type;       ///< Type of this airport, @see AirportTypes
+	uint8_t layout;     ///< Airport layout number.
 	Direction rotation; ///< How this airport is rotated.
 
 	PersistentStorage *psa; ///< Persistent storage for NewGRF airports.
@@ -754,7 +765,7 @@ struct Airport : public TileArea {
 	/** Check if this airport has at least one hangar. */
 	inline bool HasHangar() const
 	{
-		return this->GetSpec()->nof_depots > 0;
+		return !this->GetSpec()->depots.empty();
 	}
 
 	/**
@@ -789,10 +800,9 @@ struct Airport : public TileArea {
 	 */
 	inline TileIndex GetHangarTile(uint hangar_num) const
 	{
-		const AirportSpec *as = this->GetSpec();
-		for (uint i = 0; i < as->nof_depots; i++) {
-			if (as->depot_table[i].hangar_num == hangar_num) {
-				return this->GetRotatedTileFromOffset(as->depot_table[i].ti);
+		for (const auto &depot : this->GetSpec()->depots) {
+			if (depot.hangar_num == hangar_num) {
+				return this->GetRotatedTileFromOffset(depot.ti);
 			}
 		}
 		NOT_REACHED();
@@ -808,7 +818,7 @@ struct Airport : public TileArea {
 	{
 		const AirportSpec *as = this->GetSpec();
 		const HangarTileTable *htt = GetHangarDataByTile(tile);
-		return ChangeDir(htt->dir, DirDifference(this->rotation, as->rotation[0]));
+		return ChangeDir(htt->dir, DirDifference(this->rotation, as->layouts[0].rotation));
 	}
 
 	/**
@@ -828,11 +838,10 @@ struct Airport : public TileArea {
 	{
 		uint num = 0;
 		uint counted = 0;
-		const AirportSpec *as = this->GetSpec();
-		for (uint i = 0; i < as->nof_depots; i++) {
-			if (!HasBit(counted, as->depot_table[i].hangar_num)) {
+		for (const auto &depot : this->GetSpec()->depots) {
+			if (!HasBit(counted, depot.hangar_num)) {
 				num++;
-				SetBit(counted, as->depot_table[i].hangar_num);
+				SetBit(counted, depot.hangar_num);
 			}
 		}
 		return num;
@@ -847,10 +856,9 @@ private:
 	 */
 	inline const HangarTileTable *GetHangarDataByTile(TileIndex tile) const
 	{
-		const AirportSpec *as = this->GetSpec();
-		for (uint i = 0; i < as->nof_depots; i++) {
-			if (this->GetRotatedTileFromOffset(as->depot_table[i].ti) == tile) {
-				return as->depot_table + i;
+		for (const auto &depot : this->GetSpec()->depots) {
+			if (this->GetRotatedTileFromOffset(depot.ti) == tile) {
+				return &depot;
 			}
 		}
 		NOT_REACHED();
@@ -899,8 +907,10 @@ public:
 
 	StationHadVehicleOfType had_vehicle_of_type;
 
-	byte time_since_load;
-	byte time_since_unload;
+	uint8_t time_since_load;
+	uint8_t time_since_unload;
+
+	uint8_t station_cargo_history_offset = 0;                                                ///< Start offset in station_cargo_history cargo ring buffer, here for alignment
 
 	std::vector<Vehicle *> loading_vehicles;
 	GoodsEntry goods[NUM_CARGO];  ///< Goods at this station
@@ -909,8 +919,7 @@ public:
 	IndustryList industries_near; ///< Cached list of industries near the station that can accept cargo, @see DeliverGoodsToIndustry()
 	Industry *industry;           ///< NOSAVE: Associated industry for neutral stations. (Rebuilt on load from Industry->st)
 
-	CargoTypes station_cargo_history_cargoes;                                                ///< Bitmask of cargoes in station_cargo_history
-	uint8_t station_cargo_history_offset;                                                    ///< Start offset in station_cargo_history cargo ring buffer
+	CargoTypes station_cargo_history_cargoes = 0;                                            ///< Bitmask of cargoes in station_cargo_history
 	std::vector<std::array<uint16_t, MAX_STATION_CARGO_HISTORY_DAYS>> station_cargo_history; ///< Station history of waiting cargo, dynamic range compressed (see RXCompressUint)
 
 	Station(TileIndex tile = INVALID_TILE);
@@ -967,7 +976,7 @@ public:
 
 	bool IsWithinRangeOfDockingTile(TileIndex tile, uint max_distance) const;
 
-	uint32_t GetNewGRFVariable(const ResolverObject &object, uint16_t variable, byte parameter, bool *available) const override;
+	uint32_t GetNewGRFVariable(const ResolverObject &object, uint16_t variable, uint8_t parameter, bool &available) const override;
 
 	void GetTileArea(TileArea *ta, StationType type) const override;
 };

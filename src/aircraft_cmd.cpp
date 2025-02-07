@@ -17,6 +17,7 @@
 #include "newgrf_engine.h"
 #include "newgrf_sound.h"
 #include "spritecache.h"
+#include "error_func.h"
 #include "strings_func.h"
 #include "command_func.h"
 #include "window_func.h"
@@ -667,13 +668,11 @@ void UpdateAircraftCache(Aircraft *v, bool update_range)
 /**
  * Special velocities for aircraft
  */
-enum AircraftSpeedLimits {
-	SPEED_LIMIT_TAXI     =     50,  ///< Maximum speed of an aircraft while taxiing
-	SPEED_LIMIT_APPROACH =    230,  ///< Maximum speed of an aircraft on finals
-	SPEED_LIMIT_BROKEN   =    320,  ///< Maximum speed of an aircraft that is broken
-	SPEED_LIMIT_HOLD     =    425,  ///< Maximum speed of an aircraft that flies the holding pattern
-	SPEED_LIMIT_NONE     = 0xFFFF,  ///< No environmental speed limit. Speed limit is type dependent
-};
+static constexpr uint16_t SPEED_LIMIT_TAXI = 50; ///< Maximum speed of an aircraft while taxiing
+static constexpr uint16_t SPEED_LIMIT_APPROACH = 230; ///< Maximum speed of an aircraft on finals
+[[maybe_unused]] static constexpr uint16_t SPEED_LIMIT_BROKEN = 320; ///< Maximum speed of an aircraft that is broken
+static constexpr uint16_t SPEED_LIMIT_HOLD = 425; ///< Maximum speed of an aircraft that flies the holding pattern
+static constexpr uint16_t SPEED_LIMIT_NONE = UINT16_MAX; ///< No environmental speed limit. Speed limit is type dependent
 
 /**
  * Sets the new speed for an aircraft
@@ -692,7 +691,7 @@ static int UpdateAircraftSpeed(Aircraft *v, uint speed_limit = SPEED_LIMIT_NONE,
 	 *                               ~ acceleration * 77 (km-ish/h / 256)
 	 */
 	uint spd = v->acceleration * 77;
-	byte t;
+	uint8_t t;
 
 	/* Adjust speed limits by plane speed factor to prevent taxiing
 	 * and take-off speeds being too low. */
@@ -710,7 +709,7 @@ static int UpdateAircraftSpeed(Aircraft *v, uint speed_limit = SPEED_LIMIT_NONE,
 		speed_limit = v->vcache.cached_max_speed;
 	}
 
-	v->subspeed = (t = v->subspeed) + (byte)spd;
+	v->subspeed = (t = v->subspeed) + (uint8_t)spd;
 
 	/* Aircraft's current speed is used twice so that very fast planes are
 	 * forced to slow down rapidly in the short distance needed. The magic
@@ -737,7 +736,7 @@ static int UpdateAircraftSpeed(Aircraft *v, uint speed_limit = SPEED_LIMIT_NONE,
 	spd = v->GetOldAdvanceSpeed(spd);
 
 	spd += v->progress;
-	v->progress = (byte)spd;
+	v->progress = (uint8_t)spd;
 	return spd >> 8;
 }
 
@@ -861,7 +860,7 @@ template int GetAircraftFlightLevel(Aircraft *v, bool takeoff);
  * @param rotation The rotation of the airport.
  * @return   The index of the entry point
  */
-static byte AircraftGetEntryPoint(const Aircraft *v, const AirportFTAClass *apc, Direction rotation)
+static uint8_t AircraftGetEntryPoint(const Aircraft *v, const AirportFTAClass *apc, Direction rotation)
 {
 	assert(v != nullptr);
 	assert(apc != nullptr);
@@ -965,7 +964,7 @@ static bool AircraftController(Aircraft *v)
 			u->cur_speed = 32;
 			int count = UpdateAircraftSpeed(v);
 			if (count > 0) {
-				v->tile = 0;
+				v->tile = TileIndex{};
 
 				int z_dest;
 				GetAircraftFlightLevelBounds(v, &z_dest, nullptr);
@@ -1143,7 +1142,7 @@ static bool AircraftController(Aircraft *v)
 
 		v->tile = gp.new_tile;
 		/* If vehicle is in the air, use tile coordinate 0. */
-		if (amd.flag & (AMED_TAKEOFF | AMED_SLOWTURN | AMED_LAND)) v->tile = 0;
+		if (amd.flag & (AMED_TAKEOFF | AMED_SLOWTURN | AMED_LAND)) v->tile = TileIndex{};
 
 		/* Adjust Z for land or takeoff? */
 		int z = v->z_pos;
@@ -1414,10 +1413,10 @@ void Aircraft::MarkDirty()
 
 uint Aircraft::Crash(bool flooded)
 {
-	uint pass = Vehicle::Crash(flooded) + 2; // pilots
+	uint victims = Vehicle::Crash(flooded) + 2; // pilots
 	this->crashed_counter = flooded ? 9000 : 0; // max 10000, disappear pretty fast when flooded
 
-	return pass;
+	return victims;
 }
 
 /**
@@ -1428,8 +1427,8 @@ static void CrashAirplane(Aircraft *v)
 {
 	CreateEffectVehicleRel(v, 4, 4, 8, EV_EXPLOSION_LARGE);
 
-	uint pass = v->Crash();
-	SetDParam(0, pass);
+	uint victims = v->Crash();
+	SetDParam(0, victims);
 
 	v->cargo.Truncate();
 	v->Next()->cargo.Truncate();
@@ -1443,8 +1442,8 @@ static void CrashAirplane(Aircraft *v)
 		newsitem = STR_NEWS_AIRCRAFT_CRASH;
 	}
 
-	AI::NewEvent(v->owner, new ScriptEventVehicleCrashed(v->index, vt, st == nullptr ? ScriptEventVehicleCrashed::CRASH_AIRCRAFT_NO_AIRPORT : ScriptEventVehicleCrashed::CRASH_PLANE_LANDING));
-	Game::NewEvent(new ScriptEventVehicleCrashed(v->index, vt, st == nullptr ? ScriptEventVehicleCrashed::CRASH_AIRCRAFT_NO_AIRPORT : ScriptEventVehicleCrashed::CRASH_PLANE_LANDING));
+	AI::NewEvent(v->owner, new ScriptEventVehicleCrashed(v->index, vt, st == nullptr ? ScriptEventVehicleCrashed::CRASH_AIRCRAFT_NO_AIRPORT : ScriptEventVehicleCrashed::CRASH_PLANE_LANDING, victims));
+	Game::NewEvent(new ScriptEventVehicleCrashed(v->index, vt, st == nullptr ? ScriptEventVehicleCrashed::CRASH_AIRCRAFT_NO_AIRPORT : ScriptEventVehicleCrashed::CRASH_PLANE_LANDING, victims));
 
 	NewsType newstype = NT_ACCIDENT;
 	if (v->owner != _local_company) {
@@ -1728,7 +1727,7 @@ static void AircraftEventHandler_AtTerminal(Aircraft *v, const AirportFTAClass *
 
 static void AircraftEventHandler_General(Aircraft *, const AirportFTAClass *)
 {
-	error("OK, you shouldn't be here, check your Airport Scheme!");
+	FatalError("OK, you shouldn't be here, check your Airport Scheme!");
 }
 
 static void AircraftEventHandler_TakeOff(Aircraft *v, const AirportFTAClass *)
@@ -1775,7 +1774,7 @@ static void AircraftEventHandler_Flying(Aircraft *v, const AirportFTAClass *apc)
 		/* {32,FLYING,NOTHING_block,37}, {32,LANDING,N,33}, {32,HELILANDING,N,41},
 		 * if it is an airplane, look for LANDING, for helicopter HELILANDING
 		 * it is possible to choose from multiple landing runways, so loop until a free one is found */
-		byte landingtype = (v->subtype == AIR_HELICOPTER) ? HELILANDING : LANDING;
+		uint8_t landingtype = (v->subtype == AIR_HELICOPTER) ? HELILANDING : LANDING;
 		const AirportFTA *current = apc->layout[v->pos].next;
 		while (current != nullptr) {
 			if (current->heading == landingtype) {
@@ -1915,15 +1914,15 @@ static bool AirportMove(Aircraft *v, const AirportFTAClass *apc)
 {
 	/* error handling */
 	if (v->pos >= apc->nofelements) {
-		DEBUG(misc, 0, "[Ap] position %d is not valid for current airport. Max position is %d", v->pos, apc->nofelements-1);
+		Debug(misc, 0, "[Ap] position {} is not valid for current airport. Max position is {}", v->pos, apc->nofelements-1);
 		assert(v->pos < apc->nofelements);
 	}
 
 	const AirportFTA *current = &apc->layout[v->pos];
 	/* we have arrived in an important state (eg terminal, hangar, etc.) */
 	if (current->heading == v->state) {
-		byte prev_pos = v->pos; // location could be changed in state, so save it before-hand
-		byte prev_state = v->state;
+		uint8_t prev_pos = v->pos; // location could be changed in state, so save it before-hand
+		uint8_t prev_state = v->state;
 		_aircraft_state_handlers[v->state](v, apc);
 		if (v->state != FLYING) v->previous_pos = prev_pos;
 		if (v->state != prev_state || v->pos != prev_pos) UpdateAircraftCache(v);
@@ -1954,7 +1953,7 @@ static bool AirportMove(Aircraft *v, const AirportFTAClass *apc)
 		current = current->next;
 	} while (current != nullptr);
 
-	DEBUG(misc, 0, "[Ap] cannot move further on Airport! (pos %d state %d) for vehicle %d", v->pos, v->state, v->index);
+	Debug(misc, 0, "[Ap] cannot move further on Airport! (pos {} state {}) for vehicle {}", v->pos, v->state, v->index);
 	NOT_REACHED();
 }
 
@@ -2059,7 +2058,7 @@ static const MovementTerminalMapping _airport_terminal_mapping[] = {
  * @param last_terminal Terminal number to stop examining.
  * @return A terminal or helipad has been found, and has been assigned to the aircraft.
  */
-static bool FreeTerminal(Aircraft *v, byte i, byte last_terminal)
+static bool FreeTerminal(Aircraft *v, uint8_t i, uint8_t last_terminal)
 {
 	assert(last_terminal <= lengthof(_airport_terminal_mapping));
 	Station *st = Station::Get(v->targetairport);
@@ -2241,7 +2240,7 @@ static bool AircraftEventHandler(Aircraft *v, int loop)
 
 bool Aircraft::Tick()
 {
-	DEBUG_UPDATESTATECHECKSUM("Aircraft::Tick: v: %u, x: %d, y: %d", this->index, this->x_pos, this->y_pos);
+	DEBUG_UPDATESTATECHECKSUM("Aircraft::Tick: v: {}, x: {}, y: {}", this->index, this->x_pos, this->y_pos);
 	UpdateStateChecksum((((uint64_t) this->x_pos) << 32) | this->y_pos);
 	if (!this->IsNormalAircraft()) return true;
 
@@ -2259,8 +2258,8 @@ bool Aircraft::Tick()
 	}
 
 	if (HasBit(this->vcache.cached_veh_flags, VCF_REDRAW_ON_SPEED_CHANGE)) {
-		extern byte MapAircraftMovementState(const Aircraft *v);
-		byte state = MapAircraftMovementState(this);
+		extern uint8_t MapAircraftMovementState(const Aircraft *v);
+		uint8_t state = MapAircraftMovementState(this);
 		if (state != this->acache.image_movement_state) {
 			this->InvalidateImageCacheOfChain();
 			this->acache.image_movement_state = state;
@@ -2317,7 +2316,7 @@ void UpdateAirplanesOnNewStation(const Station *st)
 	if (!st->airport.HasHangar()) RemoveOrderFromAllVehicles(OT_GOTO_DEPOT, st->index, true);
 }
 
-const char *AirportMovementStateToString(byte state)
+const char *AirportMovementStateToString(uint8_t state)
 {
 #define AMS(s) case s: return #s;
 	switch (state) {

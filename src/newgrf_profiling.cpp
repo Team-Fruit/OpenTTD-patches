@@ -16,6 +16,7 @@
 #include "walltime_func.h"
 #include "timer/timer.h"
 #include "timer/timer_game_tick.h"
+#include "3rdparty/fmt/chrono.h"
 
 #include <chrono>
 
@@ -96,24 +97,27 @@ uint32_t NewGRFProfiler::Finish()
 	if (!this->active) return 0;
 
 	if (this->calls.empty()) {
-		IConsolePrintF(CC_DEBUG, "Finished profile of NewGRF [%08X], no events collected, not writing a file", BSWAP32(this->grffile->grfid));
+		IConsolePrint(CC_DEBUG, "Finished profile of NewGRF [{:08X}], no events collected, not writing a file.", BSWAP32(this->grffile->grfid));
 
 		this->Abort();
 		return 0;
 	}
 
 	std::string filename = this->GetOutputFilename();
-	IConsolePrintF(CC_DEBUG, "Finished profile of NewGRF [%08X], writing %u events to %s", BSWAP32(this->grffile->grfid), (uint)this->calls.size(), filename.c_str());
-
-	FILE *f = FioFOpenFile(filename, "wt", Subdirectory::NO_DIRECTORY);
-	FileCloser fcloser(f);
+	IConsolePrint(CC_DEBUG, "Finished profile of NewGRF [{:08X}], writing {} events to '{}'.", BSWAP32(this->grffile->grfid), this->calls.size(), filename);
 
 	uint32_t total_microseconds = 0;
 
-	fputs("Tick,Sprite,Feature,Item,CallbackID,Microseconds,Depth,Result\n", f);
-	for (const Call &c : this->calls) {
-		fprintf(f, OTTD_PRINTF64U ",%u,0x%X,%u,0x%X,%u,%u,%u\n", c.tick, c.root_sprite, c.feat, c.item, (uint)c.cb, c.time, c.subs, c.result);
-		total_microseconds += c.time;
+	auto f = FioFOpenFile(filename, "wt", Subdirectory::NO_DIRECTORY);
+
+	if (!f.has_value()) {
+		IConsolePrint(CC_ERROR, "Failed to open '{}' for writing.", filename);
+	} else {
+		fmt::print(*f, "Tick,Sprite,Feature,Item,CallbackID,Microseconds,Depth,Result\n");
+		for (const Call &c : this->calls) {
+			fmt::print(*f, "{},{},{:#X},{},{:#X},{},{},{}\n", c.tick, c.root_sprite, c.feat, c.item, (uint)c.cb, c.time, c.subs, c.result);
+			total_microseconds += c.time;
+		}
 	}
 
 	this->Abort();
@@ -132,13 +136,7 @@ void NewGRFProfiler::Abort()
  */
 std::string NewGRFProfiler::GetOutputFilename() const
 {
-	char timestamp[16] = {};
-	LocalTime::Format(timestamp, lastof(timestamp), "%Y%m%d-%H%M");
-
-	char filepath[MAX_PATH] = {};
-	seprintf(filepath, lastof(filepath), "%sgrfprofile-%s-%08X.csv", FiosGetScreenshotDir(), timestamp, BSWAP32(this->grffile->grfid));
-
-	return std::string(filepath);
+	return fmt::format("{}grfprofile-{:%Y%m%d-%H%M}-{:08X}.csv", FiosGetScreenshotDir(), fmt::localtime(time(nullptr)), BSWAP32(this->grffile->grfid));
 }
 
 /* static */ uint32_t NewGRFProfiler::FinishAll()
@@ -155,7 +153,7 @@ std::string NewGRFProfiler::GetOutputFilename() const
 	}
 
 	if (total_microseconds > 0 && max_ticks > 0) {
-		IConsolePrintF(CC_DEBUG, "Total NewGRF callback processing: %u microseconds over " OTTD_PRINTF64U " ticks", total_microseconds, max_ticks);
+		IConsolePrint(CC_DEBUG, "Total NewGRF callback processing: {} microseconds over {} ticks.", total_microseconds, max_ticks);
 	}
 
 	return total_microseconds;
@@ -164,7 +162,7 @@ std::string NewGRFProfiler::GetOutputFilename() const
 /**
  * Check whether profiling is active and should be finished.
  */
-static TimeoutTimer<TimerGameTick> _profiling_finish_timeout(0, []()
+static TimeoutTimer<TimerGameTick> _profiling_finish_timeout({ TimerGameTick::Priority::NONE, 0 }, []()
 {
 	NewGRFProfiler::FinishAll();
 });
@@ -174,7 +172,7 @@ static TimeoutTimer<TimerGameTick> _profiling_finish_timeout(0, []()
  */
 /* static */ void NewGRFProfiler::StartTimer(uint64_t ticks)
 {
-	_profiling_finish_timeout.Reset(ticks);
+	_profiling_finish_timeout.Reset({ TimerGameTick::Priority::NONE, static_cast<uint>(ticks) });
 }
 
 /**

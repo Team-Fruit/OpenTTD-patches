@@ -11,6 +11,7 @@
 #define POOL_TYPE_HPP
 
 #include "enum_type.hpp"
+#include "debug_dbg_assert.h"
 #include <vector>
 
 /** Various types of a pool. */
@@ -95,8 +96,8 @@ struct Pool : PoolBase {
 	using ParamType = typename Tops::Tparam_type;
 	using PtrType = typename Tops::Tptr;
 
-	/* Ensure Tmax_size is within the bounds of Tindex. */
-	static_assert((uint64_t)(Tmax_size - 1) >> 8 * sizeof(Tindex) == 0);
+	/* Ensure the highest possible index, i.e. Tmax_size -1, is within the bounds of Tindex. */
+	static_assert(Tmax_size - 1 <= MAX_UVALUE(Tindex));
 
 	static constexpr size_t MAX_SIZE = Tmax_size; ///< Make template parameter accessible from outside
 
@@ -119,7 +120,7 @@ struct Pool : PoolBase {
 
 	inline PtrType &GetRawRef(size_t index)
 	{
-		dbg_assert_msg(index < this->first_unused, "index: " PRINTF_SIZE ", first_unused: " PRINTF_SIZE ", name: %s", index, this->first_unused, this->name);
+		dbg_assert_msg(index < this->first_unused, "index: {}, first_unused: {}, name: {}", index, this->first_unused, this->name);
 		return this->data[index];
 	}
 
@@ -295,8 +296,8 @@ public:
 		inline void operator delete(void *p)
 		{
 			if (p == nullptr) return;
-			Titem *pn = (Titem *)p;
-			dbg_assert_msg(pn == Tpool->Get(pn->index), "name: %s", Tpool->name);
+			Titem *pn = static_cast<Titem *>(p);
+			dbg_assert_msg(pn == Tpool->Get(pn->index), "name: {}", Tpool->name);
 			Tpool->FreeItem(pn->index);
 		}
 
@@ -329,7 +330,7 @@ public:
 				 * memory are the same (because of possible inheritance).
 				 * Use { size_t index = item->index; delete item; new (index) item; }
 				 * instead to make sure destructor is called and no memory leaks. */
-				dbg_assert_msg(ptr != Tpool->data[i], "name: %s", Tpool->name);
+				dbg_assert_msg(ptr != Tpool->data[i], "name: {}", Tpool->name);
 			}
 			return ptr;
 		}

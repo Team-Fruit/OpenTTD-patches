@@ -45,9 +45,9 @@ static constexpr NWidgetPart _nested_extra_viewport_widgets[] = {
 		NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_EV_ZOOM_OUT), SetDataTip(SPR_IMG_ZOOMOUT, STR_TOOLBAR_TOOLTIP_ZOOM_THE_VIEW_OUT),
 		NWidget(NWID_HORIZONTAL, NC_EQUALSIZE),
 			NWidget(WWT_PUSHTXTBTN, COLOUR_GREY, WID_EV_MAIN_TO_VIEW), SetFill(1, 1), SetResize(1, 0),
-										SetDataTip(STR_EXTRA_VIEW_MOVE_MAIN_TO_VIEW, STR_EXTRA_VIEW_MOVE_MAIN_TO_VIEW_TT),
+										SetDataTip(STR_EXTRA_VIEW_MOVE_MAIN_TO_VIEW, STR_EXTRA_VIEW_MOVE_MAIN_TO_VIEW_TOOLTIP),
 			NWidget(WWT_PUSHTXTBTN, COLOUR_GREY, WID_EV_VIEW_TO_MAIN), SetFill(1, 1), SetResize(1, 0),
-										SetDataTip(STR_EXTRA_VIEW_MOVE_VIEW_TO_MAIN, STR_EXTRA_VIEW_MOVE_VIEW_TO_MAIN_TT),
+										SetDataTip(STR_EXTRA_VIEW_MOVE_VIEW_TO_MAIN, STR_EXTRA_VIEW_MOVE_VIEW_TO_MAIN_TOOLTIP),
 		EndContainer(),
 	EndContainer(),
 	NWidget(NWID_HORIZONTAL),
@@ -58,7 +58,7 @@ static constexpr NWidgetPart _nested_extra_viewport_widgets[] = {
 
 class ExtraViewportWindow : public Window {
 public:
-	ExtraViewportWindow(WindowDesc *desc, int window_number, TileIndex tile) : Window(desc)
+	ExtraViewportWindow(WindowDesc &desc, int window_number, TileIndex tile) : Window(desc)
 	{
 		this->InitNested(window_number);
 
@@ -152,7 +152,7 @@ public:
 			/* Cycle through the drawing modes */
 			ChangeRenderMode(this->viewport, wheel < 0);
 			this->SetDirty();
-		} else if (_settings_client.gui.scrollwheel_scrolling != 2) {
+		} else if (_settings_client.gui.scrollwheel_scrolling != SWS_OFF) {
 			ZoomInOrOutToCursorWindow(wheel < 0, this);
 		}
 	}
@@ -184,7 +184,7 @@ static WindowDesc _extra_viewport_desc(__FILE__, __LINE__,
 	WDP_AUTO, "extra_viewport", 300, 268,
 	WC_EXTRA_VIEWPORT, WC_NONE,
 	0,
-	std::begin(_nested_extra_viewport_widgets), std::end(_nested_extra_viewport_widgets)
+	_nested_extra_viewport_widgets
 );
 
 /**
@@ -198,7 +198,7 @@ void ShowExtraViewportWindow(TileIndex tile)
 	/* find next free window number for extra viewport */
 	while (FindWindowById(WC_EXTRA_VIEWPORT, i) != nullptr) i++;
 
-	new ExtraViewportWindow(&_extra_viewport_desc, i, tile);
+	new ExtraViewportWindow(_extra_viewport_desc, i, tile);
 }
 
 /**

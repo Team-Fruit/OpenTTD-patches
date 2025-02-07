@@ -10,7 +10,6 @@
 #ifndef SCRIPT_OBJECT_HPP
 #define SCRIPT_OBJECT_HPP
 
-#include "../../misc/countedptr.hpp"
 #include "../../road_type.h"
 #include "../../rail_type.h"
 #include "../../core/random_func.hpp"
@@ -22,8 +21,6 @@
 
 #include <utility>
 
-struct CommandAuxiliaryBase;
-
 /**
  * The callback function for Mode-classes.
  */
@@ -33,6 +30,27 @@ typedef bool (ScriptModeProc)();
  * The callback function for Async Mode-classes.
  */
 typedef bool (ScriptAsyncModeProc)();
+
+/**
+ * Simple counted object. Use it as base of your struct/class if you want to use
+ *  basic reference counting. Your struct/class will destroy and free itself when
+ *  last reference to it is released (using Release() method). The initial reference
+ *  count (when it is created) is zero (don't forget AddRef() at least one time if
+ *  not using ScriptObjectRef.
+ * @api -all
+ */
+class SimpleCountedObject {
+public:
+	SimpleCountedObject() : ref_count(0) {}
+	virtual ~SimpleCountedObject() = default;
+
+	inline void AddRef() { ++this->ref_count; }
+	void Release();
+	virtual void FinalRelease() {};
+
+private:
+	int32_t ref_count;
+};
 
 /**
  * Uper-parent object of all API classes. You should never use this class in
@@ -93,9 +111,9 @@ protected:
 	/**
 	 * Executes a raw DoCommand for the script.
 	 */
-	static bool DoCommandEx(TileIndex tile, uint32_t p1, uint32_t p2, uint64_t p3, uint cmd, const char *text = nullptr, const CommandAuxiliaryBase *aux_data = nullptr, Script_SuspendCallbackProc *callback = nullptr);
+	static bool DoCommandEx(TileIndex tile, uint32_t p1, uint32_t p2, uint64_t p3, uint cmd, const char *text = nullptr, const struct CommandAuxiliaryBase *aux_data = nullptr, Script_SuspendCallbackProc *callback = nullptr);
 
-	static bool DoCommandEx(TileIndex tile, uint32_t p1, uint32_t p2, uint64_t p3, uint cmd, const std::string &text, const CommandAuxiliaryBase *aux_data = nullptr, Script_SuspendCallbackProc *callback = nullptr)
+	static bool DoCommandEx(TileIndex tile, uint32_t p1, uint32_t p2, uint64_t p3, uint cmd, const std::string &text, const struct CommandAuxiliaryBase *aux_data = nullptr, Script_SuspendCallbackProc *callback = nullptr)
 	{
 		return ScriptObject::DoCommandEx(tile, p1, p2, p3, cmd, text.c_str(), aux_data, callback);
 	}
@@ -108,6 +126,11 @@ protected:
 	static bool DoCommand(TileIndex tile, uint32_t p1, uint32_t p2, uint cmd, const std::string &text, Script_SuspendCallbackProc *callback = nullptr)
 	{
 		return ScriptObject::DoCommandEx(tile, p1, p2, 0, cmd, text.c_str(), nullptr, callback);
+	}
+
+	static bool DoCommandAux(TileIndex tile, const struct CommandAuxiliaryBase *aux_data, uint cmd, Script_SuspendCallbackProc *callback = nullptr)
+	{
+		return ScriptObject::DoCommandEx(tile, 0, 0, 0, cmd, nullptr, aux_data, callback);
 	}
 
 	/**
@@ -385,7 +408,7 @@ public:
 	 */
 	ScriptObjectRef(T *data) : data(data)
 	{
-		this->data->AddRef();
+		if (this->data != nullptr) this->data->AddRef();
 	}
 
 	/* No copy constructor. */
@@ -429,6 +452,15 @@ public:
 	 * @return Pointer to the underlying object.
 	 */
 	T *operator->()
+	{
+		return this->data;
+	}
+
+	/**
+	 * The arrow operator on this reference returns the reference counted object.
+	 * @return Pointer to the underlying object.
+	 */
+	const T *operator->() const
 	{
 		return this->data;
 	}

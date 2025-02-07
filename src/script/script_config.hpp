@@ -76,7 +76,6 @@ public:
 	 * @param version The version of the Script to load, or -1 of latest.
 	 * @param force_exact_match If true try to find the exact same version
 	 *   as specified. If false any compatible version is ok.
-	 * @param is_random Is the Script chosen randomly?
 	 */
 	void Change(std::optional<const std::string> name, int version = -1, bool force_exact_match = false);
 
@@ -166,9 +165,9 @@ public:
 	 * Search a textfile file next to this script.
 	 * @param type The type of the textfile to search for.
 	 * @param slot #CompanyID to check status of.
-	 * @return The filename for the textfile, \c nullptr otherwise.
+	 * @return The filename for the textfile.
 	 */
-	const char *GetTextfile(TextfileType type, CompanyID slot) const;
+	std::optional<std::string> GetTextfile(TextfileType type, CompanyID slot) const;
 
 	void SetToLoadData(ScriptInstance::ScriptData *data);
 	ScriptInstance::ScriptData *GetToLoadData();
