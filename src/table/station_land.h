@@ -763,14 +763,14 @@ static const DrawTileSeqStruct _station_display_datas_0171[] = {
 	TILE_SEQ_END()
 };
 
-/* drive-through bus stop X */
+/* road waypoint X */
 static const DrawTileSeqStruct _station_display_datas_road_waypoint_X[] = {
 	TILE_SEQ_LINE( 0,  0,  0,  16,  3, 16, SPR_ROAD_WAYPOINT_X_W | (1U << PALETTE_MODIFIER_COLOUR))
 	TILE_SEQ_LINE( 0, 13,  0,  16,  3, 16, SPR_ROAD_WAYPOINT_X_E | (1U << PALETTE_MODIFIER_COLOUR))
 	TILE_SEQ_END()
 };
 
-/* drive-through bus stop Y */
+/* road waypoint Y */
 static const DrawTileSeqStruct _station_display_datas_road_waypoint_Y[] = {
 	TILE_SEQ_LINE(13,  0,  0,  3,  16, 16, SPR_ROAD_WAYPOINT_Y_W | (1U << PALETTE_MODIFIER_COLOUR))
 	TILE_SEQ_LINE( 0,  0,  0,  3,  16, 16, SPR_ROAD_WAYPOINT_Y_E | (1U << PALETTE_MODIFIER_COLOUR))
@@ -1013,7 +1013,7 @@ static const DrawTileSprites _station_display_datas_waypoint[] = {
  * As these are drawn/build like stations, they may use the same number of layouts. */
 static_assert(lengthof(_station_display_datas_rail) == lengthof(_station_display_datas_waypoint));
 
-static const DrawTileSprites * const _station_display_datas[] = {
+static const std::array<std::span<const DrawTileSprites>, STATION_END> _station_display_datas = {{
 	_station_display_datas_rail,
 	_station_display_datas_airport,
 	_station_display_datas_truck,
@@ -1023,4 +1023,4 @@ static const DrawTileSprites * const _station_display_datas[] = {
 	_station_display_datas_buoy,
 	_station_display_datas_waypoint,
 	_station_display_datas_road_waypoint,
-};
+}};

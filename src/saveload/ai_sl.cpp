@@ -9,7 +9,6 @@
 
 #include "../stdafx.h"
 #include "../debug.h"
-#include "../debug_fmt.h"
 
 #include "saveload.h"
 #include "compat/ai_sl_compat.h"
@@ -44,9 +43,9 @@ static const SaveLoad _ai_running_desc[] = {
 	 SLEG_CONDVAR("running_version",  _ai_saveload_version,  SLE_UINT32, SLV_AI_LOCAL_CONFIG, SL_MAX_VERSION),
 };
 
-static void SaveReal_AIPL(int *index_ptr)
+static void SaveReal_AIPL(int arg)
 {
-	CompanyID index = (CompanyID)*index_ptr;
+	CompanyID index = static_cast<CompanyID>(arg);
 	AIConfig *config = AIConfig::GetConfig(index, AIConfig::SSS_FORCE_GAME);
 
 	if (config->HasScript()) {
@@ -165,7 +164,7 @@ struct AIPLChunkHandler : ChunkHandler {
 
 		for (int i = COMPANY_FIRST; i < MAX_COMPANIES; i++) {
 			SlSetArrayIndex(i);
-			SlAutolength((AutolengthProc *)SaveReal_AIPL, &i);
+			SlAutolength(SaveReal_AIPL, i);
 		}
 	}
 };

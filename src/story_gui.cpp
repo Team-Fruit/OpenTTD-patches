@@ -16,8 +16,8 @@
 #include "core/geometry_func.hpp"
 #include "company_func.h"
 #include "command_func.h"
-#include "widgets/dropdown_type.h"
-#include "widgets/dropdown_func.h"
+#include "dropdown_type.h"
+#include "dropdown_func.h"
 #include "sortlist_type.h"
 #include "goal_base.h"
 #include "viewport_func.h"
@@ -65,8 +65,8 @@ protected:
 
 	StoryPageElementID active_button_id; ///< Which button element the player is currently using
 
-	static GUIStoryPageList::SortFunction * const page_sorter_funcs[];
-	static GUIStoryPageElementList::SortFunction * const page_element_sorter_funcs[];
+	static const std::initializer_list<GUIStoryPageList::SortFunction * const> page_sorter_funcs;
+	static const std::initializer_list<GUIStoryPageElementList::SortFunction * const> page_element_sorter_funcs;
 
 	/** (Re)Build story page list. */
 	void BuildStoryPageList()
@@ -80,7 +80,6 @@ protected:
 				}
 			}
 
-			this->story_pages.shrink_to_fit();
 			this->story_pages.RebuildDone();
 		}
 
@@ -108,7 +107,6 @@ protected:
 				}
 			}
 
-			this->story_page_elements.shrink_to_fit();
 			this->story_page_elements.RebuildDone();
 		}
 
@@ -256,11 +254,11 @@ protected:
 		for (const StoryPage *p : this->story_pages) {
 			bool current_page = p->index == this->selected_page_id;
 			if (!p->title.empty()) {
-				list.push_back(std::make_unique<DropDownListStringItem>(p->title, p->index, current_page));
+				list.push_back(MakeDropDownListStringItem(p->title, p->index, current_page));
 			} else {
 				/* No custom title => use a generic page title with page number. */
 				SetDParam(0, page_num);
-				list.push_back(std::make_unique<DropDownListStringItem>(STR_STORY_BOOK_GENERIC_PAGE_ITEM, p->index, current_page));
+				list.push_back(MakeDropDownListStringItem(STR_STORY_BOOK_GENERIC_PAGE_ITEM, p->index, current_page));
 			}
 			page_num++;
 		}
@@ -595,7 +593,7 @@ protected:
 	}
 
 public:
-	StoryBookWindow(WindowDesc *desc, WindowNumber window_number) : Window(desc)
+	StoryBookWindow(WindowDesc &desc, WindowNumber window_number) : Window(desc)
 	{
 		this->CreateNestedTree();
 		this->vscroll = this->GetScrollbar(WID_SB_SCROLLBAR);
@@ -754,7 +752,7 @@ public:
 		}
 	}
 
-	void UpdateWidgetSize(WidgetID widget, Dimension *size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension *fill, [[maybe_unused]] Dimension *resize) override
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
 	{
 		if (widget != WID_SB_SEL_PAGE && widget != WID_SB_PAGE_PANEL) return;
 
@@ -783,14 +781,14 @@ public:
 
 				d.width += padding.width;
 				d.height += padding.height;
-				*size = maxdim(*size, d);
+				size = maxdim(size, d);
 				break;
 			}
 
 			case WID_SB_PAGE_PANEL: {
 				d.height *= 5;
 				d.height += padding.height + WidgetDimensions::scaled.frametext.Vertical();
-				*size = maxdim(*size, d);
+				size = maxdim(size, d);
 				break;
 			}
 		}
@@ -942,11 +940,11 @@ public:
 	}
 };
 
-GUIStoryPageList::SortFunction * const StoryBookWindow::page_sorter_funcs[] = {
+const std::initializer_list<GUIStoryPageList::SortFunction * const> StoryBookWindow::page_sorter_funcs = {
 	&PageOrderSorter,
 };
 
-GUIStoryPageElementList::SortFunction * const StoryBookWindow::page_element_sorter_funcs[] = {
+const std::initializer_list<GUIStoryPageElementList::SortFunction * const> StoryBookWindow::page_element_sorter_funcs = {
 	&PageElementOrderSorter,
 };
 
@@ -975,14 +973,14 @@ static WindowDesc _story_book_desc(__FILE__, __LINE__,
 	WDP_AUTO, "view_story", 400, 300,
 	WC_STORY_BOOK, WC_NONE,
 	0,
-	std::begin(_nested_story_book_widgets), std::end(_nested_story_book_widgets)
+	_nested_story_book_widgets
 );
 
 static WindowDesc _story_book_gs_desc(__FILE__, __LINE__,
 	WDP_CENTER, "view_story_gs", 400, 300,
 	WC_STORY_BOOK, WC_NONE,
 	0,
-	std::begin(_nested_story_book_widgets), std::end(_nested_story_book_widgets)
+	_nested_story_book_widgets
 );
 
 static CursorID TranslateStoryPageButtonCursor(StoryPageButtonCursor cursor)
@@ -1057,6 +1055,6 @@ void ShowStoryBook(CompanyID company, uint16_t page_id, bool centered)
 {
 	if (!Company::IsValidID(company)) company = (CompanyID)INVALID_COMPANY;
 
-	StoryBookWindow *w = AllocateWindowDescFront<StoryBookWindow>(centered ? &_story_book_gs_desc : &_story_book_desc, company, true);
+	StoryBookWindow *w = AllocateWindowDescFront<StoryBookWindow>(centered ? _story_book_gs_desc : _story_book_desc, company, true);
 	if (page_id != INVALID_STORY_PAGE) w->SetSelectedPage(page_id);
 }

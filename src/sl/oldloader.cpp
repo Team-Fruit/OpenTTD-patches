@@ -33,12 +33,24 @@ static inline OldChunkType GetOldChunkType(OldChunkType type)     {return (OldCh
 static inline OldChunkType GetOldChunkVarType(OldChunkType type)  {return (OldChunkType)(GB(type, 8, 8) << 8);}
 static inline OldChunkType GetOldChunkFileType(OldChunkType type) {return (OldChunkType)(GB(type, 16, 8) << 16);}
 
-static inline byte CalcOldVarLen(OldChunkType type)
+/**
+ * Return expected size in bytes of a OldChunkType
+ * @param type OldChunkType to get size of.
+ * @return size of type in bytes.
+ */
+static inline uint8_t CalcOldVarLen(OldChunkType type)
 {
-	static const byte type_mem_size[] = {0, 1, 1, 2, 2, 4, 4, 8};
-	byte length = GB(type, 8, 8);
-	assert(length != 0 && length < lengthof(type_mem_size));
-	return type_mem_size[length];
+	switch (GetOldChunkVarType(type)) {
+		case OC_VAR_I8: return sizeof(int8_t);
+		case OC_VAR_U8: return sizeof(uint8_t);
+		case OC_VAR_I16: return sizeof(int16_t);
+		case OC_VAR_U16: return sizeof(uint16_t);
+		case OC_VAR_I32: return sizeof(int32_t);
+		case OC_VAR_U32: return sizeof(uint32_t);
+		case OC_VAR_I64: return sizeof(int64_t);
+		case OC_VAR_U64: return sizeof(uint64_t);
+		default: NOT_REACHED();
+	}
 }
 
 /**
@@ -46,18 +58,18 @@ static inline byte CalcOldVarLen(OldChunkType type)
  * Reads a byte from a file (do not call yourself, use ReadByte())
  *
  */
-static byte ReadByteFromFile(LoadgameState *ls)
+static uint8_t ReadByteFromFile(LoadgameState *ls)
 {
 	/* To avoid slow reads, we read BUFFER_SIZE of bytes per time
 	and just return a byte per time */
 	if (ls->buffer_cur >= ls->buffer_count) {
 
 		/* Read some new bytes from the file */
-		int count = (int)fread(ls->buffer, 1, BUFFER_SIZE, ls->file);
+		int count = static_cast<int>(fread(ls->buffer, 1, BUFFER_SIZE, *ls->file));
 
 		/* We tried to read, but there is nothing in the file anymore.. */
 		if (count == 0) {
-			DEBUG(oldloader, 0, "Read past end of file, loading failed");
+			Debug(oldloader, 0, "Read past end of file, loading failed");
 			throw std::exception();
 		}
 
@@ -73,7 +85,7 @@ static byte ReadByteFromFile(LoadgameState *ls)
  * Reads a byte from the buffer and decompress if needed
  *
  */
-byte ReadByte(LoadgameState *ls)
+uint8_t ReadByte(LoadgameState *ls)
 {
 	/* Old savegames have a nice compression algorithm (RLE)
 	which means that we have a chunk, which starts with a length
@@ -109,7 +121,7 @@ byte ReadByte(LoadgameState *ls)
  */
 bool LoadChunk(LoadgameState *ls, void *base, const OldChunks *chunks)
 {
-	byte *base_ptr = (byte*)base;
+	uint8_t *base_ptr = (uint8_t*)base;
 
 	for (const OldChunks *chunk = chunks; chunk->type != OC_END; chunk++) {
 		if (((chunk->type & OC_TTD) && _savegame_type == SGT_TTO) ||
@@ -118,8 +130,8 @@ bool LoadChunk(LoadgameState *ls, void *base, const OldChunks *chunks)
 			continue;
 		}
 
-		byte *ptr = (byte*)chunk->ptr;
-		if (chunk->type & OC_DEREFERENCE_POINTER) ptr = *(byte**)ptr;
+		uint8_t *ptr = (uint8_t*)chunk->ptr;
+		if (chunk->type & OC_DEREFERENCE_POINTER) ptr = *(uint8_t**)ptr;
 
 		for (uint i = 0; i < chunk->amount; i++) {
 			/* Handle simple types */
@@ -135,7 +147,7 @@ bool LoadChunk(LoadgameState *ls, void *base, const OldChunks *chunks)
 						break;
 
 					case OC_ASSERT:
-						DEBUG(oldloader, 4, "Assert point: 0x%X / 0x%X", ls->total_read, chunk->offset + _bump_assert_value);
+						Debug(oldloader, 4, "Assert point: 0x{:X} / 0x{:X}", ls->total_read, chunk->offset + _bump_assert_value);
 						if (ls->total_read != chunk->offset + _bump_assert_value) throw std::exception();
 					default: break;
 				}
@@ -226,7 +238,7 @@ static bool VerifyOldNameChecksum(char *title, uint len)
 	return sum == sum2;
 }
 
-static inline bool CheckOldSavegameType(FILE *f, char *temp, const char *last, uint len)
+static inline bool CheckOldSavegameType(FileHandle &f, char *temp, const char *last, uint len)
 {
 	assert(last - temp + 1 >= (int)len);
 
@@ -242,7 +254,7 @@ static inline bool CheckOldSavegameType(FILE *f, char *temp, const char *last, u
 	return ret;
 }
 
-static SavegameType DetermineOldSavegameType(FILE *f, char *title, const char *last)
+static SavegameType DetermineOldSavegameType(FileHandle &f, char *title, const char *last)
 {
 	static_assert(TTD_HEADER_SIZE >= TTO_HEADER_SIZE);
 	char temp[TTD_HEADER_SIZE] = "Unknown";
@@ -276,19 +288,20 @@ bool LoadOldSaveGame(const std::string &file)
 {
 	LoadgameState ls;
 
-	DEBUG(oldloader, 3, "Trying to load a TTD(Patch) savegame");
+	Debug(oldloader, 3, "Trying to load a TTD(Patch) savegame");
 
 	InitLoading(&ls);
 
 	/* Open file */
 	ls.file = FioFOpenFile(file, "rb", NO_DIRECTORY);
 
-	if (ls.file == nullptr) {
-		DEBUG(oldloader, 0, "Cannot open file '%s'", file.c_str());
+	if (!ls.file.has_value()) {
+		Debug(oldloader, 0, "Cannot open file '{}'", file);
+		SetSaveLoadError(STR_GAME_SAVELOAD_ERROR_FILE_NOT_READABLE);
 		return false;
 	}
 
-	SavegameType type = DetermineOldSavegameType(ls.file, nullptr, nullptr);
+	SavegameType type = DetermineOldSavegameType(*ls.file, nullptr, nullptr);
 
 	LoadOldMainProc *proc = nullptr;
 
@@ -307,7 +320,7 @@ bool LoadOldSaveGame(const std::string &file)
 		game_loaded = false;
 	}
 
-	fclose(ls.file);
+	ls.file.reset();
 
 	if (!game_loaded) {
 		SetSaveLoadError(STR_GAME_SAVELOAD_ERROR_DATA_INTEGRITY_CHECK_FAILED);
@@ -321,14 +334,12 @@ bool LoadOldSaveGame(const std::string &file)
 
 void GetOldSaveGameName(const std::string &file, char *title, const char *last)
 {
-	FILE *f = FioFOpenFile(file, "rb", NO_DIRECTORY);
+	auto f = FioFOpenFile(file, "rb", NO_DIRECTORY);
 
-	if (f == nullptr) {
+	if (!f.has_value()) {
 		*title = '\0';
 		return;
 	}
 
-	DetermineOldSavegameType(f, title, last);
-
-	fclose(f);
+	DetermineOldSavegameType(*f, title, last);
 }

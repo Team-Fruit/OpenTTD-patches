@@ -76,7 +76,7 @@ struct StringReader {
 	bool translation; ///< Are we reading a translation, implies !master. However, the base translation will have this false.
 
 	StringReader(StringData &data, std::string file, bool master, bool translation);
-	virtual ~StringReader() {}
+	virtual ~StringReader() = default;
 	void HandleString(char *str);
 
 	/**
@@ -136,7 +136,7 @@ struct LanguageWriter {
 	 * @param buffer The buffer to write.
 	 * @param length The amount of byte to write.
 	 */
-	virtual void Write(const byte *buffer, size_t length) = 0;
+	virtual void Write(const uint8_t *buffer, size_t length) = 0;
 
 	/**
 	 * Finalise writing the file.
@@ -165,9 +165,12 @@ struct ParsedCommandStruct {
 const CmdStruct *TranslateCmdForCompare(const CmdStruct *a);
 ParsedCommandStruct ExtractCommandString(const char *s, bool warnings);
 
-void CDECL strgen_warning(const char *s, ...) WARN_FORMAT(1, 2);
-void CDECL strgen_error(const char *s, ...) WARN_FORMAT(1, 2);
-[[noreturn]] void CDECL strgen_fatal(const char *s, ...) WARN_FORMAT(1, 2);
+void StrgenWarningI(const std::string &msg);
+void StrgenErrorI(const std::string &msg);
+[[noreturn]] void StrgenFatalI(const std::string &msg);
+#define StrgenWarning(format_string, ...) StrgenWarningI(fmt::format(FMT_STRING(format_string) __VA_OPT__(,) __VA_ARGS__))
+#define StrgenError(format_string, ...) StrgenErrorI(fmt::format(FMT_STRING(format_string) __VA_OPT__(,) __VA_ARGS__))
+#define StrgenFatal(format_string, ...) StrgenFatalI(fmt::format(FMT_STRING(format_string) __VA_OPT__(,) __VA_ARGS__))
 char *ParseWord(char **buf);
 
 extern const char *_file;

@@ -12,7 +12,7 @@
 #define TIMER_MANAGER_H
 
 #include "../stdafx.h"
-#include <set>
+#include "../3rdparty/cpp-btree/btree_set.h"
 
 template <typename TTimerType>
 class BaseTimer;
@@ -57,6 +57,20 @@ public:
 		GetTimers().erase(&timer);
 	}
 
+	/**
+	 * Change the period of a registered timer.
+	 *
+	 * @param timer The timer to change the period of.
+	 * @param new_period The new period value.
+	 */
+	static void ChangeRegisteredTimerPeriod(BaseTimer<TTimerType> &timer, TPeriod new_period)
+	{
+		/* Unregistration and re-registration is necessary because the period is used as the sort key in base_timer_sorter */
+		UnregisterTimer(timer);
+		timer.period = new_period;
+		RegisterTimer(timer);
+	}
+
 #ifdef WITH_ASSERT
 	/**
 	 * Validate that a new period is actually valid.
@@ -98,10 +112,23 @@ private:
 	};
 
 	/** Singleton list, to store all the active timers. */
-	static std::set<BaseTimer<TTimerType> *, base_timer_sorter> &GetTimers()
+	static btree::btree_set<BaseTimer<TTimerType> *, base_timer_sorter> &GetTimers()
 	{
-		static std::set<BaseTimer<TTimerType> *, base_timer_sorter> timers;
+		static btree::btree_set<BaseTimer<TTimerType> *, base_timer_sorter> timers;
 		return timers;
+	}
+
+	/** List of active timers, as a std::vector, to allow for timers to be added/removed during iteration. */
+	static std::vector<BaseTimer<TTimerType> *> GetTimerVector()
+	{
+		std::vector<BaseTimer<TTimerType> *> result;
+
+		const auto &timers = TimerManager::GetTimers();
+		result.reserve(timers.size());
+		for (BaseTimer<TTimerType> * timer : timers) {
+			result.push_back(timer);
+		}
+		return result;
 	}
 };
 

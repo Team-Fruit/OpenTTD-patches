@@ -54,13 +54,14 @@
 #define MD5_INCLUDED
 
 #include <array>
+#include <string>
 
 /** The number of bytes in a MD5 hash. */
 static const size_t MD5_HASH_BYTES = 16;
 
 /** Container for storing a MD5 hash/checksum/digest. */
-struct MD5Hash : std::array<byte, MD5_HASH_BYTES> {
-	MD5Hash() : std::array<byte, MD5_HASH_BYTES>{} {}
+struct MD5Hash : std::array<uint8_t, MD5_HASH_BYTES>, public fmt_formattable {
+	MD5Hash() : std::array<uint8_t, MD5_HASH_BYTES>{} {}
 
 	/**
 	 * Exclusively-or the given hash into this hash.
@@ -72,9 +73,11 @@ struct MD5Hash : std::array<byte, MD5_HASH_BYTES> {
 		for (size_t i = 0; i < size(); i++) this->operator[](i) ^= other[i];
 		return *this;
 	}
+
+	void fmt_format_value(struct format_target &output) const;
 };
 
-char *md5sumToString(char *buf, const char *last, const MD5Hash &md5sum);
+std::string md5sumToString(const MD5Hash &md5sum);
 
 struct Md5 {
 private:

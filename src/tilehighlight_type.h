@@ -60,14 +60,14 @@ struct TileHighlightData {
 	Point new_size;      ///< New value for \a size; used to determine whether to redraw the selection.
 	Point new_offs;      ///< New value for \a offs; used to determine whether to redraw the selection.
 	Point new_outersize; ///< New value for \a outersize; used to determine whether to redraw the selection.
-	byte dirty;          ///< Whether the build station window needs to redraw due to the changed selection.
+	uint8_t dirty;       ///< Whether the build station window needs to redraw due to the changed selection.
 
 	Point selstart;      ///< The location where the dragging started.
 	Point selend;        ///< The location where the drag currently ends.
 	Point selstart2;     ///< The location where the second segment of a polyline track starts.
 	Point selend2;       ///< The location where the second segment of a polyline track ends.
 	HighLightStyle dir2; ///< Direction of the second segment of a polyline track, HT_DIR_END if second segment is not selected. HT_LINE drawstyle.
-	byte sizelimit;      ///< Whether the selection is limited in length, and what the maximum length is.
+	uint8_t sizelimit;   ///< Whether the selection is limited in length, and what the maximum length is.
 
 	HighLightStyle drawstyle;      ///< Lower bits 0-3 are reserved for detailed highlight information.
 	HighLightStyle next_drawstyle; ///< Queued, but not yet drawn style.
@@ -75,6 +75,7 @@ struct TileHighlightData {
 	HighLightStyle place_mode;     ///< Method which is used to place the selection.
 	WindowClass window_class;      ///< The \c WindowClass of the window that is responsible for the selection mode.
 	WindowNumber window_number;    ///< The \c WindowNumber of the window that is responsible for the selection mode.
+	WindowToken window_token;      ///< The \c WindowToken of the window that is responsible for the selection mode.
 
 	PaletteID square_palette;      ///< Whether to give a tile a recoloured selection.
 	TileIndex redsq;               ///< The tile that has to get a red selection.

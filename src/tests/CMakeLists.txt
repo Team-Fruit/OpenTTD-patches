@@ -1,5 +1,6 @@
 add_test_files(
     bitmath_func.cpp
+    format_target.cpp
     landscape_partial_pixel_z.cpp
     math_func.cpp
     mock_environment.h
@@ -10,6 +11,8 @@ add_test_files(
     string_func.cpp
     strings_func.cpp
     test_main.cpp
+    test_network_crypto.cpp
+    test_network_debug.cpp
     test_script_admin.cpp
     test_window_desc.cpp
 )

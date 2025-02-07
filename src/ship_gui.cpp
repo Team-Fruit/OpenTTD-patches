@@ -12,11 +12,13 @@
 #include "window_gui.h"
 #include "gfx_func.h"
 #include "vehicle_gui.h"
+#include "vehicle_gui_base.h"
 #include "strings_func.h"
 #include "vehicle_func.h"
 #include "spritecache.h"
 #include "zoom_func.h"
 #include "ship.h"
+#include "core/format.hpp"
 
 #include "table/strings.h"
 
@@ -44,6 +46,7 @@ void DrawShipImage(const Vehicle *v, const Rect &r, VehicleID selection, EngineI
 	int y = ScaleSpriteTrad(-1) + CenterBounds(r.top, r.bottom, 0);
 
 	seq.Draw(x, y, GetVehiclePalette(v), false);
+	if (v->cargo_cap > 0) DrawCargoIconOverlay(x, y, v->cargo_type);
 
 	if (v->index == selection) {
 		x += x_offs;
@@ -85,18 +88,19 @@ void DrawShipDetails(const Vehicle *v, const Rect &r)
 			}
 		}
 
-		std::string capacity = GetString(STR_VEHICLE_DETAILS_TRAIN_ARTICULATED_RV_CAPACITY);
+		format_buffer capacity;
+		AppendStringInPlace(capacity, STR_VEHICLE_DETAILS_TRAIN_ARTICULATED_RV_CAPACITY);
 
 		bool first = true;
 		for (CargoID i = 0; i < NUM_CARGO; i++) {
 			if (max_cargo[i] > 0) {
-				if (!first) capacity += ", ";
+				if (!first) capacity.append(", ");
 				SetDParam(0, i);
 				SetDParam(1, max_cargo[i]);
-				GetString(StringBuilder(capacity), STR_JUST_CARGO);
+				AppendStringInPlace(capacity, STR_JUST_CARGO);
 
 				if (subtype_text[i] != 0) {
-					GetString(StringBuilder(capacity), subtype_text[i]);
+					AppendStringInPlace(capacity, subtype_text[i]);
 				}
 
 				first = false;

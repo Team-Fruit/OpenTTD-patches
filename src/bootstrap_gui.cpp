@@ -10,6 +10,7 @@
 #include "stdafx.h"
 #include "base_media_base.h"
 #include "blitter/factory.hpp"
+#include "error_func.h"
 
 #if defined(WITH_FREETYPE) || defined(WITH_UNISCRIBE) || defined(WITH_COCOA)
 
@@ -43,13 +44,13 @@ static WindowDesc _background_desc(__FILE__, __LINE__,
 	WDP_MANUAL, nullptr, 0, 0,
 	WC_BOOTSTRAP, WC_NONE,
 	WDF_NO_CLOSE,
-	std::begin(_background_widgets), std::end(_background_widgets)
+	_background_widgets
 );
 
 /** The background for the game. */
 class BootstrapBackground : public Window {
 public:
-	BootstrapBackground() : Window(&_background_desc)
+	BootstrapBackground() : Window(_background_desc)
 	{
 		this->InitNested(0);
 		CLRBITS(this->flags, WF_WHITE_BORDER);
@@ -79,13 +80,13 @@ static WindowDesc _bootstrap_errmsg_desc(__FILE__, __LINE__,
 	WDP_CENTER, nullptr, 0, 0,
 	WC_BOOTSTRAP, WC_NONE,
 	WDF_MODAL | WDF_NO_CLOSE,
-	std::begin(_nested_bootstrap_errmsg_widgets), std::end(_nested_bootstrap_errmsg_widgets)
+	_nested_bootstrap_errmsg_widgets
 );
 
 /** The window for a failed bootstrap. */
 class BootstrapErrorWindow : public Window {
 public:
-	BootstrapErrorWindow() : Window(&_bootstrap_errmsg_desc)
+	BootstrapErrorWindow() : Window(_bootstrap_errmsg_desc)
 	{
 		this->InitNested(1);
 	}
@@ -96,12 +97,12 @@ public:
 		this->Window::Close();
 	}
 
-	void UpdateWidgetSize(WidgetID widget, Dimension *size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension *fill, [[maybe_unused]] Dimension *resize) override
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
 	{
 		if (widget == WID_BEM_MESSAGE) {
-			*size = GetStringBoundingBox(STR_MISSING_GRAPHICS_ERROR);
-			size->width += WidgetDimensions::scaled.frametext.Horizontal();
-			size->height += WidgetDimensions::scaled.frametext.Vertical();
+			size = GetStringBoundingBox(STR_MISSING_GRAPHICS_ERROR);
+			size.width += WidgetDimensions::scaled.frametext.Horizontal();
+			size.height += WidgetDimensions::scaled.frametext.Vertical();
 		}
 	}
 
@@ -136,7 +137,7 @@ static WindowDesc _bootstrap_download_status_window_desc(__FILE__, __LINE__,
 	WDP_CENTER, nullptr, 0, 0,
 	WC_NETWORK_STATUS_WINDOW, WC_NONE,
 	WDF_MODAL | WDF_NO_CLOSE,
-	std::begin(_nested_bootstrap_download_status_window_widgets), std::end(_nested_bootstrap_download_status_window_widgets)
+	_nested_bootstrap_download_status_window_widgets
 );
 
 
@@ -144,7 +145,7 @@ static WindowDesc _bootstrap_download_status_window_desc(__FILE__, __LINE__,
 struct BootstrapContentDownloadStatusWindow : public BaseNetworkContentDownloadStatusWindow {
 public:
 	/** Simple call the constructor of the superclass. */
-	BootstrapContentDownloadStatusWindow() : BaseNetworkContentDownloadStatusWindow(&_bootstrap_download_status_window_desc)
+	BootstrapContentDownloadStatusWindow() : BaseNetworkContentDownloadStatusWindow(_bootstrap_download_status_window_desc)
 	{
 	}
 
@@ -188,7 +189,7 @@ static WindowDesc _bootstrap_query_desc(__FILE__, __LINE__,
 	WDP_CENTER, nullptr, 0, 0,
 	WC_CONFIRM_POPUP_QUERY, WC_NONE,
 	WDF_NO_CLOSE,
-	std::begin(_bootstrap_query_widgets), std::end(_bootstrap_query_widgets)
+	_bootstrap_query_widgets
 );
 
 /** The window for the query. It can't use the generic query window as that uses sprites that don't exist yet. */
@@ -197,7 +198,7 @@ class BootstrapAskForDownloadWindow : public Window, ContentCallback {
 
 public:
 	/** Start listening to the content client events. */
-	BootstrapAskForDownloadWindow() : Window(&_bootstrap_query_desc)
+	BootstrapAskForDownloadWindow() : Window(_bootstrap_query_desc)
 	{
 		this->InitNested(WN_CONFIRM_POPUP_QUERY_BOOTSTRAP);
 		_network_content_client.AddCallback(this);
@@ -210,7 +211,7 @@ public:
 		this->Window::Close();
 	}
 
-	void UpdateWidgetSize(WidgetID widget, Dimension *size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension *fill, [[maybe_unused]] Dimension *resize) override
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
 	{
 		/* We cache the button size. This is safe as no reinit can happen here. */
 		if (this->button_size.width == 0) {
@@ -222,13 +223,13 @@ public:
 		switch (widget) {
 			case WID_BAFD_QUESTION:
 				/* The question is twice as wide as the buttons, and determine the height based on the width. */
-				size->width = this->button_size.width * 2;
-				size->height = GetStringHeight(STR_MISSING_GRAPHICS_SET_MESSAGE, size->width - WidgetDimensions::scaled.frametext.Horizontal()) + WidgetDimensions::scaled.frametext.Vertical();
+				size.width = this->button_size.width * 2;
+				size.height = GetStringHeight(STR_MISSING_GRAPHICS_SET_MESSAGE, size.width - WidgetDimensions::scaled.frametext.Horizontal()) + WidgetDimensions::scaled.frametext.Vertical();
 				break;
 
 			case WID_BAFD_YES:
 			case WID_BAFD_NO:
-				*size = this->button_size;
+				size = this->button_size;
 				break;
 		}
 	}
@@ -260,7 +261,7 @@ public:
 	void OnConnect(bool success) override
 	{
 		if (!success) {
-			usererror("Failed to connect to content server. Please acquire a graphics set for OpenTTD. See section 1.4 of README.md.");
+			UserError("Failed to connect to content server. Please acquire a graphics set for OpenTTD. See section 1.4 of README.md.");
 			/* _exit_game is used to break out of the outer video driver's MainLoop. */
 			_exit_game = true;
 			this->Close();
@@ -290,10 +291,10 @@ public:
 #	include "video/video_driver.hpp"
 
 class BootstrapEmscripten : public ContentCallback {
-	bool downloading{false};
-	uint total_files{0};
-	uint total_bytes{0};
-	uint downloaded_bytes{0};
+	bool downloading = false;
+	uint total_files = 0;
+	uint total_bytes = 0;
+	uint downloaded_bytes = 0;
 
 public:
 	BootstrapEmscripten()
@@ -414,6 +415,6 @@ bool HandleBootstrap()
 
 	/* Failure to get enough working to get a graphics set. */
 failure:
-	usererror("Failed to find a graphics set. Please acquire a graphics set for OpenTTD. See section 1.4 of README.md.");
+	UserError("Failed to find a graphics set. Please acquire a graphics set for OpenTTD. See section 1.4 of README.md.");
 	return false;
 }

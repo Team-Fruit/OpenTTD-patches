@@ -84,7 +84,7 @@ inline bool HasTunnelReservation(TileIndex t)
 inline void SetTunnelReservation(TileIndex t, bool b)
 {
 	dbg_assert_tile(IsRailTunnelTile(t), t);
-	SB(_m[t].m5, 4, 1, b ? 1 : 0);
+	AssignBit(_m[t].m5, 4, b);
 }
 
 TileIndex GetOtherTunnelEnd(TileIndex);
@@ -111,7 +111,7 @@ inline void SetTunnelIndex(TileIndex t, TunnelID id)
 	_m[t].m2 = (id >= TUNNEL_ID_MAP_LOOKUP) ? TUNNEL_ID_MAP_LOOKUP : id;
 }
 
-void SetTunnelSignalStyle(TileIndex t, TileIndex end, uint8_t style);
+void SetTunnelSignalStyle(TileIndex t, uint8_t style);
 
 inline uint8_t GetTunnelSignalStyle(TileIndex t)
 {

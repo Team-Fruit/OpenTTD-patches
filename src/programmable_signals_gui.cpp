@@ -9,6 +9,7 @@
 
 #include "stdafx.h"
 #include "programmable_signals.h"
+#include "debug.h"
 #include "command_func.h"
 #include "window_func.h"
 #include "strings_func.h"
@@ -16,7 +17,7 @@
 #include "viewport_func.h"
 #include "textbuf_gui.h"
 #include "company_func.h"
-#include "widgets/dropdown_func.h"
+#include "dropdown_func.h"
 #include "gui.h"
 #include "gfx_func.h"
 #include "tilehighlight_func.h"
@@ -25,6 +26,7 @@
 #include "error.h"
 #include "scope.h"
 #include "zoom_func.h"
+#include "tracerestrict.h"
 
 #include "table/sprites.h"
 #include "table/strings.h"
@@ -80,7 +82,6 @@ enum PanelWidgets {
 static const StringID _program_insert[] = {
 	STR_PROGSIG_INSERT_IF,
 	STR_PROGSIG_INSERT_SET_SIGNAL,
-	INVALID_STRING_ID
 };
 
 static SignalOpcode OpcodeForIndex(int index)
@@ -116,7 +117,6 @@ static const StringID _program_condvar[] = {
 	/* PSC_SLOT_OCC*/     STR_PROGSIG_COND_SLOT,
 	/* PSC_SLOT_OCC_REM*/ STR_PROGSIG_COND_SLOT_REMAINING,
 	/* PSC_COUNTER*/      STR_PROGSIG_COND_COUNTER,
-	INVALID_STRING_ID
 };
 
 // TODO: These should probably lose the ORDER
@@ -129,14 +129,12 @@ static const StringID _program_comparator[] = {
 	/* SGC_MORE_THAN_EQUALS */   STR_ORDER_CONDITIONAL_COMPARATOR_MORE_EQUALS,
 	/* SGC_IS_TRUE */            STR_ORDER_CONDITIONAL_COMPARATOR_IS_TRUE,
 	/* SGC_IS_FALSE */           STR_ORDER_CONDITIONAL_COMPARATOR_IS_FALSE,
-	INVALID_STRING_ID
 };
 static const uint _program_comparator_hide_mask = 0xC0;
 
 static const StringID _program_sigstate[] = {
 	STR_COLOUR_RED,
 	STR_COLOUR_GREEN,
-	INVALID_STRING_ID
 };
 
 /** Get the string for a condition */
@@ -247,7 +245,7 @@ typedef std::vector<GuiInstruction> GuiInstructionList;
 
 class ProgramWindow: public Window {
 public:
-	ProgramWindow(WindowDesc *desc, SignalReference ref): Window(desc)
+	ProgramWindow(WindowDesc &desc, SignalReference ref): Window(desc)
 	{
 		// this->InitNested(desc, (ref.tile << 3) | ref.track);
 		this->tile = ref.tile;
@@ -284,7 +282,7 @@ public:
 			} break;
 
 			case PROGRAM_WIDGET_INSERT: {
-				DEBUG(misc, 5, "Selection is %d", this->selected_instruction);
+				Debug(misc, 5, "Selection is {}", this->selected_instruction);
 				if (this->GetOwner() != _local_company || this->selected_instruction < 1)
 					return;
 				ShowDropDownMenu(this, _program_insert, -1, PROGRAM_WIDGET_INSERT, 0, 0, 0);
@@ -337,7 +335,7 @@ public:
 				SignalConditionComparable *vc = static_cast<SignalConditionComparable*>(sif->condition);
 
 				SetDParam(0, vc->value);
-				//ShowQueryString(STR_JUST_INT, STR_PROGSIG_CONDITION_VALUE_CAPT, 5, 100, this, CS_NUMERAL, QSF_NONE);
+				this->query_submode = QSM_DEFAULT;
 				ShowQueryString(STR_JUST_INT, STR_PROGSIG_CONDITION_VALUE_CAPT, 5, this, CS_NUMERAL, QSF_NONE);
 				this->UpdateButtonState();
 			} break;
@@ -512,20 +510,43 @@ public:
 		//OnPaint(); // this appears to cause visual artefacts
 	}
 
-	virtual void OnQueryTextFinished(char *str) override
+	virtual void OnQueryTextFinished(std::optional<std::string> str) override
 	{
-		if (!StrEmpty(str)) {
+		if (str.has_value() && !str->empty()) {
 			SignalInstruction *si = this->GetSelected();
-			if (!si || si->Opcode() != PSO_IF) return;
-			SignalIf *sif = static_cast <SignalIf*>(si);
-			if (!IsConditionComparator(sif->condition)) return;
+			if (si == nullptr) return;
 
-			uint value = atoi(str);
-
-			uint32_t p1 = 0, p2 = 0;
+			uint32_t p1 = 0;
 			SB(p1, 0, 3, this->track);
 			SB(p1, 3, 16, si->Id());
 
+			switch (this->query_submode) {
+				case QSM_DEFAULT:
+					break;
+
+				case QSM_NEW_SLOT:
+				case QSM_NEW_COUNTER: {
+					uint p2 = 0;
+					SB(p2, 0, 1, 1);
+					SB(p2, 1, 2, SCF_SLOT_COUNTER);
+					TraceRestrictFollowUpCmdData aux;
+					aux.cmd = NewBaseCommandContainerBasic(this->tile, p1, p2, CMD_MODIFY_SIGNAL_INSTRUCTION | CMD_MSG(STR_ERROR_CAN_T_MODIFY_INSTRUCTION));
+					if (this->query_submode == QSM_NEW_SLOT) {
+						DoCommandPEx(0, VEH_TRAIN, INVALID_TRACE_RESTRICT_SLOT_GROUP, 0, CMD_CREATE_TRACERESTRICT_SLOT | CMD_MSG(STR_TRACE_RESTRICT_ERROR_SLOT_CAN_T_CREATE), CcCreateTraceRestrictSlot, str->c_str(), &aux);
+					} else {
+						DoCommandPEx(0, 0, 0, 0, CMD_CREATE_TRACERESTRICT_COUNTER | CMD_MSG(STR_TRACE_RESTRICT_ERROR_COUNTER_CAN_T_CREATE), CcCreateTraceRestrictCounter, str->c_str(), &aux);
+					}
+					return;
+				}
+			}
+
+			if (si->Opcode() != PSO_IF) return;
+			SignalIf *sif = static_cast <SignalIf*>(si);
+			if (!IsConditionComparator(sif->condition)) return;
+
+			uint value = atoi(str->c_str());
+
+			uint32_t p2 = 0;
 			SB(p2, 0, 1, 1);
 			SB(p2, 1, 2, SCF_VALUE);
 			SB(p2, 3, 27, value);
@@ -587,6 +608,17 @@ public:
 
 			case PROGRAM_WIDGET_COND_SLOT:
 			case PROGRAM_WIDGET_COND_COUNTER: {
+				if (widget == PROGRAM_WIDGET_COND_SLOT && index == NEW_TRACE_RESTRICT_SLOT_ID) {
+					this->query_submode = QSM_NEW_SLOT;
+					ShowQueryString(STR_EMPTY, STR_TRACE_RESTRICT_SLOT_CREATE_CAPTION, MAX_LENGTH_TRACE_RESTRICT_SLOT_NAME_CHARS, this, CS_ALPHANUMERAL, QSF_ENABLE_DEFAULT | QSF_LEN_IN_CHARS);
+					return;
+				}
+				if (widget == PROGRAM_WIDGET_COND_COUNTER && index == NEW_TRACE_RESTRICT_COUNTER_ID) {
+					this->query_submode = QSM_NEW_COUNTER;
+					ShowQueryString(STR_EMPTY, STR_TRACE_RESTRICT_COUNTER_CREATE_CAPTION, MAX_LENGTH_TRACE_RESTRICT_SLOT_NAME_CHARS, this, CS_ALPHANUMERAL, QSF_ENABLE_DEFAULT | QSF_LEN_IN_CHARS);
+					return;
+				}
+
 				uint64_t p1 = 0, p2 = 0;
 				SB(p1, 0, 3, this->track);
 				SB(p1, 3, 16, ins->Id());
@@ -595,17 +627,23 @@ public:
 				SB(p2, 1, 2, SCF_SLOT_COUNTER);
 				SB(p2, 3, 27, index);
 
+				if (widget == PROGRAM_WIDGET_COND_SLOT) {
+					TraceRestrictRecordRecentSlot(index);
+				} else {
+					TraceRestrictRecordRecentCounter(index);
+				}
+
 				DoCommandP(this->tile, p1, p2, CMD_MODIFY_SIGNAL_INSTRUCTION | CMD_MSG(STR_ERROR_CAN_T_MODIFY_INSTRUCTION));
 			}
 		}
 	}
 
-	virtual void UpdateWidgetSize(WidgetID widget, Dimension *size, const Dimension &padding, Dimension *fill, Dimension *resize) override
+	virtual void UpdateWidgetSize(WidgetID widget, Dimension &size, const Dimension &padding, Dimension &fill, Dimension &resize) override
 	{
 		switch (widget) {
 			case PROGRAM_WIDGET_INSTRUCTION_LIST:
-				resize->height = GetCharacterHeight(FS_NORMAL);
-				size->height = 6 * resize->height + WidgetDimensions::scaled.framerect.Vertical();
+				resize.height = GetCharacterHeight(FS_NORMAL);
+				size.height = 6 * resize.height + WidgetDimensions::scaled.framerect.Vertical();
 				break;
 		}
 	}
@@ -645,6 +683,23 @@ public:
 		}
 	}
 
+	bool OnTooltip(Point pt, WidgetID widget, TooltipCloseCondition close_cond) override
+	{
+		switch (widget) {
+			case PROGRAM_WIDGET_COND_SLOT: {
+				GuiShowTooltips(this, TraceRestrictPrepareSlotCounterSelectTooltip(STR_PROGSIG_COND_SLOT_TOOLTIP, VEH_TRAIN), close_cond, 0);
+				return true;
+			}
+
+			case PROGRAM_WIDGET_COND_COUNTER: {
+				GuiShowTooltips(this, TraceRestrictPrepareSlotCounterSelectTooltip(STR_PROGSIG_COND_COUNTER_TOOLTIP, VEH_TRAIN), close_cond, 0);
+				return true;
+			}
+
+			default:
+				return false;
+		}
+	}
 
 	virtual void SetStringParameters(WidgetID widget) const override
 	{
@@ -716,7 +771,7 @@ private:
 		uint indent = 0;
 
 		do {
-			DEBUG(misc, 5, "PSig Gui: Opcode %d", insn->Opcode());
+			Debug(misc, 5, "PSig Gui: Opcode {}", insn->Opcode());
 			switch (insn->Opcode()) {
 				case PSO_FIRST:
 				case PSO_LAST: {
@@ -895,6 +950,13 @@ private:
 	int selected_instruction;
 	Scrollbar *vscroll;
 	int current_aux_plane;
+
+	enum QuerySubMode {
+		QSM_DEFAULT,
+		QSM_NEW_SLOT,
+		QSM_NEW_COUNTER,
+	};
+	QuerySubMode query_submode = QSM_DEFAULT;
 };
 
 static constexpr NWidgetPart _nested_program_widgets[] = {
@@ -966,7 +1028,7 @@ static WindowDesc _program_desc(__FILE__, __LINE__,
 	WDP_AUTO, "signal_program", 384, 100,
 	WC_SIGNAL_PROGRAM, WC_BUILD_SIGNAL,
 	WDF_CONSTRUCTION,
-	std::begin(_nested_program_widgets), std::end(_nested_program_widgets)
+	_nested_program_widgets
 );
 
 void ShowSignalProgramWindow(SignalReference ref)
@@ -974,5 +1036,5 @@ void ShowSignalProgramWindow(SignalReference ref)
 	uint32_t window_id = (ref.tile << 3) | ref.track;
 	if (BringWindowToFrontById(WC_SIGNAL_PROGRAM, window_id) != nullptr) return;
 
-	new ProgramWindow(&_program_desc, ref);
+	new ProgramWindow(_program_desc, ref);
 }

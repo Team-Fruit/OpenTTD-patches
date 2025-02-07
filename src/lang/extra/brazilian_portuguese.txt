@@ -23,8 +23,6 @@ STR_TRANSPARENT_LOADING_TOOLTIP                                 :{BLACK}Altera t
 
 # Programmable Pre-Signals
 
-#House construction window (for SE only)
-
 #Town select window (for SE only)
 
 STR_MAPGEN_SNOW_LINE_HEIGHT                                     :{BLACK}Linha da neve
@@ -50,8 +48,8 @@ STR_VEHICLE_STATUS_CANNOT_REACH_DEPOT_SERVICE_VEL_END           :{LTBLUE}Não é
 
 STR_ORDERS_GO_TO_TOOLTIP_EXTRA                                  :{BLACK}Inserir uma nova ordem antes da ordem selecionada ou adicionar ao final da lista. Ctrl+Clique em uma estação para "carga completa de qualquer carga", em um ponto de controle para "sem parar" ou em um depósito para "manutenção". Clique em outro veículo para copiar suas ordens ou Ctrl+Clique compartilha as ordens. Uma ordem de depósito desativa a manutenção automática do veículo
 
-STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :C:
-STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :P:
+STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :C:{SPACE}{SPACE}
+STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :P:{SPACE}{SPACE}
 
 # Cargo type orders Window
 
@@ -90,3 +88,19 @@ STR_ERROR_CAN_T_SELL_25_SHARE_IN                                :{WHITE}Impossí
 STR_ERROR_PROTECTED                                             :{WHITE}Esta empresa ainda não troca ações...
 
 STR_CONFIG_SETTING_CYCLE_SIGNAL_PBS                             :De trajeto apenas
+
+STR_WARNING_PASSWORD_SECURITY                                   :{YELLOW}Aviso: os administradores do servidor podem ler qualquer texto inserido aqui.
+STR_NETWORK_NEED_COMPANY_PASSWORD_CAPTION                       :{WHITE}Empresa protegida. Digite a senha
+STR_NETWORK_CLIENT_LIST_ADMIN_COMPANY_UNLOCK                    :Desbloquear senha
+STR_NETWORK_CLIENT_LIST_ASK_COMPANY_UNLOCK                      :{YELLOW}Você quer mesmo apagar a senha da empresa '{COMPANY}'?
+
+# Network set password
+STR_COMPANY_PASSWORD_CANCEL                                     :{BLACK}Não salvar a senha digitada
+STR_COMPANY_PASSWORD_OK                                         :{BLACK}Atribuir nova senha à empresa
+STR_COMPANY_PASSWORD_CAPTION                                    :{WHITE}Senha da empresa
+STR_COMPANY_PASSWORD_MAKE_DEFAULT                               :{BLACK}Senha padrão da empresa
+STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}Usar a senha desta empresa como padrão para novas empresas
+
+STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}Senha
+STR_COMPANY_VIEW_PASSWORD_TOOLTIP                               :{BLACK}Proteja a sua empresa com uma senha para impedir a participação de usuários não autorizados
+STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}Definir senha para empresa

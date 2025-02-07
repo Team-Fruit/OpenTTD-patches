@@ -20,8 +20,6 @@ STR_TRANSPARENT_LOADING_TOOLTIP                                 :{BLACK}فعال
 
 # Programmable Pre-Signals
 
-#House construction window (for SE only)
-
 #Town select window (for SE only)
 
 STR_MAPGEN_SNOW_LINE_HEIGHT                                     :{BLACK}ارتفاع خط برف:
@@ -63,3 +61,16 @@ STR_ERROR_CAN_T_BUY_25_SHARE_IN_THIS                            :{WHITE}نمی �
 STR_ERROR_CAN_T_SELL_25_SHARE_IN                                :{WHITE}نمی شود 25% سهام این شرکت را فروخت
 
 STR_CONFIG_SETTING_CYCLE_SIGNAL_PBS                             :فقط نشانگرهای مسیر
+
+STR_NETWORK_NEED_COMPANY_PASSWORD_CAPTION                       :{WHITE}شرکت محافظت شده است.رمز را وارد نمایید
+
+# Network set password
+STR_COMPANY_PASSWORD_CANCEL                                     :{BLACK}رمز وارد شده را به خاطر نسپار
+STR_COMPANY_PASSWORD_OK                                         :{BLACK}دادن رمز جدید به شرکت
+STR_COMPANY_PASSWORD_CAPTION                                    :{WHITE}رمز شرکت
+STR_COMPANY_PASSWORD_MAKE_DEFAULT                               :{BLACK}رمز پیش فرض شرکت
+STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}استفاده از این رمز شرکت به عنوان پیش فرض برای شرکت های جدید
+
+STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}رمز
+STR_COMPANY_VIEW_PASSWORD_TOOLTIP                               :{BLACK}شرکت خود را با رمز محافظت کنید تا هر بازیگری نتواند به شرکت شما بپیوندد
+STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}ثبت رمز جدید

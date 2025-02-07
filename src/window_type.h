@@ -403,8 +403,8 @@ enum WindowClass {
 
 	/**
 	 * Build house; %Window numbers:
-	 *  - 0 = #BuildHouseWidgets
-	*/
+	 *   - 0 = #BuildHouseWidgets
+	 */
 	WC_BUILD_HOUSE,
 
 	/**
@@ -479,6 +479,12 @@ enum WindowClass {
 	 *   - 0 = #EditorTerraformToolbarWidgets
 	 */
 	WC_SCEN_LAND_GEN,
+
+	/**
+	 * Public roads generation (in Scenario Editor); %Window numbers:
+	 *   - 0 = #PublicRoadsWidgets
+	 */
+	WC_SCEN_PUBLIC_ROADS,
 
 	/**
 	 * Generate landscape (newgame); %Window numbers:
@@ -612,6 +618,12 @@ enum WindowClass {
 	 *   - 0 = #PerformanceRatingDetailsWidgets
 	 */
 	WC_PERFORMANCE_DETAIL,
+
+	/**
+	 * Industry production history graph; %Window numbers:
+	 *   - #IndustryID = #IndustryProductionGraphWidgets
+	 */
+	WC_INDUSTRY_PRODUCTION,
 
 	/**
 	 * Company infrastructure overview; %Window numbers:

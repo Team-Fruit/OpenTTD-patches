@@ -12,8 +12,8 @@
 #include "debug.h"
 #include <string>
 
-std::string _log_file; ///< File to reroute output of a forked OpenTTD to
-std::unique_ptr<FILE, FileDeleter> _log_fd; ///< File to reroute output of a forked OpenTTD to
+std::string _log_file; ///< Filename to reroute output of a forked OpenTTD to
+std::optional<FileHandle> _log_fd; ///< File to reroute output of a forked OpenTTD to
 
 #if defined(UNIX)
 
@@ -34,17 +34,17 @@ void DedicatedFork()
 
 		case 0: { // We're the child
 			/* Open the log-file to log all stuff too */
-			_log_fd.reset(fopen(_log_file.c_str(), "a"));
-			if (!_log_fd) {
+			_log_fd = FileHandle::Open(_log_file, "a");
+			if (!_log_fd.has_value()) {
 				perror("Unable to open logfile");
 				exit(1);
 			}
 			/* Redirect stdout and stderr to log-file */
-			if (dup2(fileno(_log_fd.get()), fileno(stdout)) == -1) {
+			if (dup2(fileno(*_log_fd), fileno(stdout)) == -1) {
 				perror("Rerouting stdout");
 				exit(1);
 			}
-			if (dup2(fileno(_log_fd.get()), fileno(stderr)) == -1) {
+			if (dup2(fileno(*_log_fd), fileno(stderr)) == -1) {
 				perror("Rerouting stderr");
 				exit(1);
 			}
@@ -53,8 +53,8 @@ void DedicatedFork()
 
 		default:
 			/* We're the parent */
-			DEBUG(net, 0, "Loading dedicated server...\n");
-			DEBUG(net, 0, "  - Forked to background with pid " PRINTF_PID_T "\n", pid);
+			Debug(net, 0, "Loading dedicated server...");
+			Debug(net, 0, "  - Forked to background with pid {}", pid);
 			exit(0);
 	}
 }

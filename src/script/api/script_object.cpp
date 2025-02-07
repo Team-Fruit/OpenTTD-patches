@@ -15,7 +15,6 @@
 #include "../../network/network.h"
 #include "../../genworld.h"
 #include "../../string_func.h"
-#include "../../string_func_extra.h"
 #include "../../strings_func.h"
 #include "../../scope_info.h"
 #include "../../map_func.h"
@@ -28,6 +27,21 @@
 #include "../../debug.h"
 
 #include "../../safeguards.h"
+
+void SimpleCountedObject::Release()
+{
+	int32_t res = --this->ref_count;
+	assert(res >= 0);
+	if (res == 0) {
+		try {
+			this->FinalRelease(); // may throw, for example ScriptTest/ExecMode
+		} catch (...) {
+			delete this;
+			throw;
+		}
+		delete this;
+	}
+}
 
 /**
  * Get the storage associated with the current ScriptInstance.
@@ -105,7 +119,7 @@ ScriptObject::ActiveInstance::~ActiveInstance()
 /* static */ void ScriptObject::SetLastCommand(TileIndex tile, uint32_t p1, uint32_t p2, uint64_t p3, uint32_t cmd)
 {
 	ScriptStorage *s = GetStorage();
-	DEBUG(script, 6, "SetLastCommand company=%02d tile=%06x p1=%08x p2=%08x p3=" OTTD_PRINTFHEX64PAD " cmd=%d", s->root_company, tile, p1, p2, p3, cmd);
+	Debug(script, 6, "SetLastCommand company={} tile={:X} p1={:X} p2={:X} p3={:X} cmd={:X}", s->root_company, tile, p1, p2, p3, cmd);
 	s->last_tile = tile;
 	s->last_p1 = p1;
 	s->last_p2 = p2;
@@ -116,7 +130,7 @@ ScriptObject::ActiveInstance::~ActiveInstance()
 /* static */ bool ScriptObject::CheckLastCommand(TileIndex tile, uint32_t p1, uint32_t p2, uint64_t p3, uint32_t cmd)
 {
 	ScriptStorage *s = GetStorage();
-	DEBUG(script, 6, "CheckLastCommand company=%02d tile=%06x p1=%08x p2=%08x p3=" OTTD_PRINTFHEX64PAD " cmd=%d", s->root_company, tile, p1, p2, p3, cmd);
+	Debug(script, 6, "CheckLastCommand company={} tile={:X} p1={:X} p2={:X} p3={:X} cmd={:X}", s->root_company, tile, p1, p2, p3, cmd);
 	if (s->last_tile != tile) return false;
 	if (s->last_p1 != p1) return false;
 	if (s->last_p2 != p2) return false;
@@ -318,7 +332,7 @@ ScriptObject::ActiveInstance::~ActiveInstance()
 
 /* static */ void ScriptObject::SetCallbackVariable(int index, int value)
 {
-	if ((size_t)index >= GetStorage()->callback_value.size()) GetStorage()->callback_value.resize(index + 1);
+	if (static_cast<size_t>(index) >= GetStorage()->callback_value.size()) GetStorage()->callback_value.resize(index + 1);
 	GetStorage()->callback_value[index] = value;
 }
 
@@ -359,8 +373,8 @@ ScriptObject::ActiveInstance::~ActiveInstance()
 	/* Only set p2 when the command does not come from the network. */
 	if (GetCommandFlags(cmd) & CMD_CLIENT_ID && p2 == 0) p2 = UINT32_MAX;
 
-	SCOPE_INFO_FMT([=], "ScriptObject::DoCommand: tile: %X (%d x %d), p1: 0x%X, p2: 0x%X, p3: 0x" OTTD_PRINTFHEX64 ", company: %s, cmd: 0x%X (%s), estimate_only: %d",
-			tile, TileX(tile), TileY(tile), p1, p2, p3, scope_dumper().CompanyInfo(_current_company), cmd, GetCommandName(cmd), estimate_only);
+	SCOPE_INFO_FMT([=], "ScriptObject::DoCommand: tile: 0x{:X} ({} x {}), p1: 0x{:X}, p2: 0x{:X}, p3: 0x{:X}, company: {}, cmd: 0x{:X} ({}), estimate_only: {}",
+			tile, TileX(tile), TileY(tile), p1, p2, p3, CompanyInfoDumper(_current_company), cmd, GetCommandName(cmd), estimate_only);
 
 	/* Store the command for command callback validation. */
 	if (!estimate_only && _networking && !_generating_world) SetLastCommand(tile, p1, p2, p3, cmd);

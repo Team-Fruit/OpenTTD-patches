@@ -23,6 +23,8 @@
 #include "zoom_func.h"
 #include "unit_conversion.h"
 #include "core/math_func.hpp"
+#include "station_base.h"
+#include "industry.h"
 
 #include "widgets/graph_widget.h"
 
@@ -31,11 +33,11 @@
 #include <math.h>
 
 #include "safeguards.h"
-#include "station_base.h"
 
 /* Bitmasks of company and cargo indices that shouldn't be drawn. */
 static CompanyMask _legend_excluded_companies;
-static CargoTypes _legend_excluded_cargo;
+static CargoTypes _legend_excluded_cargo_payment_rates;
+static CargoTypes _legend_excluded_cargo_production_history;
 
 uint8_t _cargo_payment_x_mode;
 
@@ -51,7 +53,7 @@ static_assert(static_cast<int64_t>(INT64_MAX_IN_DOUBLE) < INT64_MAX);
 /****************/
 
 struct GraphLegendWindow : Window {
-	GraphLegendWindow(WindowDesc *desc, WindowNumber window_number) : Window(desc)
+	GraphLegendWindow(WindowDesc &desc, WindowNumber window_number) : Window(desc)
 	{
 		this->InitNested(window_number);
 
@@ -119,7 +121,7 @@ static std::unique_ptr<NWidgetBase> MakeNWidgetCompanyLines()
 {
 	auto vert = std::make_unique<NWidgetVertical>(NC_EQUALSIZE);
 	vert->SetPadding(2, 2, 2, 2);
-	uint sprite_height = GetSpriteSize(SPR_COMPANY_ICON, nullptr, ZOOM_LVL_OUT_4X).height;
+	uint sprite_height = GetSpriteSize(SPR_COMPANY_ICON, nullptr, ZOOM_LVL_NORMAL).height;
 
 	for (WidgetID widnum = WID_GL_FIRST_COMPANY; widnum <= WID_GL_LAST_COMPANY; widnum++) {
 		auto panel = std::make_unique<NWidgetBackground>(WWT_PANEL, COLOUR_BROWN, widnum);
@@ -148,12 +150,12 @@ static WindowDesc _graph_legend_desc(__FILE__, __LINE__,
 	WDP_AUTO, "graph_legend", 0, 0,
 	WC_GRAPH_LEGEND, WC_NONE,
 	0,
-	std::begin(_nested_graph_legend_widgets), std::end(_nested_graph_legend_widgets)
+	_nested_graph_legend_widgets
 );
 
 static void ShowGraphLegend()
 {
-	AllocateWindowDescFront<GraphLegendWindow>(&_graph_legend_desc, 0);
+	AllocateWindowDescFront<GraphLegendWindow>(_graph_legend_desc, 0);
 }
 
 /** Contains the interval of a graph's data. */
@@ -178,6 +180,7 @@ protected:
 	static const int PAYMENT_GRAPH_X_STEP_DAYS    = 10; ///< X-axis step label for cargo payment rates "Days in transit".
 	static const int PAYMENT_GRAPH_X_STEP_SECONDS = 20; ///< X-axis step label for cargo payment rates "Seconds in transit".
 	static const int ECONOMY_QUARTER_MINUTES = 3;  ///< Minutes per economic quarter.
+	static const int ECONOMY_MONTH_MINUTES = 1;  ///< Minutes per economic month.
 
 	static const TextColour GRAPH_AXIS_LABEL_COLOUR = TC_BLACK; ///< colour of the graph axis label.
 
@@ -185,13 +188,14 @@ protected:
 	static const int MIN_GRID_PIXEL_SIZE    =  20; ///< Minimum distance between graph lines.
 
 	uint64_t excluded_data; ///< bitmask of the datasets that shouldn't be displayed.
-	byte num_dataset;
-	byte num_on_x_axis;
-	byte num_vert_lines;
+	uint64_t excluded_range; ///< bitmask of ranges that should not be displayed.
+	uint8_t num_on_x_axis;
+	uint8_t num_vert_lines;
 
 	/* The starting month and year that values are plotted against. */
 	EconTime::Month month;
 	EconTime::Year year;
+	uint8_t month_increment; ///< month increment between vertical lines. must be divisor of 12.
 
 	bool draw_dates = true; ///< Should we draw months and years on the time axis?
 
@@ -201,8 +205,27 @@ protected:
 	uint16_t x_values_increment;
 
 	StringID format_str_y_axis;
-	byte colours[GRAPH_MAX_DATASETS];
-	OverflowSafeInt64 cost[GRAPH_MAX_DATASETS][GRAPH_NUM_MONTHS]; ///< Stored costs for the last #GRAPH_NUM_MONTHS months
+
+	struct DataSet {
+		std::array<OverflowSafeInt64, GRAPH_NUM_MONTHS> values;
+		uint8_t colour;
+		uint8_t exclude_bit;
+		uint8_t range_bit;
+		uint8_t dash;
+	};
+	std::vector<DataSet> data;
+
+	std::span<const StringID> ranges = {};
+
+	/**
+	 * Get appropriate part of dataset values for the current number of horizontal points.
+	 * @param dataset Dataset to get values of
+	 * @returns span covering dataset's current valid range.
+	 */
+	std::span<const OverflowSafeInt64> GetDataSetRange(const DataSet &dataset) const
+	{
+		return {std::begin(dataset.values), std::begin(dataset.values) + this->num_on_x_axis};
+	}
 
 	/**
 	 * Get the interval that contains the graph's data. Excluded data is ignored to show smaller values in
@@ -218,11 +241,11 @@ protected:
 		current_interval.highest = INT64_MIN;
 		current_interval.lowest  = INT64_MAX;
 
-		for (int i = 0; i < this->num_dataset; i++) {
-			if (HasBit(this->excluded_data, i)) continue;
-			for (int j = 0; j < this->num_on_x_axis; j++) {
-				OverflowSafeInt64 datapoint = this->cost[i][j];
+		for (const DataSet &dataset : this->data) {
+			if (HasBit(this->excluded_data, dataset.exclude_bit)) continue;
+			if (HasBit(this->excluded_range, dataset.range_bit)) continue;
 
+			for (const OverflowSafeInt64 &datapoint : this->GetDataSetRange(dataset)) {
 				if (datapoint != INVALID_DATAPOINT) {
 					current_interval.highest = std::max(current_interval.highest, datapoint);
 					current_interval.lowest  = std::min(current_interval.lowest, datapoint);
@@ -423,7 +446,7 @@ protected:
 				SetDParam(1, year);
 				DrawStringMultiLine(x, x + x_sep, y, this->height, month == 0 ? STR_GRAPH_X_LABEL_MONTH_YEAR : STR_GRAPH_X_LABEL_MONTH, GRAPH_AXIS_LABEL_COLOUR, SA_LEFT);
 
-				month += 3;
+				month += this->month_increment;
 				if (month >= 12) {
 					month = 0;
 					year++;
@@ -452,67 +475,67 @@ protected:
 		uint linewidth = _settings_client.gui.graph_line_thickness;
 		uint pointoffs1 = (linewidth + 1) / 2;
 		uint pointoffs2 = linewidth + 1 - pointoffs1;
-		for (int i = 0; i < this->num_dataset; i++) {
-			if (!HasBit(this->excluded_data, i)) {
-				/* Centre the dot between the grid lines. */
-				x = r.left + (x_sep / 2);
 
-				byte colour  = this->colours[i];
-				uint prev_x = INVALID_DATAPOINT_POS;
-				uint prev_y = INVALID_DATAPOINT_POS;
+		for (const DataSet &dataset : this->data) {
+			if (HasBit(this->excluded_data, dataset.exclude_bit)) continue;
+			if (HasBit(this->excluded_range, dataset.range_bit)) continue;
 
-				for (int j = 0; j < this->num_on_x_axis; j++) {
-					OverflowSafeInt64 datapoint = this->cost[i][j];
+			/* Centre the dot between the grid lines. */
+			x = r.left + (x_sep / 2);
 
-					if (datapoint != INVALID_DATAPOINT) {
-						/*
-						 * Check whether we need to reduce the 'accuracy' of the
-						 * datapoint value and the highest value to split overflows.
-						 * And when 'drawing' 'one million' or 'one million and one'
-						 * there is no significant difference, so the least
-						 * significant bits can just be removed.
-						 *
-						 * If there are more bits needed than would fit in a 32 bits
-						 * integer, so at about 31 bits because of the sign bit, the
-						 * least significant bits are removed.
-						 */
-						int mult_range = FindLastBit<uint32_t>(x_axis_offset) + FindLastBit<uint64_t>(abs(datapoint));
-						int reduce_range = std::max(mult_range - 31, 0);
+			uint prev_x = INVALID_DATAPOINT_POS;
+			uint prev_y = INVALID_DATAPOINT_POS;
 
-						/* Handle negative values differently (don't shift sign) */
-						if (datapoint < 0) {
-							datapoint = -(abs(datapoint) >> reduce_range);
-						} else {
-							datapoint >>= reduce_range;
-						}
-						y = r.top + x_axis_offset - ((r.bottom - r.top) * datapoint) / (interval_size >> reduce_range);
+			const uint dash = ScaleGUITrad(dataset.dash);
+			for (OverflowSafeInt64 datapoint : this->GetDataSetRange(dataset)) {
+				if (datapoint != INVALID_DATAPOINT) {
+					/*
+						* Check whether we need to reduce the 'accuracy' of the
+						* datapoint value and the highest value to split overflows.
+						* And when 'drawing' 'one million' or 'one million and one'
+						* there is no significant difference, so the least
+						* significant bits can just be removed.
+						*
+						* If there are more bits needed than would fit in a 32 bits
+						* integer, so at about 31 bits because of the sign bit, the
+						* least significant bits are removed.
+						*/
+					int mult_range = FindLastBit<uint32_t>(x_axis_offset) + FindLastBit<uint64_t>(abs(datapoint));
+					int reduce_range = std::max(mult_range - 31, 0);
 
-						/* Draw the point. */
-						GfxFillRect(x - pointoffs1, y - pointoffs1, x + pointoffs2, y + pointoffs2, colour);
-
-						/* Draw the line connected to the previous point. */
-						if (prev_x != INVALID_DATAPOINT_POS) GfxDrawLine(prev_x, prev_y, x, y, colour, linewidth);
-
-						prev_x = x;
-						prev_y = y;
+					/* Handle negative values differently (don't shift sign) */
+					if (datapoint < 0) {
+						datapoint = -(abs(datapoint) >> reduce_range);
 					} else {
-						prev_x = INVALID_DATAPOINT_POS;
-						prev_y = INVALID_DATAPOINT_POS;
+						datapoint >>= reduce_range;
 					}
+					y = r.top + x_axis_offset - ((r.bottom - r.top) * datapoint) / (interval_size >> reduce_range);
 
-					x += x_sep;
+					/* Draw the point. */
+					GfxFillRect(x - pointoffs1, y - pointoffs1, x + pointoffs2, y + pointoffs2, dataset.colour);
+
+					/* Draw the line connected to the previous point. */
+					if (prev_x != INVALID_DATAPOINT_POS) GfxDrawLine(prev_x, prev_y, x, y, dataset.colour, linewidth, dash);
+
+					prev_x = x;
+					prev_y = y;
+				} else {
+					prev_x = INVALID_DATAPOINT_POS;
+					prev_y = INVALID_DATAPOINT_POS;
 				}
+
+				x += x_sep;
 			}
 		}
 	}
 
-
-	BaseGraphWindow(WindowDesc *desc, StringID format_str_y_axis) :
+	BaseGraphWindow(WindowDesc &desc, StringID format_str_y_axis) :
 			Window(desc),
 			format_str_y_axis(format_str_y_axis)
 	{
 		SetWindowDirty(WC_GRAPH_LEGEND, 0);
-		this->num_vert_lines = 24;
+		this->num_vert_lines = GRAPH_NUM_MONTHS;
+		this->month_increment = 3;
 	}
 
 	void InitializeWindow(WindowNumber number)
@@ -525,7 +548,7 @@ protected:
 		if (EconTime::UsingWallclockUnits()) {
 			auto *wid = this->GetWidget<NWidgetCore>(WID_GRAPH_FOOTER);
 			if (wid != nullptr) {
-				wid->SetDataTip(STR_GRAPH_LAST_72_MINUTES_TIME_LABEL, STR_NULL);
+				wid->SetDataTip(ReplaceWallclockMinutesUnit() ? STR_GRAPH_LAST_72_PRODUCTION_INTERVALS_TIME_LABEL : STR_GRAPH_LAST_72_MINUTES_TIME_LABEL, STR_NULL);
 			}
 		}
 
@@ -539,47 +562,91 @@ protected:
 	}
 
 public:
-	void UpdateWidgetSize(WidgetID widget, Dimension *size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension *fill, [[maybe_unused]] Dimension *resize) override
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
 	{
-		if (widget != WID_GRAPH_GRAPH) return;
-
-		uint x_label_width = 0;
-
-		/* Draw x-axis labels and markings for graphs based on financial quarters and years.  */
-		if (this->draw_dates) {
-			EconTime::Month month = this->month;
-			EconTime::Year year = this->year;
-			for (int i = 0; i < this->num_on_x_axis; i++) {
-				SetDParam(0, month + STR_MONTH_ABBREV_JAN);
-				SetDParam(1, year);
-				x_label_width = std::max(x_label_width, GetStringBoundingBox(month == 0 ? STR_GRAPH_X_LABEL_MONTH_YEAR : STR_GRAPH_X_LABEL_MONTH).width);
-
-				month += 3;
-				if (month >= 12) {
-					month = 0;
-					year++;
+		switch (widget) {
+			case WID_GRAPH_RANGE_MATRIX:
+				for (const StringID &str : this->ranges) {
+					size = maxdim(size, GetStringBoundingBox(str, FS_SMALL));
 				}
+
+				size.width += WidgetDimensions::scaled.framerect.Horizontal();
+				size.height += WidgetDimensions::scaled.framerect.Vertical();
+
+				/* Set fixed height for number of ranges. */
+				size.height *= static_cast<uint>(std::size(this->ranges));
+
+				resize.width = 0;
+				resize.height = 0;
+				this->GetWidget<NWidgetCore>(WID_GRAPH_RANGE_MATRIX)->SetDataTip((1 << MAT_COL_START) | (static_cast<uint16_t>(std::size(this->ranges)) << MAT_ROW_START), 0);
+				break;
+
+			case WID_GRAPH_GRAPH: {
+				uint x_label_width = 0;
+
+				/* Draw x-axis labels and markings for graphs based on financial quarters and years.  */
+				if (this->draw_dates) {
+					EconTime::Month month = this->month;
+					EconTime::Year year = this->year;
+					for (int i = 0; i < this->num_on_x_axis; i++) {
+						SetDParam(0, month + STR_MONTH_ABBREV_JAN);
+						SetDParam(1, year);
+						x_label_width = std::max(x_label_width, GetStringBoundingBox(month == 0 ? STR_GRAPH_X_LABEL_MONTH_YEAR : STR_GRAPH_X_LABEL_MONTH).width);
+
+						month += this->month_increment;
+						if (month >= 12) {
+							month = 0;
+							year++;
+						}
+					}
+				} else {
+					/* Draw x-axis labels for graphs not based on quarterly performance (cargo payment rates). */
+					StringID str = this->PrepareXAxisMaxSizeText(this->x_values_start + this->num_on_x_axis * this->x_values_increment);
+					x_label_width = GetStringBoundingBox(str, FS_SMALL).width;
+				}
+
+				SetDParam(0, this->format_str_y_axis);
+				SetDParam(1, INT64_MAX);
+				uint y_label_width = GetStringBoundingBox(STR_GRAPH_Y_LABEL).width;
+
+				size.width  = std::max<uint>(size.width,  ScaleGUITrad(5) + y_label_width + this->num_vert_lines * (x_label_width + ScaleGUITrad(5)) + ScaleGUITrad(9));
+				size.height = std::max<uint>(size.height, ScaleGUITrad(5) + (1 + MIN_GRAPH_NUM_LINES_Y * 2 + (this->draw_dates ? 3 : 1)) * GetCharacterHeight(FS_SMALL) + ScaleGUITrad(4));
+				size.height = std::max<uint>(size.height, size.width / 3);
+				break;
 			}
-		} else {
-			/* Draw x-axis labels for graphs not based on quarterly performance (cargo payment rates). */
-			StringID str = this->PrepareXAxisMaxSizeText(this->x_values_start + this->num_on_x_axis * this->x_values_increment);
-			x_label_width = GetStringBoundingBox(str, FS_SMALL).width;
+
+			default: break;
 		}
-
-		SetDParam(0, this->format_str_y_axis);
-		SetDParam(1, INT64_MAX);
-		uint y_label_width = GetStringBoundingBox(STR_GRAPH_Y_LABEL).width;
-
-		size->width  = std::max<uint>(size->width,  ScaleGUITrad(5) + y_label_width + this->num_vert_lines * (x_label_width + ScaleGUITrad(5)) + ScaleGUITrad(9));
-		size->height = std::max<uint>(size->height, ScaleGUITrad(5) + (1 + MIN_GRAPH_NUM_LINES_Y * 2 + (this->draw_dates ? 3 : 1)) * GetCharacterHeight(FS_SMALL) + ScaleGUITrad(4));
-		size->height = std::max<uint>(size->height, size->width / 3);
 	}
 
 	void DrawWidget(const Rect &r, WidgetID widget) const override
 	{
-		if (widget != WID_GRAPH_GRAPH) return;
+		switch (widget) {
+			case WID_GRAPH_GRAPH:
+				this->DrawGraph(r);
+				break;
 
-		DrawGraph(r);
+			case WID_GRAPH_RANGE_MATRIX: {
+				uint line_height = GetCharacterHeight(FS_SMALL) + WidgetDimensions::scaled.framerect.Vertical();
+				uint index = 0;
+				Rect line = r.WithHeight(line_height);
+				for (const auto &str : this->ranges) {
+					bool lowered = !HasBit(this->excluded_range, index);
+
+					/* Redraw frame if lowered */
+					if (lowered) DrawFrameRect(line, COLOUR_BROWN, FR_LOWERED);
+
+					const Rect text = line.Shrink(WidgetDimensions::scaled.framerect);
+					DrawString(text, str, TC_BLACK, SA_CENTER, false, FS_SMALL);
+
+					line = line.Translate(0, line_height);
+					++index;
+				}
+				break;
+			}
+
+			default: break;
+		}
 	}
 
 	virtual OverflowSafeInt64 GetGraphData(const Company *, int)
@@ -590,7 +657,21 @@ public:
 	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
 	{
 		/* Clicked on legend? */
-		if (widget == WID_GRAPH_KEY_BUTTON) ShowGraphLegend();
+		switch (widget) {
+			case WID_GRAPH_KEY_BUTTON:
+				ShowGraphLegend();
+				break;
+
+			case WID_GRAPH_RANGE_MATRIX: {
+				int row = GetRowFromWidget(pt.y, widget, 0, GetCharacterHeight(FS_SMALL) + WidgetDimensions::scaled.framerect.Vertical());
+
+				ToggleBit(this->excluded_range, row);
+				this->SetDirty();
+				break;
+			}
+
+			default: break;
+		}
 	}
 
 	void OnGameTick() override
@@ -613,7 +694,7 @@ public:
 	 * Update the statistics.
 	 * @param initialize Initialize the data structure.
 	 */
-	void UpdateStatistics(bool initialize)
+	virtual void UpdateStatistics(bool initialize)
 	{
 		CompanyMask excluded_companies = _legend_excluded_companies;
 
@@ -622,12 +703,12 @@ public:
 			if (!Company::IsValidID(c)) SetBit(excluded_companies, c);
 		}
 
-		byte nums = 0;
+		uint8_t nums = 0;
 		for (const Company *c : Company::Iterate()) {
 			nums = std::min(this->num_vert_lines, std::max(nums, c->num_valid_stat_ent));
 		}
 
-		int mo = (EconTime::CurMonth() / 3 - nums) * 3;
+		int mo = (EconTime::CurMonth() / this->month_increment - nums) * this->month_increment;
 		EconTime::Year yr = EconTime::CurYear();
 		while (mo < 0) {
 			yr--;
@@ -645,26 +726,26 @@ public:
 		this->year = yr;
 		this->month = mo;
 
-		int numd = 0;
+		this->data.clear();
 		for (CompanyID k = COMPANY_FIRST; k < MAX_COMPANIES; k++) {
 			const Company *c = Company::GetIfValid(k);
-			if (c != nullptr) {
-				this->colours[numd] = GetColourGradient(c->colour, SHADE_LIGHTER);
-				for (int j = this->num_on_x_axis, i = 0; --j >= 0;) {
-					if (j >= c->num_valid_stat_ent) {
-						this->cost[numd][i] = INVALID_DATAPOINT;
-					} else {
-						/* Ensure we never assign INVALID_DATAPOINT, as that has another meaning.
-						 * Instead, use the value just under it. Hopefully nobody will notice. */
-						this->cost[numd][i] = std::min(GetGraphData(c, j), INVALID_DATAPOINT - 1);
-					}
-					i++;
-				}
-			}
-			numd++;
-		}
+			if (c == nullptr) continue;
 
-		this->num_dataset = numd;
+			DataSet &dataset = this->data.emplace_back();
+			dataset.colour = GetColourGradient(c->colour, SHADE_LIGHTER);
+			dataset.exclude_bit = k;
+
+			for (int j = this->num_on_x_axis, i = 0; --j >= 0;) {
+				if (j >= c->num_valid_stat_ent) {
+					dataset.values[i] = INVALID_DATAPOINT;
+				} else {
+					/* Ensure we never assign INVALID_DATAPOINT, as that has another meaning.
+					 * Instead, use the value just under it. Hopefully nobody will notice. */
+					dataset.values[i] = std::min(GetGraphData(c, j), INVALID_DATAPOINT - 1);
+				}
+				i++;
+			}
+		}
 	}
 };
 
@@ -674,7 +755,7 @@ public:
 /********************/
 
 struct OperatingProfitGraphWindow : BaseGraphWindow {
-	OperatingProfitGraphWindow(WindowDesc *desc, WindowNumber window_number) :
+	OperatingProfitGraphWindow(WindowDesc &desc, WindowNumber window_number) :
 			BaseGraphWindow(desc, STR_JUST_CURRENCY_SHORT)
 	{
 		this->num_on_x_axis = GRAPH_NUM_MONTHS;
@@ -703,10 +784,10 @@ static constexpr NWidgetPart _nested_operating_profit_widgets[] = {
 	EndContainer(),
 	NWidget(WWT_PANEL, COLOUR_BROWN, WID_GRAPH_BACKGROUND),
 		NWidget(NWID_VERTICAL),
-			NWidget(WWT_EMPTY, COLOUR_BROWN, WID_GRAPH_GRAPH), SetMinimalSize(576, 160), SetFill(1, 1), SetResize(1, 1),
+			NWidget(WWT_EMPTY, INVALID_COLOUR, WID_GRAPH_GRAPH), SetMinimalSize(576, 160), SetFill(1, 1), SetResize(1, 1),
 			NWidget(NWID_HORIZONTAL),
 				NWidget(NWID_SPACER), SetMinimalSize(12, 0), SetFill(1, 0), SetResize(1, 0),
-				NWidget(WWT_TEXT, COLOUR_BROWN, WID_GRAPH_FOOTER), SetMinimalSize(0, 6), SetPadding(2, 0, 2, 0), SetDataTip(STR_EMPTY, STR_NULL),
+				NWidget(WWT_TEXT, INVALID_COLOUR, WID_GRAPH_FOOTER), SetMinimalSize(0, 6), SetPadding(2, 0, 2, 0), SetDataTip(STR_EMPTY, STR_NULL),
 				NWidget(NWID_SPACER), SetFill(1, 0), SetResize(1, 0),
 				NWidget(WWT_RESIZEBOX, COLOUR_BROWN, WID_GRAPH_RESIZE), SetDataTip(RWV_HIDE_BEVEL, STR_TOOLTIP_RESIZE),
 			EndContainer(),
@@ -718,13 +799,13 @@ static WindowDesc _operating_profit_desc(__FILE__, __LINE__,
 	WDP_AUTO, "graph_operating_profit", 0, 0,
 	WC_OPERATING_PROFIT, WC_NONE,
 	0,
-	std::begin(_nested_operating_profit_widgets), std::end(_nested_operating_profit_widgets)
+	_nested_operating_profit_widgets
 );
 
 
 void ShowOperatingProfitGraph()
 {
-	AllocateWindowDescFront<OperatingProfitGraphWindow>(&_operating_profit_desc, 0);
+	AllocateWindowDescFront<OperatingProfitGraphWindow>(_operating_profit_desc, 0);
 }
 
 
@@ -733,7 +814,7 @@ void ShowOperatingProfitGraph()
 /****************/
 
 struct IncomeGraphWindow : BaseGraphWindow {
-	IncomeGraphWindow(WindowDesc *desc, WindowNumber window_number) :
+	IncomeGraphWindow(WindowDesc &desc, WindowNumber window_number) :
 			BaseGraphWindow(desc, STR_JUST_CURRENCY_SHORT)
 	{
 		this->num_on_x_axis = GRAPH_NUM_MONTHS;
@@ -762,10 +843,10 @@ static constexpr NWidgetPart _nested_income_graph_widgets[] = {
 	EndContainer(),
 	NWidget(WWT_PANEL, COLOUR_BROWN, WID_GRAPH_BACKGROUND),
 		NWidget(NWID_VERTICAL),
-			NWidget(WWT_EMPTY, COLOUR_BROWN, WID_GRAPH_GRAPH), SetMinimalSize(576, 128), SetFill(1, 1), SetResize(1, 1),
+			NWidget(WWT_EMPTY, INVALID_COLOUR, WID_GRAPH_GRAPH), SetMinimalSize(576, 128), SetFill(1, 1), SetResize(1, 1),
 			NWidget(NWID_HORIZONTAL),
 				NWidget(NWID_SPACER), SetMinimalSize(12, 0), SetFill(1, 0), SetResize(1, 0),
-				NWidget(WWT_TEXT, COLOUR_BROWN, WID_GRAPH_FOOTER), SetMinimalSize(0, 6), SetPadding(2, 0, 2, 0), SetDataTip(STR_EMPTY, STR_NULL),
+				NWidget(WWT_TEXT, INVALID_COLOUR, WID_GRAPH_FOOTER), SetMinimalSize(0, 6), SetPadding(2, 0, 2, 0), SetDataTip(STR_EMPTY, STR_NULL),
 				NWidget(NWID_SPACER), SetFill(1, 0), SetResize(1, 0),
 				NWidget(WWT_RESIZEBOX, COLOUR_BROWN, WID_GRAPH_RESIZE), SetDataTip(RWV_HIDE_BEVEL, STR_TOOLTIP_RESIZE),
 			EndContainer(),
@@ -777,12 +858,12 @@ static WindowDesc _income_graph_desc(__FILE__, __LINE__,
 	WDP_AUTO, "graph_income", 0, 0,
 	WC_INCOME_GRAPH, WC_NONE,
 	0,
-	std::begin(_nested_income_graph_widgets), std::end(_nested_income_graph_widgets)
+	_nested_income_graph_widgets
 );
 
 void ShowIncomeGraph()
 {
-	AllocateWindowDescFront<IncomeGraphWindow>(&_income_graph_desc, 0);
+	AllocateWindowDescFront<IncomeGraphWindow>(_income_graph_desc, 0);
 }
 
 /*******************/
@@ -795,7 +876,7 @@ struct ExcludingCargoBaseGraphWindow : BaseGraphWindow {
 	Scrollbar *vscroll; ///< Cargo list scrollbar.
 	uint legend_width;  ///< Width of legend 'blob'.
 
-	ExcludingCargoBaseGraphWindow(WindowDesc *desc, StringID format_str_y_axis):
+	ExcludingCargoBaseGraphWindow(WindowDesc &desc, StringID format_str_y_axis):
 			BaseGraphWindow(desc, format_str_y_axis)
 	{}
 
@@ -805,7 +886,7 @@ struct ExcludingCargoBaseGraphWindow : BaseGraphWindow {
 		this->legend_width = (GetCharacterHeight(FS_SMALL) - ScaleGUITrad(1)) * 9 / 6;
 	}
 
-	virtual void UpdateWidgetSize(WidgetID widget, Dimension *size, const Dimension &padding, Dimension *fill, Dimension *resize) override
+	virtual void UpdateWidgetSize(WidgetID widget, Dimension &size, const Dimension &padding, Dimension &fill, Dimension &resize) override
 	{
 		if (widget != WID_ECBG_MATRIX) {
 			BaseGraphWindow::UpdateWidgetSize(widget, size, padding, fill, resize);
@@ -818,13 +899,13 @@ struct ExcludingCargoBaseGraphWindow : BaseGraphWindow {
 			d.width += this->legend_width + WidgetDimensions::scaled.hsep_normal; // colour field
 			d.width += WidgetDimensions::scaled.framerect.Horizontal();
 			d.height += WidgetDimensions::scaled.framerect.Vertical();
-			*size = maxdim(d, *size);
+			size = maxdim(d, size);
 		}
 
-		this->line_height = size->height;
-		size->height = this->line_height * 11; /* Default number of cargo types in most climates. */
-		resize->width = 0;
-		resize->height = this->line_height;
+		this->line_height = size.height;
+		size.height = this->line_height * 11; /* Default number of cargo types in most climates. */
+		resize.width = 0;
+		resize.height = this->line_height;
 	}
 
 	virtual void DrawWidget(const Rect &r, WidgetID widget) const override
@@ -844,7 +925,7 @@ struct ExcludingCargoBaseGraphWindow : BaseGraphWindow {
 			if (pos-- > 0) continue;
 			if (--max < 0) break;
 
-			bool lowered = !HasBit(_legend_excluded_cargo, cs->Index());
+			bool lowered = !HasBit(_legend_excluded_cargo_production_history, cs->Index());
 
 			/* Redraw frame if lowered */
 			if (lowered) DrawFrameRect(line, COLOUR_BROWN, FR_LOWERED);
@@ -873,14 +954,14 @@ struct ExcludingCargoBaseGraphWindow : BaseGraphWindow {
 
 			case WID_ECBG_ENABLE_CARGOES:
 				/* Remove all cargoes from the excluded lists. */
-				_legend_excluded_cargo = 0;
+				_legend_excluded_cargo_production_history = 0;
 				this->UpdateCargoExcludingGraphs();
 				break;
 
 			case WID_ECBG_DISABLE_CARGOES: {
 				/* Add all cargoes to the excluded lists. */
 				for (const CargoSpec *cs : _sorted_standard_cargo_specs) {
-					SetBit(_legend_excluded_cargo, cs->Index());
+					SetBit(_legend_excluded_cargo_production_history, cs->Index());
 				}
 				this->UpdateCargoExcludingGraphs();
 				break;
@@ -893,7 +974,7 @@ struct ExcludingCargoBaseGraphWindow : BaseGraphWindow {
 				for (const CargoSpec *cs : _sorted_standard_cargo_specs) {
 					if (row-- > 0) continue;
 
-					ToggleBit(_legend_excluded_cargo, cs->Index());
+					ToggleBit(_legend_excluded_cargo_production_history, cs->Index());
 					this->UpdateCargoExcludingGraphs();
 					break;
 				}
@@ -911,7 +992,7 @@ struct ExcludingCargoBaseGraphWindow : BaseGraphWindow {
 struct DeliveredCargoGraphWindow : ExcludingCargoBaseGraphWindow {
 	bool graph_by_cargo_mode = false;
 
-	DeliveredCargoGraphWindow(WindowDesc *desc, WindowNumber window_number) :
+	DeliveredCargoGraphWindow(WindowDesc &desc, WindowNumber window_number) :
 			ExcludingCargoBaseGraphWindow(desc, STR_JUST_COMMA)
 	{
 		this->num_on_x_axis = GRAPH_NUM_MONTHS;
@@ -929,7 +1010,7 @@ struct DeliveredCargoGraphWindow : ExcludingCargoBaseGraphWindow {
 		if (EconTime::UsingWallclockUnits()) {
 			auto *wid = this->GetWidget<NWidgetCore>(WID_GRAPH_FOOTER);
 			if (wid != nullptr) {
-				wid->SetDataTip(STR_GRAPH_LAST_72_MINUTES_TIME_LABEL, STR_NULL);
+				wid->SetDataTip(ReplaceWallclockMinutesUnit() ? STR_GRAPH_LAST_72_PRODUCTION_INTERVALS_TIME_LABEL : STR_GRAPH_LAST_72_MINUTES_TIME_LABEL, STR_NULL);
 			}
 		}
 
@@ -938,12 +1019,12 @@ struct DeliveredCargoGraphWindow : ExcludingCargoBaseGraphWindow {
 
 	OverflowSafeInt64 GetGraphData(const Company *c, int j) override
 	{
-		if (_legend_excluded_cargo == 0) {
+		if (_legend_excluded_cargo_production_history == 0) {
 			return c->old_economy[j].delivered_cargo.GetSum<OverflowSafeInt64>();
 		}
 		OverflowSafeInt64 total_delivered = 0;
 		for (const CargoSpec *cs : _sorted_standard_cargo_specs) {
-			if (!HasBit(_legend_excluded_cargo, cs->Index())){
+			if (!HasBit(_legend_excluded_cargo_production_history, cs->Index())){
 				total_delivered += c->old_economy[j].delivered_cargo[cs->Index()];
 			}
 		}
@@ -1010,7 +1091,7 @@ struct DeliveredCargoGraphWindow : ExcludingCargoBaseGraphWindow {
 			if (!Company::IsValidID(c)) SetBit(excluded_companies, c);
 		}
 
-		byte nums = 0;
+		uint8_t nums = 0;
 		for (const Company *c : Company::Iterate()) {
 			nums = std::min(this->num_vert_lines, std::max(nums, c->num_valid_stat_ent));
 		}
@@ -1028,15 +1109,20 @@ struct DeliveredCargoGraphWindow : ExcludingCargoBaseGraphWindow {
 			return;
 		}
 
-		this->excluded_data = UINT64_MAX;
+		this->data.clear();
+		this->excluded_data = 0;
 		this->num_on_x_axis = nums;
 		this->year = yr;
 		this->month = mo;
 
 		for (const CargoSpec *cs : _sorted_standard_cargo_specs) {
-			if (HasBit(_legend_excluded_cargo, cs->Index())) continue;
-			ClrBit(this->excluded_data, cs->Index());
-			this->colours[cs->Index()] = cs->legend_colour;
+			DataSet &dataset = this->data.emplace_back();
+			dataset.colour = cs->legend_colour;
+			dataset.exclude_bit = cs->Index();
+			if (HasBit(_legend_excluded_cargo_production_history, cs->Index())) {
+				SetBit(this->excluded_data, cs->Index());
+				continue;
+			}
 
 			for (int j = this->num_on_x_axis, i = 0; --j >= 0;) {
 				bool is_valid = false;
@@ -1051,12 +1137,10 @@ struct DeliveredCargoGraphWindow : ExcludingCargoBaseGraphWindow {
 						total_delivered += c->old_economy[j].delivered_cargo[cs->Index()];
 					}
 				}
-				this->cost[cs->Index()][i] = is_valid ? total_delivered : INVALID_DATAPOINT;
+				dataset.values[i] = is_valid ? total_delivered : INVALID_DATAPOINT;
 				i++;
 			}
 		}
-
-		this->num_dataset = NUM_CARGO;
 	}
 };
 
@@ -1072,7 +1156,7 @@ static constexpr NWidgetPart _nested_delivered_cargo_graph_widgets[] = {
 	NWidget(WWT_PANEL, COLOUR_BROWN, WID_GRAPH_BACKGROUND),
 		NWidget(NWID_VERTICAL),
 			NWidget(NWID_HORIZONTAL),
-				NWidget(WWT_EMPTY, COLOUR_BROWN, WID_GRAPH_GRAPH), SetMinimalSize(576, 128), SetFill(1, 1), SetResize(1, 1),
+				NWidget(WWT_EMPTY, INVALID_COLOUR, WID_GRAPH_GRAPH), SetMinimalSize(576, 128), SetFill(1, 1), SetResize(1, 1),
 				NWidget(NWID_VERTICAL),
 					NWidget(NWID_SPACER), SetMinimalSize(0, 4), SetFill(0, 0),
 					NWidget(WWT_TEXTBTN, COLOUR_BROWN, WID_DCG_BY_COMPANY), SetDataTip(STR_GRAPH_DELIVERED_CARGO_BY_COMPANY_MODE, STR_GRAPH_DELIVERED_CARGO_BY_COMPANY_MODE_TOOLTIP), SetFill(1, 0),
@@ -1090,7 +1174,7 @@ static constexpr NWidgetPart _nested_delivered_cargo_graph_widgets[] = {
 			NWidget(NWID_SPACER), SetMinimalSize(0, 4),
 			NWidget(NWID_HORIZONTAL),
 				NWidget(NWID_SPACER), SetMinimalSize(12, 0), SetFill(1, 0), SetResize(1, 0),
-				NWidget(WWT_TEXT, COLOUR_BROWN, WID_GRAPH_FOOTER), SetMinimalSize(0, 6), SetPadding(2, 0, 2, 0), SetDataTip(STR_EMPTY, STR_NULL),
+				NWidget(WWT_TEXT, INVALID_COLOUR, WID_GRAPH_FOOTER), SetMinimalSize(0, 6), SetPadding(2, 0, 2, 0), SetDataTip(STR_EMPTY, STR_NULL),
 				NWidget(NWID_SPACER), SetFill(1, 0), SetResize(1, 0),
 				NWidget(WWT_RESIZEBOX, COLOUR_BROWN, WID_GRAPH_RESIZE), SetDataTip(RWV_HIDE_BEVEL, STR_TOOLTIP_RESIZE),
 			EndContainer(),
@@ -1102,12 +1186,12 @@ static WindowDesc _delivered_cargo_graph_desc(__FILE__, __LINE__,
 	WDP_AUTO, "graph_delivered_cargo", 0, 0,
 	WC_DELIVERED_CARGO, WC_NONE,
 	0,
-	std::begin(_nested_delivered_cargo_graph_widgets), std::end(_nested_delivered_cargo_graph_widgets)
+	_nested_delivered_cargo_graph_widgets
 );
 
 void ShowDeliveredCargoGraph()
 {
-	AllocateWindowDescFront<DeliveredCargoGraphWindow>(&_delivered_cargo_graph_desc, 0);
+	AllocateWindowDescFront<DeliveredCargoGraphWindow>(_delivered_cargo_graph_desc, 0);
 }
 
 /***********************/
@@ -1115,7 +1199,7 @@ void ShowDeliveredCargoGraph()
 /***********************/
 
 struct PerformanceHistoryGraphWindow : BaseGraphWindow {
-	PerformanceHistoryGraphWindow(WindowDesc *desc, WindowNumber window_number) :
+	PerformanceHistoryGraphWindow(WindowDesc &desc, WindowNumber window_number) :
 			BaseGraphWindow(desc, STR_JUST_COMMA)
 	{
 		this->num_on_x_axis = GRAPH_NUM_MONTHS;
@@ -1151,10 +1235,10 @@ static constexpr NWidgetPart _nested_performance_history_widgets[] = {
 	EndContainer(),
 	NWidget(WWT_PANEL, COLOUR_BROWN, WID_GRAPH_BACKGROUND),
 		NWidget(NWID_VERTICAL),
-			NWidget(WWT_EMPTY, COLOUR_BROWN, WID_GRAPH_GRAPH), SetMinimalSize(576, 224), SetFill(1, 1), SetResize(1, 1),
+			NWidget(WWT_EMPTY, INVALID_COLOUR, WID_GRAPH_GRAPH), SetMinimalSize(576, 224), SetFill(1, 1), SetResize(1, 1),
 			NWidget(NWID_HORIZONTAL),
 				NWidget(NWID_SPACER), SetMinimalSize(12, 0), SetFill(1, 0), SetResize(1, 0),
-				NWidget(WWT_TEXT, COLOUR_BROWN, WID_GRAPH_FOOTER), SetMinimalSize(0, 6), SetPadding(2, 0, 2, 0), SetDataTip(STR_EMPTY, STR_NULL),
+				NWidget(WWT_TEXT, INVALID_COLOUR, WID_GRAPH_FOOTER), SetMinimalSize(0, 6), SetPadding(2, 0, 2, 0), SetDataTip(STR_EMPTY, STR_NULL),
 				NWidget(NWID_SPACER), SetFill(1, 0), SetResize(1, 0),
 				NWidget(WWT_RESIZEBOX, COLOUR_BROWN, WID_GRAPH_RESIZE), SetDataTip(RWV_HIDE_BEVEL, STR_TOOLTIP_RESIZE),
 			EndContainer(),
@@ -1166,12 +1250,12 @@ static WindowDesc _performance_history_desc(__FILE__, __LINE__,
 	WDP_AUTO, "graph_performance", 0, 0,
 	WC_PERFORMANCE_HISTORY, WC_NONE,
 	0,
-	std::begin(_nested_performance_history_widgets), std::end(_nested_performance_history_widgets)
+	_nested_performance_history_widgets
 );
 
 void ShowPerformanceHistoryGraph()
 {
-	AllocateWindowDescFront<PerformanceHistoryGraphWindow>(&_performance_history_desc, 0);
+	AllocateWindowDescFront<PerformanceHistoryGraphWindow>(_performance_history_desc, 0);
 }
 
 /*****************/
@@ -1179,7 +1263,7 @@ void ShowPerformanceHistoryGraph()
 /*****************/
 
 struct CompanyValueGraphWindow : BaseGraphWindow {
-	CompanyValueGraphWindow(WindowDesc *desc, WindowNumber window_number) :
+	CompanyValueGraphWindow(WindowDesc &desc, WindowNumber window_number) :
 			BaseGraphWindow(desc, STR_JUST_CURRENCY_SHORT)
 	{
 		this->num_on_x_axis = GRAPH_NUM_MONTHS;
@@ -1208,10 +1292,10 @@ static constexpr NWidgetPart _nested_company_value_graph_widgets[] = {
 	EndContainer(),
 	NWidget(WWT_PANEL, COLOUR_BROWN, WID_GRAPH_BACKGROUND),
 		NWidget(NWID_VERTICAL),
-			NWidget(WWT_EMPTY, COLOUR_BROWN, WID_GRAPH_GRAPH), SetMinimalSize(576, 224), SetFill(1, 1), SetResize(1, 1),
+			NWidget(WWT_EMPTY, INVALID_COLOUR, WID_GRAPH_GRAPH), SetMinimalSize(576, 224), SetFill(1, 1), SetResize(1, 1),
 			NWidget(NWID_HORIZONTAL),
 				NWidget(NWID_SPACER), SetMinimalSize(12, 0), SetFill(1, 0), SetResize(1, 0),
-				NWidget(WWT_TEXT, COLOUR_BROWN, WID_GRAPH_FOOTER), SetMinimalSize(0, 6), SetPadding(2, 0, 2, 0), SetDataTip(STR_EMPTY, STR_NULL),
+				NWidget(WWT_TEXT, INVALID_COLOUR, WID_GRAPH_FOOTER), SetMinimalSize(0, 6), SetPadding(2, 0, 2, 0), SetDataTip(STR_EMPTY, STR_NULL),
 				NWidget(NWID_SPACER), SetFill(1, 0), SetResize(1, 0),
 				NWidget(WWT_RESIZEBOX, COLOUR_BROWN, WID_GRAPH_RESIZE), SetDataTip(RWV_HIDE_BEVEL, STR_TOOLTIP_RESIZE),
 			EndContainer(),
@@ -1223,12 +1307,12 @@ static WindowDesc _company_value_graph_desc(__FILE__, __LINE__,
 	WDP_AUTO, "graph_company_value", 0, 0,
 	WC_COMPANY_VALUE, WC_NONE,
 	0,
-	std::begin(_nested_company_value_graph_widgets), std::end(_nested_company_value_graph_widgets)
+	_nested_company_value_graph_widgets
 );
 
 void ShowCompanyValueGraph()
 {
-	AllocateWindowDescFront<CompanyValueGraphWindow>(&_company_value_graph_desc, 0);
+	AllocateWindowDescFront<CompanyValueGraphWindow>(_company_value_graph_desc, 0);
 }
 
 /*****************/
@@ -1240,7 +1324,7 @@ struct PaymentRatesGraphWindow : BaseGraphWindow {
 	Scrollbar *vscroll; ///< Cargo list scrollbar.
 	uint legend_width;  ///< Width of legend 'blob'.
 
-	PaymentRatesGraphWindow(WindowDesc *desc, WindowNumber window_number) :
+	PaymentRatesGraphWindow(WindowDesc &desc, WindowNumber window_number) :
 			BaseGraphWindow(desc, STR_JUST_CURRENCY_SHORT)
 	{
 		this->num_on_x_axis = 20;
@@ -1249,7 +1333,7 @@ struct PaymentRatesGraphWindow : BaseGraphWindow {
 		this->SetXAxis();
 
 		this->CreateNestedTree();
-		this->vscroll = this->GetScrollbar(WID_CPR_MATRIX_SCROLLBAR);
+		this->vscroll = this->GetScrollbar(WID_GRAPH_MATRIX_SCROLLBAR);
 		this->vscroll->SetCount(_sorted_standard_cargo_specs.size());
 
 		this->SetWidgetLoweredState(WID_CPR_DAYS, _cargo_payment_x_mode == 0);
@@ -1301,6 +1385,8 @@ struct PaymentRatesGraphWindow : BaseGraphWindow {
 			}
 			val *= 74;
 			val /= _settings_time.ticks_per_minute;
+		} else if (EconTime::UsingWallclockUnits()) {
+			decimals = 0;
 		} else {
 			if ((10 % DayLengthFactor()) == 0) {
 				decimals = 0;
@@ -1342,23 +1428,17 @@ struct PaymentRatesGraphWindow : BaseGraphWindow {
 
 	void UpdateExcludedData()
 	{
-		this->excluded_data = 0;
-
-		int i = 0;
-		for (const CargoSpec *cs : _sorted_standard_cargo_specs) {
-			if (HasBit(_legend_excluded_cargo, cs->Index())) SetBit(this->excluded_data, i);
-			i++;
-		}
+		this->excluded_data = _legend_excluded_cargo_payment_rates;
 	}
 
-	void UpdateWidgetSize(WidgetID widget, Dimension *size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension *fill, [[maybe_unused]] Dimension *resize) override
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
 	{
-		if (widget != WID_CPR_MATRIX) {
+		if (widget != WID_GRAPH_MATRIX) {
 			BaseGraphWindow::UpdateWidgetSize(widget, size, padding, fill, resize);
 			return;
 		}
 
-		size->height = GetCharacterHeight(FS_SMALL) + WidgetDimensions::scaled.framerect.Vertical();
+		size.height = GetCharacterHeight(FS_SMALL) + WidgetDimensions::scaled.framerect.Vertical();
 
 		for (const CargoSpec *cs : _sorted_standard_cargo_specs) {
 			SetDParam(0, cs->name);
@@ -1366,18 +1446,18 @@ struct PaymentRatesGraphWindow : BaseGraphWindow {
 			d.width += this->legend_width + WidgetDimensions::scaled.hsep_normal; // colour field
 			d.width += WidgetDimensions::scaled.framerect.Horizontal();
 			d.height += WidgetDimensions::scaled.framerect.Vertical();
-			*size = maxdim(d, *size);
+			size = maxdim(d, size);
 		}
 
-		this->line_height = size->height;
-		size->height = this->line_height * 11; /* Default number of cargo types in most climates. */
-		resize->width = 0;
-		resize->height = this->line_height;
+		this->line_height = size.height;
+		size.height = this->line_height * 11; /* Default number of cargo types in most climates. */
+		resize.width = 0;
+		resize.height = this->line_height;
 	}
 
 	void DrawWidget(const Rect &r, WidgetID widget) const override
 	{
-		if (widget != WID_CPR_MATRIX) {
+		if (widget != WID_GRAPH_MATRIX) {
 			BaseGraphWindow::DrawWidget(r, widget);
 			return;
 		}
@@ -1390,7 +1470,7 @@ struct PaymentRatesGraphWindow : BaseGraphWindow {
 		for (auto it = first; it != last; ++it) {
 			const CargoSpec *cs = *it;
 
-			bool lowered = !HasBit(_legend_excluded_cargo, cs->Index());
+			bool lowered = !HasBit(_legend_excluded_cargo_payment_rates, cs->Index());
 
 			/* Redraw frame if lowered */
 			if (lowered) DrawFrameRect(line, COLOUR_BROWN, FR_LOWERED);
@@ -1413,32 +1493,29 @@ struct PaymentRatesGraphWindow : BaseGraphWindow {
 	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
 	{
 		switch (widget) {
-			case WID_CPR_ENABLE_CARGOES:
+			case WID_GRAPH_ENABLE_CARGOES:
 				/* Remove all cargoes from the excluded lists. */
-				_legend_excluded_cargo = 0;
+				_legend_excluded_cargo_payment_rates = 0;
 				this->excluded_data = 0;
 				this->UpdateCargoExcludingGraphs();
 				break;
 
-			case WID_CPR_DISABLE_CARGOES: {
+			case WID_GRAPH_DISABLE_CARGOES: {
 				/* Add all cargoes to the excluded lists. */
-				int i = 0;
 				for (const CargoSpec *cs : _sorted_standard_cargo_specs) {
-					SetBit(_legend_excluded_cargo, cs->Index());
-					SetBit(this->excluded_data, i);
-					i++;
+					SetBit(_legend_excluded_cargo_payment_rates, cs->Index());
+					SetBit(this->excluded_data, cs->Index());
 				}
 				this->UpdateCargoExcludingGraphs();
 				break;
 			}
 
-			case WID_CPR_MATRIX: {
-				auto it = this->vscroll->GetScrolledItemFromWidget(_sorted_standard_cargo_specs, pt.y, this, WID_CPR_MATRIX);
+			case WID_GRAPH_MATRIX: {
+				auto it = this->vscroll->GetScrolledItemFromWidget(_sorted_standard_cargo_specs, pt.y, this, WID_GRAPH_MATRIX);
 				if (it != _sorted_standard_cargo_specs.end()) {
-					ToggleBit(_legend_excluded_cargo, (*it)->Index());
+					ToggleBit(_legend_excluded_cargo_payment_rates, (*it)->Index());
 					this->UpdateExcludedData();
 					this->UpdateCargoExcludingGraphs();
-					break;
 				}
 				break;
 			}
@@ -1452,12 +1529,16 @@ struct PaymentRatesGraphWindow : BaseGraphWindow {
 				this->OnHundredthTick();
 				this->SetDirty();
 				break;
+
+			default:
+				this->BaseGraphWindow::OnClick(pt, widget, click_count);
+				break;
 		}
 	}
 
 	void OnResize() override
 	{
-		this->vscroll->SetCapacityFromWidget(this, WID_CPR_MATRIX);
+		this->vscroll->SetCapacityFromWidget(this, WID_GRAPH_MATRIX);
 	}
 
 	void OnGameTick() override
@@ -1481,18 +1562,19 @@ struct PaymentRatesGraphWindow : BaseGraphWindow {
 	{
 		this->UpdateExcludedData();
 
-		int i = 0;
 		const float factor = 200.0f * 28.57f * 0.4f * ConvertSpeedToUnitDisplaySpeed(1 << 16, VEH_TRAIN) / (1.6f * static_cast<float>(1 << 16));
 
+		this->data.clear();
 		for (const CargoSpec *cs : _sorted_standard_cargo_specs) {
-			this->colours[i] = cs->legend_colour;
-			for (int j = 0; j != this->num_on_x_axis; j++) {
-				const byte ctt = _cargo_payment_x_mode ? static_cast<byte>(factor / static_cast<float>((j + 1) * this->x_values_increment)) : (j + 1) * 4;
-				this->cost[i][j] = GetTransportedGoodsIncome(_cargo_payment_x_mode ? 1 : 10, _cargo_payment_x_mode ? 200 : 20, ctt, cs->Index());
+			DataSet &dataset = this->data.emplace_back();
+			dataset.colour = cs->legend_colour;
+			dataset.exclude_bit = cs->Index();
+
+			for (uint j = 0; j != this->num_on_x_axis; j++) {
+				const uint8_t ctt = _cargo_payment_x_mode ? static_cast<uint8_t>(factor / static_cast<float>((j + 1) * this->x_values_increment)) : (j + 1) * 4;
+				dataset.values[j] = GetTransportedGoodsIncome(_cargo_payment_x_mode ? 1 : 10, _cargo_payment_x_mode ? 200 : 20, ctt, cs->Index());
 			}
-			i++;
 		}
-		this->num_dataset = i;
 	}
 
 	void SetStringParameters(WidgetID widget) const override
@@ -1540,21 +1622,21 @@ static constexpr NWidgetPart _nested_cargo_payment_rates_widgets[] = {
 	EndContainer(),
 	NWidget(WWT_PANEL, COLOUR_BROWN, WID_GRAPH_BACKGROUND), SetMinimalSize(568, 128),
 		NWidget(NWID_HORIZONTAL),
-			NWidget(WWT_TEXT, COLOUR_BROWN, WID_GRAPH_HEADER), SetMinimalSize(0, 6), SetAlignment(SA_CENTER), SetPadding(2, 0, 2, 0), SetDataTip(STR_JUST_STRING1, STR_NULL), SetFill(1, 0), SetResize(1, 0),
+			NWidget(WWT_TEXT, INVALID_COLOUR, WID_GRAPH_HEADER), SetMinimalSize(0, 6), SetAlignment(SA_CENTER), SetPadding(2, 0, 2, 0), SetDataTip(STR_JUST_STRING1, STR_NULL), SetFill(1, 0), SetResize(1, 0),
 		EndContainer(),
 		NWidget(NWID_HORIZONTAL),
-			NWidget(WWT_EMPTY, COLOUR_BROWN, WID_GRAPH_GRAPH), SetMinimalSize(495, 0), SetFill(1, 1), SetResize(1, 1),
+			NWidget(WWT_EMPTY, INVALID_COLOUR, WID_GRAPH_GRAPH), SetMinimalSize(495, 0), SetFill(1, 1), SetResize(1, 1),
 			NWidget(NWID_VERTICAL),
 				NWidget(NWID_SPACER), SetMinimalSize(0, 4),
 				NWidget(WWT_TEXTBTN, COLOUR_BROWN, WID_CPR_DAYS), SetDataTip(STR_JUST_STRING, STR_GRAPH_CARGO_TOOLTIP_TIME_MODE), SetFill(1, 0),
 				NWidget(WWT_TEXTBTN, COLOUR_BROWN, WID_CPR_SPEED), SetDataTip(STR_GRAPH_CARGO_SPEED_MODE, STR_GRAPH_CARGO_TOOLTIP_SPEED_MODE), SetFill(1, 0),
 				NWidget(NWID_SPACER), SetMinimalSize(0, 16), SetFill(0, 1),
-				NWidget(WWT_PUSHTXTBTN, COLOUR_BROWN, WID_CPR_ENABLE_CARGOES), SetDataTip(STR_GRAPH_CARGO_ENABLE_ALL, STR_GRAPH_CARGO_TOOLTIP_ENABLE_ALL), SetFill(1, 0),
-				NWidget(WWT_PUSHTXTBTN, COLOUR_BROWN, WID_CPR_DISABLE_CARGOES), SetDataTip(STR_GRAPH_CARGO_DISABLE_ALL, STR_GRAPH_CARGO_TOOLTIP_DISABLE_ALL), SetFill(1, 0),
+				NWidget(WWT_PUSHTXTBTN, COLOUR_BROWN, WID_GRAPH_ENABLE_CARGOES), SetDataTip(STR_GRAPH_CARGO_ENABLE_ALL, STR_GRAPH_CARGO_TOOLTIP_ENABLE_ALL), SetFill(1, 0),
+				NWidget(WWT_PUSHTXTBTN, COLOUR_BROWN, WID_GRAPH_DISABLE_CARGOES), SetDataTip(STR_GRAPH_CARGO_DISABLE_ALL, STR_GRAPH_CARGO_TOOLTIP_DISABLE_ALL), SetFill(1, 0),
 				NWidget(NWID_SPACER), SetMinimalSize(0, 4),
 				NWidget(NWID_HORIZONTAL),
-					NWidget(WWT_MATRIX, COLOUR_BROWN, WID_CPR_MATRIX), SetFill(1, 0), SetResize(0, 2), SetMatrixDataTip(1, 0, STR_GRAPH_CARGO_PAYMENT_TOGGLE_CARGO), SetScrollbar(WID_CPR_MATRIX_SCROLLBAR),
-					NWidget(NWID_VSCROLLBAR, COLOUR_BROWN, WID_CPR_MATRIX_SCROLLBAR),
+					NWidget(WWT_MATRIX, COLOUR_BROWN, WID_GRAPH_MATRIX), SetFill(1, 0), SetResize(0, 2), SetMatrixDataTip(1, 0, STR_GRAPH_CARGO_PAYMENT_TOGGLE_CARGO), SetScrollbar(WID_GRAPH_MATRIX_SCROLLBAR),
+					NWidget(NWID_VSCROLLBAR, COLOUR_BROWN, WID_GRAPH_MATRIX_SCROLLBAR),
 				EndContainer(),
 				NWidget(NWID_SPACER), SetMinimalSize(0, 24), SetFill(0, 1),
 			EndContainer(),
@@ -1562,7 +1644,7 @@ static constexpr NWidgetPart _nested_cargo_payment_rates_widgets[] = {
 		EndContainer(),
 		NWidget(NWID_HORIZONTAL),
 			NWidget(NWID_SPACER), SetMinimalSize(12, 0), SetFill(0, 0), SetResize(0, 0),
-			NWidget(WWT_TEXT, COLOUR_BROWN, WID_GRAPH_FOOTER_CUSTOM), SetMinimalSize(0, 6), SetAlignment(SA_CENTER), SetPadding(2, 0, 2, 0), SetDataTip(STR_JUST_STRING1, STR_NULL), SetFill(1, 0), SetResize(1, 0),
+			NWidget(WWT_TEXT, INVALID_COLOUR, WID_GRAPH_FOOTER_CUSTOM), SetMinimalSize(0, 6), SetAlignment(SA_CENTER), SetPadding(2, 0, 2, 0), SetDataTip(STR_JUST_STRING2, STR_NULL), SetFill(1, 0), SetResize(1, 0),
 			NWidget(WWT_RESIZEBOX, COLOUR_BROWN, WID_GRAPH_RESIZE), SetDataTip(RWV_HIDE_BEVEL, STR_TOOLTIP_RESIZE),
 		EndContainer(),
 	EndContainer(),
@@ -1572,13 +1654,13 @@ static WindowDesc _cargo_payment_rates_desc(__FILE__, __LINE__,
 	WDP_AUTO, "graph_cargo_payment_rates", 0, 0,
 	WC_PAYMENT_RATES, WC_NONE,
 	0,
-	std::begin(_nested_cargo_payment_rates_widgets), std::end(_nested_cargo_payment_rates_widgets)
+	_nested_cargo_payment_rates_widgets
 );
 
 
 void ShowCargoPaymentRates()
 {
-	AllocateWindowDescFront<PaymentRatesGraphWindow>(&_cargo_payment_rates_desc, 0);
+	AllocateWindowDescFront<PaymentRatesGraphWindow>(_cargo_payment_rates_desc, 0);
 }
 
 /*****************************/
@@ -1589,7 +1671,7 @@ struct PerformanceRatingDetailWindow : Window {
 	static CompanyID company;
 	int timeout;
 
-	PerformanceRatingDetailWindow(WindowDesc *desc, WindowNumber window_number) : Window(desc)
+	PerformanceRatingDetailWindow(WindowDesc &desc, WindowNumber window_number) : Window(desc)
 	{
 		this->UpdateCompanyStats();
 
@@ -1617,12 +1699,12 @@ struct PerformanceRatingDetailWindow : Window {
 	uint score_detail_left;
 	uint score_detail_right;
 
-	void UpdateWidgetSize(WidgetID widget, Dimension *size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension *fill, [[maybe_unused]] Dimension *resize) override
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
 	{
 		switch (widget) {
 			case WID_PRD_SCORE_FIRST:
 				this->bar_height = GetCharacterHeight(FS_NORMAL) + WidgetDimensions::scaled.fullbevel.Vertical();
-				size->height = this->bar_height + WidgetDimensions::scaled.matrix.Vertical();
+				size.height = this->bar_height + WidgetDimensions::scaled.matrix.Vertical();
 
 				uint score_info_width = 0;
 				for (uint i = SCORE_BEGIN; i < SCORE_END; i++) {
@@ -1653,14 +1735,14 @@ struct PerformanceRatingDetailWindow : Window {
 				 * least 999 999 M which roughly is equally long. Furthermore if the
 				 * exchange rate is that high, 999 999 k is usually not enough anymore
 				 * to show the different currency numbers. */
-				if (_currency->rate < 1000) max /= _currency->rate;
+				if (GetCurrency().rate < 1000) max /= GetCurrency().rate;
 				SetDParam(0, max);
 				SetDParam(1, max);
 				uint score_detail_width = GetStringBoundingBox(STR_PERFORMANCE_DETAIL_AMOUNT_CURRENCY).width;
 
-				size->width = WidgetDimensions::scaled.frametext.Horizontal() + score_info_width + WidgetDimensions::scaled.hsep_wide + this->bar_width + WidgetDimensions::scaled.hsep_wide + score_detail_width;
+				size.width = WidgetDimensions::scaled.frametext.Horizontal() + score_info_width + WidgetDimensions::scaled.hsep_wide + this->bar_width + WidgetDimensions::scaled.hsep_wide + score_detail_width;
 				uint left  = WidgetDimensions::scaled.frametext.left;
-				uint right = size->width - WidgetDimensions::scaled.frametext.right;
+				uint right = size.width - WidgetDimensions::scaled.frametext.right;
 
 				bool rtl = _current_text_dir == TD_RTL;
 				this->score_info_left  = rtl ? right - score_info_width : left;
@@ -1804,11 +1886,296 @@ struct PerformanceRatingDetailWindow : Window {
 		}
 
 		/* Make sure the widget is lowered */
-		this->LowerWidget(WID_PRD_COMPANY_FIRST + this->company);
+		if (this->company != INVALID_COMPANY) {
+			this->LowerWidget(WID_PRD_COMPANY_FIRST + this->company);
+		}
 	}
 };
 
 CompanyID PerformanceRatingDetailWindow::company = INVALID_COMPANY;
+
+/*******************************/
+/* INDUSTRY PRODUCTION HISTORY */
+/*******************************/
+
+struct IndustryProductionGraphWindow : BaseGraphWindow {
+	uint line_height;   ///< Pixel height of each cargo type row.
+	Scrollbar *vscroll; ///< Cargo list scrollbar.
+	uint legend_width;  ///< Width of legend 'blob'.
+
+	static inline constexpr StringID RANGE_LABELS[] = {
+		STR_GRAPH_INDUSTRY_RANGE_PRODUCED,
+		STR_GRAPH_INDUSTRY_RANGE_TRANSPORTED
+	};
+
+	IndustryProductionGraphWindow(WindowDesc &desc, WindowNumber window_number) :
+			BaseGraphWindow(desc, STR_JUST_COMMA)
+	{
+		this->num_on_x_axis = GRAPH_NUM_MONTHS;
+		this->num_vert_lines = GRAPH_NUM_MONTHS;
+		this->month_increment = 1;
+		this->x_values_start = ECONOMY_MONTH_MINUTES;
+		this->x_values_increment = ECONOMY_MONTH_MINUTES;
+		this->draw_dates = !EconTime::UsingWallclockUnits();
+		this->ranges = RANGE_LABELS;
+
+		this->CreateNestedTree();
+		this->vscroll = this->GetScrollbar(WID_GRAPH_MATRIX_SCROLLBAR);
+
+		int count = 0;
+		const Industry *i = Industry::Get(window_number);
+		for (const auto &p : i->Produced()) {
+			if (!IsValidCargoID(p.cargo)) continue;
+			count++;
+		}
+		this->vscroll->SetCount(count);
+
+		auto *wid = this->GetWidget<NWidgetCore>(WID_GRAPH_FOOTER);
+		wid->SetDataTip(EconTime::UsingWallclockUnits() ? (ReplaceWallclockMinutesUnit() ? STR_GRAPH_LAST_24_PRODUCTION_INTERVALS_TIME_LABEL : STR_GRAPH_LAST_24_MINUTES_TIME_LABEL) : STR_EMPTY, STR_NULL);
+
+		this->FinishInitNested(window_number);
+
+		/* Initialise the dataset */
+		this->UpdateStatistics(true);
+	}
+
+	void OnInit() override
+	{
+		/* Width of the legend blob. */
+		this->legend_width = GetCharacterHeight(FS_SMALL) * 9 / 6;
+	}
+
+	void UpdateExcludedData()
+	{
+		this->excluded_data = _legend_excluded_cargo_production_history;
+	}
+
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
+	{
+		if (widget != WID_GRAPH_MATRIX) {
+			BaseGraphWindow::UpdateWidgetSize(widget, size, padding, fill, resize);
+			return;
+		}
+
+		const Industry *i = Industry::Get(this->window_number);
+		const CargoSpec *cs;
+		for (const auto &p : i->Produced()) {
+			if (!IsValidCargoID(p.cargo)) continue;
+
+			cs = CargoSpec::Get(p.cargo);
+			SetDParam(0, cs->name);
+			Dimension d = GetStringBoundingBox(STR_GRAPH_CARGO_PAYMENT_CARGO);
+			d.width += this->legend_width + WidgetDimensions::scaled.hsep_normal; // colour field
+			d.width += WidgetDimensions::scaled.framerect.Horizontal();
+			d.height += WidgetDimensions::scaled.framerect.Vertical();
+			size = maxdim(d, size);
+		}
+
+		this->line_height = size.height;
+		size.height = this->line_height * 11; /* Default number of cargo types in most climates. */
+		resize.width = 0;
+		resize.height = this->line_height;
+	}
+
+	void DrawWidget(const Rect &r, WidgetID widget) const override
+	{
+		if (widget != WID_GRAPH_MATRIX) {
+			BaseGraphWindow::DrawWidget(r, widget);
+			return;
+		}
+
+		bool rtl = _current_text_dir == TD_RTL;
+
+		int pos = this->vscroll->GetPosition();
+		int max = pos + this->vscroll->GetCapacity();
+
+		Rect line = r.WithHeight(this->line_height);
+		const Industry *i = Industry::Get(this->window_number);
+		const CargoSpec *cs;
+
+		for (const auto &p : i->Produced()) {
+			if (!IsValidCargoID(p.cargo)) continue;
+
+			if (pos-- > 0) continue;
+			if (--max < 0) break;
+
+			cs = CargoSpec::Get(p.cargo);
+
+			bool lowered = !HasBit(_legend_excluded_cargo_production_history, p.cargo);
+
+			/* Redraw frame if lowered */
+			if (lowered) DrawFrameRect(line, COLOUR_BROWN, FR_LOWERED);
+
+			const Rect text = line.Shrink(WidgetDimensions::scaled.framerect);
+
+			/* Cargo-colour box with outline */
+			const Rect cargo = text.WithWidth(this->legend_width, rtl);
+			GfxFillRect(cargo, PC_BLACK);
+			GfxFillRect(cargo.Shrink(WidgetDimensions::scaled.bevel), cs->legend_colour);
+
+			/* Cargo name */
+			SetDParam(0, cs->name);
+			DrawString(text.Indent(this->legend_width + WidgetDimensions::scaled.hsep_normal, rtl), STR_GRAPH_CARGO_PAYMENT_CARGO);
+
+			line = line.Translate(0, this->line_height);
+		}
+	}
+
+	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
+	{
+		switch (widget) {
+			case WID_GRAPH_ENABLE_CARGOES:
+				/* Remove all cargoes from the excluded lists. */
+				_legend_excluded_cargo_production_history = 0;
+				this->excluded_data = 0;
+				this->SetDirty();
+				break;
+
+			case WID_GRAPH_DISABLE_CARGOES: {
+				/* Add all cargoes to the excluded lists. */
+				const Industry *i = Industry::Get(this->window_number);
+				for (const auto &p : i->Produced()) {
+					if (!IsValidCargoID(p.cargo)) continue;
+
+					SetBit(_legend_excluded_cargo_production_history, p.cargo);
+					SetBit(this->excluded_data, p.cargo);
+				}
+				this->SetDirty();
+				break;
+			}
+
+			case WID_GRAPH_MATRIX: {
+				int row = this->vscroll->GetScrolledRowFromWidget(pt.y, this, WID_GRAPH_MATRIX);
+				if (row >= this->vscroll->GetCount()) return;
+
+				const Industry *i = Industry::Get(this->window_number);
+				for (const auto &p : i->Produced()) {
+					if (!IsValidCargoID(p.cargo)) continue;
+					if (row-- > 0) continue;
+
+					ToggleBit(_legend_excluded_cargo_production_history, p.cargo);
+					this->UpdateExcludedData();
+					this->SetDirty();
+					break;
+				}
+				break;
+			}
+
+			default:
+				this->BaseGraphWindow::OnClick(pt, widget, click_count);
+				break;
+		}
+	}
+
+	void SetStringParameters(WidgetID widget) const override
+	{
+		if (widget == WID_GRAPH_CAPTION) SetDParam(0, this->window_number);
+	}
+
+	void OnResize() override
+	{
+		this->vscroll->SetCapacityFromWidget(this, WID_GRAPH_MATRIX);
+	}
+
+	void UpdateStatistics(bool initialize) override
+	{
+		CargoTypes excluded_cargo = this->excluded_data;
+		this->UpdateExcludedData();
+
+		int mo = EconTime::CurMonth() - this->num_vert_lines;
+		auto yr = EconTime::CurYear();
+		while (mo < 0) {
+			yr--;
+			mo += 12;
+		}
+
+		if (!initialize && this->excluded_data == excluded_cargo && this->num_on_x_axis == this->num_vert_lines && this->year == yr && this->month == mo) {
+			/* There's no reason to get new stats */
+			return;
+		}
+
+		this->year = yr;
+		this->month = mo;
+
+		const Industry *i = Industry::Get(this->window_number);
+
+		this->data.clear();
+		for (const auto &p : i->Produced()) {
+			if (!IsValidCargoID(p.cargo)) continue;
+			const CargoSpec *cs = CargoSpec::Get(p.cargo);
+
+			DataSet &produced = this->data.emplace_back();
+			produced.colour = cs->legend_colour;
+			produced.exclude_bit = cs->Index();
+			produced.range_bit = 0;
+
+			for (uint j = 0; j < GRAPH_NUM_MONTHS; j++) {
+				produced.values[j] = p.history[GRAPH_NUM_MONTHS - j].production;
+			}
+
+			DataSet &transported = this->data.emplace_back();
+			transported.colour = cs->legend_colour;
+			transported.exclude_bit = cs->Index();
+			transported.range_bit = 1;
+			transported.dash = 2;
+
+			for (uint j = 0; j < GRAPH_NUM_MONTHS; j++) {
+				transported.values[j] = p.history[GRAPH_NUM_MONTHS - j].transported;
+			}
+		}
+
+		this->vscroll->SetCount(std::size(this->data));
+
+		this->SetDirty();
+	}
+};
+
+static constexpr NWidgetPart _nested_industry_production_widgets[] = {
+	NWidget(NWID_HORIZONTAL),
+		NWidget(WWT_CLOSEBOX, COLOUR_BROWN),
+		NWidget(WWT_CAPTION, COLOUR_BROWN, WID_GRAPH_CAPTION), SetDataTip(STR_GRAPH_INDUSTRY_PRODUCTION_CAPTION, STR_TOOLTIP_WINDOW_TITLE_DRAG_THIS),
+		NWidget(WWT_SHADEBOX, COLOUR_BROWN),
+		NWidget(WWT_DEFSIZEBOX, COLOUR_BROWN),
+		NWidget(WWT_STICKYBOX, COLOUR_BROWN),
+	EndContainer(),
+	NWidget(WWT_PANEL, COLOUR_BROWN, WID_GRAPH_BACKGROUND), SetMinimalSize(568, 128),
+		NWidget(NWID_HORIZONTAL),
+			NWidget(WWT_EMPTY, INVALID_COLOUR, WID_GRAPH_GRAPH), SetMinimalSize(495, 0), SetFill(1, 1), SetResize(1, 1),
+			NWidget(NWID_VERTICAL),
+				NWidget(NWID_SPACER), SetMinimalSize(0, 24), SetFill(0, 1),
+				NWidget(WWT_MATRIX, COLOUR_BROWN, WID_GRAPH_RANGE_MATRIX), SetFill(1, 0), SetResize(0, 0), SetMatrixDataTip(1, 0, STR_GRAPH_CARGO_PAYMENT_TOGGLE_CARGO),
+				NWidget(NWID_SPACER), SetMinimalSize(0, 4),
+				NWidget(WWT_PUSHTXTBTN, COLOUR_BROWN, WID_GRAPH_ENABLE_CARGOES), SetDataTip(STR_GRAPH_CARGO_ENABLE_ALL, STR_GRAPH_CARGO_TOOLTIP_ENABLE_ALL), SetFill(1, 0),
+				NWidget(WWT_PUSHTXTBTN, COLOUR_BROWN, WID_GRAPH_DISABLE_CARGOES), SetDataTip(STR_GRAPH_CARGO_DISABLE_ALL, STR_GRAPH_CARGO_TOOLTIP_DISABLE_ALL), SetFill(1, 0),
+				NWidget(NWID_SPACER), SetMinimalSize(0, 4),
+				NWidget(NWID_HORIZONTAL),
+					NWidget(WWT_MATRIX, COLOUR_BROWN, WID_GRAPH_MATRIX), SetFill(1, 0), SetResize(0, 2), SetMatrixDataTip(1, 0, STR_GRAPH_CARGO_PAYMENT_TOGGLE_CARGO), SetScrollbar(WID_GRAPH_MATRIX_SCROLLBAR),
+					NWidget(NWID_VSCROLLBAR, COLOUR_BROWN, WID_GRAPH_MATRIX_SCROLLBAR),
+				EndContainer(),
+				NWidget(NWID_SPACER), SetMinimalSize(0, 24), SetFill(0, 1),
+			EndContainer(),
+			NWidget(NWID_SPACER), SetMinimalSize(5, 0), SetFill(0, 1), SetResize(0, 1),
+		EndContainer(),
+		NWidget(NWID_HORIZONTAL),
+			NWidget(NWID_SPACER), SetMinimalSize(12, 0), SetFill(1, 0), SetResize(1, 0),
+			NWidget(WWT_TEXT, INVALID_COLOUR, WID_GRAPH_FOOTER), SetMinimalSize(0, 6), SetPadding(2, 0, 2, 0), SetDataTip(STR_EMPTY, STR_NULL),
+			NWidget(NWID_SPACER), SetFill(1, 0), SetResize(1, 0),
+			NWidget(WWT_RESIZEBOX, COLOUR_BROWN, WID_GRAPH_RESIZE), SetDataTip(RWV_HIDE_BEVEL, STR_TOOLTIP_RESIZE),
+		EndContainer(),
+	EndContainer(),
+};
+
+static WindowDesc _industry_production_desc(__FILE__, __LINE__,
+	WDP_AUTO, "graph_industry_production", 0, 0,
+	WC_INDUSTRY_PRODUCTION, WC_INDUSTRY_VIEW,
+	0,
+	_nested_industry_production_widgets
+);
+
+void ShowIndustryProductionGraph(WindowNumber window_number)
+{
+	AllocateWindowDescFront<IndustryProductionGraphWindow>(_industry_production_desc, window_number);
+}
 
 /**
  * Make a vertical list of panels for outputting score details.
@@ -1864,18 +2231,19 @@ static WindowDesc _performance_rating_detail_desc(__FILE__, __LINE__,
 	WDP_AUTO, "league_details", 0, 0,
 	WC_PERFORMANCE_DETAIL, WC_NONE,
 	0,
-	std::begin(_nested_performance_rating_detail_widgets), std::end(_nested_performance_rating_detail_widgets)
+	_nested_performance_rating_detail_widgets
 );
 
 void ShowPerformanceRatingDetail()
 {
-	AllocateWindowDescFront<PerformanceRatingDetailWindow>(&_performance_rating_detail_desc, 0);
+	AllocateWindowDescFront<PerformanceRatingDetailWindow>(_performance_rating_detail_desc, 0);
 }
 
 void InitializeGraphGui()
 {
 	_legend_excluded_companies = 0;
-	_legend_excluded_cargo = 0;
+	_legend_excluded_cargo_payment_rates = 0;
+	_legend_excluded_cargo_production_history = 0;
 }
 
 /*************************/
@@ -1889,7 +2257,7 @@ struct StationCargoGraphWindow final : BaseGraphWindow {
 	CargoTypes legend_excluded_cargo;
 	CargoTypes present_cargoes;
 
-	StationCargoGraphWindow(WindowDesc *desc, WindowNumber window) :
+	StationCargoGraphWindow(WindowDesc &desc, WindowNumber window) :
 		BaseGraphWindow(desc, STR_JUST_COMMA)
 	{
 		station_id = static_cast<uint16_t>(window);
@@ -1897,12 +2265,12 @@ struct StationCargoGraphWindow final : BaseGraphWindow {
 		this->num_on_x_axis = MAX_STATION_CARGO_HISTORY_DAYS; // Four weeks
 		this->num_vert_lines = MAX_STATION_CARGO_HISTORY_DAYS;
 		this->draw_dates = false;
-		const uint16_t x_unit = EconTime::UsingWallclockUnits() ? 4 : 2;
+		const uint16_t x_unit = EconTime::UsingWallclockUnits() ? 4 * DayLengthFactor() : 2;
 		this->x_values_start = x_unit;
 		this->x_values_increment = x_unit;
 
 		this->CreateNestedTree();
-		this->vscroll = this->GetScrollbar(WID_SCG_MATRIX_SCROLLBAR);
+		this->vscroll = this->GetScrollbar(WID_GRAPH_MATRIX_SCROLLBAR);
 
 		/* Initialise the data set */
 		this->FillGraphData();
@@ -1919,30 +2287,24 @@ struct StationCargoGraphWindow final : BaseGraphWindow {
 
 	void SetStringParameters(WidgetID widget) const override
 	{
-		if (widget == WID_SCG_CAPTION) {
+		if (widget == WID_GRAPH_CAPTION) {
 			SetDParam(0, this->station_id);
 		}
 		if (widget == WID_GRAPH_FOOTER_CUSTOM) {
-			SetDParam(0, EconTime::UsingWallclockUnits() ? STR_GRAPH_STATION_CARGO_X_LABEL_SECONDS : STR_GRAPH_STATION_CARGO_X_LABEL_DAYS);
-			SetDParam(1, EconTime::UsingWallclockUnits() ? 96 : 48);
+			SetDParam(0, STR_GRAPH_X_LABEL_LAST_UNITS);
+			SetDParam(1, EconTime::UsingWallclockUnits() ? STR_UNITS_SECONDS : STR_UNITS_DAYS);
+			SetDParam(2, EconTime::UsingWallclockUnits() ? 96 * DayLengthFactor() : 48);
 		}
 	}
 
 	void UpdateExcludedData()
 	{
-		this->excluded_data = 0;
-
-		uint8_t i = 0;
-		for (const CargoSpec *cs : _sorted_standard_cargo_specs) {
-			if (!HasBit(this->present_cargoes, cs->Index())) continue;
-			if (HasBit(legend_excluded_cargo, cs->Index())) SetBit(this->excluded_data, i);
-			i++;
-		}
+		this->excluded_data = legend_excluded_cargo;
 	}
 
-	void UpdateWidgetSize(WidgetID widget, Dimension *size, const Dimension &padding, Dimension *fill, Dimension *resize) override
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, const Dimension &padding, Dimension &fill, Dimension &resize) override
 	{
-		if (widget < WID_SCG_MATRIX) {
+		if (widget != WID_GRAPH_MATRIX) {
 			BaseGraphWindow::UpdateWidgetSize(widget, size, padding, fill, resize);
 			return;
 		}
@@ -1953,18 +2315,18 @@ struct StationCargoGraphWindow final : BaseGraphWindow {
 			d.width += this->legend_width + 4; // color field
 			d.width += WidgetDimensions::scaled.framerect.Horizontal();
 			d.height += WidgetDimensions::scaled.framerect.Vertical();
-			*size = maxdim(d, *size);
+			size = maxdim(d, size);
 		}
 
-		this->line_height = size->height;
-		size->height = this->line_height * 11; /* Default number of cargo types in most climates. */
-		resize->width = 0;
-		resize->height = this->line_height;
+		this->line_height = size.height;
+		size.height = this->line_height * 11; /* Default number of cargo types in most climates. */
+		resize.width = 0;
+		resize.height = this->line_height;
 	}
 
 	void DrawWidget(const Rect &r, WidgetID widget) const override
 	{
-		if (widget < WID_SCG_MATRIX) {
+		if (widget != WID_GRAPH_MATRIX) {
 			BaseGraphWindow::DrawWidget(r, widget);
 			return;
 		}
@@ -1991,7 +2353,7 @@ struct StationCargoGraphWindow final : BaseGraphWindow {
 			/* Redraw box if lowered */
 			if (lowered) DrawFrameRect(r.left, y, r.right, y + this->line_height - 1, COLOUR_BROWN, lowered ? FR_LOWERED : FR_NONE);
 
-			const byte clk_dif = lowered ? 1 : 0;
+			const uint8_t clk_dif = lowered ? 1 : 0;
 			const int rect_x = clk_dif + (rtl ? ir.right - this->legend_width : ir.left);
 
 			GfxFillRect(rect_x, y + padding + clk_dif, rect_x + this->legend_width, y + row_height - 1 + clk_dif, PC_BLACK);
@@ -2006,28 +2368,26 @@ struct StationCargoGraphWindow final : BaseGraphWindow {
 	void OnClick(Point pt, WidgetID widget, int click_count) override
 	{
 		switch (widget) {
-			case WID_CPR_ENABLE_CARGOES:
+			case WID_GRAPH_ENABLE_CARGOES:
 				/* Remove all cargoes from the excluded lists. */
 				this->legend_excluded_cargo = 0;
 				this->excluded_data = 0;
 				this->SetDirty();
 				break;
 
-			case WID_CPR_DISABLE_CARGOES: {
+			case WID_GRAPH_DISABLE_CARGOES: {
 				/* Add all cargoes to the excluded lists. */
 				this->legend_excluded_cargo = ~static_cast<CargoTypes>(0);
-				int i = 0;
 				for (const CargoSpec *cs : _sorted_standard_cargo_specs) {
 					if (!HasBit(this->present_cargoes, cs->Index())) continue;
-					SetBit(this->excluded_data, i);
-					i++;
+					SetBit(this->excluded_data, cs->Index());
 				}
 				this->SetDirty();
 				break;
 			}
 
-			case WID_SCG_MATRIX: {
-				int32_t row = this->vscroll->GetScrolledRowFromWidget(pt.y, this, WID_SCG_MATRIX);
+			case WID_GRAPH_MATRIX: {
+				int32_t row = this->vscroll->GetScrolledRowFromWidget(pt.y, this, WID_GRAPH_MATRIX);
 				if (row >= this->vscroll->GetCount()) return;
 
 				for (const CargoSpec *cs : _sorted_standard_cargo_specs) {
@@ -2046,7 +2406,7 @@ struct StationCargoGraphWindow final : BaseGraphWindow {
 
 	void OnResize() override
 	{
-		this->vscroll->SetCapacityFromWidget(this, WID_SCG_MATRIX);
+		this->vscroll->SetCapacityFromWidget(this, WID_GRAPH_MATRIX);
 	}
 
 	void OnGameTick() override
@@ -2075,23 +2435,22 @@ struct StationCargoGraphWindow final : BaseGraphWindow {
 
 		this->UpdateExcludedData();
 
-		uint8_t i = 0;
+		this->data.clear();
 		for (const CargoSpec *cs : _sorted_standard_cargo_specs) {
 			if (!HasBit(this->present_cargoes, cs->Index())) continue;
-			this->colours[i] = cs->legend_colour;
+			DataSet &dataset = this->data.emplace_back();
+			dataset.colour = cs->legend_colour;
+			dataset.exclude_bit = cs->Index();
 
 			const auto &history = station->station_cargo_history[CountBits(this->present_cargoes & (cs->CargoTypesBit() - 1))];
 
 			uint offset = station->station_cargo_history_offset;
 			for (uint j = 0; j < MAX_STATION_CARGO_HISTORY_DAYS; j++) {
-				this->cost[i][j] = RXDecompressUint(history[offset]);
+				dataset.values[j] = RXDecompressUint(history[offset]);
 				offset++;
 				if (offset == MAX_STATION_CARGO_HISTORY_DAYS) offset = 0;
 			}
-			i++;
 		}
-
-		this->num_dataset = i;
 
 		this->SetDirty();
 	}
@@ -2100,28 +2459,28 @@ struct StationCargoGraphWindow final : BaseGraphWindow {
 
 static constexpr NWidgetPart _nested_station_cargo_widgets[] = {
 	NWidget(NWID_HORIZONTAL),
-		NWidget(WWT_CLOSEBOX, COLOUR_GREY),
-		NWidget(WWT_CAPTION, COLOUR_GREY, WID_SCG_CAPTION), SetDataTip(STR_GRAPH_STATION_CARGO_CAPTION, STR_TOOLTIP_WINDOW_TITLE_DRAG_THIS),
-		NWidget(WWT_SHADEBOX, COLOUR_GREY),
-		NWidget(WWT_DEFSIZEBOX, COLOUR_GREY),
-		NWidget(WWT_STICKYBOX, COLOUR_GREY),
+		NWidget(WWT_CLOSEBOX, COLOUR_BROWN),
+		NWidget(WWT_CAPTION, COLOUR_BROWN, WID_GRAPH_CAPTION), SetDataTip(STR_GRAPH_STATION_CARGO_CAPTION, STR_TOOLTIP_WINDOW_TITLE_DRAG_THIS),
+		NWidget(WWT_SHADEBOX, COLOUR_BROWN),
+		NWidget(WWT_DEFSIZEBOX, COLOUR_BROWN),
+		NWidget(WWT_STICKYBOX, COLOUR_BROWN),
 	EndContainer(),
-	NWidget(WWT_PANEL, COLOUR_GREY, WID_GRAPH_BACKGROUND), SetMinimalSize(568, 128),
+	NWidget(WWT_PANEL, COLOUR_BROWN, WID_GRAPH_BACKGROUND), SetMinimalSize(568, 128),
 		NWidget(NWID_HORIZONTAL),
 			NWidget(NWID_SPACER), SetFill(1, 0), SetResize(1, 0),
-			NWidget(WWT_TEXT, COLOUR_GREY, WID_GRAPH_HEADER), SetMinimalSize(0, 6), SetPadding(2, 0, 2, 0), SetDataTip(STR_GRAPH_STATION_CARGO_TITLE, STR_NULL),
+			NWidget(WWT_TEXT, INVALID_COLOUR, WID_GRAPH_HEADER), SetMinimalSize(0, 6), SetPadding(2, 0, 2, 0), SetDataTip(STR_GRAPH_STATION_CARGO_TITLE, STR_NULL),
 			NWidget(NWID_SPACER), SetFill(1, 0), SetResize(1, 0),
 		EndContainer(),
 		NWidget(NWID_HORIZONTAL),
-			NWidget(WWT_EMPTY, COLOUR_GREY, WID_GRAPH_GRAPH), SetMinimalSize(495, 0), SetFill(1, 1), SetResize(1, 1),
+			NWidget(WWT_EMPTY, INVALID_COLOUR, WID_GRAPH_GRAPH), SetMinimalSize(495, 0), SetFill(1, 1), SetResize(1, 1),
 			NWidget(NWID_VERTICAL),
 				NWidget(NWID_SPACER), SetMinimalSize(0, 24), SetFill(0, 0), SetResize(0, 1),
-				NWidget(WWT_PUSHTXTBTN, COLOUR_ORANGE, WID_CPR_ENABLE_CARGOES), SetDataTip(STR_GRAPH_CARGO_ENABLE_ALL, STR_GRAPH_CARGO_TOOLTIP_ENABLE_ALL), SetFill(1, 0),
-				NWidget(WWT_PUSHTXTBTN, COLOUR_ORANGE, WID_CPR_DISABLE_CARGOES), SetDataTip(STR_GRAPH_CARGO_DISABLE_ALL, STR_GRAPH_CARGO_TOOLTIP_DISABLE_ALL), SetFill(1, 0),
+				NWidget(WWT_PUSHTXTBTN, COLOUR_ORANGE, WID_GRAPH_ENABLE_CARGOES), SetDataTip(STR_GRAPH_CARGO_ENABLE_ALL, STR_GRAPH_CARGO_TOOLTIP_ENABLE_ALL), SetFill(1, 0),
+				NWidget(WWT_PUSHTXTBTN, COLOUR_ORANGE, WID_GRAPH_DISABLE_CARGOES), SetDataTip(STR_GRAPH_CARGO_DISABLE_ALL, STR_GRAPH_CARGO_TOOLTIP_DISABLE_ALL), SetFill(1, 0),
 				NWidget(NWID_SPACER), SetMinimalSize(0, 4),
 				NWidget(NWID_HORIZONTAL),
-					NWidget(WWT_MATRIX, COLOUR_BROWN, WID_SCG_MATRIX), SetResize(0, 2), SetMatrixDataTip(1, 0, STR_GRAPH_CARGO_PAYMENT_TOGGLE_CARGO), SetScrollbar(WID_SCG_MATRIX_SCROLLBAR),
-					NWidget(NWID_VSCROLLBAR, COLOUR_BROWN, WID_SCG_MATRIX_SCROLLBAR),
+					NWidget(WWT_MATRIX, COLOUR_BROWN, WID_GRAPH_MATRIX), SetResize(0, 2), SetMatrixDataTip(1, 0, STR_GRAPH_CARGO_PAYMENT_TOGGLE_CARGO), SetScrollbar(WID_GRAPH_MATRIX_SCROLLBAR),
+					NWidget(NWID_VSCROLLBAR, COLOUR_BROWN, WID_GRAPH_MATRIX_SCROLLBAR),
 				EndContainer(),
 				NWidget(NWID_SPACER), SetMinimalSize(0, 24), SetFill(0, 1), SetResize(0, 1),
 			EndContainer(),
@@ -2129,9 +2488,9 @@ static constexpr NWidgetPart _nested_station_cargo_widgets[] = {
 		EndContainer(),
 		NWidget(NWID_HORIZONTAL),
 			NWidget(NWID_SPACER), SetMinimalSize(WidgetDimensions::unscaled.resizebox.Horizontal(), 0), SetFill(1, 0), SetResize(1, 0),
-			NWidget(WWT_TEXT, COLOUR_GREY, WID_GRAPH_FOOTER_CUSTOM), SetMinimalSize(0, 6), SetPadding(2, 0, 2, 0), SetDataTip(STR_JUST_STRING1, STR_NULL),
+			NWidget(WWT_TEXT, INVALID_COLOUR, WID_GRAPH_FOOTER_CUSTOM), SetMinimalSize(0, 6), SetPadding(2, 0, 2, 0), SetDataTip(STR_JUST_STRING2, STR_NULL),
 			NWidget(NWID_SPACER), SetFill(1, 0), SetResize(1, 0),
-			NWidget(WWT_RESIZEBOX, COLOUR_GREY, WID_GRAPH_RESIZE),
+			NWidget(WWT_RESIZEBOX, COLOUR_BROWN, WID_GRAPH_RESIZE),
 		EndContainer(),
 	EndContainer(),
 };
@@ -2140,12 +2499,12 @@ static WindowDesc _station_cargo_desc(__FILE__, __LINE__,
 	WDP_AUTO, "graph_station_cargo", 0, 0,
 	WC_STATION_CARGO, WC_NONE,
 	0,
-	std::begin(_nested_station_cargo_widgets), std::end(_nested_station_cargo_widgets)
+	_nested_station_cargo_widgets
 );
 
 
 void ShowStationCargo(StationID station_id)
 {
-	AllocateWindowDescFront<StationCargoGraphWindow>(&_station_cargo_desc, station_id);
+	AllocateWindowDescFront<StationCargoGraphWindow>(_station_cargo_desc, station_id);
 }
 

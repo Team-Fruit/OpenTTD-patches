@@ -18,49 +18,46 @@
 #include "map_func.h"
 #include "window_func.h"
 #include "window_gui.h"
+#include "core/format.hpp"
 #include "table/strings.h"
 
 #include "safeguards.h"
 
-#ifdef USE_SCOPE_INFO
+#if !defined(DISABLE_SCOPE_INFO)
 
-std::vector<std::function<int(char *, const char *)>> _scope_stack;
+ScopeStackRecord *_scope_stack_head = nullptr;
 
-int WriteScopeLog(char *buf, const char *last)
+void WriteScopeLog(struct format_target &buffer)
 {
-	char *b = buf;
-	if (!_scope_stack.empty()) {
-		b += seprintf(b, last, "Within context:");
+	if (_scope_stack_head != nullptr) {
+		buffer.append("Within context:");
 		int depth = 0;
-		for (auto it = _scope_stack.rbegin(); it != _scope_stack.rend(); ++it, depth++) {
-			b += seprintf(b, last, "\n    %2d: ", depth);
-			b += (*it)(b, last);
+		for (ScopeStackRecord *record = _scope_stack_head; record != nullptr; record = record->next, depth++) {
+			buffer.format("\n    {:2}: ", depth);
+			record->functor(record, buffer);
 		}
-		b += seprintf(b, last, "\n\n");
+		buffer.append("\n\n");
 	}
-	return b - buf;
 }
 
 #endif
 
-// helper functions
-const char *scope_dumper::CompanyInfo(int company_id)
+template<>
+void GeneralFmtDumper<Company, int>::fmt_format_value(format_target &buf) const
 {
-	char *b = this->buffer;
-	const char *last = lastof(this->buffer);
-	b += seprintf(b, last, "%d (", company_id);
-	SetDParam(0, company_id);
-	b = strecpy(b, GetString(STR_COMPANY_NAME).c_str(), last);
-	b += seprintf(b, last, ")");
-	return buffer;
+	buf.format("{} (", this->value);
+	SetDParam(0, this->value);
+	buf.append(GetString(STR_COMPANY_NAME));
+	buf.push_back(')');
 }
 
-const char *scope_dumper::VehicleInfo(const Vehicle *v)
+template<>
+void GeneralFmtDumper<Vehicle, const Vehicle *>::fmt_format_value(format_target &buf) const
 {
-	char *b = this->buffer;
-	const char *last = lastof(this->buffer);
+	const Vehicle *v = this->value;
+
 	auto dump_flags = [&](const Vehicle *u) {
-		b = u->DumpVehicleFlags(b, last, true);
+		u->DumpVehicleFlags(buf, true);
 	};
 	auto dump_name = [&](const Vehicle *u) {
 		if (u->type < VEH_COMPANY_END) {
@@ -70,61 +67,59 @@ const char *scope_dumper::VehicleInfo(const Vehicle *v)
 				"Ship",
 				"Aircraft",
 			};
-			b = strecpy(b, veh_type[u->type], last, true);
+			buf.append(veh_type[u->type]);
 			if (u->unitnumber > 0) {
-				b += seprintf(b, last, " %u", u->unitnumber);
+				buf.format(" {}", u->unitnumber);
 			} else {
-				b += seprintf(b, last, " [N/A]");
+				buf.append(" [N/A]");
 			}
 			if (!u->name.empty()) {
-				b += seprintf(b, last, " (%s)", u->name.c_str());
+				buf.format(" ({})", u->name.c_str());
 			}
 		} else if (u->type == VEH_EFFECT) {
-			b += seprintf(b, last, "Effect Vehicle: subtype: %u", u->subtype);
+			buf.format("Effect Vehicle: subtype: {}", u->subtype);
 		} else if (u->type == VEH_DISASTER) {
-			b += seprintf(b, last, "Disaster Vehicle: subtype: %u", u->subtype);
+			buf.format("Disaster Vehicle: subtype: {}", u->subtype);
 		}
 	};
 	if (v) {
-		b += seprintf(b, last, "veh: %u: (", v->index);
+		buf.format("veh: {}: (", v->index);
 		if (Vehicle::GetIfValid(v->index) != v) {
-			b += seprintf(b, last, "INVALID PTR: %p)", v);
-			return this->buffer;
+			buf.format("INVALID PTR: {})", fmt::ptr(v));
+			return;
 		}
 		dump_name(v);
-		b += seprintf(b, last, ", c:%d, ", (int) v->owner);
+		buf.format(", c:{}, ", (int)v->owner);
 		dump_flags(v);
 		if (v->First() && v->First() != v) {
-			b += seprintf(b, last, ", front: %u: (", v->First()->index);
+			buf.format(", front: {}: (", v->First()->index);
 			if (Vehicle::GetIfValid(v->First()->index) != v->First()) {
-				b += seprintf(b, last, "INVALID PTR: %p)", v->First());
-				return this->buffer;
+				buf.format("INVALID PTR: {})", fmt::ptr(v->First()));
+				return;
 			}
 			dump_name(v->First());
-			b += seprintf(b, last, ", ");
+			buf.append(", ");
 			dump_flags(v->First());
-			b += seprintf(b, last, ")");
+			buf.push_back(')');
 		}
-		b += seprintf(b, last, ")");
+		buf.push_back(')');
 	} else {
-		b += seprintf(b, last, "veh: nullptr");
+		buf.append("veh: nullptr");
 	}
-	return this->buffer;
 }
 
-const char *scope_dumper::StationInfo(const BaseStation *st)
+template<>
+void GeneralFmtDumper<BaseStation, const BaseStation *>::fmt_format_value(format_target &buf) const
 {
-	char *b = this->buffer;
-	const char *last = lastof(this->buffer);
-
-	if (st) {
+	const BaseStation *st = this->value;
+	if (st != nullptr) {
 		const bool waypoint = Waypoint::IsExpected(st);
-		b += seprintf(b, last, "%s: %u: (", waypoint ? "waypoint" : "station", st->index);
+		buf.format("{}: {}: (", waypoint ? "waypoint" : "station", st->index);
 		SetDParam(0, st->index);
-		b = strecpy(b, GetString(waypoint ? STR_WAYPOINT_NAME : STR_STATION_NAME).c_str(), last);
-		b += seprintf(b, last, ", c:%d, facil: ", (int) st->owner);
+		buf.append(GetString(waypoint ? STR_WAYPOINT_NAME : STR_STATION_NAME));
+		buf.format(", c:{}, facil: ", (int)st->owner);
 		auto dump_facil = [&](char c, StationFacility flag) {
-			if (st->facilities & flag) b += seprintf(b, last, "%c", c);
+			if (st->facilities & flag) buf.push_back(c);
 		};
 		dump_facil('R', FACIL_TRAIN);
 		dump_facil('T', FACIL_TRUCK_STOP);
@@ -132,21 +127,20 @@ const char *scope_dumper::StationInfo(const BaseStation *st)
 		dump_facil('A', FACIL_AIRPORT);
 		dump_facil('D', FACIL_DOCK);
 		dump_facil('W', FACIL_WAYPOINT);
-		b += seprintf(b, last, ")");
+		buf.push_back(')');
 	} else {
-		b += seprintf(b, last, "station/waypoint: nullptr");
+		buf.append("station/waypoint: nullptr");
 	}
-	return this->buffer;
 }
 
-const char *scope_dumper::TileInfo(TileIndex tile)
+template<>
+void GeneralFmtDumper<DumpTileInfoTag, TileIndex>::fmt_format_value(format_target &output) const
 {
-	DumpTileInfo(this->buffer, lastof(this->buffer), tile);
-	return this->buffer;
+	DumpTileInfo(output, this->value);
 }
 
-const char *scope_dumper::WindowInfo(const Window *w)
+template<>
+void GeneralFmtDumper<Window, const struct Window *>::fmt_format_value(format_target &output) const
 {
-	DumpWindowInfo(this->buffer, lastof(this->buffer), w);
-	return this->buffer;
+	DumpWindowInfo(output, this->value);
 }

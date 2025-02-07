@@ -13,15 +13,16 @@
 #include "core/enum_type.hpp"
 #include "fileio_type.h"
 #include <string>
+#include <optional>
 #include <vector>
 
-void FioFCloseFile(FILE *f);
-FILE *FioFOpenFile(const std::string &filename, const char *mode, Subdirectory subdir, size_t *filesize = nullptr, std::string *output_filename = nullptr);
+std::optional<FileHandle> FioFOpenFile(const std::string &filename, const char *mode, Subdirectory subdir, size_t *filesize = nullptr, std::string *output_filename = nullptr);
 bool FioCheckFileExists(const std::string &filename, Subdirectory subdir);
 std::string FioFindFullPath(Subdirectory subdir, const std::string &filename);
 std::string FioGetDirectory(Searchpath sp, Subdirectory subdir);
 std::string FioFindDirectory(Subdirectory subdir);
 void FioCreateDirectory(const std::string &name);
+bool FioRemove(const std::string &filename);
 bool FioRenameFile(const std::string &oldname, const std::string &newname);
 
 const char *FiosGetScreenshotDir();
@@ -104,38 +105,5 @@ int closedir(DIR *d);
 # include <sys/types.h>
 # include <dirent.h>
 #endif /* defined(_WIN32) */
-
-/**
- * A wrapper around opendir() which will convert the string from
- * OPENTTD encoding to that of the filesystem. For all purposes this
- * function behaves the same as the original opendir function
- * @param path string to open directory of
- * @return DIR pointer
- */
-inline DIR *ttd_opendir(const char *path)
-{
-	return opendir(OTTD2FS(path).c_str());
-}
-
-
-/** Auto-close a file upon scope exit. */
-class FileCloser {
-	FILE *f;
-
-public:
-	FileCloser(FILE *_f) : f(_f) {}
-	~FileCloser()
-	{
-		fclose(f);
-	}
-};
-
-/** Helper to manage a FILE with a \c std::unique_ptr. */
-struct FileDeleter {
-	void operator()(FILE *f)
-	{
-		if (f) fclose(f);
-	}
-};
 
 #endif /* FILEIO_FUNC_H */

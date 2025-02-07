@@ -26,7 +26,7 @@
 #define IS_CUSTOM_FIRSTHEAD_SPRITE(x) (x == 0xFD)
 #define IS_CUSTOM_SECONDHEAD_SPRITE(x) (x == 0xFE)
 
-static constexpr DateDelta VEHICLE_PROFIT_MIN_AGE = DAYS_IN_YEAR * 2; ///< Only vehicles older than this have a meaningful profit.
+static constexpr DateDelta VEHICLE_PROFIT_MIN_AGE = DateDelta{DAYS_IN_YEAR * 2}; ///< Only vehicles older than this have a meaningful profit.
 static const Money VEHICLE_PROFIT_THRESHOLD = 10000;        ///< Threshold for a vehicle to be considered making good profit.
 
 struct Viewport;
@@ -55,6 +55,7 @@ uint CountVehiclesInChain(const Vehicle *v);
  * @note Use this function when you have the intention that all vehicles
  *       should be iterated over.
  * @param tile The location on the map
+ * @param type The vehicle type
  * @param data Arbitrary data passed to \a proc.
  * @param proc The proc that determines whether a vehicle will be "found".
  */
@@ -70,6 +71,7 @@ inline void FindVehicleOnPos(TileIndex tile, VehicleType type, void *data, Vehic
  * @note Use #FindVehicleOnPos when you have the intention that all vehicles
  *       should be iterated over.
  * @param tile The location on the map
+ * @param type The vehicle type
  * @param data Arbitrary data passed to \a proc.
  * @param proc The \a proc that determines whether a vehicle will be "found".
  * @return True if proc returned non-nullptr.
@@ -79,6 +81,8 @@ inline bool HasVehicleOnPos(TileIndex tile, VehicleType type, void *data, Vehicl
 	extern Vehicle *VehicleFromPos(TileIndex tile, VehicleType type, void *data, VehicleFromPosProc *proc, bool find_first);
 	return VehicleFromPos(tile, type, data, proc, true) != nullptr;
 }
+
+Vehicle *GetFirstVehicleOnPos(TileIndex tile, VehicleType type);
 
 /**
  * Find a vehicle from a specific location. It will call proc for ALL vehicles
@@ -91,6 +95,7 @@ inline bool HasVehicleOnPos(TileIndex tile, VehicleType type, void *data, Vehicl
  *       should be iterated over.
  * @param x    The X location on the map
  * @param y    The Y location on the map
+ * @param type The vehicle type
  * @param data Arbitrary data passed to proc
  * @param proc The proc that determines whether a vehicle will be "found".
  */
@@ -107,6 +112,7 @@ inline void FindVehicleOnPosXY(int x, int y, VehicleType type, void *data, Vehic
  *       should be iterated over.
  * @param x    The X location on the map
  * @param y    The Y location on the map
+ * @param type The vehicle type
  * @param data Arbitrary data passed to proc
  * @param proc The proc that determines whether a vehicle will be "found".
  * @return True if proc returned non-nullptr.
@@ -126,7 +132,7 @@ void VehicleLengthChanged(const Vehicle *u);
 void ResetVehicleHash();
 void ResetVehicleColourMap();
 
-byte GetBestFittingSubType(const Vehicle *v_from, Vehicle *v_for, CargoID dest_cargo_type);
+uint8_t GetBestFittingSubType(const Vehicle *v_from, Vehicle *v_for, CargoID dest_cargo_type);
 
 void ViewportAddVehicles(DrawPixelInfo *dpi, bool update_vehicles);
 void ViewportMapDrawVehicles(DrawPixelInfo *dpi, Viewport *vp);
@@ -153,7 +159,7 @@ UnitID GetFreeUnitNumber(VehicleType type);
 
 void VehicleEnterDepot(Vehicle *v);
 
-bool CanBuildVehicleInfrastructure(VehicleType type, byte subtype = 0);
+bool CanBuildVehicleInfrastructure(VehicleType type, uint8_t subtype = 0);
 
 /** Position information of a vehicle after it moved */
 struct GetNewVehiclePosResult {
@@ -172,15 +178,7 @@ Direction GetDirectionTowards(const Vehicle *v, int x, int y);
  */
 inline bool IsCompanyBuildableVehicleType(VehicleType type)
 {
-	switch (type) {
-		case VEH_TRAIN:
-		case VEH_ROAD:
-		case VEH_SHIP:
-		case VEH_AIRCRAFT:
-			return true;
-
-		default: return false;
-	}
+	return type < VEH_COMPANY_END;
 }
 
 /**
@@ -194,7 +192,7 @@ inline bool IsCompanyBuildableVehicleType(const BaseVehicle *v)
 }
 
 LiveryScheme GetEngineLiveryScheme(EngineID engine_type, EngineID parent_engine_type, const Vehicle *v);
-const struct Livery *GetEngineLivery(EngineID engine_type, CompanyID company, EngineID parent_engine_type, const Vehicle *v, byte livery_setting, bool ignore_group = false);
+const struct Livery *GetEngineLivery(EngineID engine_type, CompanyID company, EngineID parent_engine_type, const Vehicle *v, uint8_t livery_setting, bool ignore_group = false);
 
 SpriteID GetEnginePalette(EngineID engine_type, CompanyID company);
 SpriteID GetVehiclePalette(const Vehicle *v);

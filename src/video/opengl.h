@@ -15,11 +15,12 @@
 #include "../gfx_type.h"
 #include "../spriteloader/spriteloader.hpp"
 #include "../misc/lrucache.hpp"
+#include <vector>
 
 typedef void (*OGLProc)();
 typedef OGLProc (*GetOGLProcAddressProc)(const char *proc);
 
-bool IsOpenGLVersionAtLeast(byte major, byte minor);
+bool IsOpenGLVersionAtLeast(uint8_t major, uint8_t minor);
 const char *FindStringInExtensionList(const char *string, const char *substring);
 
 class OpenGLSprite;
@@ -65,9 +66,7 @@ private:
 
 	Point cursor_pos;                    ///< Cursor position
 	bool cursor_in_window;               ///< Cursor inside this window
-	PalSpriteID cursor_sprite_seq[16];   ///< Current image of cursor
-	Point cursor_sprite_pos[16];         ///< Relative position of individual cursor sprites
-	uint cursor_sprite_count;            ///< Number of cursor sprites to draw
+	std::vector<CursorSprite> cursor_sprites; ///< Sprites comprising cursor
 
 	OpenGLBackend();
 	~OpenGLBackend();
@@ -108,7 +107,7 @@ public:
 	/* SpriteEncoder */
 
 	uint GetSpriteAlignment() override { return 1u << (ZOOM_LVL_SPR_COUNT - 1); }
-	Sprite *Encode(const SpriteLoader::SpriteCollection &sprite, AllocatorProc *allocator) override;
+	Sprite *Encode(const SpriteLoader::SpriteCollection &sprite, SpriteAllocator &allocator) override;
 };
 
 

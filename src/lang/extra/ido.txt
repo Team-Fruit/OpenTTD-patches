@@ -13,8 +13,6 @@ STR_VEHICLE_TYPE_AIRCRAFT                                       :Aeroplani
 
 # Programmable Pre-Signals
 
-#House construction window (for SE only)
-
 #Town select window (for SE only)
 
 # Town tooltip
@@ -32,3 +30,5 @@ STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_SERVICE_VEL_END            :{LTBLUE}Servado
 # Scheduled Dispatch
 
 # Modifier key toggle window
+
+# Network set password

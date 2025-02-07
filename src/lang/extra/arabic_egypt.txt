@@ -21,8 +21,6 @@ STR_TRANSPARENT_LOADING_TOOLTIP                                 :{BLACK}غير �
 
 # Programmable Pre-Signals
 
-#House construction window (for SE only)
-
 #Town select window (for SE only)
 
 STR_MAPGEN_SNOW_LINE_HEIGHT                                     :{BLACK} ارتفاع خط الثلج
@@ -44,8 +42,8 @@ STR_VEHICLE_STATUS_CANNOT_REACH_DEPOT_VEL_END                   :{ORANGE}لا ي
 
 STR_ORDERS_GO_TO_TOOLTIP_EXTRA                                  :{BLACK}اضافة امر قبل الامر المختار, او لاخر الاوامر
 
-STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :و:
-STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :م:
+STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :و:{SPACE}{SPACE}
+STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :م:{SPACE}{SPACE}
 
 # Cargo type orders Window
 
@@ -79,3 +77,17 @@ STR_ERROR_CAN_T_SELL_25_SHARE_IN                                :{WHITE}لا ي�
 STR_ERROR_PROTECTED                                             :{WHITE}هذه الشركة ليست عريقة بقدر كافي لمشاركة الأسهم ...
 
 STR_CONFIG_SETTING_CYCLE_SIGNAL_PBS                             :اشارات الطريق فقط
+
+STR_NETWORK_NEED_COMPANY_PASSWORD_CAPTION                       :{WHITE}الشركه محميه. من فضلك ادخل كلمه المرور
+STR_NETWORK_CLIENT_LIST_ASK_COMPANY_UNLOCK                      :{YELLOW}هل أنت متأكد أنك تريد محو كلمة السر الخاصة بالشركة '{COMPANY}'?
+
+# Network set password
+STR_COMPANY_PASSWORD_CANCEL                                     :{BLACK}لا تحفظ كلمة المرور المدخلة
+STR_COMPANY_PASSWORD_OK                                         :{BLACK}اعط الشركة كلمة المرور الجديدة
+STR_COMPANY_PASSWORD_CAPTION                                    :{WHITE}كلمة مرور الشركة
+STR_COMPANY_PASSWORD_MAKE_DEFAULT                               :{BLACK}كلمة مرور الشركة القياسية
+STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}استخدم كلمة مرور هذه الشركة كافتراضية للشركات الجديدة
+
+STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}كلمة المرور
+STR_COMPANY_VIEW_PASSWORD_TOOLTIP                               :{BLACK}احمي شركتك بكلمة مرور خاصة لمنع الوصول الغير مسموح من اللاعبين الآخرين.
+STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}ادخل كلمة المرور

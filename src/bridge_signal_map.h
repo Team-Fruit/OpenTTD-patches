@@ -15,15 +15,21 @@
 #include "signal_type.h"
 #include "core/bitmath_func.hpp"
 #include "3rdparty/cpp-btree/btree_set.h"
+#include "3rdparty/robin_hood/robin_hood.h"
 
 #include <vector>
-#include <unordered_map>
 
 struct LongBridgeSignalStorage {
 	std::vector<uint64_t> signal_red_bits;
+
+	LongBridgeSignalStorage() = default;
+	LongBridgeSignalStorage(const LongBridgeSignalStorage &other) = delete;
+	LongBridgeSignalStorage(LongBridgeSignalStorage &&other) = default;
+	LongBridgeSignalStorage& operator=(const LongBridgeSignalStorage &other) = delete;
+	LongBridgeSignalStorage& operator=(LongBridgeSignalStorage &&other) = default;
 };
 
-extern std::unordered_map<TileIndex, LongBridgeSignalStorage> _long_bridge_signal_sim_map;
+extern robin_hood::unordered_flat_map<TileIndex, LongBridgeSignalStorage> _long_bridge_signal_sim_map;
 
 extern btree::btree_set<uint32_t> _bridge_signal_style_map;
 
@@ -50,7 +56,7 @@ void SetBridgeEntranceSimulatedSignalStateExtended(TileIndex t, uint16_t signal,
 inline void SetBridgeEntranceSimulatedSignalState(TileIndex t, uint16_t signal, SignalState state)
 {
 	if (signal < BRIDGE_M2_SIGNAL_STATE_COUNT) {
-		SB(_m[t].m2, signal + BRIDGE_M2_SIGNAL_STATE_OFFSET, 1, (state == SIGNAL_STATE_RED) ? 1 : 0);
+		AssignBit(_m[t].m2, signal + BRIDGE_M2_SIGNAL_STATE_OFFSET, state == SIGNAL_STATE_RED);
 	} else {
 		SetBridgeEntranceSimulatedSignalStateExtended(t, signal, state);
 	}
@@ -68,6 +74,8 @@ inline bool SetAllBridgeEntranceSimulatedSignalsGreen(TileIndex t)
 		return changed;
 	}
 }
+
+void SetAllBridgeEntranceSimulatedSignalsRed(TileIndex t, TileIndex other_end);
 
 void ClearBridgeEntranceSimulatedSignalsExtended(TileIndex t);
 

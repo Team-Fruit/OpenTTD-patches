@@ -18,28 +18,11 @@
 /** All the cheats. */
 Cheats _cheats;
 
-std::map<std::string, Cheat> _unknown_cheats;
+std::map<std::string, bool> _unknown_cheat_fields;
 
 /** Reinitialise all the cheats. */
 void InitializeCheats()
 {
 	memset(&_cheats, 0, sizeof(Cheats));
-	_unknown_cheats.clear();
-}
-
-/**
- * Return true if any cheat has been used, false otherwise
- * @return has a cheat been used?
- */
-bool CheatHasBeenUsed()
-{
-	/* Cannot use lengthof because _cheats is of type Cheats, not Cheat */
-	const Cheat *cht = (Cheat*)&_cheats;
-	const Cheat *cht_last = &cht[sizeof(_cheats) / sizeof(Cheat)];
-
-	for (; cht != cht_last; cht++) {
-		if (cht->been_used) return true;
-	}
-
-	return false;
+	_unknown_cheat_fields.clear();
 }

@@ -14,11 +14,13 @@
 #include "map_func.h"
 #include "tracerestrict.h"
 #include "string_func.h"
+#include "newgrf_dump.h"
 
 #include "safeguards.h"
 
 std::vector<const GRFFile *> _new_signals_grfs;
 std::array<NewSignalStyle, MAX_NEW_SIGNAL_STYLES> _new_signal_styles;
+uint8_t _default_signal_style_lookahead_extra_aspects = 0;
 std::array<NewSignalStyleMapping, MAX_NEW_SIGNAL_STYLES> _new_signal_style_mapping;
 uint8_t _num_new_signal_styles = 0;
 uint16_t _enabled_new_signal_styles_mask = 0;
@@ -45,7 +47,7 @@ uint32_t GetNewSignalsSideVariable()
 	return side ? 1 : 0;
 }
 
-/* virtual */ uint32_t NewSignalsScopeResolver::GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra *extra) const
+/* virtual */ uint32_t NewSignalsScopeResolver::GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra &extra) const
 {
 	if (this->tile == INVALID_TILE) {
 		switch (variable) {
@@ -69,9 +71,9 @@ uint32_t GetNewSignalsSideVariable()
 		case A2VRI_SIGNALS_SIGNAL_VERTICAL_CLEARANCE: return GetNewSignalsVerticalClearanceInfo(this->tile, this->z);
 	}
 
-	DEBUG(grf, 1, "Unhandled new signals tile variable 0x%X", variable);
+	Debug(grf, 1, "Unhandled new signals tile variable 0x{:X}", variable);
 
-	extra->available = false;
+	extra.available = false;
 	return UINT_MAX;
 }
 
@@ -112,7 +114,7 @@ uint GetNewSignalsRestrictedSignalsInfo(const TraceRestrictProgram *prog, TileIn
 	if (prog != nullptr) {
 		result |= 1;
 		if ((prog->actions_used_flags & TRPAUF_RESERVE_THROUGH_ALWAYS) && !IsTileType(tile, MP_TUNNELBRIDGE)) result |= 2;
-		if ((prog->actions_used_flags & TRPAUF_REVERSE) && !IsTileType(tile, MP_TUNNELBRIDGE)) result |= 4;
+		if ((prog->actions_used_flags & TRPAUF_REVERSE_BEHIND) && !IsTileType(tile, MP_TUNNELBRIDGE)) result |= 4;
 	}
 	return result;
 }
@@ -132,9 +134,7 @@ void DumpNewSignalsSpriteGroups(SpriteGroupDumper &dumper)
 	bool first = true;
 	for (const GRFFile *grf : _new_signals_grfs) {
 		if (!first) dumper.Print("");
-		char buffer[64];
-		seprintf(buffer, lastof(buffer), "GRF: %08X", BSWAP32(grf->grfid));
-		dumper.Print(buffer);
+		dumper.Print(fmt::format("GRF: {:08X}", BSWAP32(grf->grfid)));
 		first = false;
 		dumper.DumpSpriteGroup(grf->new_signals_group, 0);
 	}

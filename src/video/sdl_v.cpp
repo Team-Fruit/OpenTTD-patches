@@ -11,6 +11,7 @@
 
 #include "../stdafx.h"
 #include "../openttd.h"
+#include "../error_func.h"
 #include "../gfx_func.h"
 #include "../blitter/factory.hpp"
 #include "../thread.h"
@@ -181,15 +182,15 @@ static const Dimension _default_resolutions[] = {
 static void GetVideoModes()
 {
 	SDL_Rect **modes = SDL_ListModes(nullptr, SDL_SWSURFACE | SDL_FULLSCREEN);
-	if (modes == nullptr) usererror("sdl: no modes available");
+	if (modes == nullptr) UserError("sdl: no modes available");
 
 	_resolutions.clear();
 
 	_all_modes = (SDL_ListModes(nullptr, SDL_SWSURFACE | (_fullscreen ? SDL_FULLSCREEN : 0)) == (void*)-1);
 	if (modes == (void*)-1) {
-		for (uint i = 0; i < lengthof(_default_resolutions); i++) {
-			if (SDL_VideoModeOK(_default_resolutions[i].width, _default_resolutions[i].height, 8, SDL_FULLSCREEN) != 0) {
-				_resolutions.push_back(_default_resolutions[i]);
+		for (const auto &default_resolution : _default_resolutions) {
+			if (SDL_VideoModeOK(default_resolution.width, default_resolution.height, 8, SDL_FULLSCREEN) != 0) {
+				_resolutions.push_back(default_resolution);
 			}
 		}
 	} else {
@@ -197,10 +198,10 @@ static void GetVideoModes()
 			uint w = modes[i]->w;
 			uint h = modes[i]->h;
 			if (w < 640 || h < 480) continue; // reject too small resolutions
-			if (std::find(_resolutions.begin(), _resolutions.end(), Dimension(w, h)) != _resolutions.end()) continue;
+			if (std::ranges::find(_resolutions, Dimension(w, h)) != _resolutions.end()) continue;
 			_resolutions.emplace_back(w, h);
 		}
-		if (_resolutions.empty()) usererror("No usable screen resolutions found!\n");
+		if (_resolutions.empty()) UserError("No usable screen resolutions found!\n");
 		SortResolutions();
 	}
 }
@@ -211,7 +212,7 @@ static void GetAvailableVideoMode(uint *w, uint *h)
 	if (_all_modes || _resolutions.empty()) return;
 
 	/* Is the wanted mode among the available modes? */
-	if (std::find(_resolutions.begin(), _resolutions.end(), Dimension(*w, *h)) != _resolutions.end()) return;
+	if (std::ranges::find(_resolutions, Dimension(*w, *h)) != _resolutions.end()) return;
 
 	/* Use the closest possible resolution */
 	uint best = 0;
@@ -235,9 +236,9 @@ bool VideoDriver_SDL::CreateMainSurface(uint w, uint h)
 
 	GetAvailableVideoMode(&w, &h);
 
-	DEBUG(driver, 1, "SDL: using mode %ux%ux%d", w, h, bpp);
+	Debug(driver, 1, "SDL: using mode {}x{}x{}", w, h, bpp);
 
-	if (bpp == 0) usererror("Can't use a blitter that blits 0 bpp for normal visuals");
+	if (bpp == 0) UserError("Can't use a blitter that blits 0 bpp for normal visuals");
 
 	std::string icon_path = FioFindFullPath(BASESET_DIR, "openttd.32.bmp");
 	if (!icon_path.empty()) {
@@ -281,7 +282,7 @@ bool VideoDriver_SDL::CreateMainSurface(uint w, uint h)
 		want_hwpalette = _use_hwpalette;
 	}
 
-	if (want_hwpalette) DEBUG(driver, 1, "SDL: requesting hardware palette");
+	if (want_hwpalette) Debug(driver, 1, "SDL: requesting hardware palette");
 
 	/* Free any previously allocated shadow surface */
 	if (_sdl_surface != nullptr && _sdl_surface != _sdl_realscreen) SDL_FreeSurface(_sdl_surface);
@@ -296,7 +297,7 @@ bool VideoDriver_SDL::CreateMainSurface(uint w, uint h)
 			 * windowed), we restart the entire video
 			 * subsystem to force creating a new window.
 			 */
-			DEBUG(driver, 0, "SDL: Restarting SDL video subsystem, to force hwpalette change");
+			Debug(driver, 0, "SDL: Restarting SDL video subsystem, to force hwpalette change");
 			SDL_QuitSubSystem(SDL_INIT_VIDEO);
 			SDL_InitSubSystem(SDL_INIT_VIDEO);
 			ClaimMousePointer();
@@ -312,7 +313,7 @@ bool VideoDriver_SDL::CreateMainSurface(uint w, uint h)
 	/* DO NOT CHANGE TO HWSURFACE, IT DOES NOT WORK */
 	newscreen = SDL_SetVideoMode(w, h, bpp, SDL_SWSURFACE | (want_hwpalette ? SDL_HWPALETTE : 0) | (_fullscreen ? SDL_FULLSCREEN : SDL_RESIZABLE));
 	if (newscreen == nullptr) {
-		DEBUG(driver, 0, "SDL: Couldn't allocate a window to draw on");
+		Debug(driver, 0, "SDL: Couldn't allocate a window to draw on");
 		return false;
 	}
 	_sdl_realscreen = newscreen;
@@ -336,10 +337,10 @@ bool VideoDriver_SDL::CreateMainSurface(uint w, uint h)
 		 * This shadow surface will have SDL_HWPALLETE set, so
 		 * we won't create a second shadow surface in this case.
 		 */
-		DEBUG(driver, 1, "SDL: using shadow surface");
+		Debug(driver, 1, "SDL: using shadow surface");
 		newscreen = SDL_CreateRGBSurface(SDL_SWSURFACE, w, h, bpp, 0, 0, 0, 0);
 		if (newscreen == nullptr) {
-			DEBUG(driver, 0, "SDL: Couldn't allocate a shadow surface to draw on");
+			Debug(driver, 0, "SDL: Couldn't allocate a shadow surface to draw on");
 			return false;
 		}
 	}
@@ -378,15 +379,21 @@ bool VideoDriver_SDL::ClaimMousePointer()
 }
 
 struct SDLVkMapping {
-	uint16_t vk_from;
-	byte vk_count;
-	byte map_to;
+	const uint16_t vk_from;
+	const uint8_t vk_count;
+	const uint8_t map_to;
+
+	constexpr SDLVkMapping(SDLKey vk_first, SDLKey vk_last, uint8_t map_first, [[maybe_unused]] uint8_t map_last)
+		: vk_from(vk_first), vk_count(vk_last - vk_first + 1), map_to(map_first)
+	{
+		assert((vk_last - vk_first) == (map_last - map_first));
+	}
 };
 
-#define AS(x, z) {x, 0, z}
-#define AM(x, y, z, w) {x, (byte)(y - x), z}
+#define AS(x, z) {x, x, z, z}
+#define AM(x, y, z, w) {x, y, z, w}
 
-static const SDLVkMapping _vk_mapping[] = {
+static constexpr SDLVkMapping _vk_mapping[] = {
 	/* Pageup stuff + up/down */
 	AM(SDLK_PAGEUP, SDLK_PAGEDOWN, WKC_PAGEUP, WKC_PAGEDOWN),
 	AS(SDLK_UP,     WKC_UP),
@@ -441,12 +448,11 @@ static const SDLVkMapping _vk_mapping[] = {
 
 static uint ConvertSdlKeyIntoMy(SDL_keysym *sym, char32_t *character)
 {
-	const SDLVkMapping *map;
 	uint key = 0;
 
-	for (map = _vk_mapping; map != endof(_vk_mapping); ++map) {
-		if ((uint)(sym->sym - map->vk_from) <= map->vk_count) {
-			key = sym->sym - map->vk_from + map->map_to;
+	for (const auto &map : _vk_mapping) {
+		if (IsInsideBS(sym->sym, map.vk_from, map.vk_count)) {
+			key = sym->sym - map.vk_from + map.map_to;
 			break;
 		}
 	}
@@ -607,7 +613,7 @@ const char *VideoDriver_SDL::Start(const StringList &param)
 	}
 
 	SDL_VideoDriverName(buf, sizeof buf);
-	DEBUG(driver, 1, "SDL: using driver '%s'", buf);
+	Debug(driver, 1, "SDL: using driver '{}'", buf);
 
 	MarkWholeScreenDirty();
 	SetupKeyboard();

@@ -34,7 +34,7 @@
 	/* Scan orders for cargo-specific load/unload, and run LinkRefresher separately for each set of cargoes where they differ. */
 	while (cargo_mask != 0) {
 		CargoTypes iter_cargo_mask = cargo_mask;
-		for (const Order *o = v->orders->GetFirstOrder(); o != nullptr; o = o->next) {
+		for (const Order *o : v->Orders()) {
 			if (o->IsType(OT_GOTO_STATION) || o->IsType(OT_IMPLICIT)) {
 				if (o->GetUnloadType() == OUFB_CARGO_TYPE_UNLOAD) {
 					CargoMaskValueFilter<uint>(iter_cargo_mask, [&](CargoID cargo) -> uint {
@@ -77,8 +77,6 @@ LinkRefresher::LinkRefresher(Vehicle *vehicle, HopSet *seen_hops, bool allow_mer
 	vehicle(vehicle), seen_hops(seen_hops), cargo(INVALID_CARGO), allow_merge(allow_merge),
 	is_full_loading(is_full_loading), cargo_mask(cargo_mask)
 {
-	memset(this->capacities, 0, sizeof(this->capacities));
-
 	/* Assemble list of capacities and set last loading stations to 0. */
 	for (Vehicle *v = this->vehicle; v != nullptr; v = v->Next()) {
 		this->refit_capacities.push_back(RefitDesc(v->cargo_type, v->cargo_cap, v->refit_cap));
@@ -109,7 +107,7 @@ bool LinkRefresher::HandleRefit(CargoID refit_cargo)
 
 		/* Back up the vehicle's cargo type */
 		CargoID temp_cid = v->cargo_type;
-		byte temp_subtype = v->cargo_subtype;
+		uint8_t temp_subtype = v->cargo_subtype;
 		v->cargo_type = this->cargo;
 		if (e->refit_capacity_values == nullptr || !(e->callbacks_used & SGCU_REFIT_CB_ALL_CARGOES) || this->cargo == e->GetDefaultCargoType() || (e->type == VEH_AIRCRAFT && IsCargoInClass(this->cargo, CC_PASSENGERS))) {
 			/* This can be omitted when the refit capacity values are already determined, and the capacity is definitely from the refit callback */
@@ -262,7 +260,7 @@ std::pair<const Order *, LinkRefresher::TimetableTravelTime> LinkRefresher::Pred
 
 				/* Record the branch before executing it,
 				 * to avoid recursively executing it again. */
-				Hop hop(cur->index, skip_to->index, this->cargo, flags);
+				Hop hop(this->vehicle->orders->GetIndexOfOrder(cur), this->vehicle->orders->GetIndexOfOrder(skip_to), this->cargo, flags);
 				auto iter = this->seen_hops->lower_bound(hop);
 				if (iter == this->seen_hops->end() || *iter != hop) {
 					this->seen_hops->insert(iter, hop);
@@ -387,7 +385,9 @@ void LinkRefresher::RefreshLinks(const Order *cur, const Order *next, TimetableT
 				SetBit(flags, IN_AUTOREFIT);
 				LinkRefresher backup(*this);
 				for (CargoID c = 0; c != NUM_CARGO; ++c) {
-					if (CargoSpec::Get(c)->IsValid() && this->HandleRefit(c)) {
+					if (!CargoSpec::Get(c)->IsValid()) continue;
+					if (next->GetCargoLoadType(c) == OLFB_NO_LOAD) continue;
+					if (this->HandleRefit(c)) {
 						this->RefreshLinks(cur, next, travel, flags, num_hops);
 						*this = backup;
 					}
@@ -406,7 +406,7 @@ void LinkRefresher::RefreshLinks(const Order *cur, const Order *next, TimetableT
 
 		std::tie(next, travel) = this->PredictNextOrder(cur, next, travel, flags, num_hops);
 		if (next == nullptr) break;
-		Hop hop(cur->index, next->index, this->cargo);
+		Hop hop(this->vehicle->orders->GetIndexOfOrder(cur), this->vehicle->orders->GetIndexOfOrder(next), this->cargo);
 		auto iter = this->seen_hops->lower_bound(hop);
 		if (iter != this->seen_hops->end() && *iter == hop) {
 			break;

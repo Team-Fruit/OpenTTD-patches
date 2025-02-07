@@ -38,6 +38,11 @@ inline uint8_t DayLengthFactor()
 	return DateDetail::_effective_day_length;
 }
 
+inline bool ReplaceWallclockMinutesUnit()
+{
+	return DayLengthFactor() > 1 || _settings_time.time_in_minutes;
+}
+
 inline Ticks TicksPerCalendarDay()
 {
 	return DateDetail::_ticks_per_calendar_day;
@@ -47,34 +52,34 @@ void UpdateEffectiveDayLengthFactor();
 
 inline constexpr YearDelta DateDeltaToYearDelta(DateDelta date)
 {
-	return date.base() / DAYS_IN_LEAP_YEAR;
+	return YearDelta{date.base() / DAYS_IN_LEAP_YEAR};
 }
 
 inline constexpr DateTicksDelta DateDeltaToDateTicksDelta(DateDelta date, uint16_t fract = 0)
 {
-	return ((int64_t)date.base() * DAY_TICKS) + fract;
+	return DateTicksDelta{((int64_t)date.base() * DAY_TICKS) + fract};
 }
 
 inline EconTime::Date StateTicksToDate(StateTicks ticks)
 {
-	return (ticks.base() - DateDetail::_state_ticks_offset.base()) / (DAY_TICKS * DayLengthFactor());
+	return EconTime::Date{static_cast<int>((ticks.base() - DateDetail::_state_ticks_offset.base()) / (DAY_TICKS * DayLengthFactor()))};
 }
 
 CalTime::Date StateTicksToCalendarDate(StateTicks ticks);
 
 inline StateTicks DateToStateTicks(EconTime::Date date)
 {
-	return ((int64_t)date.base() * DAY_TICKS * DayLengthFactor()) + DateDetail::_state_ticks_offset.base();
+	return StateTicks{((int64_t)date.base() * DAY_TICKS * DayLengthFactor()) + DateDetail::_state_ticks_offset.base()};
 }
 
 inline EconTime::DateTicks StateTicksToDateTicks(StateTicks ticks)
 {
-	return (ticks.base() - DateDetail::_state_ticks_offset.base()) / DayLengthFactor();
+	return EconTime::DateTicks{(ticks.base() - DateDetail::_state_ticks_offset.base()) / DayLengthFactor()};
 }
 
 inline StateTicks DateTicksToStateTicks(EconTime::DateTicks date_ticks)
 {
-	return ((int64_t)date_ticks.base() * DayLengthFactor()) + DateDetail::_state_ticks_offset.base();
+	return StateTicks{((int64_t)date_ticks.base() * DayLengthFactor()) + DateDetail::_state_ticks_offset.base()};
 }
 
 inline Ticks TimetableDisplayUnitSize()
@@ -96,6 +101,14 @@ inline Ticks TimetableAbsoluteDisplayUnitSize()
 		return TicksPerCalendarDay();
 	}
 }
+
+/* Casts from economy date/year to the equivalent calendar type, this is only for use when not using wallclock mode or during saveload conversion */
+inline CalTime::Date ToCalTimeCast(EconTime::Date date) { return CalTime::Date{date.base()}; }
+inline CalTime::Year ToCalTimeCast(EconTime::Year year) { return CalTime::Year{year.base()}; }
+
+/* Casts from calendar date/year to the equivalent economy type, this is only for use when not using wallclock mode or during saveload conversion */
+inline EconTime::Date ToEconTimeCast(CalTime::Date date) { return EconTime::Date{date.base()}; }
+inline EconTime::Year ToEconTimeCast(CalTime::Year year) { return EconTime::Year{year.base()}; }
 
 struct debug_date_dumper {
 	const char *HexDate(EconTime::Date date, EconTime::DateFract date_fract, uint8_t tick_skip_counter);

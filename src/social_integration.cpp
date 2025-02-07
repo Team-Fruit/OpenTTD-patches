@@ -13,7 +13,6 @@
 #include "3rdparty/openttd_social_integration_api/openttd_social_integration_api.h"
 
 #include "debug.h"
-#include "debug_fmt.h"
 #include "fileio_func.h"
 #include "library_loader.h"
 #include "rev.h"
@@ -59,14 +58,14 @@ public:
 	void Scan()
 	{
 #ifdef _WIN32
-		std::string extension = "-social.dll";
+		const char *extension = "-social.dll";
 #elif defined(__APPLE__)
-		std::string extension = "-social.dylib";
+		const char *extension = "-social.dylib";
 #else
-		std::string extension = "-social.so";
+		const char *extension = "-social.so";
 #endif
 
-		this->FileScanner::Scan(extension.c_str(), SOCIAL_INTEGRATION_DIR, false);
+		this->FileScanner::Scan(extension, SOCIAL_INTEGRATION_DIR, false);
 	}
 
 	bool AddFile(const std::string &filename, size_t basepath_length, const std::string &) override
@@ -165,19 +164,18 @@ size_t SocialIntegration::GetPluginCount()
 	return _plugins.size();
 }
 
-char *SocialIntegration::LogPluginSummary(char *buffer, const char *last)
+void SocialIntegration::LogPluginSummary(format_target &buffer)
 {
 	extern const char *PluginStateToString(SocialIntegrationPlugin::State state);
 
 	for (auto &plugin : _plugins) {
-		buffer += seprintf(buffer, last, "  %s:\n", plugin->external.name.c_str());
-		buffer += seprintf(buffer, last, "    Version: %s\n", plugin->external.version.c_str());
-		buffer += seprintf(buffer, last, "    Basepath: %s\n", plugin->external.basepath.c_str());
-		buffer += seprintf(buffer, last, "    State: %s\n", PluginStateToString(plugin->external.state));
+		buffer.format("  {}:\n", plugin->external.name);
+		buffer.format("    Version: {}\n", plugin->external.version);
+		buffer.format("    Basepath: {}\n", plugin->external.basepath);
+		buffer.format("    State: {}\n", PluginStateToString(plugin->external.state));
 	}
 
-	buffer += seprintf(buffer, last, "\n");
-	return buffer;
+	buffer.push_back('\n');
 }
 
 void SocialIntegration::Initialize()

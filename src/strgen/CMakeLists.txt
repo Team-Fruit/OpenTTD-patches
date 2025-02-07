@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.16)
 
 if (NOT HOST_BINARY_DIR)
     project(strgen)
@@ -9,8 +9,11 @@ if (NOT HOST_BINARY_DIR)
             strgen.cpp
             strgen_base.cpp
             ../core/alloc_func.cpp
+            ../core/format.cpp
             ../misc/getoptdata.cpp
+            ../error.cpp
             ../string.cpp
+            ../3rdparty/fmt/format.cc
     )
     add_definitions(-DSTRGEN)
     add_executable(strgen ${sourcefiles})

@@ -23,8 +23,6 @@ STR_TRANSPARENT_LOADING_TOOLTIP                                 :{BLACK}Växla g
 
 # Programmable Pre-Signals
 
-#House construction window (for SE only)
-
 #Town select window (for SE only)
 
 STR_MAPGEN_SNOW_LINE_HEIGHT                                     :{BLACK}Snögränsens höjd:
@@ -50,8 +48,8 @@ STR_VEHICLE_STATUS_CANNOT_REACH_DEPOT_SERVICE_VEL_END           :{LTBLUE}Kan int
 
 STR_ORDERS_GO_TO_TOOLTIP_EXTRA                                  :{BLACK}Infoga ny order före markerad order, eller lägg till i slutet av listan. Ctrl+Klick på en station för 'full last någon godstyp', på ett riktmärke för att invertera inställningen 'non-stop som standard', och på en depå för 'service'.  Klicka på ett annat fordon för att kopiera dess ordrar eller Ctrl+Klick för att dela ordrar. En depåorder stänger av automatisk service av fordonet
 
-STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :A:
-STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :D:
+STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :A:{SPACE}{SPACE}
+STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :D:{SPACE}{SPACE}
 
 # Cargo type orders Window
 
@@ -88,3 +86,19 @@ STR_ERROR_CAN_T_SELL_25_SHARE_IN                                :{WHITE}Kan inte
 STR_ERROR_PROTECTED                                             :{WHITE}Det här företaget bedriver inte aktiehandel ännu...
 
 STR_CONFIG_SETTING_CYCLE_SIGNAL_PBS                             :Endast avancerade
+
+STR_WARNING_PASSWORD_SECURITY                                   :{YELLOW}Varning: Serveradministratörer kan ha möjlighet att läsa text som skrivs här.
+STR_NETWORK_NEED_COMPANY_PASSWORD_CAPTION                       :{WHITE}Företaget är skyddat. Ange lösenord
+STR_NETWORK_CLIENT_LIST_ADMIN_COMPANY_UNLOCK                    :Lås upp med lösenord
+STR_NETWORK_CLIENT_LIST_ASK_COMPANY_UNLOCK                      :{YELLOW}Är du säker på att du vill återställa företaget {COMPANY}s lösenord?
+
+# Network set password
+STR_COMPANY_PASSWORD_CANCEL                                     :{BLACK}Spara inte det inmatade lösenordet
+STR_COMPANY_PASSWORD_OK                                         :{BLACK}Ge företaget det nya lösenordet
+STR_COMPANY_PASSWORD_CAPTION                                    :{WHITE}Företagslösenord
+STR_COMPANY_PASSWORD_MAKE_DEFAULT                               :{BLACK}Förvalt företagslösenord
+STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}Använd detta företagslösenord som förval för nya företag
+
+STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}Lösenord
+STR_COMPANY_VIEW_PASSWORD_TOOLTIP                               :{BLACK}Lösenordsskydda ditt företag för att förhindra att obehöriga spelare ansluter
+STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}Ange företagets lösenord

@@ -27,6 +27,7 @@
 
 #include "../../openttd.h"
 #include "../../debug.h"
+#include "../../error_func.h"
 #include "../../core/geometry_func.hpp"
 #include "../../core/math_func.hpp"
 #include "cocoa_v.h"
@@ -387,7 +388,7 @@ bool VideoDriver_Cocoa::MakeWindow(int width, int height)
 #endif
 	this->window = [ [ OTTD_CocoaWindow alloc ] initWithContentRect:contentRect styleMask:style backing:NSBackingStoreBuffered defer:NO driver:this ];
 	if (this->window == nil) {
-		DEBUG(driver, 0, "Could not create the Cocoa window.");
+		Debug(driver, 0, "Could not create the Cocoa window.");
 		this->setup = false;
 		return false;
 	}
@@ -415,7 +416,7 @@ bool VideoDriver_Cocoa::MakeWindow(int width, int height)
 	NSRect view_frame = [ this->window contentRectForFrameRect:[ this->window frame ] ];
 	this->cocoaview = [ [ OTTD_CocoaView alloc ] initWithFrame:view_frame ];
 	if (this->cocoaview == nil) {
-		DEBUG(driver, 0, "Could not create the event wrapper view.");
+		Debug(driver, 0, "Could not create the event wrapper view.");
 		this->setup = false;
 		return false;
 	}
@@ -424,7 +425,7 @@ bool VideoDriver_Cocoa::MakeWindow(int width, int height)
 	/* Create content view. */
 	NSView *draw_view = this->AllocateDrawView();
 	if (draw_view == nil) {
-		DEBUG(driver, 0, "Could not create the drawing view.");
+		Debug(driver, 0, "Could not create the drawing view.");
 		this->setup = false;
 		return false;
 	}
@@ -440,7 +441,7 @@ bool VideoDriver_Cocoa::MakeWindow(int width, int height)
 	CGColorSpaceRelease(this->color_space);
 	this->color_space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
 	if (this->color_space == nullptr) this->color_space = CGColorSpaceCreateDeviceRGB();
-	if (this->color_space == nullptr) error("Could not get a valid colour space for drawing.");
+	if (this->color_space == nullptr) FatalError("Could not get a valid colour space for drawing.");
 
 	this->setup = false;
 
@@ -674,7 +675,7 @@ void VideoDriver_CocoaQuartz::AllocateBackingStore(bool)
 	if (this->buffer_depth == 8) {
 		free(this->pixel_buffer);
 		this->pixel_buffer = malloc(this->window_width * this->window_height);
-		if (this->pixel_buffer == nullptr) usererror("Out of memory allocating pixel buffer");
+		if (this->pixel_buffer == nullptr) UserError("Out of memory allocating pixel buffer");
 	} else {
 		free(this->pixel_buffer);
 		this->pixel_buffer = nullptr;

@@ -20,6 +20,7 @@
 #include "network/network_base.h"
 #include "network/network_admin.h"
 #include "ai/ai.hpp"
+#include "ai/ai_instance.hpp"
 #include "ai/ai_config.hpp"
 #include "company_manager_face.h"
 #include "window_func.h"
@@ -37,13 +38,14 @@
 #include "story_base.h"
 #include "zoning.h"
 #include "tbtr_template_vehicle_func.h"
-#include "widgets/statusbar_widget.h"
 #include "core/backup_type.hpp"
 #include "debug_desync.h"
 #include "timer/timer.h"
 #include "timer/timer_game_tick.h"
 #include "tilehighlight_func.h"
 #include "plans_func.h"
+
+#include "widgets/statusbar_widget.h"
 
 #include "table/strings.h"
 
@@ -72,7 +74,7 @@ INSTANTIATE_POOL_METHODS(Company)
  * @param name_1 Name of the company.
  * @param is_ai  A computer program is running for this company.
  */
-Company::Company(uint16_t name_1, bool is_ai)
+Company::Company(StringID name_1, bool is_ai)
 {
 	this->name_1 = name_1;
 	this->location_of_HQ = INVALID_TILE;
@@ -160,6 +162,9 @@ void SetLocalCompany(CompanyID new_company)
 	InvalidateWindowClassesData(WC_GOALS_LIST);
 	ClearZoningCaches();
 	InvalidatePlanCaches();
+
+	extern void TraceRestrictClearRecentSlotsAndCounters();
+	TraceRestrictClearRecentSlotsAndCounters();
 }
 
 /**
@@ -323,10 +328,10 @@ void SubtractMoneyFromCompany(const CommandCost &cost)
 void SubtractMoneyFromCompanyFract(CompanyID company, const CommandCost &cst)
 {
 	Company *c = Company::Get(company);
-	byte m = c->money_fraction;
+	uint8_t m = c->money_fraction;
 	Money cost = cst.GetCost();
 
-	c->money_fraction = m - (byte)cost;
+	c->money_fraction = m - (uint8_t)cost;
 	cost >>= 8;
 	if (c->money_fraction > m) cost++;
 	if (cost != 0) SubtractMoneyFromAnyCompany(c, CommandCost(cst.GetExpensesType(), cost));
@@ -392,7 +397,7 @@ CommandCost CheckOwnership(Owner owner, TileIndex tile)
 	if (owner == _current_company) return CommandCost();
 
 	SetDParamsForOwnedBy(owner, tile);
-	return_cmd_error(STR_ERROR_OWNED_BY);
+	return CommandCost(STR_ERROR_OWNED_BY);
 }
 
 /**
@@ -412,7 +417,7 @@ CommandCost CheckTileOwnership(TileIndex tile)
 
 	/* no need to get the name of the owner unless we're the local company (saves some time) */
 	if (IsLocalCompany()) SetDParamsForOwnedBy(owner, tile);
-	return_cmd_error(STR_ERROR_OWNED_BY);
+	return CommandCost(STR_ERROR_OWNED_BY);
 }
 
 /**
@@ -450,12 +455,12 @@ set_name:;
 		MarkWholeScreenDirty();
 
 		if (c->is_ai) {
-			CompanyNewsInformation *cni = new CompanyNewsInformation(c);
+			auto cni = std::make_unique<CompanyNewsInformation>(c);
 			SetDParam(0, STR_NEWS_COMPANY_LAUNCH_TITLE);
 			SetDParam(1, STR_NEWS_COMPANY_LAUNCH_DESCRIPTION);
 			SetDParamStr(2, cni->company_name);
 			SetDParam(3, t->index);
-			AddNewsItem(STR_MESSAGE_NEWS_FORMAT, NT_COMPANY_INFO, NF_COMPANY, NR_TILE, c->last_build_coordinate, NR_NONE, UINT32_MAX, cni);
+			AddNewsItem(STR_MESSAGE_NEWS_FORMAT, NT_COMPANY_INFO, NF_COMPANY, NR_TILE, c->last_build_coordinate, NR_NONE, UINT32_MAX, std::move(cni));
 		}
 		return;
 	}
@@ -473,7 +478,7 @@ bad_town_name:;
 }
 
 /** Sorting weights for the company colours. */
-static const byte _colour_sort[COLOUR_END] = {2, 2, 3, 2, 3, 2, 3, 2, 3, 2, 2, 2, 3, 1, 1, 1};
+static const uint8_t _colour_sort[COLOUR_END] = {2, 2, 3, 2, 3, 2, 3, 2, 3, 2, 2, 2, 3, 1, 1, 1};
 /** Similar colours, so we can try to prevent same coloured companies. */
 static const Colours _similar_colour[COLOUR_END][2] = {
 	{ COLOUR_BLUE,       COLOUR_LIGHT_BLUE }, // COLOUR_DARK_BLUE
@@ -668,7 +673,7 @@ Company *DoStartupNewCompany(DoStartupNewCompanyFlag flags, CompanyID company)
 }
 
 /** Start a new competitor company if possible. */
-TimeoutTimer<TimerGameTick> _new_competitor_timeout(0, []() {
+TimeoutTimer<TimerGameTick> _new_competitor_timeout({ TimerGameTick::Priority::COMPETITOR_TIMEOUT, 0 }, []() {
 	if (_game_mode == GM_MENU || !AI::CanStartNew()) return;
 	if (_networking && Company::GetNumItems() >= _settings_client.network.max_companies) return;
 
@@ -711,12 +716,12 @@ void UninitializeCompanies()
 }
 
 /**
- * May company \a cbig buy company \a csmall?
+ * Can company \a cbig buy company \a csmall without exceeding vehicle limits?
  * @param cbig   Company buying \a csmall.
  * @param csmall Company getting bought.
  * @return Return \c true if it is allowed.
  */
-bool MayCompanyTakeOver(CompanyID cbig, CompanyID csmall)
+bool CheckTakeoverVehicleLimit(CompanyID cbig, CompanyID csmall)
 {
 	const Company *c1 = Company::Get(cbig);
 	const Company *c2 = Company::Get(csmall);
@@ -779,7 +784,7 @@ static void HandleBankruptcyTakeover(Company *c)
 		if ((c2->bankrupt_asked == 0 || (c2->bankrupt_flags & CBRF_SALE_ONLY)) && // Don't ask companies going bankrupt themselves
 				!HasBit(c->bankrupt_asked, c2->index) &&
 				best_performance < c2->old_economy[1].performance_history &&
-				MayCompanyTakeOver(c2->index, c->index)) {
+				CheckTakeoverVehicleLimit(c2->index, c->index)) {
 			best_performance = c2->old_economy[1].performance_history;
 			best = c2;
 		}
@@ -850,7 +855,7 @@ void OnTick_Companies(bool main_tick)
 		/* Randomize a bit when the AI is actually going to start; ranges from 87.5% .. 112.5% of indicated value. */
 		timeout += ScriptObject::GetRandomizer(OWNER_NONE).Next(timeout / 4) - timeout / 8;
 
-		_new_competitor_timeout.Reset(std::max(1, timeout));
+		_new_competitor_timeout.Reset({ TimerGameTick::Priority::COMPETITOR_TIMEOUT, static_cast<uint>(std::max(1, timeout)) });
 	}
 }
 
@@ -866,7 +871,7 @@ void CompaniesYearlyLoop()
 		std::rotate(std::rbegin(c->yearly_expenses), std::rbegin(c->yearly_expenses) + 1, std::rend(c->yearly_expenses));
 		c->yearly_expenses[0] = {};
 		c->age_years++;
-		SetWindowDirty(WC_FINANCES, c->index);
+		InvalidateWindowData(WC_FINANCES, c->index);
 	}
 
 	if (_settings_client.gui.show_finances && _local_company != COMPANY_SPECTATOR) {
@@ -931,6 +936,7 @@ void CompanyAdminRemove(CompanyID company_id, CompanyRemoveReason reason)
  * - bits 0..15: CompanyCtrlAction
  * - bits 16..23: CompanyID
  * - bits 24..31: CompanyRemoveReason (with CCA_DELETE)
+ * - bits 24..31: CompanyID to merge (with CCA_MERGE)
  * @param p2 ClientID
  * @param text unused
  * @return the cost of this operation or an error
@@ -991,7 +997,7 @@ CommandCost CmdCompanyCtrl(TileIndex tile, DoCommandFlag flags, uint32_t p1, uin
 				MarkWholeScreenDirty();
 			}
 
-			DEBUG(desync, 1, "new_company: %s, company_id: %u", debug_date_dumper().HexDate(), c->index);
+			Debug(desync, 1, "new_company: {}, company_id: {}", debug_date_dumper().HexDate(), c->index);
 			break;
 		}
 
@@ -1010,7 +1016,7 @@ CommandCost CmdCompanyCtrl(TileIndex tile, DoCommandFlag flags, uint32_t p1, uin
 			if (c != nullptr) {
 				NetworkAdminCompanyNew(c);
 				NetworkServerNewCompany(c, nullptr);
-				DEBUG(desync, 1, "new_company_ai: %s, company_id: %u", debug_date_dumper().HexDate(), c->index);
+				Debug(desync, 1, "new_company_ai: {}, company_id: {}", debug_date_dumper().HexDate(), c->index);
 			}
 			break;
 		}
@@ -1027,15 +1033,15 @@ CommandCost CmdCompanyCtrl(TileIndex tile, DoCommandFlag flags, uint32_t p1, uin
 
 			if (!(flags & DC_EXEC)) return CommandCost();
 
-			DEBUG(desync, 1, "delete_company: %s, company_id: %u, reason: %u", debug_date_dumper().HexDate(), company_id, reason);
+			Debug(desync, 1, "delete_company: {}, company_id: {}, reason: {}", debug_date_dumper().HexDate(), company_id, reason);
 
-			CompanyNewsInformation *cni = new CompanyNewsInformation(c);
+			auto cni = std::make_unique<CompanyNewsInformation>(c);
 
 			/* Show the bankrupt news */
 			SetDParam(0, STR_NEWS_COMPANY_BANKRUPT_TITLE);
 			SetDParam(1, STR_NEWS_COMPANY_BANKRUPT_DESCRIPTION);
 			SetDParamStr(2, cni->company_name);
-			AddCompanyNewsItem(STR_MESSAGE_NEWS_FORMAT, cni);
+			AddCompanyNewsItem(STR_MESSAGE_NEWS_FORMAT, std::move(cni));
 
 			/* Remove the company */
 			ChangeOwnershipOfCompanyItems(c->index, INVALID_OWNER);
@@ -1071,6 +1077,38 @@ CommandCost CmdCompanyCtrl(TileIndex tile, DoCommandFlag flags, uint32_t p1, uin
 			break;
 		}
 
+		case CCA_MERGE: {
+			Company *c = Company::GetIfValid(company_id);
+			if (c == nullptr) return CMD_ERROR;
+
+			CompanyID to_merge_id = (CompanyID)GB(p1, 24, 8);
+			if (to_merge_id == company_id) return CMD_ERROR;
+
+			Company *to_merge = Company::GetIfValid(to_merge_id);
+			if (to_merge == nullptr) return CMD_ERROR;
+
+			if (!(flags & DC_EXEC)) return CommandCost();
+
+			SubtractMoneyFromAnyCompany(c, CommandCost(EXPENSES_OTHER, to_merge->current_loan - to_merge->money));
+
+			Debug(desync, 1, "merge_companies: {}, company_id: {}, merged_company_id: {}", debug_date_dumper().HexDate(), company_id, to_merge_id);
+
+			auto cni = std::make_unique<CompanyNewsInformation>(c);
+
+			SetDParam(0, STR_NEWS_COMPANY_MERGER_TITLE);
+			SetDParam(1, STR_NEWS_MERGER_TAKEOVER_TITLE);
+			SetDParamStr(2, cni->company_name);
+			SetDParamStr(3, cni->other_company_name);
+			AddCompanyNewsItem(STR_MESSAGE_NEWS_FORMAT, std::move(cni));
+			AI::BroadcastNewEvent(new ScriptEventCompanyMerger(to_merge_id, company_id));
+			Game::NewEvent(new ScriptEventCompanyMerger(to_merge_id, company_id));
+
+			ChangeOwnershipOfCompanyItems(to_merge_id, company_id);
+
+			PostAcquireCompany(to_merge);
+			break;
+		}
+
 		default: return CMD_ERROR;
 	}
 
@@ -1079,6 +1117,60 @@ CommandCost CmdCompanyCtrl(TileIndex tile, DoCommandFlag flags, uint32_t p1, uin
 	InvalidateWindowClassesData(WC_SCRIPT_LIST);
 
 	return CommandCost();
+}
+
+static bool ExecuteAllowListCtrlAction(CompanyAllowListCtrlAction action, Company *c, const std::string &public_key)
+{
+	switch (action) {
+		case CALCA_ADD:
+			return c->allow_list.Add(public_key);
+
+		case CALCA_REMOVE:
+			return c->allow_list.Remove(public_key);
+
+		default:
+			NOT_REACHED();
+	}
+}
+
+/**
+ * Add or remove the given public key to the allow list of this company.
+ * @param flags Operation to perform.
+ * @param action The action to perform.
+ * @param public_key The public key of the client to add or remove.
+ * @return The cost of this operation or an error.
+ */
+CommandCost CmdCompanyAllowListCtrl(DoCommandFlag flags, CompanyAllowListCtrlAction action, const std::string &public_key)
+{
+	Company *c = Company::GetIfValid(_current_company);
+	if (c == nullptr) return CMD_ERROR;
+
+	/* The public key length includes the '\0'. */
+	if (public_key.size() != NETWORK_PUBLIC_KEY_LENGTH - 1) return CMD_ERROR;
+
+	switch (action) {
+		case CALCA_ADD:
+		case CALCA_REMOVE:
+			break;
+
+		default:
+			return CMD_ERROR;
+	}
+
+	if (flags & DC_EXEC) {
+		if (ExecuteAllowListCtrlAction(action, c, public_key)) {
+			InvalidateWindowData(WC_CLIENT_LIST, 0);
+			SetWindowDirty(WC_COMPANY, _current_company);
+		}
+	}
+
+	return CommandCost();
+}
+
+CommandCost CmdCompanyAllowListCtrl(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint32_t p2, const char *text)
+{
+	if (StrEmpty(text)) return CMD_ERROR;
+	return CmdCompanyAllowListCtrl(flags, static_cast<CompanyAllowListCtrlAction>(p1), std::string{text});
 }
 
 /**
@@ -1150,7 +1242,7 @@ CommandCost CmdSetCompanyColour(TileIndex tile, DoCommandFlag flags, uint32_t p1
 
 	if (flags & DC_EXEC) {
 		if (!second) {
-			if (scheme != LS_DEFAULT) SB(c->livery[scheme].in_use, 0, 1, colour != INVALID_COLOUR);
+			if (scheme != LS_DEFAULT) AssignBit(c->livery[scheme].in_use, 0, colour != INVALID_COLOUR);
 			if (colour == INVALID_COLOUR) colour = c->livery[LS_DEFAULT].colour1;
 			c->livery[scheme].colour1 = colour;
 
@@ -1163,7 +1255,7 @@ CommandCost CmdSetCompanyColour(TileIndex tile, DoCommandFlag flags, uint32_t p1
 				CompanyAdminUpdate(c);
 			}
 		} else {
-			if (scheme != LS_DEFAULT) SB(c->livery[scheme].in_use, 1, 1, colour != INVALID_COLOUR);
+			if (scheme != LS_DEFAULT) AssignBit(c->livery[scheme].in_use, 1, colour != INVALID_COLOUR);
 			if (colour == INVALID_COLOUR) colour = c->livery[LS_DEFAULT].colour2;
 			c->livery[scheme].colour2 = colour;
 
@@ -1247,7 +1339,7 @@ CommandCost CmdRenameCompany(TileIndex tile, DoCommandFlag flags, uint32_t p1, u
 
 	if (!reset) {
 		if (Utf8StringLength(text) >= MAX_LENGTH_COMPANY_NAME_CHARS) return CMD_ERROR;
-		if (!IsUniqueCompanyName(text)) return_cmd_error(STR_ERROR_NAME_MUST_BE_UNIQUE);
+		if (!IsUniqueCompanyName(text)) return CommandCost(STR_ERROR_NAME_MUST_BE_UNIQUE);
 	}
 
 	if (flags & DC_EXEC) {
@@ -1293,7 +1385,7 @@ CommandCost CmdRenamePresident(TileIndex tile, DoCommandFlag flags, uint32_t p1,
 
 	if (!reset) {
 		if (Utf8StringLength(text) >= MAX_LENGTH_PRESIDENT_NAME_CHARS) return CMD_ERROR;
-		if (!IsUniquePresidentName(text)) return_cmd_error(STR_ERROR_NAME_MUST_BE_UNIQUE);
+		if (!IsUniquePresidentName(text)) return CommandCost(STR_ERROR_NAME_MUST_BE_UNIQUE);
 	}
 
 	if (flags & DC_EXEC) {
@@ -1305,13 +1397,14 @@ CommandCost CmdRenamePresident(TileIndex tile, DoCommandFlag flags, uint32_t p1,
 			c->president_name = text;
 
 			if (c->name_1 == STR_SV_UNNAMED && c->name.empty()) {
-				char buf[80];
+				format_buffer buf;
 
-				seprintf(buf, lastof(buf), "%s Transport", text);
-				DoCommand(0, 0, 0, DC_EXEC, CMD_RENAME_COMPANY, buf);
+				buf.format("{} Transport", text);
+				DoCommand(0, 0, 0, DC_EXEC, CMD_RENAME_COMPANY, buf.c_str());
 			}
 		}
 
+		InvalidateWindowClassesData(WC_COMPANY, 1);
 		MarkWholeScreenDirty();
 		CompanyAdminUpdate(c);
 	}
@@ -1377,23 +1470,21 @@ uint32_t CompanyInfrastructure::GetTramTotal() const
 	return total;
 }
 
-char *CompanyInfrastructure::Dump(char *buffer, const char *last) const
+void CompanyInfrastructure::Dump(format_target &buffer) const
 {
 	uint rail_total = 0;
 	for (RailType rt = RAILTYPE_BEGIN; rt != RAILTYPE_END; rt++) {
-		if (rail[rt]) buffer += seprintf(buffer, last, "Rail: %s: %u\n", GetStringPtr(GetRailTypeInfo(rt)->strings.name), rail[rt]);
+		if (rail[rt]) buffer.format("Rail: {}: {}\n", GetStringPtr(GetRailTypeInfo(rt)->strings.name), rail[rt]);
 		rail_total += rail[rt];
 	}
-	buffer += seprintf(buffer, last, "Total Rail: %u\n", rail_total);
-	buffer += seprintf(buffer, last, "Signal: %u\n", signal);
+	buffer.format("Total Rail: {}\n", rail_total);
+	buffer.format("Signal: {}\n", signal);
 	for (RoadType rt = ROADTYPE_BEGIN; rt != ROADTYPE_END; rt++) {
-		if (road[rt]) buffer += seprintf(buffer, last, "%s: %s: %u\n", RoadTypeIsTram(rt) ? "Tram" : "Road", GetStringPtr(GetRoadTypeInfo(rt)->strings.name), road[rt]);
+		if (road[rt]) buffer.format("{}: {}: {}\n", RoadTypeIsTram(rt) ? "Tram" : "Road", GetStringPtr(GetRoadTypeInfo(rt)->strings.name), road[rt]);
 	}
-	buffer += seprintf(buffer, last, "Total Road: %u\n", this->GetRoadTotal());
-	buffer += seprintf(buffer, last, "Total Tram: %u\n", this->GetTramTotal());
-	buffer += seprintf(buffer, last, "Water: %u\n", water);
-	buffer += seprintf(buffer, last, "Station: %u\n", station);
-	buffer += seprintf(buffer, last, "Airport: %u\n", airport);
-
-	return buffer;
+	buffer.format("Total Road: {}\n", this->GetRoadTotal());
+	buffer.format("Total Tram: {}\n", this->GetTramTotal());
+	buffer.format("Water: {}\n", water);
+	buffer.format("Station: {}\n", station);
+	buffer.format("Airport: {}\n", airport);
 }

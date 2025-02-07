@@ -181,15 +181,9 @@ UBool ScriptRun::next()
                 // now that we have a final script code, fix any open
                 // characters we pushed before we knew the script code.
                 while (startSP < parenSP) {
-                    parenStack[++startSP].scriptCode = scriptCode;
+                    auto idx = ++startSP;
+                    if (idx >= 0) parenStack[idx].scriptCode = scriptCode;
                 }
-            }
-
-            // if this character is a close paired character,
-            // pop it from the stack
-            if (pairIndex >= 0 && (pairIndex & 1) != 0 && parenSP >= 0) {
-                parenSP -= 1;
-                startSP -= 1;
             }
         } else {
             // if the run broke on a surrogate pair,

@@ -15,6 +15,7 @@
 #include "landscape.h"
 #include "window_func.h"
 #include "tunnel_map.h"
+
 #include "widgets/vehicle_widget.h"
 
 /** What is the status of our acceleration? */
@@ -46,6 +47,8 @@ struct GroundVehicleCache {
 
 	/* Cached UI information. */
 	uint16_t last_speed;              ///< The last speed we did display, so we only have to redraw when this changes.
+
+	bool operator==(const GroundVehicleCache &) const = default;
 };
 
 /** Ground vehicle flags. */
@@ -72,9 +75,9 @@ struct GroundVehicleAcceleration {
  * virtual uint16_t      GetWeightWithoutCargo() const = 0;
  * virtual uint16_t      GetCargoWeight() const = 0;
  * virtual uint16_t      GetWeight() const = 0;
- * virtual byte          GetTractiveEffort() const = 0;
- * virtual byte          GetAirDrag() const = 0;
- * virtual byte          GetAirDragArea() const = 0;
+ * virtual uint8_t       GetTractiveEffort() const = 0;
+ * virtual uint8_t       GetAirDrag() const = 0;
+ * virtual uint8_t       GetAirDragArea() const = 0;
  * virtual AccelStatus   GetAccelerationStatus() const = 0;
  * virtual uint16_t      GetCurrentSpeed() const = 0;
  * virtual uint32_t      GetRollingFriction() const = 0;
@@ -138,7 +141,7 @@ struct GroundVehicle : public SpecializedVehicle<T, Type> {
 			}
 			if (incl != 0) zero_slope_resist = false;
 		}
-		SB(this->vcache.cached_veh_flags, VCF_GV_ZERO_SLOPE_RESIST, 1, zero_slope_resist ? 1 : 0);
+		AssignBit(this->vcache.cached_veh_flags, VCF_GV_ZERO_SLOPE_RESIST, zero_slope_resist);
 
 		return incl;
 	}
@@ -423,96 +426,7 @@ struct GroundVehicle : public SpecializedVehicle<T, Type> {
 	}
 
 protected:
-	/**
-	 * Update the speed of the vehicle.
-	 *
-	 * It updates the cur_speed and subspeed variables depending on the state
-	 * of the vehicle; in this case the current acceleration, minimum and
-	 * maximum speeds of the vehicle. It returns the distance that that the
-	 * vehicle can drive this tick. #Vehicle::GetAdvanceDistance() determines
-	 * the distance to drive before moving a step on the map.
-	 * @param accel     The acceleration we would like to give this vehicle.
-	 * @param min_speed The minimum speed here, in vehicle specific units.
-	 * @param max_speed The maximum speed here, in vehicle specific units.
-	 * @param advisory_max_speed The advisory maximum speed here, in vehicle specific units.
-	 * @return Distance to drive.
-	 */
-	inline uint DoUpdateSpeed(GroundVehicleAcceleration accel, int min_speed, int max_speed, int advisory_max_speed, bool use_realistic_braking)
-	{
-		const byte initial_subspeed = this->subspeed;
-		uint spd = this->subspeed + accel.acceleration;
-		this->subspeed = (byte)spd;
-
-		if (!use_realistic_braking) {
-			max_speed = std::min(max_speed, advisory_max_speed);
-		}
-
-		int tempmax = max_speed;
-
-		/* When we are going faster than the maximum speed, reduce the speed
-		 * somewhat gradually. But never lower than the maximum speed. */
-		if (this->breakdown_ctr == 1) {
-			if (this->breakdown_type == BREAKDOWN_LOW_POWER) {
-				if ((this->tick_counter & 0x7) == 0 && _settings_game.vehicle.train_acceleration_model == AM_ORIGINAL) {
-					if (this->cur_speed > (this->breakdown_severity * max_speed) >> 8) {
-						tempmax = this->cur_speed - (this->cur_speed / 10) - 1;
-					} else {
-						tempmax = (this->breakdown_severity * max_speed) >> 8;
-					}
-				}
-			} else if (this->breakdown_type == BREAKDOWN_LOW_SPEED) {
-				tempmax = std::min<int>(max_speed, this->breakdown_severity);
-			} else {
-				tempmax = this->cur_speed;
-			}
-		}
-
-		if (this->cur_speed > max_speed) {
-			if (use_realistic_braking && accel.braking >= 0) {
-				extern void TrainBrakesOverheatedBreakdown(Vehicle *v);
-				TrainBrakesOverheatedBreakdown(this);
-			}
-			tempmax = std::max(this->cur_speed - (this->cur_speed / 10) - 1, max_speed);
-		}
-
-		int tempspeed = this->cur_speed + ((int)spd >> 8);
-
-		if (use_realistic_braking && tempspeed > advisory_max_speed && accel.braking != accel.acceleration) {
-			spd = initial_subspeed + accel.braking;
-			int braking_speed = this->cur_speed + ((int)spd >> 8);
-			if (braking_speed >= advisory_max_speed) {
-				if (braking_speed > tempmax) {
-					if (use_realistic_braking && accel.braking >= 0) {
-						extern void TrainBrakesOverheatedBreakdown(Vehicle *v);
-						TrainBrakesOverheatedBreakdown(this);
-					}
-					tempspeed = tempmax;
-					this->subspeed = 0;
-				} else {
-					tempspeed = braking_speed;
-					this->subspeed = (byte)spd;
-				}
-			} else {
-				tempspeed = advisory_max_speed;
-				this->subspeed = 0;
-			}
-		}
-
-		/* Enforce a maximum and minimum speed. Normally we would use something like
-		 * Clamp for this, but in this case min_speed might be below the maximum speed
-		 * threshold for some reason. That makes acceleration fail and assertions
-		 * happen in Clamp. So make it explicit that min_speed overrules the maximum
-		 * speed by explicit ordering of min and max. */
-		tempspeed = std::min(tempspeed, tempmax);
-
-		this->cur_speed = std::max(tempspeed, min_speed);
-
-		int scaled_spd = this->GetAdvanceSpeed(this->cur_speed);
-
-		scaled_spd += this->progress;
-		this->progress = 0; // set later in *Handler or *Controller
-		return scaled_spd;
-	}
+	uint DoUpdateSpeed(GroundVehicleAcceleration accel, int min_speed, int max_speed, int advisory_max_speed, bool use_realistic_braking);
 };
 
 #endif /* GROUND_VEHICLE_HPP */

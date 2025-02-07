@@ -25,7 +25,7 @@
 template <typename T>
 constexpr T abs(const T a)
 {
-	return (a < (T)0) ? -a : a;
+	return (a < static_cast<T>(0)) ? -a : a;
 }
 
 /**
@@ -41,7 +41,7 @@ constexpr T Align(const T x, uint n)
 {
 	assert((n & (n - 1)) == 0 && n != 0);
 	n--;
-	return (T)((x + n) & ~((T)n));
+	return static_cast<T>((x + n) & ~static_cast<T>(n));
 }
 
 /**
@@ -57,8 +57,8 @@ constexpr T Align(const T x, uint n)
 template <typename T>
 constexpr T *AlignPtr(T *x, uint n)
 {
-	static_assert(sizeof(size_t) == sizeof(void *));
-	return reinterpret_cast<T *>(Align((size_t)x, n));
+	static_assert(sizeof(uintptr_t) == sizeof(void *));
+	return reinterpret_cast<T *>(Align(reinterpret_cast<uintptr_t>(x), n));
 }
 
 /**
@@ -254,7 +254,7 @@ constexpr T Delta(const T a, const T b)
 template <typename T>
 constexpr bool IsInsideBS(const T x, const size_t base, const size_t size)
 {
-	return (size_t)(x - base) < size;
+	return static_cast<size_t>(x - base) < size;
 }
 
 /**
@@ -271,9 +271,9 @@ template <typename T, std::enable_if_t<std::disjunction_v<std::is_convertible<T,
 constexpr bool IsInsideMM(const T x, const size_t min, const size_t max) noexcept
 {
 	if constexpr (std::is_base_of_v<StrongTypedefBase, T>) {
-		return (size_t)(x.base() - min) < (max - min);
+		return static_cast<size_t>(x.base() - min) < (max - min);
 	} else {
-		return (size_t)(x - min) < (max - min);
+		return static_cast<size_t>(x - min) < (max - min);
 	}
 }
 
@@ -431,6 +431,21 @@ constexpr inline T SaturatingAdd(T a, T b)
 	if (c < a) return std::numeric_limits<T>::max();
 	return c;
 #endif
+}
+
+/**
+ * Return number of base 10 digits required for an unsigned value.
+ */
+template<typename T, std::enable_if_t<std::is_unsigned_v<T>, int> = 0>
+constexpr inline uint GetBase10DigitsRequired(T x)
+{
+	if (sizeof(T) <= sizeof(uint32_t) || x <= UINT32_MAX) {
+		extern uint GetBase10DigitsRequired32(uint32_t x);
+		return GetBase10DigitsRequired32(static_cast<uint32_t>(x));
+	} else {
+		extern uint GetBase10DigitsRequired64(uint64_t x);
+		return GetBase10DigitsRequired64(x);
+	}
 }
 
 

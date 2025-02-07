@@ -11,12 +11,12 @@
 #include "debug.h"
 #include "core/alloc_func.hpp"
 #include "core/math_func.hpp"
+#include "error_func.h"
 #include "string_func.h"
 #include "string_base.h"
 
 #include "table/control_codes.h"
 
-#include <stdarg.h>
 #include <ctype.h> /* required for tolower() */
 #include <sstream>
 
@@ -50,51 +50,6 @@
 #undef vsnprintf
 
 /**
- * Safer implementation of vsnprintf; same as vsnprintf except:
- * - last instead of size, i.e. replace sizeof with lastof.
- * - return gives the amount of characters added, not what it would add.
- * @param str    buffer to write to up to last
- * @param last   last character we may write to
- * @param format the formatting (see snprintf)
- * @param ap     the list of arguments for the format
- * @return the number of added characters
- */
-int CDECL vseprintf(char *str, const char *last, const char *format, va_list ap)
-{
-	ptrdiff_t diff = last - str;
-	if (diff < 0) return 0;
-	return std::min(static_cast<int>(diff), vsnprintf(str, diff + 1, format, ap));
-}
-
-/**
- * Appends characters from one string to another.
- *
- * Appends the source string to the destination string with respect of the
- * terminating null-character and and the last pointer to the last element
- * in the destination buffer. If the last pointer is set to nullptr no
- * boundary check is performed.
- *
- * @note usage: strecat(dst, src, lastof(dst));
- * @note lastof() applies only to fixed size arrays
- *
- * @param dst The buffer containing the target string
- * @param src The buffer containing the string to append
- * @param last The pointer to the last element of the destination buffer
- * @return The pointer to the terminating null-character in the destination buffer
- */
-char *strecat(char *dst, const char *src, const char *last)
-{
-	dbg_assert(dst <= last);
-	while (*dst != '\0') {
-		if (dst == last) return dst;
-		dst++;
-	}
-
-	return strecpy(dst, src, last);
-}
-
-
-/**
  * Copies characters from one buffer to another.
  *
  * Copies the source string to the destination buffer with respect of the
@@ -120,12 +75,39 @@ char *strecpy(char *dst, const char *src, const char *last, bool quiet_mode)
 
 	if (dst == last && *src != '\0') {
 #if defined(STRGEN) || defined(SETTINGSGEN)
-		error("String too long for destination buffer");
+		FatalError("String too long for destination buffer");
 #else /* STRGEN || SETTINGSGEN */
-		DEBUG(misc, quiet_mode ? 1 : 0, "String too long for destination buffer");
+		Debug(misc, quiet_mode ? 1 : 0, "String too long for destination buffer");
 #endif /* STRGEN || SETTINGSGEN */
 	}
 	return dst;
+}
+
+/**
+ * Copies characters from one buffer to another.
+ *
+ * Copies the source string to the destination buffer with respect of the
+ * terminating null-character and the size of the destination buffer.
+ *
+ * @note usage: strecpy(dst, src);
+ *
+ * @param dst The destination buffer
+ * @param src The buffer containing the string to copy
+ */
+void strecpy(std::span<char> dst, std::string_view src)
+{
+	/* Ensure source string fits with NUL terminator; dst must be at least 1 character longer than src. */
+	if (std::empty(dst) || std::size(src) >= std::size(dst) - 1U) {
+#if defined(STRGEN) || defined(SETTINGSGEN)
+		FatalError("String too long for destination buffer");
+#else /* STRGEN || SETTINGSGEN */
+		Debug(misc, 0, "String too long for destination buffer");
+		src = src.substr(0, std::size(dst) - 1U);
+#endif /* STRGEN || SETTINGSGEN */
+	}
+
+	auto it = std::copy(std::begin(src), std::end(src), std::begin(dst));
+	*it = '\0';
 }
 
 /**
@@ -141,42 +123,6 @@ char *stredup(const char *s, const char *last)
 	char *tmp = CallocT<char>(len + 1);
 	memcpy(tmp, s, len);
 	return tmp;
-}
-
-std::string stdstr_vfmt(const char *str, va_list va)
-{
-	std::string out;
-
-	va_list va2;
-	va_copy(va2, va);
-
-	static constexpr int DEFAULT_BUFFER_SIZE = 1024;
-	char buf[DEFAULT_BUFFER_SIZE];
-
-	int len = vsnprintf(buf, DEFAULT_BUFFER_SIZE, str, va);
-	if (len >= DEFAULT_BUFFER_SIZE) {
-		/* buffer was too small */
-		out.resize(len);
-		vsnprintf(out.data(), len + 1, str, va2);
-	} else if (len > 0) {
-		out.assign(buf, len);
-	}
-	va_end(va2);
-	return out;
-}
-
-/**
- * Format, "printf", into a std::string.
- * @param str The formatting string.
- * @return The formatted string.
- */
-std::string CDECL stdstr_fmt(const char *str, ...)
-{
-	va_list va;
-	va_start(va, str);
-	std::string output = stdstr_vfmt(str, va);
-	va_end(va);
-	return output;
 }
 
 /**
@@ -210,23 +156,19 @@ const char *str_fix_scc_encoded(char *str, const char *last)
  * @param data Array to format
  * @return Converted string.
  */
-std::string FormatArrayAsHex(std::span<const byte> data, bool upper_case)
+std::string FormatArrayAsHex(std::span<const uint8_t> data, bool upper_case)
 {
-	std::string hex_output;
-	hex_output.resize(data.size() * 2);
+	format_buffer buf;
 
-	char txt[3];
 	for (uint i = 0; i < data.size(); ++i) {
 		if (upper_case) {
-			seprintf(txt, lastof(txt), "%02X", data[i]);
+			buf.format("{:02X}", data[i]);
 		} else {
-			seprintf(txt, lastof(txt), "%02x", data[i]);
+			buf.format("{:02x}", data[i]);
 		}
-		hex_output[i * 2] = txt[0];
-		hex_output[(i * 2) + 1] = txt[1];
 	}
 
-	return hex_output;
+	return buf.to_string();
 }
 
 /**
@@ -349,42 +291,45 @@ std::string StrMakeValid(std::string_view str, StringValidationSettings settings
 	auto buf = str.data();
 	auto last = buf + str.size() - 1;
 
-	std::ostringstream dst;
-	std::ostreambuf_iterator<char> dst_iter(dst);
+	std::string dst;
+	auto dst_iter = std::back_inserter(dst);
 	StrMakeValid(dst_iter, buf, last, settings);
 
-	return dst.str();
+	return dst;
 }
 
 /**
  * Checks whether the given string is valid, i.e. contains only
  * valid (printable) characters and is properly terminated.
- * @param str  The string to validate.
- * @param last The last character of the string, i.e. the string
- *             must be terminated here or earlier.
+ * @note std::span is used instead of std::string_view as we are validating fixed-length string buffers, and
+ * std::string_view's constructor will assume a C-string that ends with a NUL terminator, which is one of the things
+ * we are checking.
+ * @param str Span of chars to validate.
  */
-bool StrValid(const char *str, const char *last)
+bool StrValid(std::span<const char> str)
 {
 	/* Assume the ABSOLUTE WORST to be in str as it comes from the outside. */
+	auto it = std::begin(str);
+	auto last = std::prev(std::end(str));
 
-	while (str <= last && *str != '\0') {
-		size_t len = Utf8EncodedCharLen(*str);
+	while (it <= last && *it != '\0') {
+		size_t len = Utf8EncodedCharLen(*it);
 		/* Encoded length is 0 if the character isn't known.
 		 * The length check is needed to prevent Utf8Decode to read
 		 * over the terminating '\0' if that happens to be placed
 		 * within the encoding of an UTF8 character. */
-		if (len == 0 || str + len > last) return false;
+		if (len == 0 || it + len > last) return false;
 
 		char32_t c;
-		len = Utf8Decode(&c, str);
+		len = Utf8Decode(&c, &*it);
 		if (!IsPrintable(c) || (c >= SCC_SPRITE_START && c <= SCC_SPRITE_END)) {
 			return false;
 		}
 
-		str += len;
+		it += len;
 	}
 
-	return *str == '\0';
+	return *it == '\0';
 }
 
 /**
@@ -693,63 +638,6 @@ bool IsValidChar(char32_t key, CharSetFilter afilter)
 	}
 }
 
-#ifdef _WIN32
-#if defined(_MSC_VER) && _MSC_VER < 1900
-/**
- * Almost POSIX compliant implementation of \c vsnprintf for VC compiler.
- * The difference is in the value returned on output truncation. This
- * implementation returns size whereas a POSIX implementation returns
- * size or more (the number of bytes that would be written to str
- * had size been sufficiently large excluding the terminating null byte).
- */
-int CDECL vsnprintf(char *str, size_t size, const char *format, va_list ap)
-{
-	if (size == 0) return 0;
-
-	errno = 0;
-	int ret = _vsnprintf(str, size, format, ap);
-
-	if (ret < 0) {
-		if (errno != ERANGE) {
-			/* There's a formatting error, better get that looked
-			 * at properly instead of ignoring it. */
-			NOT_REACHED();
-		}
-	} else if ((size_t)ret < size) {
-		/* The buffer is big enough for the number of
-		 * characters stored (excluding null), i.e.
-		 * the string has been null-terminated. */
-		return ret;
-	}
-
-	/* The buffer is too small for _vsnprintf to write the
-	 * null-terminator at its end and return size. */
-	str[size - 1] = '\0';
-	return (int)size;
-}
-#endif /* _MSC_VER */
-
-#endif /* _WIN32 */
-
-/**
- * Safer implementation of snprintf; same as snprintf except:
- * - last instead of size, i.e. replace sizeof with lastof.
- * - return gives the amount of characters added, not what it would add.
- * @param str    buffer to write to up to last
- * @param last   last character we may write to
- * @param format the formatting (see snprintf)
- * @return the number of added characters
- */
-int CDECL seprintf(char *str, const char *last, const char *format, ...)
-{
-	va_list ap;
-
-	va_start(ap, format);
-	int ret = vseprintf(str, last, format, ap);
-	va_end(ap);
-	return ret;
-}
-
 
 /* UTF-8 handling routines */
 
@@ -886,6 +774,22 @@ char *strcasestr(const char *haystack, const char *needle)
 #endif /* DEFINE_STRCASESTR */
 
 /**
+ * Test if a unicode character is considered garbage to be skipped.
+ * @param c Character to test.
+ * @returns true iff the character should be skipped.
+ */
+static bool IsGarbageCharacter(char32_t c)
+{
+	if (c >= '0' && c <= '9') return false;
+	if (c >= 'A' && c <= 'Z') return false;
+	if (c >= 'a' && c <= 'z') return false;
+	if (c >= SCC_CONTROL_START && c <= SCC_CONTROL_END) return true;
+	if (c >= 0xC0 && c <= 0x10FFFF) return false;
+
+	return true;
+}
+
+/**
  * Skip some of the 'garbage' in the string that we don't want to use
  * to sort on. This way the alphabetical sorting will work better as
  * we would be actually using those characters instead of some other
@@ -895,8 +799,15 @@ char *strcasestr(const char *haystack, const char *needle)
  */
 static std::string_view SkipGarbage(std::string_view str)
 {
-	while (!str.empty() && (str[0] < '0' || IsInsideMM(str[0], ';', '@' + 1) || IsInsideMM(str[0], '[', '`' + 1) || IsInsideMM(str[0], '{', '~' + 1))) str.remove_prefix(1);
-	return str;
+	auto first = std::begin(str);
+	auto last = std::end(str);
+	while (first < last) {
+		char32_t c;
+		size_t len = Utf8Decode(&c, &*first);
+		if (!IsGarbageCharacter(c)) break;
+		first += len;
+	}
+	return {first, last};
 }
 
 static int _strnatcmpIntl(const char *s1, const char *s2) {
@@ -1392,3 +1303,33 @@ public:
 #endif /* defined(WITH_COCOA) && !defined(STRGEN) && !defined(SETTINGSGEN) */
 
 #endif
+
+const char *StrErrorDumper::Get(int errornum)
+{
+#if defined(_WIN32)
+	if (strerror_s(this->buf, lengthof(this->buf), errornum) == 0) {
+		return this->buf;
+	}
+#else
+	struct StrErrorRHelper {
+		static bool Success(char *result) { return true; }      ///< GNU-specific
+		static bool Success(int result) { return result == 0; } ///< XSI-compliant
+
+		static const char *GetString(char *result, const char *buffer) { return result; } ///< GNU-specific
+		static const char *GetString(int result, const char *buffer) { return buffer; }   ///< XSI-compliant
+	};
+
+	auto result = strerror_r(errornum, this->buf, lengthof(this->buf));
+	if (StrErrorRHelper::Success(result)) {
+		return StrErrorRHelper::GetString(result, this->buf);
+	}
+#endif
+
+	format_to_fixed_z::format_to(this->buf, lastof(this->buf), "Unknown error {}", errornum);
+	return this->buf;
+}
+
+const char *StrErrorDumper::GetLast()
+{
+	return this->Get(errno);
+}

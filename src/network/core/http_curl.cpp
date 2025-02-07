@@ -10,7 +10,7 @@
  */
 
 #include "../../stdafx.h"
-#include "../../debug_fmt.h"
+#include "../../debug.h"
 #include "../../fileio_func.h"
 #include "../../rev.h"
 #include "../../thread.h"
@@ -61,10 +61,10 @@ public:
 	 * @param callback the callback to send data back on.
 	 * @param data     the data we want to send. When non-empty, this will be a POST request, otherwise a GET request.
 	 */
-	NetworkHTTPRequest(const std::string &uri, HTTPCallback *callback, const std::string &data) :
+	NetworkHTTPRequest(const std::string &uri, HTTPCallback *callback, std::string data) :
 		uri(uri),
 		callback(callback),
-		data(data)
+		data(std::move(data))
 	{
 		std::lock_guard<std::mutex> lock(_new_http_callback_mutex);
 		_new_http_callbacks.push_back(&this->callback);
@@ -91,7 +91,7 @@ static std::string _http_ca_file = "";
 static std::string _http_ca_path = "";
 #endif /* UNIX */
 
-/* static */ void NetworkHTTPSocketHandler::Connect(const std::string &uri, HTTPCallback *callback, const std::string data)
+/* static */ void NetworkHTTPSocketHandler::Connect(const std::string &uri, HTTPCallback *callback, std::string data)
 {
 #if defined(UNIX)
 	if (_http_ca_file.empty() && _http_ca_path.empty()) {
@@ -101,7 +101,7 @@ static std::string _http_ca_path = "";
 #endif /* UNIX */
 
 	std::lock_guard<std::mutex> lock(_http_mutex);
-	_http_requests.push(std::make_unique<NetworkHTTPRequest>(uri, callback, data));
+	_http_requests.push(std::make_unique<NetworkHTTPRequest>(uri, callback, std::move(data)));
 	_http_cv.notify_one();
 }
 
@@ -147,7 +147,7 @@ void HttpThread()
 		curl_easy_reset(curl);
 		curl_slist *headers = nullptr;
 
-		if (_debug_net_level >= 5) {
+		if (GetDebugLevel(DebugLevelID::net) >= 5) {
 			curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
 		}
 

@@ -11,6 +11,7 @@
 #define GENWORLD_H
 
 #include "company_type.h"
+#include <functional>
 #include <thread>
 
 /** Constants related to world generation */
@@ -90,12 +91,15 @@ void GenerateWorld(GenWorldMode mode, uint size_x, uint size_y, bool reset_setti
 void AbortGeneratingWorld();
 bool IsGeneratingWorldAborted();
 void HandleGeneratingWorldAbortion();
+void ExecuteWithGenerateWorld(std::function<void()> func);
+void ScheduleExecuteWithGenerateWorld(std::function<void()> func);
+void LoadTownData();
 
 /* genworld_gui.cpp */
-void SetNewLandscapeType(byte landscape);
+void SetNewLandscapeType(uint8_t landscape);
 void SetGeneratingWorldProgress(GenWorldProgress cls, uint total);
 void IncreaseGeneratingWorldProgress(GenWorldProgress cls);
-void PrepareGenerateWorldProgress();
+void PrepareGenerateWorldProgress(bool single_section_mode = false);
 void ShowGenerateWorldProgress();
 void StartNewGameWithoutGUI(uint32_t seed);
 void ShowCreateScenario();

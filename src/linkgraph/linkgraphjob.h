@@ -128,10 +128,11 @@ private:
 
 	typedef std::vector<NodeAnnotation> NodeAnnotationVector;
 
-	friend SaveLoadTable GetLinkGraphJobDesc();
+	friend NamedSaveLoadTable GetLinkGraphJobDesc();
 	friend upstream_sl::SaveLoadTable upstream_sl::GetLinkGraphJobDesc();
 	friend void GetLinkGraphJobDayLengthScaleAfterLoad(LinkGraphJob *lgj);
 	friend void LinkGraphFixupAfterLoad(bool compression_was_date);
+	friend void LinkGraphJobSetDayLengthFactor();
 	friend class LinkGraphSchedule;
 	friend class LinkGraphJobGroup;
 
@@ -144,6 +145,7 @@ protected:
 	ScaledTickCounter start_tick;     ///< Tick when the job was started.
 	NodeAnnotationVector nodes;       ///< Extra node data necessary for link graph calculation.
 	EdgeAnnotationVector edges;       ///< Edge data necessary for link graph calculation.
+	uint8_t day_length_factor;        ///< Day length factor for this job
 	std::atomic<bool> job_completed;  ///< Is the job still running. This is accessed by multiple threads and reads may be stale.
 	std::atomic<bool> job_aborted;    ///< Has the job been aborted. This is accessed by multiple threads and reads may be stale.
 
@@ -264,7 +266,7 @@ public:
 	 * settings have to be brutally const-casted in order to populate them.
 	 */
 	LinkGraphJob() : settings(_settings_game.linkgraph),
-			join_tick(0), start_tick(0), job_completed(false), job_aborted(false) {}
+			join_tick(0), start_tick(0), day_length_factor(1), job_completed(false), job_aborted(false) {}
 
 	LinkGraphJob(const LinkGraph &orig, uint duration_multiplier);
 	~LinkGraphJob();
@@ -312,6 +314,12 @@ public:
 	 * @return Start date.
 	 */
 	inline ScaledTickCounter StartTick() const { return this->start_tick; }
+
+	/**
+	 * Get the day length factor to use for this job.
+	 * @return Day length factor.
+	 */
+	inline uint8_t DayLengthFactor() const { return this->day_length_factor; }
 
 	/**
 	 * Set the tick when the job should be joined.
@@ -371,7 +379,6 @@ public:
 	static Path *invalid_path;
 
 	Path(NodeID n, bool source = false);
-	virtual ~Path() = default;
 
 	/** Get the node this leg passes. */
 	inline NodeID GetNode() const { return this->node; }
@@ -439,18 +446,16 @@ public:
 	void Fork(Path *base, uint cap, int free_cap, uint dist);
 
 	inline bool GetAnnosSetFlag() const { return HasBit(this->parent_storage, 0); }
-	inline void SetAnnosSetFlag(bool flag) { SB(this->parent_storage, 0, 1, flag ? 1 : 0); }
+	inline void SetAnnosSetFlag(bool flag) { AssignBit(this->parent_storage, 0, flag); }
 
 protected:
 
-	/**
+	/*
 	 * Some boundaries to clamp against in order to avoid integer overflows.
 	 */
-	enum PathCapacityBoundaries {
-		PATH_CAP_MULTIPLIER = 16,
-		PATH_CAP_MIN_FREE = (INT_MIN + 1) / PATH_CAP_MULTIPLIER,
-		PATH_CAP_MAX_FREE = (INT_MAX - 1) / PATH_CAP_MULTIPLIER
-	};
+	static constexpr int PATH_CAP_MULTIPLIER = 16;
+	static constexpr int PATH_CAP_MIN_FREE = (INT_MIN + 1) / PATH_CAP_MULTIPLIER;
+	static constexpr int PATH_CAP_MAX_FREE = (INT_MAX - 1) / PATH_CAP_MULTIPLIER;
 
 	uint distance;     ///< Sum(distance of all legs up to this one).
 	uint capacity;     ///< This capacity is min(capacity) fom all edges.
@@ -462,9 +467,11 @@ protected:
 
 	uintptr_t parent_storage; ///< Parent leg of this one, flag in LSB of pointer
 
-	/** Get the parent leg of this one. */
+public:
+	/** Set the parent leg of this one, only for internal use, or when moving parent path. */
 	inline void SetParent(Path *parent) { this->parent_storage = reinterpret_cast<uintptr_t>(parent) | (this->parent_storage & 1); }
 };
+static_assert(std::is_trivially_destructible_v<Path>);
 
 inline bool IsLinkGraphCargoExpress(CargoID cargo)
 {

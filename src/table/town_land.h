@@ -1811,14 +1811,13 @@ static_assert(lengthof(_town_draw_tile_data) == (NEW_HOUSE_OFFSET) * 4 * 4);
  */
 #define CMAXYEAR CalTime::MAX_YEAR
 #define MS(mnd, mxd, p, rc, bn, rr, mg, ca1, ca2, ca3, bf, ba, cg1, cg2, cg3) \
-	{mnd, mxd, p, rc, bn, rr, mg, \
+	{CalTime::Year{mnd}, CalTime::Year{mxd}, p, rc, bn, rr, mg, \
 	{ca1, ca2, ca3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, \
 	{INVALID_CARGO, INVALID_CARGO, INVALID_CARGO, INVALID_CARGO, INVALID_CARGO, INVALID_CARGO, INVALID_CARGO, INVALID_CARGO, INVALID_CARGO, INVALID_CARGO, INVALID_CARGO, INVALID_CARGO, INVALID_CARGO, INVALID_CARGO, INVALID_CARGO, INVALID_CARGO}, \
-	{cg1, cg2, cg3, CT_INVALID, CT_INVALID, CT_INVALID, CT_INVALID, CT_INVALID, CT_INVALID, CT_INVALID, CT_INVALID, CT_INVALID, CT_INVALID, CT_INVALID, CT_INVALID, CT_INVALID}, \
 	bf, ba, true, GRFFileProps(INVALID_HOUSE_ID), 0, {COLOUR_BEGIN, COLOUR_BEGIN, COLOUR_BEGIN, COLOUR_BEGIN}, \
-	16, NO_EXTRA_FLAG, HCF_NONE, HOUSE_NO_CLASS, {0, 2, 0, 0}, 0, 0, 0}
+	16, NO_EXTRA_FLAG, HCF_NONE, HOUSE_NO_CLASS, {0, 2, 0, 0}, 0, 0, 0, {cg1, cg2, cg3}}
 /** House specifications from original data */
-static const HouseSpec _original_house_specs[] = {
+extern const HouseSpec _original_house_specs[] = {
 	/**
 	 *                                                                              remove_rating_decrease
 	 *                                                                              |    mail_generation

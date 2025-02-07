@@ -39,14 +39,14 @@ static constexpr NWidgetPart _nested_ai_config_widgets[] = {
 						NWidget(WWT_PUSHARROWBTN, COLOUR_YELLOW, WID_AIC_DECREASE_NUMBER), SetDataTip(AWV_DECREASE, STR_NULL),
 						NWidget(WWT_PUSHARROWBTN, COLOUR_YELLOW, WID_AIC_INCREASE_NUMBER), SetDataTip(AWV_INCREASE, STR_NULL),
 					EndContainer(),
-					NWidget(WWT_TEXT, COLOUR_MAUVE, WID_AIC_NUMBER), SetDataTip(STR_AI_CONFIG_MAX_COMPETITORS, STR_NULL), SetFill(1, 0),
+					NWidget(WWT_TEXT, INVALID_COLOUR, WID_AIC_NUMBER), SetDataTip(STR_AI_CONFIG_MAX_COMPETITORS, STR_NULL), SetFill(1, 0),
 				EndContainer(),
 				NWidget(NWID_HORIZONTAL), SetPIP(0, WidgetDimensions::unscaled.hsep_wide, 0),
 					NWidget(NWID_HORIZONTAL, NC_EQUALSIZE),
 						NWidget(WWT_PUSHARROWBTN, COLOUR_YELLOW, WID_AIC_DECREASE_INTERVAL), SetDataTip(AWV_DECREASE, STR_NULL),
 						NWidget(WWT_PUSHARROWBTN, COLOUR_YELLOW, WID_AIC_INCREASE_INTERVAL), SetDataTip(AWV_INCREASE, STR_NULL),
 					EndContainer(),
-					NWidget(WWT_TEXT, COLOUR_MAUVE, WID_AIC_INTERVAL), SetDataTip(STR_AI_CONFIG_COMPETITORS_INTERVAL, STR_NULL), SetFill(1, 0),
+					NWidget(WWT_TEXT, INVALID_COLOUR, WID_AIC_INTERVAL), SetDataTip(STR_AI_CONFIG_COMPETITORS_INTERVAL, STR_NULL), SetFill(1, 0),
 				EndContainer(),
 				NWidget(NWID_HORIZONTAL, NC_EQUALSIZE),
 					NWidget(WWT_PUSHTXTBTN, COLOUR_YELLOW, WID_AIC_MOVE_UP), SetResize(1, 0), SetFill(1, 0), SetDataTip(STR_AI_CONFIG_MOVE_UP, STR_AI_CONFIG_MOVE_UP_TOOLTIP),
@@ -85,7 +85,7 @@ static WindowDesc _ai_config_desc(__FILE__, __LINE__,
 	WDP_CENTER, nullptr, 0, 0,
 	WC_GAME_OPTIONS, WC_NONE,
 	0,
-	std::begin(_nested_ai_config_widgets), std::end(_nested_ai_config_widgets)
+	_nested_ai_config_widgets
 );
 
 /**
@@ -96,7 +96,7 @@ struct AIConfigWindow : public Window {
 	int line_height;         ///< Height of a single AI-name line.
 	Scrollbar *vscroll;      ///< Cache of the vertical scrollbar.
 
-	AIConfigWindow() : Window(&_ai_config_desc)
+	AIConfigWindow() : Window(_ai_config_desc)
 	{
 		this->InitNested(WN_GAME_OPTIONS_AI); // Initializes 'this->line_height' as a side effect.
 		this->vscroll = this->GetScrollbar(WID_AIC_SCROLLBAR);
@@ -127,20 +127,20 @@ struct AIConfigWindow : public Window {
 		}
 	}
 
-	void UpdateWidgetSize(WidgetID widget, Dimension *size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension *fill, [[maybe_unused]] Dimension *resize) override
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
 	{
 		switch (widget) {
 			case WID_AIC_DECREASE_NUMBER:
 			case WID_AIC_INCREASE_NUMBER:
 			case WID_AIC_DECREASE_INTERVAL:
 			case WID_AIC_INCREASE_INTERVAL:
-				*size = maxdim(*size, NWidgetScrollbar::GetHorizontalDimension());
+				size = maxdim(size, NWidgetScrollbar::GetHorizontalDimension());
 				break;
 
 			case WID_AIC_LIST:
 				this->line_height = GetCharacterHeight(FS_NORMAL) + padding.height;
-				resize->height = this->line_height;
-				size->height = 8 * this->line_height;
+				resize.height = this->line_height;
+				size.height = 8 * this->line_height;
 				break;
 		}
 	}
@@ -314,7 +314,7 @@ struct AIConfigWindow : public Window {
 
 		this->SetWidgetDisabledState(WID_AIC_OPEN_URL, this->selected_slot == INVALID_COMPANY || config->GetInfo() == nullptr || config->GetInfo()->GetURL().empty());
 		for (TextfileType tft = TFT_CONTENT_BEGIN; tft < TFT_CONTENT_END; tft++) {
-			this->SetWidgetDisabledState(WID_AIC_TEXTFILE + tft, this->selected_slot == INVALID_COMPANY || (config->GetTextfile(tft, this->selected_slot) == nullptr));
+			this->SetWidgetDisabledState(WID_AIC_TEXTFILE + tft, this->selected_slot == INVALID_COMPANY || !config->GetTextfile(tft, this->selected_slot).has_value());
 		}
 	}
 };

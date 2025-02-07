@@ -71,22 +71,28 @@ public:
 	static const WidgetDimensions unscaled; ///< Unscaled widget dimensions.
 	static WidgetDimensions scaled;         ///< Widget dimensions scaled for current zoom level.
 
+	static constexpr float ASPECT_LOCATION = 12.f / 14.f;
+	static constexpr float ASPECT_RENAME = 12.f / 14.f;
+	static constexpr float ASPECT_SETTINGS_BUTTON = 21.f / 12.f;
+	static constexpr float ASPECT_TOGGLE_SIZE = 12.f / 14.f;
+	static constexpr float ASPECT_LEFT_RIGHT_BUTTON = 8.f / 12.f;
+	static constexpr float ASPECT_UP_DOWN_BUTTON = 11.f / 12.f;
+	static constexpr float ASPECT_VEHICLE_ICON = 15.f / 12.f;
+	static constexpr float ASPECT_VEHICLE_FLAG = 11.f / 12.f;
+
 private:
 	/**
 	 * Distances used in drawing widgets.
 	 * These constants should not be used elsewhere, use scaled/unscaled WidgetDimensions instead.
 	 */
-	enum WidgetDrawDistances {
-		WD_SHADEBOX_WIDTH   = 12, ///< Minimum width of a standard shade box widget.
-		WD_STICKYBOX_WIDTH  = 12, ///< Minimum width of a standard sticky box widget.
-		WD_DEBUGBOX_WIDTH   = 12, ///< Minimum width of a standard debug box widget.
-		WD_DEFSIZEBOX_WIDTH = 12, ///< Minimum width of a standard defsize box widget.
-		WD_RESIZEBOX_WIDTH  = 12, ///< Minimum width of a resize box widget.
-		WD_CLOSEBOX_WIDTH   = 11, ///< Minimum width of a close box widget.
-
-		WD_CAPTION_HEIGHT   = 14, ///< Minimum height of a title bar.
-		WD_DROPDOWN_HEIGHT  = 12, ///< Minimum height of a drop down widget.
-	};
+	static constexpr uint WD_SHADEBOX_WIDTH = 12; ///< Minimum width of a standard shade box widget.
+	static constexpr uint WD_STICKYBOX_WIDTH = 12; ///< Minimum width of a standard sticky box widget.
+	static constexpr uint WD_DEBUGBOX_WIDTH = 12; ///< Minimum width of a standard debug box widget.
+	static constexpr uint WD_DEFSIZEBOX_WIDTH = 12; ///< Minimum width of a standard defsize box widget.
+	static constexpr uint WD_RESIZEBOX_WIDTH = 12; ///< Minimum width of a resize box widget.
+	static constexpr uint WD_CLOSEBOX_WIDTH = 11; ///< Minimum width of a close box widget.
+	static constexpr uint WD_CAPTION_HEIGHT = 14; ///< Minimum height of a title bar.
+	static constexpr uint WD_DROPDOWN_HEIGHT = 12; ///< Minimum height of a drop down widget.
 
 	friend NWidgetLeaf;
 };
@@ -177,7 +183,7 @@ struct WindowDesc {
 
 	WindowDesc(const char * const file, const int line, WindowPosition default_pos, const char *ini_key, int16_t def_width_trad, int16_t def_height_trad,
 			WindowClass window_class, WindowClass parent_class, uint32_t flags,
-			const NWidgetPart *nwid_begin, const NWidgetPart *nwid_end, HotkeyList *hotkeys = nullptr, WindowDesc *ini_parent = nullptr);
+			const std::span<const NWidgetPart> nwid_parts, HotkeyList *hotkeys = nullptr, WindowDesc *ini_parent = nullptr);
 
 	~WindowDesc();
 
@@ -188,8 +194,7 @@ struct WindowDesc {
 	WindowClass parent_cls;        ///< Class of the parent window. @see WindowClass
 	const char *ini_key;           ///< Key to store window defaults in openttd.cfg. \c nullptr if nothing shall be stored.
 	uint32_t flags;                ///< Flags. @see WindowDefaultFlag
-	const NWidgetPart *nwid_begin; ///< Beginning of nested widget parts describing the window.
-	const NWidgetPart *nwid_end;   ///< Ending of nested widget parts describing the window.
+	const std::span<const NWidgetPart> nwid_parts; ///< Span of nested widget parts describing the window.
 	HotkeyList *hotkeys;           ///< Hotkeys for the window.
 	WindowDesc *ini_parent;        ///< Other window desc to use for WindowDescPreferences.
 
@@ -329,12 +334,12 @@ protected:
 	virtual ~Window();
 
 public:
-	Window(WindowDesc *desc);
+	Window(WindowDesc &desc);
 
 	virtual void Close(int data = 0);
 	static void DeleteClosedWindows();
 
-	WindowDesc *window_desc;    ///< Window description
+	WindowDesc &window_desc;    ///< Window description
 	WindowFlags flags;          ///< Window flags
 	WindowNumber window_number; ///< Window number within the window class
 
@@ -472,6 +477,20 @@ public:
 	inline bool IsWidgetGloballyFocused(WidgetID widget_index) const
 	{
 		return _focused_window == this && IsWidgetFocused(widget_index);
+	}
+
+	/**
+	 * Check if given widget is active in the current window layout.
+	 * This means that the widget exists, is not disabled and is not in a non-selected NWidgetStacked sub-tree.
+	 * @param widget_index : index of the widget in the window to check
+	 * @return true if given widget is active in the current window layout
+	 */
+	inline bool IsWidgetActiveInLayout(WidgetID widget_index) const
+	{
+		const NWidgetCore *nwid = this->GetWidget<NWidgetCore>(widget_index);
+		if (nwid == nullptr) return false;
+
+		return nwid->IsActiveInLayout();
 	}
 
 	/**
@@ -651,12 +670,12 @@ public:
 	 * and \a resize is taken to contain the resize steps. For the convenience of the callee, \a padding contains the amount of
 	 * padding between the content and the edge of the widget. This should be added to the returned size.
 	 * @param widget  Widget number.
-	 * @param size    Size of the widget.
+	 * @param[in,out] size Size of the widget.
 	 * @param padding Recommended amount of space between the widget content and the widget edge.
-	 * @param fill    Fill step of the widget.
-	 * @param resize  Resize step of the widget.
+	 * @param[in,out] fill Fill step of the widget.
+	 * @param[in,out] resize Resize step of the widget.
 	 */
-	virtual void UpdateWidgetSize([[maybe_unused]] WidgetID widget, [[maybe_unused]] Dimension *size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension *fill, [[maybe_unused]] Dimension *resize) {}
+	virtual void UpdateWidgetSize([[maybe_unused]] WidgetID widget, [[maybe_unused]] Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) {}
 
 	/**
 	 * Initialize string parameters for a widget.
@@ -816,11 +835,11 @@ public:
 
 	/**
 	 * The query window opened from this window has closed.
-	 * @param str the new value of the string, nullptr if the window
+	 * @param str the new value of the string, \c std::nullopt if the window
 	 *            was cancelled or an empty string when the default
-	 *            button was pressed, i.e. StrEmpty(str).
+	 *            button was pressed, i.e. \c str->empty().
 	 */
-	virtual void OnQueryTextFinished([[maybe_unused]] char *str) {}
+	virtual void OnQueryTextFinished([[maybe_unused]] std::optional<std::string> str) {}
 
 	/**
 	 * Some data on this window has become invalid.
@@ -1065,7 +1084,7 @@ inline const NWID *Window::GetWidget(WidgetID widnum) const
 class PickerWindowBase : public Window {
 
 public:
-	PickerWindowBase(WindowDesc *desc, Window *parent) : Window(desc)
+	PickerWindowBase(WindowDesc &desc, Window *parent) : Window(desc)
 	{
 		this->parent = parent;
 	}
@@ -1073,6 +1092,7 @@ public:
 	void Close([[maybe_unused]] int data = 0) override;
 };
 
+void BringWindowToFront(Window *w);
 Window *BringWindowToFrontById(WindowClass cls, WindowNumber number);
 Window *FindWindowFromPt(int x, int y);
 
@@ -1085,9 +1105,9 @@ Window *FindWindowFromPt(int x, int y);
  * @return %Window pointer of the newly created window, or the existing one if \a return_existing is set, or \c nullptr.
  */
 template <typename Wcls>
-Wcls *AllocateWindowDescFront(WindowDesc *desc, int window_number, bool return_existing = false)
+Wcls *AllocateWindowDescFront(WindowDesc &desc, int window_number, bool return_existing = false)
 {
-	Wcls *w = static_cast<Wcls *>(BringWindowToFrontById(desc->cls, window_number));
+	Wcls *w = static_cast<Wcls *>(BringWindowToFrontById(desc.cls, window_number));
 	if (w != nullptr) return return_existing ? w : nullptr;
 	return new Wcls(desc, window_number);
 }
@@ -1103,7 +1123,7 @@ extern Point _cursorpos_drag_start;
 
 extern int _scrollbar_start_pos;
 extern int _scrollbar_size;
-extern byte _scroller_click_timeout;
+extern uint8_t _scroller_click_timeout;
 
 extern Window *_scrolling_viewport;
 extern Rect _scrolling_viewport_bound;
@@ -1122,6 +1142,7 @@ extern SpecialMouseMode _special_mouse_mode;
 void SetFocusedWindow(Window *w);
 
 void ScrollbarClickHandler(Window *w, NWidgetCore *nw, int x, int y);
+Rect ScrollRect(Rect r, const Scrollbar &sb, int resize_step = 1);
 
 /**
  * Returns whether a window may be shown or not.
@@ -1148,7 +1169,7 @@ inline bool MayBeShown(const Window *w)
 struct GeneralVehicleWindow : public Window {
 	const Vehicle *vehicle;
 
-	GeneralVehicleWindow(WindowDesc *desc, const Vehicle *v) : Window(desc), vehicle(v) {}
+	GeneralVehicleWindow(WindowDesc &desc, const Vehicle *v) : Window(desc), vehicle(v) {}
 };
 
 #endif /* WINDOW_GUI_H */

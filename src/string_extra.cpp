@@ -9,23 +9,22 @@
 
 #include "stdafx.h"
 #include "string_func.h"
+#include "core/format.hpp"
 #include "3rdparty/md5/md5.h"
+
+void MD5Hash::fmt_format_value(format_target &output) const
+{
+	for (size_t i = 0; i < this->size(); i++) {
+		output.format("{:02X}", (*this)[i]);
+	}
+}
 
 /**
  * Convert the md5sum to a hexadecimal string representation
- * @param buf buffer to put the md5sum into
- * @param last last character of buffer (usually lastof(buf))
  * @param md5sum the md5sum itself
- * @return a pointer to the next character after the md5sum
  * @return the string representation of the md5sum.
  */
-char *md5sumToString(char *buf, const char *last, const MD5Hash &md5sum)
+std::string md5sumToString(const MD5Hash &md5sum)
 {
-	char *p = buf;
-
-	for (size_t i = 0; i < md5sum.size(); i++) {
-		p += seprintf(p, last, "%02X", md5sum[i]);
-	}
-
-	return p;
+	return fmt::format("{}", md5sum);
 }

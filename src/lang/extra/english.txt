@@ -9,12 +9,12 @@ STR_ORDER_TEXT                                                  :{STRING6} {STRI
 STR_JUST_DECIMAL1                                               :{DECIMAL1}
 STR_JUST_TIME_HHMM                                              :{TIME_HHMM}
 STR_JUST_STRING3                                                :{STRING3}
+STR_JUST_STRING6                                                :{STRING6}
 STR_JUST_VELOCITY                                               :{VELOCITY}
 STR_JUST_TT_TICKS                                               :{TT_TICKS}
 STR_JUST_TT_TICKS_LONG                                          :{TT_TICKS_LONG}
 STR_JUST_TT_TIME                                                :{TT_TIME}
 STR_JUST_TT_TIME_ABS                                            :{TT_TIME_ABS}
-STR_JUST_STATION                                                :{STATION}
 
 STR_RED_INT                                                     :{RED}{NUM}
 
@@ -59,6 +59,7 @@ STR_ORDER_CONDITIONAL_COUNTER_VALUE                             :Counter value
 STR_ORDER_CONDITIONAL_TIME_DATE_VALUE                           :Current time/date
 STR_ORDER_CONDITIONAL_TIMETABLE_STATE                           :Timetable state
 STR_ORDER_CONDITIONAL_DISPATCH_SLOT                             :Dispatch slot
+STR_ORDER_CONDITIONAL_CARGO_WAITING_AMOUNT_PERCENTAGE           :Waiting cargo / capacity
 
 ##after STR_ORDER_STOP_LOCATION_FAR_END
 STR_ORDER_STOP_LOCATION_THROUGH                                 :[through load]
@@ -74,9 +75,13 @@ STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_EVERY_MINUTES_CUSTOM         :Every {COMMA}{N
 STR_RIVERS_VERY_MANY                                            :{RED}Very many
 STR_RIVERS_EXTREMELY_MANY                                       :{RED}Extremely many
 
-##end-after
+##after STR_CONFIG_SETTING_BRIBE_HELPTEXT_MINUTES
+STR_CONFIG_SETTING_BRIBE_HELPTEXT_PERIODS                       :Allow companies to try bribing the local town authority. If the bribe is noticed by an inspector, the company will not be able to act in the town for half a period
 
-STR_COMMA_SEPARATOR                                             :,{SP}
+##after STR_CONFIG_SETTING_ALLOW_EXCLUSIVE_HELPTEXT_MINUTES
+STR_CONFIG_SETTING_ALLOW_EXCLUSIVE_HELPTEXT_PERIODS              :If a company buys exclusive transport rights for a town, opponents' stations (passenger and cargo) won't receive any cargo for one period
+
+##end-after
 
 STR_UNIT_NAME_VELOCITY_IMPERIAL                                 :mph
 STR_UNIT_NAME_VELOCITY_METRIC                                   :km/h
@@ -85,6 +90,7 @@ STR_UNIT_NAME_VELOCITY_GAMEUNITS                                :tiles/day
 STR_UNIT_NAME_VELOCITY_GAMEUNITS_WALLCLOCK                      :tiles/sec
 
 STR_UNITS_SECONDS_SHORT                                         :{COMMA}{NBSP}s
+STR_UNITS_PRODUCTION_INTERVALS                                  :{NUM}{NBSP}production interval{P "" s}
 
 STR_BUTTON_RENAME                                               :{BLACK}Rename
 
@@ -96,8 +102,7 @@ STR_SORT_BY_MAX_SPEED_LOADED                                    :Maximum speed (
 STR_SORT_BY_VEHICLES_CALLING                                    :Number of vehicles calling
 STR_SORT_BY_CARGO_CAPACITY_VS_RUNNING_COST                      :Cargo capacity/Running cost
 STR_SORT_BY_VEHICLE_COUNT                                       :Vehicle count
-
-STR_SCENEDIT_TOOLBAR_PLACE_HOUSE                                :{BLACK}Place house
+STR_SORT_BY_TIMETABLE_TYPE                                      :Timetable type
 
 STR_SETTINGS_MENU_ZONING                                        :Zoning
 
@@ -111,12 +116,12 @@ STR_VEHICLE_TYPE_ROAD_VEHICLES                                  :Road Vehicles
 STR_VEHICLE_TYPE_SHIPS                                          :Ships
 STR_VEHICLE_TYPE_AIRCRAFT                                       :Aircraft
 
+STR_GRAPH_X_LABEL_LAST_UNITS                                    :{TINY_FONT}{BLACK}Last {STRING1}
+
 STR_GRAPH_CARGO_PAYMENT_RATES_X_LABEL_SPEED                     :{TINY_FONT}{BLACK}Average transit speed ({STRING})
 STR_GRAPH_CARGO_PAYMENT_RATES_TITLE_AVG_SPEED                   :{TINY_FONT}{BLACK}Payment for delivering 1 unit (or 1,000 litres) of cargo a distance of 200 squares
 STR_GRAPH_CARGO_PAYMENT_RATES_X_LABEL_MINUTES                   :{TINY_FONT}{BLACK}Minutes in transit
 STR_GRAPH_STATION_CARGO_CAPTION                                 :{WHITE}{STATION} - Waiting Cargo History
-STR_GRAPH_STATION_CARGO_X_LABEL_DAYS                            :{TINY_FONT}{BLACK}Development over the last {NUM} days
-STR_GRAPH_STATION_CARGO_X_LABEL_SECONDS                         :{TINY_FONT}{BLACK}Development over the last {NUM} seconds
 STR_GRAPH_STATION_CARGO_TITLE                                   :{TINY_FONT}{BLACK}Units of cargo waiting at the station
 
 STR_GRAPH_CARGO_SPEED_MODE                                      :{TINY_FONT}{BLACK}Average speed
@@ -128,10 +133,16 @@ STR_GRAPH_DELIVERED_CARGO_BY_CARGO_MODE                         :{TINY_FONT}{BLA
 STR_GRAPH_DELIVERED_CARGO_BY_COMPANY_MODE_TOOLTIP               :{BLACK}Display one line for each selected company
 STR_GRAPH_DELIVERED_CARGO_BY_CARGO_MODE_TOOLTIP                 :{BLACK}Display one line for each selected cargo
 
+STR_GRAPH_LAST_24_PRODUCTION_INTERVALS_TIME_LABEL               :{TINY_FONT}{BLACK}Last 24 production intervals
+STR_GRAPH_LAST_72_PRODUCTION_INTERVALS_TIME_LABEL               :{TINY_FONT}{BLACK}Last 72 production intervals
+
 STR_SMALLMAP_SCREENSHOT                                         :{BLACK}Screenshot
 
 STR_NEWS_VEHICLE_NO_DEPOT_ORDER                                 :{WHITE}{VEHICLE} does not have a depot order in its schedule
 STR_NEWS_TRAIN_OVERSHOT_STATION                                 :{WHITE}{VEHICLE} failed to stop at {STRING1} due to excessive speed
+
+STR_NEWS_ROAD_REBUILDING_PERIODS                                :{BIG_FONT}{BLACK}Traffic chaos in {TOWN}!{}{}Road rebuilding programme funded by {RAW_STRING} brings half a period of misery to motorists!
+STR_NEWS_EXCLUSIVE_RIGHTS_DESCRIPTION_PERIOD                    :{BIG_FONT}{BLACK}Local authority of {TOWN} signs contract with {RAW_STRING} for 1 period of exclusive transport rights!
 
 STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_EVERY_MINUTES_CUSTOM_LABEL   :Custom interval (real-time minutes)
 STR_GAME_OPTIONS_AUTOSAVE_MINUTES_QUERY_CAPT                    :{WHITE}Autosave interval in real-time minutes
@@ -172,16 +183,23 @@ STR_CONFIG_SETTING_STATION_RATING_SIZE_CARGO_AMOUNT             :Station cargo c
 STR_CONFIG_SETTING_STATION_RATING_SIZE_CARGO_AMOUNT_HELPTEXT    :When enabled, the cargo capacity of stations before waiting cargo is truncated and the effect of the waiting cargo amount on the station rating for that cargo depend on the size of the station. Larger stations can store more cargo and are more tolerant of large amounts of waiting cargo.
 
 STR_CONFIG_SETTING_CARGO_DELIVERY_MODE                          :Cargo delivery distribution mode: {STRING2}
-STR_CONFIG_SETTING_CARGO_DELIVERY_MODE_HELPTEXT                 :The method used to deliver cargo to industries surrounding a station.
+STR_CONFIG_SETTING_CARGO_DELIVERY_MODE_HELPTEXT                 :The method used to distribute cargo delivered to a station to industries in the station's catchment area.{}The "original" mode distributes all cargo to the closest industry (measured from the station sign tile).{}The "balanced" mode distributes cargo equally to all accepting industries in the station's catchment area.
 
 STR_CONFIG_SETTING_TRAIN_BRAKING_MODEL                          :Train braking model: {STRING2}
-STR_CONFIG_SETTING_TRAIN_BRAKING_MODEL_HELPTEXT                 :Select the physics model for train braking. The "original" model allows trains to stop instantly. In the "realistic" model, trains have a stopping distance and will reserve ahead accordingly, trains cannot stop instantly.{}{}The "realistic" model has many implications for signalling and track layout design, and is therefore an advanced feature which may not be suitable for beginners. In particular pre-signals and two-way signals are not permitted, and PBS is used for all signalling.
+STR_CONFIG_SETTING_TRAIN_BRAKING_MODEL_HELPTEXT                 :Select the physics model for train braking. The "original" model allows trains to stop instantly. In the "realistic" model, trains have a stopping distance and will reserve ahead accordingly, trains cannot stop instantly.{}{}The "realistic" model has many implications for signalling and track layout design, and is therefore an advanced feature which may not be suitable for beginners. In particular pre-signals and two-way signals are not permitted, and path reservations are used for all signalling.
 
 STR_CONFIG_SETTING_REALISTIC_BRAKING_ASPECT_LIMITED             :Realistic train braking is aspect limited: {STRING2}
 STR_CONFIG_SETTING_REALISTIC_BRAKING_ASPECT_LIMITED_HELPTEXT    :In the realistic train braking model, limit the look-ahead of trains to the aspect of signals (i.e. do not allow reserving and looking ahead an unlimited number of signals).{}This requires a NewGRF which provides multi-aspect signals.{}{}This is an expert setting which will likely increase gameplay difficulty and will require additional thought about signal types and placement.
 
 STR_CONFIG_SETTING_LIMIT_TRAIN_ACCELERATION                     :Limit train acceleration: {STRING2}
 STR_CONFIG_SETTING_LIMIT_TRAIN_ACCELERATION_HELPTEXT            :When using the realistic train braking model, also limit the maximum acceleration of trains. This is to prevent passengers from spilling their drinks due to some train types otherwise accelerating excessively quickly.
+
+STR_CONFIG_SETTING_TRAIN_ACC_BRAKING_PERCENT                    :Train acceleration/braking scale factor: {STRING2}
+STR_CONFIG_SETTING_TRAIN_ACC_BRAKING_PERCENT_HELPTEXT           :The percentage by which train acceleration and braking is adjusted.{}{}This setting can be used to alter the acceleration and braking of trains, without changing the maximum speed of trains.
+STR_CONFIG_SETTING_TRAIN_ACC_BRAKING_PERCENT_VALUE              :{COMMA}%
+
+STR_CONFIG_SETTING_TRACK_EDIT_IGNORE_REALISTIC_BRAKING          :Track editing ignores realistic braking: {STRING2}
+STR_CONFIG_SETTING_TRACK_EDIT_IGNORE_REALISTIC_BRAKING_HELPTEXT :Allow track editing to ignore the realistic train braking model. When enabled, restrictions on editing/removing the reservation of moving trains are not enforced. This may result in non-realistic train braking behaviour.
 
 STR_CONFIG_SETTING_THROUGH_LOAD_SPEED_LIMIT                     :Train through load maximum speed: {STRING2}
 STR_CONFIG_SETTING_THROUGH_LOAD_SPEED_LIMIT_HELPTEXT            :The maximum permitted speed for trains when through loading at a station
@@ -193,7 +211,7 @@ STR_CONFIG_SETTING_NON_LEADING_ENGINES_KEEP_NAME                :Non-leading tra
 STR_CONFIG_SETTING_NON_LEADING_ENGINES_KEEP_NAME_HELPTEXT       :Whether train engines with a custom name should keep their custom name when moved to a non-leading position in a train consist
 
 STR_CONFIG_SETTING_BACK_ONE_WAY_PBS_SAFE_WAITING                :Pathfind up to back of one-way path signals: {STRING2}
-STR_CONFIG_SETTING_BACK_ONE_WAY_PBS_SAFE_WAITING_HELPTEXT       :When enabled, the YAPF train pathfinder may pathfind up to the back of a one-way path signal.
+STR_CONFIG_SETTING_BACK_ONE_WAY_PBS_SAFE_WAITING_HELPTEXT       :When enabled, the train pathfinder may pathfind up to the back of a one-way path signal.
 
 STR_CONFIG_SETTING_INFLATION_FIXED_DATES                        :Apply inflation from 1920 to 2090: {STRING2}
 STR_CONFIG_SETTING_INFLATION_FIXED_DATES_HELPTEXT               :If enabled, inflation is always applied from 1920 to 2090, regardless of the game start date. This is the inflation model used since OpenTTD 1.11.{}If disabled, inflation is applied from the game start date for 170 years. This is the inflation model used until OpenTTD 1.10.
@@ -216,10 +234,10 @@ STR_CONFIG_SETTING_ROADVEH_CANT_QUANTUM_TUNNEL                  :Prevent road ve
 STR_CONFIG_SETTING_ROADVEH_CANT_QUANTUM_TUNNEL_HELPTEXT         :Disable road vehicles from passing through other road vehicles when their path is blocked for an extended period of time.
 
 STR_CONFIG_SETTING_DRIVE_THROUGH_TRAIN_DEPOT                    :Drive-through train depots: {STRING2}
-STR_CONFIG_SETTING_DRIVE_THROUGH_TRAIN_DEPOT_HELPTEXT           :Enable emulation of drive-through train depots. Trains can move between depots placed back to back, optionally with intermediary depots in between. Requires the YAPF pathfinder.
+STR_CONFIG_SETTING_DRIVE_THROUGH_TRAIN_DEPOT_HELPTEXT           :Enable emulation of drive-through train depots. Trains can move between depots placed back to back, optionally with intermediary depots in between.
 
 STR_CONFIG_SETTING_WARN_RESTRICTION_WAIT_VEHICLE                :Warn if train is stuck due to a routing restriction: {STRING2}
-STR_CONFIG_SETTING_WARN_RESTRICTION_WAIT_VEHICLE_HELPTEXT       :Trigger messages about trains which are stuck waiting at a PBS signal for a long time because of a routing restriction
+STR_CONFIG_SETTING_WARN_RESTRICTION_WAIT_VEHICLE_HELPTEXT       :Trigger messages about trains which are stuck waiting at a path signal for a long time because of a routing restriction.
 
 STR_CONFIG_SETTING_WARN_NO_DEPOT_ORDER                          :Warn if a vehicle does not have a depot order: {STRING2}
 STR_CONFIG_SETTING_WARN_NO_DEPOT_ORDER_HELPTEXT                 :When enabled and when reviewing vehicle orders is also enabled, a news message gets sent when a train, road vehicle or ship does not have a depot order in its schedule
@@ -321,14 +339,17 @@ STR_CONFIG_SETTING_SHOW_ORDER_NUMBER_IN_VEHICLE_VIEW_HELPTEXT   :When enabled, t
 STR_CONFIG_SETTING_SHOW_SPEED_FIRST_IN_VEHICLE_VIEW             :Show speed before destination in vehicle view window: {STRING2}
 STR_CONFIG_SETTING_SHOW_SPEED_FIRST_IN_VEHICLE_VIEW_HELPTEXT    :When enabled, show the vehicle speed before the destination in the vehicle view window start/stop bar
 
+STR_CONFIG_SETTING_SHORTEN_STATUS_VEHICLE_VIEW                  :Shorten status vehicle view window: {STRING2}
+STR_CONFIG_SETTING_SHORTEN_STATUS_VEHICLE_VIEW_HELPTEXT         :When enabled, shorten the text used to show the destination in the vehicle view window start/stop bar
+
 STR_CONFIG_SETTING_HIDE_DEFAULT_STOP_LOCATION                   :Hide default order stop locations: {STRING2}
 STR_CONFIG_SETTING_HIDE_DEFAULT_STOP_LOCATION_HELPTEXT          :When enabled, hide the order stop location when it matches the default.
 
 STR_CONFIG_SHOW_RAIL_POLYLINE_TOOL                              :Show rail polyline tool: {STRING2}
 STR_CONFIG_SHOW_RAIL_POLYLINE_TOOL_HELPTEXT                     :When enabled, the rail construction toolbar includes a button to build using the polyline mode.
 
-STR_CONFIG_SHOW_VEHICLE_RUNNING_COSTS_CALENDAR_YEAR             :Show vehicle running costs per calendar year: {STRING2}
-STR_CONFIG_SHOW_VEHICLE_RUNNING_COSTS_CALENDAR_YEAR_HELPTEXT    :When using a day length factor greater than one, show vehicle running costs per calendar year instead of per original year.
+STR_CONFIG_SHOW_VEHICLE_RUNNING_COSTS_CALENDAR_YEAR             :Show vehicle running costs per calendar year/period: {STRING2}
+STR_CONFIG_SHOW_VEHICLE_RUNNING_COSTS_CALENDAR_YEAR_HELPTEXT    :When using a economy speed reduction factor greater than one, show vehicle running costs per calendar year (in calendar mode) or per period (in wallclock mode) instead of per original year.
 
 STR_CONFIG_SETTING_ADV_SIG_BRIDGE_TUN_MODES                     :Enable signals on bridges/tunnels advanced modes: {STRING2}
 STR_CONFIG_SETTING_ADV_SIG_BRIDGE_TUN_MODES_HELPTEXT            :Enables use of advanced modes of signal simulation on bridges and tunnels. When disabled, bridges/tunnels which are not already in an advanced mode cannot be changed to an advanced mode, however other players may choose to enable this setting and use an advanced mode.
@@ -468,20 +489,20 @@ STR_CONFIG_SETTING_TIMETABLE_SEPARATION_BY_DEFAULT_HELPTEXT     :Choose whether 
 STR_CONFIG_SETTING_TIMETABLE_LEFTOVER_TICKS                     :Show leftover ticks in timetable: {STRING2}
 STR_CONFIG_SETTING_TIMETABLE_LEFTOVER_TICKS_HELPTEXT            :When converting from ticks to days/minutes in timetables, also show any leftover ticks
 
-STR_CONFIG_SETTING_OVERRIDE_TIME_SETTINGS                       :Use client time settings instead of savegame time settings: {STRING2}
-STR_CONFIG_SETTING_OVERRIDE_TIME_SETTINGS_HELPTEXT              :Select whether to use local client settings for time display, instead of the time settings in the savegame.
+STR_CONFIG_SETTING_OVERRIDE_TIME_SETTINGS                       :Use client timetable time settings instead of savegame time settings: {STRING2}
+STR_CONFIG_SETTING_OVERRIDE_TIME_SETTINGS_HELPTEXT              :Select whether to use local client settings for timetable time display, instead of the time settings in the savegame.
 
-STR_CONFIG_SETTING_TIME_IN_MINUTES                              :Show time in minutes rather than days: {STRING2}
-STR_CONFIG_SETTING_TIME_IN_MINUTES_HELPTEXT                     :Select whether to use hours and minutes instead of days
+STR_CONFIG_SETTING_TIME_IN_MINUTES                              :Show timetable time in minutes: {STRING2}
+STR_CONFIG_SETTING_TIME_IN_MINUTES_HELPTEXT                     :Select whether to use hours and minutes instead of days (or seconds in wallclock timekeeping mode) for timetable times
 
-STR_CONFIG_SETTING_TICKS_PER_MINUTE                             :Ticks per minute: {STRING2}
-STR_CONFIG_SETTING_TICKS_PER_MINUTE_HELPTEXT                    :The number of game ticks per minute
+STR_CONFIG_SETTING_TICKS_PER_MINUTE                             :Ticks per timetable minute: {STRING2}
+STR_CONFIG_SETTING_TICKS_PER_MINUTE_HELPTEXT                    :The number of game ticks per timetable minute
 
-STR_CONFIG_SETTING_DATE_WITH_TIME                               :Show date with time in status bar: {STRING2}
-STR_CONFIG_SETTING_DATE_WITH_TIME_HELPTEXT                      :Show the real game date in the status bar as well as the time
+STR_CONFIG_SETTING_DATE_WITH_TIME                               :Show calendar date with timetable time in status bar: {STRING2}
+STR_CONFIG_SETTING_DATE_WITH_TIME_HELPTEXT                      :Show the calendar date in the status bar as well as the timetable time
 
-STR_CONFIG_SETTING_CLOCK_OFFSET                                 :Clock offset in minutes: {STRING2}
-STR_CONFIG_SETTING_CLOCK_OFFSET_HELPTEXT                        :The number of minutes the game clock is offset by
+STR_CONFIG_SETTING_CLOCK_OFFSET                                 :Timetable clock offset in minutes: {STRING2}
+STR_CONFIG_SETTING_CLOCK_OFFSET_HELPTEXT                        :The number of minutes the timetable clock is offset by
 
 STR_CONFIG_SETTING_DATE_WITH_TIME_NONE                          :None
 STR_CONFIG_SETTING_DATE_WITH_TIME_Y                             :Year
@@ -497,7 +518,7 @@ STR_CONFIG_SETTING_TIMETABLE_SEPARATION_RATE                    :Auto timetable 
 STR_CONFIG_SETTING_TIMETABLE_SEPARATION_RATE_HELPTEXT           :How much of the vehicle separation auto timetable change to apply at each step
 
 STR_CONFIG_SETTING_TIMETABLE_AUTOFILL_ROUNDING_TICKS            :Round up auto-filled timetable times to multiples of this many ticks: {STRING2}
-STR_CONFIG_SETTING_TIMETABLE_AUTOFILL_ROUNDING_TICKS_HELPTEXT   :Timetable times adjusted by timetable automation are not rounded. A day at a day length of 1 is 74 ticks.{}By default the game ticks per minute value is used if using minutes, otherwise 74 ticks is used.
+STR_CONFIG_SETTING_TIMETABLE_AUTOFILL_ROUNDING_TICKS_HELPTEXT   :Timetable times adjusted by timetable automation are not rounded. An unscaled day is 74 ticks.{}By default the game ticks per minute value is used if using minutes, otherwise 74 ticks is used.
 STR_CONFIG_SETTING_TIMETABLE_AUTOFILL_ROUNDING_TICKS_VALUE      :{COMMA}{NBSP}tick{P 0 "" s}
 ###setting-zero-is-special
 ##default-translation STR_COLOUR_DEFAULT
@@ -527,7 +548,7 @@ STR_CONFIG_SETTING_SHARING_FEE_RAIL                             :Daily track tol
 STR_CONFIG_SETTING_SHARING_FEE_ROAD                             :Stopping fee for road vehicles: {STRING2} per day
 STR_CONFIG_SETTING_SHARING_FEE_WATER                            :Docking fee for ships: {STRING2} per day
 STR_CONFIG_SETTING_SHARING_FEE_AIR                              :Terminal fee for aircraft: {STRING2} per day
-STR_CONFIG_SETTING_SHARING_FEE_HELPTEXT                         :This fee is paid per unscaled day (i.e. the duration of a day at a day length of 1, this is 74 ticks).
+STR_CONFIG_SETTING_SHARING_FEE_HELPTEXT                         :This fee is paid per unscaled economy day (i.e. per 74 ticks).
 STR_CONFIG_SETTING_SHARING_PAYMENT_IN_DEBT                      :Allow companies in debt to pay sharing fees: {STRING2}
 STR_CONFIG_SETTING_SHARING_USED_BY_VEHICLES                     :Can't change this setting, vehicles are using shared infrastructure.
 STR_CONFIG_SETTING_SHARING_ORDERS_TO_OTHERS                     :Can't change this setting, vehicles have orders to destinations of others.
@@ -538,7 +559,7 @@ STR_CONFIG_SETTING_INFRA_OTHERS_BUY_IN_DEPOT_WATER              :Enable competit
 STR_CONFIG_SETTING_INFRA_OTHERS_BUY_IN_DEPOT_AIR                :Enable competitors to buy and renew aircraft in hangars: {STRING2}
 
 STR_CONFIG_SETTING_TRAIN_SPEED_ADAPTATION                       :Enable train speed adaptation: {STRING2}
-STR_CONFIG_SETTING_TRAIN_SPEED_ADAPTATION_HELPTEXT              :When enabled, faster trains adjust their speed to match slower trains in front.
+STR_CONFIG_SETTING_TRAIN_SPEED_ADAPTATION_HELPTEXT              :When enabled, faster trains adjust their speed when passing signals to attempt to match slower trains in front.{}This may not be appropriate for some signalling styles or layouts, and can be disabled and re-enabled on a per-train basis using signal routing restrictions.
 
 STR_CONFIG_SETTING_SLOW_ROAD_VEHICLES_IN_CURVES                 :Road vehicles slow down in curves: {STRING2}
 STR_CONFIG_SETTING_SLOW_ROAD_VEHICLES_IN_CURVES_HELPTEXT        :When enabled, road vehicles slow down in curves. (Only with realistic acceleration)
@@ -547,8 +568,8 @@ STR_CONFIG_SETTING_SIMULATE_SIGNALS                             :Simulate signal
 STR_CONFIG_SETTING_SIMULATE_SIGNALS_HELPTEXT                    :This sets the target signal spacing for newly signalled bridges and tunnels. The actual spacing may slightly differ from this to avoid uneven spacing. Changing this setting does not re-signal existing signalled bridges and tunnels.
 STR_CONFIG_SETTING_SIMULATE_SIGNALS_VALUE                       :{COMMA} tile{P 0 "" s}
 
-STR_CONFIG_SETTING_DAY_LENGTH_FACTOR                            :Day length factor: {STRING2}
-STR_CONFIG_SETTING_DAY_LENGTH_FACTOR_HELPTEXT                   :Game pace is slowed by this factor
+STR_CONFIG_SETTING_DAY_LENGTH_FACTOR                            :Economy speed reduction factor: {STRING2}
+STR_CONFIG_SETTING_DAY_LENGTH_FACTOR_HELPTEXT                   :This scales the length of economic time periods and proportionally slows the game processes which occur in those time periods. Economic time periods are used for: town and industry cargo production, town growth, natural processes such as grass and tree growth, infrastructure maintenance costs, station rating calculations, and so on.{}In calendar timekeeping mode this scales the length of days/months/years, and so therefore also slows processes controlled by the calendar speed such as introduction and expiry of vehicle/house/etc models and seasonal changes such as snow line movement.{}In wallclock mode this scales the length of periods and industry production intervals.{}{}This setting was formerly known as the day length factor.
 
 STR_CONFIG_SETTING_TOWN_TUNNELS                                 :Towns are allowed to build tunnels: {STRING2}
 STR_CONFIG_SETTING_TOWN_TUNNELS_HELPTEXT                        :Under what conditions are towns allowed to build road tunnels
@@ -566,22 +587,29 @@ STR_CONFIG_SETTING_TOWN_MAX_ROAD_SLOPE_ZERO                     :No limit
 STR_CONFIG_SETTING_ALLOW_TOWN_BRIDGES                           :Towns are allowed to build bridges: {STRING2}
 STR_CONFIG_SETTING_ALLOW_TOWN_BRIDGES_HELPTEXT                  :Enabling this setting allows towns to build bridges
 
+STR_CONFIG_SETTING_DEFAULT_ALLOW_TOWN_GROWTH                    :Towns are allowed to grow by default: {STRING2}
+STR_CONFIG_SETTING_DEFAULT_ALLOW_TOWN_GROWTH_HELPTEXT           :This settings controls the default state for the per-town growth override
+
+STR_CONFIG_SETTING_ALLOW_TOWN_ROADS_BRANCH_NON_BUILD            :Towns are allowed to branch from road types with houses that they can't build: {STRING2}
+STR_CONFIG_SETTING_ALLOW_TOWN_ROADS_BRANCH_NON_BUILD_HELPTEXT   :This enables towns to create junctions on road types which allow houses but which cannot be built by towns.{}This is useful to reduce snaking of houses along roads built by players and to prevent player-built roads from stunting town growth.
+
+##default-translation STR_CONFIG_SETTING_TOWN_TUNNELS_ALLOWED
+STR_CONFIG_SETTING_DEFAULT_ALLOW_TOWN_GROWTH_ALLOWED            :Allowed
+
 STR_CONFIG_SETTING_INDUSTRY_CARGO_SCALE_HELPTEXT_EXTRA          :{STRING}{}This excludes tree-cutting industries.{}This is not guaranteed to be fully compatible with all industry NewGRFs.
 
-STR_CONFIG_SETTING_TOWN_CARGO_SCALE_MODE                        :Time interval for town cargo production scaling: {STRING2}
-STR_CONFIG_SETTING_INDUSTRY_CARGO_SCALE_MODE                    :Time interval for industry cargo production scaling: {STRING2}
+STR_CONFIG_SETTING_TOWN_CARGO_SCALE_MODE                        :Town cargo production scaling mode: {STRING2}
+STR_CONFIG_SETTING_INDUSTRY_CARGO_SCALE_MODE                    :Industry cargo production scaling mode: {STRING2}
 
-STR_CONFIG_SETTING_CARGO_SCALE_MODE_HELPTEXT                    :Monthly: The cargo production per month is scaled.{}{}Game-time: The cargo production per unit of game time is scaled, (the cargo production per month is also scaled by the day length factor). Very high scaling factors may not be achievable.
-STR_CONFIG_SETTING_INDUSTRY_CARGO_SCALE_MODE_HELPTEXT_EXTRA     :{STRING}{}Game-time mode is not guaranteed to be fully compatible with all industry NewGRFs.
+STR_CONFIG_SETTING_CARGO_SCALE_MODE_HELPTEXT                    :The scaling factor for cargo production per month/production interval may optionally be multiplied by the value of the economy speed reduction factor setting.
 
-STR_CONFIG_SETTING_CARGO_SCALE_MODE_MONTHLY                     :Monthly
-STR_CONFIG_SETTING_CARGO_SCALE_MODE_GAME_TIME                   :Game-time
+STR_CONFIG_SETTING_CARGO_SCALE_MODE_NORMAL                      :Normal
+STR_CONFIG_SETTING_CARGO_SCALE_MODE_ECON_SPEED_REDUCTION_MULT   :Multiply by economy speed reduction factor
 
-STR_CONFIG_SETTING_CARGO_SCALE_VALUE_MONTHLY                    :{NUM}% (monthly)
-STR_CONFIG_SETTING_CARGO_SCALE_VALUE_REAL_TIME                  :{NUM}% (game-time)
+STR_CONFIG_SETTING_CARGO_SCALE_VALUE_ECON_SPEED_REDUCTION_MULT  :{NUM}% x economy speed reduction factor
 
 STR_CONFIG_SETTING_TOWN_ABOVE_HEIGHT                            :No towns above height level: {STRING2}
-STR_CONFIG_SETTING_TOWN_ABOVE_HEIGHT_HELPTEXT                   :No towns above the specified height level are built during map creation.
+STR_CONFIG_SETTING_TOWN_ABOVE_HEIGHT_HELPTEXT                   :Towns can only be placed at or below this height level.
 
 STR_CONFIG_SETTING_MIN_TOWN_LAND_AREA                           :Minimum contiguous land area for towns: {STRING2}
 STR_CONFIG_SETTING_MIN_TOWN_LAND_AREA_HELPTEXT                  :Towns can only be placed on contiguous landmasses of at least this many tiles.
@@ -625,27 +653,27 @@ STR_CONFIG_SETTING_TREE_GROWTH_STATIC                           :None
 
 STR_CONFIG_SETTING_TOWN_ZONES                                   :{ORANGE}Custom town zones
 STR_CONFIG_SETTING_TOWN_ZONE_CALC_MODE                          :Use custom town zone calculations: {STRING2}
-STR_CONFIG_SETTING_TOWN_ZONE_CALC_MODE_HELPTEXT                 :Allows manually configuring the size of town zones generated by towns. The default values for custom town zone settings are similar to the default town generation. Some zones only require small changes while Zone 0 in particular benefits from larger values.
-STR_CONFIG_SETTING_TOWN_ZONE_0_MULT                             :Multiplier for Town Zone 0: {STRING2}
-STR_CONFIG_SETTING_TOWN_ZONE_0_MULT_HELPTEXT                    :Multiplier for the size of Town Zone 0 (Outermost roads with no pavement). This setting can benefit from large values.
-STR_CONFIG_SETTING_TOWN_ZONE_1_MULT                             :Multiplier for Town Zone 1: {STRING2}
-STR_CONFIG_SETTING_TOWN_ZONE_1_MULT_HELPTEXT                    :Multiplier for the size of Town Zone 1 (Outer zone with pavements). This setting works best with minor alterations.
-STR_CONFIG_SETTING_TOWN_ZONE_2_MULT                             :Multiplier for Town Zone 2: {STRING2}
-STR_CONFIG_SETTING_TOWN_ZONE_2_MULT_HELPTEXT                    :Multiplier for the size of Town Zone 2 (Outer zone with pavements). This setting works best with minor alterations.
-STR_CONFIG_SETTING_TOWN_ZONE_3_MULT                             :Multiplier for Town Zone 3: {STRING2}
-STR_CONFIG_SETTING_TOWN_ZONE_3_MULT_HELPTEXT                    :Multiplier for the size of Town Zone 3 (Inner tree-lined roads). This setting works best with minor alterations.
-STR_CONFIG_SETTING_TOWN_ZONE_4_MULT                             :Multiplier for Town Zone 4: {STRING2}
-STR_CONFIG_SETTING_TOWN_ZONE_4_MULT_HELPTEXT                    :Multiplier for the size of Town Zone 4 (Innermost roads with street lights). This setting works best with minor alterations.
-STR_CONFIG_SETTING_CITY_ZONE_0_MULT                             :Multiplier for City Zone 0: {STRING2}
-STR_CONFIG_SETTING_CITY_ZONE_0_MULT_HELPTEXT                    :Multiplier for the size of City Zone 0 (Outermost roads with no pavement). This setting can benefit from large values.
-STR_CONFIG_SETTING_CITY_ZONE_1_MULT                             :Multiplier for City Zone 1: {STRING2}
-STR_CONFIG_SETTING_CITY_ZONE_1_MULT_HELPTEXT                    :Multiplier for the size of City Zone 1 (Outer zone with pavements). This setting works best with minor alterations.
-STR_CONFIG_SETTING_CITY_ZONE_2_MULT                             :Multiplier for City Zone 2: {STRING2}
-STR_CONFIG_SETTING_CITY_ZONE_2_MULT_HELPTEXT                    :Multiplier for the size of City Zone 2 (Outer zone with pavements). This setting works best with minor alterations.
-STR_CONFIG_SETTING_CITY_ZONE_3_MULT                             :Multiplier for City Zone 3: {STRING2}
-STR_CONFIG_SETTING_CITY_ZONE_3_MULT_HELPTEXT                    :Multiplier for the size of City Zone 3 (Inner tree-lined roads). This setting works best with minor alterations.
-STR_CONFIG_SETTING_CITY_ZONE_4_MULT                             :Multiplier for City Zone 4: {STRING2}
-STR_CONFIG_SETTING_CITY_ZONE_4_MULT_HELPTEXT                    :Multiplier for the size of City Zone 4 (Innermost roads with street lights). This setting works best with minor alterations.
+STR_CONFIG_SETTING_TOWN_ZONE_CALC_MODE_HELPTEXT                 :Allows manually configuring the size of town zones generated by towns. The default values for custom town zone settings are similar to the default town generation. Some zones only require small changes while Town / City Edge (Zone 0) in particular benefits from larger values.
+STR_CONFIG_SETTING_TOWN_ZONE_0_MULT                             :Multiplier for Town Edge: {STRING2}
+STR_CONFIG_SETTING_TOWN_ZONE_0_MULT_HELPTEXT                    :Multiplier for the size of Town Edge (Zone 0, Outermost roads with no pavement). This setting can benefit from large values.
+STR_CONFIG_SETTING_TOWN_ZONE_1_MULT                             :Multiplier for Town Outskirts: {STRING2}
+STR_CONFIG_SETTING_TOWN_ZONE_1_MULT_HELPTEXT                    :Multiplier for the size of Town Outskirts (Zone 1, Outer zone with pavements). This setting works best with minor alterations.
+STR_CONFIG_SETTING_TOWN_ZONE_2_MULT                             :Multiplier for Town Outer Suburbs: {STRING2}
+STR_CONFIG_SETTING_TOWN_ZONE_2_MULT_HELPTEXT                    :Multiplier for the size of Town Outer Suburbs (Zone 2, Outer zone with pavements). This setting works best with minor alterations.
+STR_CONFIG_SETTING_TOWN_ZONE_3_MULT                             :Multiplier for Town Inner Suburbs: {STRING2}
+STR_CONFIG_SETTING_TOWN_ZONE_3_MULT_HELPTEXT                    :Multiplier for the size of Town Inner Suburbs (Zone 3, Inner tree-lined roads). This setting works best with minor alterations.
+STR_CONFIG_SETTING_TOWN_ZONE_4_MULT                             :Multiplier for Town Centre: {STRING2}
+STR_CONFIG_SETTING_TOWN_ZONE_4_MULT_HELPTEXT                    :Multiplier for the size of Town Centre (Zone 4, Innermost roads with street lights). This setting works best with minor alterations.
+STR_CONFIG_SETTING_CITY_ZONE_0_MULT                             :Multiplier for City Edge: {STRING2}
+STR_CONFIG_SETTING_CITY_ZONE_0_MULT_HELPTEXT                    :Multiplier for the size of City Edge (Zone 0, Outermost roads with no pavement). This setting can benefit from large values.
+STR_CONFIG_SETTING_CITY_ZONE_1_MULT                             :Multiplier for City Outskirts: {STRING2}
+STR_CONFIG_SETTING_CITY_ZONE_1_MULT_HELPTEXT                    :Multiplier for the size of City Outskirts (Zone 1, Outer zone with pavements). This setting works best with minor alterations.
+STR_CONFIG_SETTING_CITY_ZONE_2_MULT                             :Multiplier for City Outer Suburbs: {STRING2}
+STR_CONFIG_SETTING_CITY_ZONE_2_MULT_HELPTEXT                    :Multiplier for the size of City Outer Suburbs (Zone 2, Outer zone with pavements). This setting works best with minor alterations.
+STR_CONFIG_SETTING_CITY_ZONE_3_MULT                             :Multiplier for City Inner Suburbs: {STRING2}
+STR_CONFIG_SETTING_CITY_ZONE_3_MULT_HELPTEXT                    :Multiplier for the size of City Inner Suburbs (Zone 3, Inner tree-lined roads). This setting works best with minor alterations.
+STR_CONFIG_SETTING_CITY_ZONE_4_MULT                             :Multiplier for City Centre: {STRING2}
+STR_CONFIG_SETTING_CITY_ZONE_4_MULT_HELPTEXT                    :Multiplier for the size of City Centre (Zone 4, Innermost roads with street lights). This setting works best with minor alterations.
 
 STR_CONFIG_SETTING_TOWN_GROWTH_CARGO_TRANSPORTED                :Town growth speed depends on transported cargo: {STRING2}
 STR_CONFIG_SETTING_TOWN_GROWTH_CARGO_TRANSPORTED_HELPTEXT       :Percentage of town growth speed which depends on proportion of town cargo transported in the last month.{}This percentage of the calculated town growth speed is multiplied by the fraction of passengers and mail which were transported in the last month. This setting can only decrease the town growth speed, not increase it.
@@ -679,7 +707,7 @@ STR_CONFIG_SETTING_SYNC_LOCALE_SETTINGS_NETWORK_SERVER          :Sync localisati
 STR_CONFIG_SETTING_SYNC_LOCALE_SETTINGS_NETWORK_SERVER_HELPTEXT :When joining a multiplayer game as a network client, change the localisation settings to match the server
 
 STR_CONFIG_SETTING_INTERFACE_DEPARTUREBOARDS                    :{ORANGE}Departure boards
-STR_CONFIG_SETTING_INTERFACE_WALLCLOCK                          :{ORANGE}Wall clock
+STR_CONFIG_SETTING_INTERFACE_TIMETABLE_CLOCK                    :{ORANGE}Timetable clock
 STR_CONFIG_SETTING_INTERFACE_TIME_CLIENT                        :{ORANGE}Client settings
 STR_CONFIG_SETTING_INTERFACE_TIME_SAVEGAME                      :{ORANGE}Savegame settings
 STR_CONFIG_SETTING_INTERFACE_TIMETABLE                          :{ORANGE}Timetables
@@ -691,7 +719,6 @@ STR_CONFIG_SETTING_ENVIRONMENT_CARGODIST_PER_CARGO_OVERRIDE     :{ORANGE}Cargo d
 STR_CONFIG_SETTING_VIEWPORT_MAP_OPTIONS                         :{ORANGE}Map mode
 STR_CONFIG_SETTING_VEHICLE_ROUTE_OVERLAY                        :{ORANGE}Vehicle route overlay
 STR_CONFIG_SETTING_SHARING                                      :{ORANGE}Infrastructure sharing
-STR_CONFIG_SETTING_SCENARIO_EDITOR                              :{ORANGE}Scenario Editor
 
 STR_CONFIG_SETTING_REROUTE_RV_ON_LAYOUT_CHANGE                  :Re-route road vehicles when road layout changes: {STRING2}
 STR_CONFIG_SETTING_REROUTE_RV_ON_LAYOUT_CHANGE_HELPTEXT         :Whether to re-route all road vehicles on the map when the road layout is changed.{}This can improve road vehicle responsiveness to a changing road layout at the expense of performance.{}Note that if this is set to "Yes", town growth can trigger re-routing of road vehicles which may cause slow-downs on large maps.
@@ -740,6 +767,9 @@ STR_CONFIG_SETTING_PURCHASED_LAND_CLEAR_GROUND_HELPTEXT         :If enabled, pur
 STR_CONFIG_SETTING_SPAWN_PRIMARY_INDUSTRY_ONLY                  :Only generate primary industries: {STRING2}
 STR_CONFIG_SETTING_SPAWN_PRIMARY_INDUSTRY_ONLY_HELPTEXT         :If enabled, only primary industries are generated during game play and map generation.
 
+STR_CONFIG_SETTING_INDUSTRY_EVENT_RATE                          :Industry event rate: {STRING2}
+STR_CONFIG_SETTING_INDUSTRY_EVENT_RATE_HELPTEXT                 :Scale the rate of industry events per economic time period in wallclock timekeeping mode, or per month/year in calendar timekeeping mode. This includes industry production changes, opening and closing.
+
 STR_PURCHASE_LAND_PERMITTED_NO                                  :No
 STR_PURCHASE_LAND_PERMITTED_SINGLE                              :Yes, 1 tile at a time
 STR_PURCHASE_LAND_PERMITTED_AREA                                :Yes, large areas at a time
@@ -773,30 +803,17 @@ STR_CONFIG_SETTING_COPY_CLONE_ADD_TO_GROUP_HELPTEXT             :Set whether clo
 STR_CONFIG_SETTING_REMAIN_IF_NEXT_ORDER_SAME_STATION            :Remain in station if next order is for same station: {STRING2}
 STR_CONFIG_SETTING_REMAIN_IF_NEXT_ORDER_SAME_STATION_HELPTEXT   :If a vehicle's next order is for the same station it would be about to leave, start loading/unloading again instead of leaving.
 
-STR_CONFIG_SETTING_SCENARIO_MULTIPLE_BUILDINGS                  :Allow multiple churches/stadiums: {STRING2}
-STR_CONFIG_SETTING_SCENARIO_MULTIPLE_BUILDINGS_HELPTEXT         :Allow manually adding churches and stadiums when there is already one present in the town.
-
-STR_CONFIG_SETTING_SCENARIO_HOUSE_IGNORE_DATES                  :Ignore house year restrictions: {STRING2}
-STR_CONFIG_SETTING_SCENARIO_HOUSE_IGNORE_DATES_HELPTEXT         :Allow manually adding houses which are not available for the current date.
-STR_CONFIG_SETTING_SCENARIO_HOUSE_IGNORE_ZONES                  :Ignore house zone restrictions: {STRING2}
-STR_CONFIG_SETTING_SCENARIO_HOUSE_IGNORE_ZONES_HELPTEXT         :Allow manually adding houses which are not suitable for the target town zone.
-STR_CONFIG_SETTING_SCENARIO_HOUSE_IGNORE_GRF                    :Ignore house GRF restrictions: {STRING2}
-STR_CONFIG_SETTING_SCENARIO_HOUSE_IGNORE_GRF_HELPTEXT           :Allow manually adding houses even if this is not permitted by the house GRF.
-
-STR_CONFIG_SETTING_SCENARIO_HOUSE_IGNORE_ZONES_OFF              :Off
-STR_CONFIG_SETTING_SCENARIO_HOUSE_IGNORE_ZONES_WITHIN_TOWN      :Within town
-STR_CONFIG_SETTING_SCENARIO_HOUSE_IGNORE_ZONES_ANYWHERE         :Anywhere
-
 STR_CONFIG_SETTING_DRAG_SIGNALS_SKIP_STATIONS                   :When auto-fill dragging, continue past stations/waypoints: {STRING2}
 STR_CONFIG_SETTING_DRAG_SIGNALS_SKIP_STATIONS_HELPTEXT          :Select the behaviour of signal placement when Ctrl+dragging signals. If disabled, signal placement stops when reaching a station/waypoint tile. If enabled, signal placement continues on the far side of rail stations/waypoints
+
+STR_CONFIG_SETTING_DRAG_SIGNALS_STOP_RESTRICTED_SIGNAL          :When removing signals using auto-fill drag, stop at restricted signals: {STRING2}
+STR_CONFIG_SETTING_DRAG_SIGNALS_STOP_RESTRICTED_SIGNAL_HELPTEXT :Select the behaviour of signal placement when removing signal using Ctrl+dragging. If enabled, removal of signals stops when reaching a signal with an attached routing restriction program
 
 STR_CONFIG_SETTING_NETWORK_CHANGE_NOT_ALLOWED                   :{WHITE}Can't change setting...
 STR_CONFIG_SETTING_NETWORK_CHANGE_NOT_ALLOWED_NEWGRF            :{WHITE}...setting is observed by a NewGRF
 
 STR_CONFIG_SETTING_TIMETABLE_IN_TICKS                           :Show timetable in ticks rather than days: {STRING2}
 STR_CONFIG_SETTING_TIMETABLE_IN_TICKS_HELPTEXT                  :Show travel times in time tables in game ticks instead of days
-
-STR_CONFIG_SETTING_PATHFINDER_FOR_TRAINS_HELPTEXT_EXTRA         :{STRING}{}Various features require use of the YAPF pathfinder, including: routing restrictions (all pathfinder and reservation related actions), reverse at waypoint/signal and drive through train depots.
 
 STR_CONFIG_SETTING_DISABLED_TIMEKEEPING_MODE_CALENDAR           :{RED}[Setting disabled in calendar timekeeping mode]
 STR_CONFIG_SETTING_DISABLED_TIMEKEEPING_MODE_WALLCLOCK          :{RED}[Setting disabled in wallclock timekeeping mode]
@@ -820,6 +837,8 @@ STR_LINKGRAPH_STATS_TOOLTIP_CAPACITY                            :{}Capacity: {CA
 STR_LINKGRAPH_STATS_TOOLTIP_USAGE                               :{}Usage: {CARGO_LONG}
 STR_LINKGRAPH_STATS_TOOLTIP_PLANNED                             :{}Planned: {CARGO_LONG}
 STR_LINKGRAPH_STATS_TOOLTIP_DISTANCE                            :Manhattan Distance: {COMMA} tile{P 0 "" s}{}Bird Fly Distance: {COMMA} tile{P 1 "" s}
+
+STR_LINKGRAPH_STATS_TOOLTIP_PRODUCTION_INTERVAL                 :{BLACK}{CARGO_LONG} to be transported per production interval from {STATION} to {STATION} ({COMMA}% of capacity){RAW_STRING}
 
 STR_RAIL_TOOLBAR_TOOLTIP_BUILD_POLYRAIL                         :{BLACK}Build railway track using the polyline mode. Ctrl toggles build/remove for railway construction. Shift toggles building/showing cost estimate
 
@@ -857,12 +876,12 @@ STR_TRACE_RESTRICT_VARIABLE_LAST_VISITED_STATION                :last visited st
 STR_TRACE_RESTRICT_VARIABLE_CARGO                               :cargo
 STR_TRACE_RESTRICT_VARIABLE_LOAD_PERCENT                        :load percentage
 STR_TRACE_RESTRICT_VARIABLE_ENTRY_DIRECTION                     :entry direction
-STR_TRACE_RESTRICT_VARIABLE_PBS_ENTRY_SIGNAL                    :PBS entry signal
-STR_TRACE_RESTRICT_VARIABLE_PBS_ENTRY_SIGNAL_LONG               :entered signal of PBS block
-STR_TRACE_RESTRICT_VARIABLE_PBS_RES_END_SIGNAL                  :PBS end signal
-STR_TRACE_RESTRICT_VARIABLE_PBS_RES_END_SIGNAL_LONG             :signal at current end of PBS reservation
-STR_TRACE_RESTRICT_VARIABLE_PBS_RES_END_TILE                    :PBS reservation end tile
-STR_TRACE_RESTRICT_VARIABLE_PBS_RES_END_TILE_LONG               :tile at end of PBS reservation from this signal
+STR_TRACE_RESTRICT_VARIABLE_PBS_ENTRY_SIGNAL                    :path start signal
+STR_TRACE_RESTRICT_VARIABLE_PBS_ENTRY_SIGNAL_LONG               :signal at start of current path reservation
+STR_TRACE_RESTRICT_VARIABLE_PBS_RES_END_SIGNAL                  :path end signal
+STR_TRACE_RESTRICT_VARIABLE_PBS_RES_END_SIGNAL_LONG             :signal at current end of path reservation
+STR_TRACE_RESTRICT_VARIABLE_PBS_RES_END_TILE                    :path reservation end tile
+STR_TRACE_RESTRICT_VARIABLE_PBS_RES_END_TILE_LONG               :tile at end of path reservation from this signal
 STR_TRACE_RESTRICT_VARIABLE_TRAIN_GROUP                         :train group
 STR_TRACE_RESTRICT_VARIABLE_TRAIN_SLOT                          :train in slot
 STR_TRACE_RESTRICT_VARIABLE_SLOT_OCCUPANCY                      :slot occupancy
@@ -881,8 +900,8 @@ STR_TRACE_RESTRICT_VARIABLE_TRAIN_OWNER                         :train owner
 STR_TRACE_RESTRICT_VARIABLE_TRAIN_STATUS                        :train status
 STR_TRACE_RESTRICT_VARIABLE_TRAIN_ENGINE_CLASS                  :engine class
 STR_TRACE_RESTRICT_VARIABLE_ORDER_TARGET_DIRECTION              :direction of order target
-STR_TRACE_RESTRICT_VARIABLE_RESERVATION_THROUGH                 :PBS reservation passes tile
-STR_TRACE_RESTRICT_VARIABLE_RESERVATION_THROUGH_SHORT           :PBS reservation
+STR_TRACE_RESTRICT_VARIABLE_RESERVATION_THROUGH                 :path reservation passes tile
+STR_TRACE_RESTRICT_VARIABLE_RESERVATION_THROUGH_SHORT           :path reservation
 STR_TRACE_RESTRICT_VARIABLE_UNDEFINED                           :undefined
 STR_TRACE_RESTRICT_VARIABLE_UNDEFINED_RED                       :{PUSH_COLOUR}{RED}undefined{POP_COLOUR}
 STR_TRACE_RESTRICT_CONDITIONAL_COMPARE_INTEGER                  :{STRING} {STRING} {STRING} {COMMA} then
@@ -902,23 +921,22 @@ STR_TRACE_RESTRICT_CONDITIONAL_ENTRY_SIGNAL_FACE                :{STRING} train 
 STR_TRACE_RESTRICT_CONDITIONAL_ENTRY_SIGNAL_TYPE                :{STRING} train {STRING} {STRING} then
 STR_TRACE_RESTRICT_CONDITIONAL_TILE_INDEX                       :{STRING} {STRING} {STRING} at {NUM} x {NUM} then
 STR_TRACE_RESTRICT_CONDITIONAL_GROUP                            :{STRING} train {STRING} in group: {GROUP} then
-STR_TRACE_RESTRICT_CONDITIONAL_GROUP_STR                        :{STRING} train {STRING} in group: {STRING} {BLACK}{STRING}then
+STR_TRACE_RESTRICT_CONDITIONAL_GROUP_STR                        :{STRING} train {STRING} in group: {PUSH_COLOUR}{STRING}{POP_COLOUR} then
 STR_TRACE_RESTRICT_CONDITIONAL_OWNER                            :{STRING} {STRING} {STRING} {COMPANY} {COMPANY_NUM} then
 STR_TRACE_RESTRICT_CONDITIONAL_SLOT                             :{STRING} train {STRING} in slot: {TRSLOT} then
-STR_TRACE_RESTRICT_CONDITIONAL_SLOT_STR                         :{STRING} train {STRING} in slot: {STRING} {BLACK}{STRING}then
+STR_TRACE_RESTRICT_CONDITIONAL_SLOT_STR                         :{STRING} train {STRING} in slot: {PUSH_COLOUR}{STRING}{POP_COLOUR} then
 STR_TRACE_RESTRICT_CONDITIONAL_SLOT_OCCUPANCY                   :{STRING} {STRING} of slot: {TRSLOT} {STRING} {COMMA} then
-STR_TRACE_RESTRICT_CONDITIONAL_SLOT_OCCUPANCY_STR               :{STRING} {STRING} of slot: {STRING} {BLACK}{STRING} {STRING} {COMMA} then
+STR_TRACE_RESTRICT_CONDITIONAL_SLOT_OCCUPANCY_STR               :{STRING} {STRING} of slot: {PUSH_COLOUR}{STRING}{POP_COLOUR} {STRING} {COMMA} then
 STR_TRACE_RESTRICT_CONDITIONAL_TRAIN_STATUS                     :{STRING} train {STRING} status: {STRING} then
 STR_TRACE_RESTRICT_CONDITIONAL_COUNTER                          :{STRING} value of counter: {TRCOUNTER} {STRING} {COMMA} then
-STR_TRACE_RESTRICT_CONDITIONAL_COUNTER_STR                      :{STRING} value of counter: {STRING} {BLACK}{STRING} {STRING} {COMMA} then
+STR_TRACE_RESTRICT_CONDITIONAL_COUNTER_STR                      :{STRING} value of counter: {PUSH_COLOUR}{STRING}{POP_COLOUR} {STRING} {COMMA} then
 STR_TRACE_RESTRICT_CONDITIONAL_ENGINE_CLASSES                   :{STRING} train {STRING}: {STRING} then
 STR_TRACE_RESTRICT_CONDITIONAL_TARGET_DIRECTION                 :{STRING} tile of {STRING} {STRING} further {STRING} than this signal tile then
 STR_TRACE_RESTRICT_CONDITIONAL_PASSES_TILE_INDEX                :{STRING} {STRING} {STRING} {NUM} x {NUM} then
-STR_TRACE_RESTRICT_CONDITIONAL_UNDEFINED                        :{STRING} {STRING} {STRING} {RED}undefined {BLACK}{STRING}then
-STR_TRACE_RESTRICT_CONDITIONAL_COMPARE_UNDEFINED                :{STRING} {RED}undefined {BLACK}{STRING}then
+STR_TRACE_RESTRICT_CONDITIONAL_UNDEFINED                        :{STRING} {STRING} {STRING} {PUSH_COLOUR}{RED}undefined{POP_COLOUR} then
+STR_TRACE_RESTRICT_CONDITIONAL_COMPARE_UNDEFINED                :{STRING} {PUSH_COLOUR}{RED}undefined{POP_COLOUR} then
 STR_TRACE_RESTRICT_PF_PENALTY_ITEM                              :Add pathfinder penalty: {COMMA}
 STR_TRACE_RESTRICT_PF_PENALTY_ITEM_PRESET                       :Add {STRING} pathfinder penalty
-STR_TRACE_RESTRICT_WHITE                                        :{WHITE}
 STR_TRACE_RESTRICT_START                                        :Start
 STR_TRACE_RESTRICT_END                                          :End
 STR_TRACE_RESTRICT_PF_DENY                                      :Deny
@@ -929,12 +947,12 @@ STR_TRACE_RESTRICT_RESERVE_THROUGH_CANCEL                       :Cancel reserve 
 STR_TRACE_RESTRICT_LONG_RESERVE                                 :Long reserve
 STR_TRACE_RESTRICT_LONG_RESERVE_CANCEL                          :Cancel long reserve
 STR_TRACE_RESTRICT_LONG_RESERVE_UNLESS_STOPPING                 :Long reserve (unless stopping)
-STR_TRACE_RESTRICT_WAIT_AT_PBS                                  :Wait at PBS signal
-STR_TRACE_RESTRICT_WAIT_AT_PBS_CANCEL                           :Cancel wait at PBS signal
-STR_TRACE_RESTRICT_PBS_RES_END_WAIT                             :Wait at start PBS signal for reservation ending here
-STR_TRACE_RESTRICT_PBS_RES_END_WAIT_CANCEL                      :Cancel wait at start PBS signal for reservation ending here
-STR_TRACE_RESTRICT_PBS_RES_END_WAIT_SHORT                       :Wait at start PBS...
-STR_TRACE_RESTRICT_PBS_RES_END_WAIT_CANCEL_SHORT                :Cancel wait at start PBS...
+STR_TRACE_RESTRICT_WAIT_AT_PBS                                  :Wait at path signal
+STR_TRACE_RESTRICT_WAIT_AT_PBS_CANCEL                           :Cancel wait at path signal
+STR_TRACE_RESTRICT_PBS_RES_END_WAIT                             :Wait at start path signal for reservation ending here
+STR_TRACE_RESTRICT_PBS_RES_END_WAIT_CANCEL                      :Cancel wait at start path signal for reservation ending here
+STR_TRACE_RESTRICT_PBS_RES_END_WAIT_SHORT                       :Wait at start signal...
+STR_TRACE_RESTRICT_PBS_RES_END_WAIT_CANCEL_SHORT                :Cancel wait at start signal...
 STR_TRACE_RESTRICT_PF_PENALTY                                   :Penalty
 STR_TRACE_RESTRICT_PF_VALUE_SMALL                               :small
 STR_TRACE_RESTRICT_PF_VALUE_MEDIUM                              :medium
@@ -963,19 +981,22 @@ STR_TRACE_RESTRICT_SLOT_TRY_ACQUIRE                             :Try to acquire
 STR_TRACE_RESTRICT_SLOT_RELEASE_FRONT                           :Release (front)
 STR_TRACE_RESTRICT_SLOT_RELEASE_BACK                            :Release (back)
 STR_TRACE_RESTRICT_SLOT_RELEASE_ON_RESERVE                      :Release (on reserve)
-STR_TRACE_RESTRICT_SLOT_PBS_RES_END_ACQUIRE_WAIT                :PBS end: Acquire or wait
-STR_TRACE_RESTRICT_SLOT_PBS_RES_END_TRY_ACQUIRE                 :PBS end: Try to acquire
-STR_TRACE_RESTRICT_SLOT_PBS_RES_END_RELEASE                     :PBS end: Release
-STR_TRACE_RESTRICT_SLOT_ACQUIRE_WAIT_ITEM                       :Acquire slot: {STRING1}{BLACK}{STRING}, or wait at PBS signal
-STR_TRACE_RESTRICT_SLOT_TRY_ACQUIRE_ITEM                        :Try to acquire slot: {STRING1}{BLACK}{STRING}, or continue anyway
-STR_TRACE_RESTRICT_SLOT_RELEASE_FRONT_ITEM                      :Release slot: {STRING1}{BLACK}{STRING} (front of train)
-STR_TRACE_RESTRICT_SLOT_RELEASE_BACK_ITEM                       :Release slot: {STRING1}{BLACK}{STRING} (back of train)
-STR_TRACE_RESTRICT_SLOT_RELEASE_ON_RESERVE_ITEM                 :Release slot: {STRING1}{BLACK}{STRING} (on PBS reserve)
-STR_TRACE_RESTRICT_SLOT_PBS_RES_END_ACQUIRE_WAIT_ITEM           :PBS reservation ending here: Acquire slot: {STRING1}{BLACK}{STRING}, or wait at start
-STR_TRACE_RESTRICT_SLOT_PBS_RES_END_TRY_ACQUIRE_ITEM            :PBS reservation ending here: Acquire slot: {STRING1}{BLACK}{STRING}, or continue anyway
-STR_TRACE_RESTRICT_SLOT_PBS_RES_END_RELEASE_ITEM                :PBS reservation ending here: Release slot: {STRING1}{BLACK}{STRING}
+STR_TRACE_RESTRICT_SLOT_PBS_RES_END_ACQUIRE_WAIT                :Path end: Acquire or wait
+STR_TRACE_RESTRICT_SLOT_PBS_RES_END_TRY_ACQUIRE                 :Path end: Try to acquire
+STR_TRACE_RESTRICT_SLOT_PBS_RES_END_RELEASE                     :Path end: Release
+STR_TRACE_RESTRICT_SLOT_ACQUIRE_WAIT_ITEM                       :Acquire slot: {PUSH_COLOUR}{STRING1}{POP_COLOUR}, or wait at path signal
+STR_TRACE_RESTRICT_SLOT_TRY_ACQUIRE_ITEM                        :Try to acquire slot: {PUSH_COLOUR}{STRING1}{POP_COLOUR}, or continue anyway
+STR_TRACE_RESTRICT_SLOT_RELEASE_FRONT_ITEM                      :Release slot: {PUSH_COLOUR}{STRING1}{POP_COLOUR} (front of train)
+STR_TRACE_RESTRICT_SLOT_RELEASE_BACK_ITEM                       :Release slot: {PUSH_COLOUR}{STRING1}{POP_COLOUR} (back of train)
+STR_TRACE_RESTRICT_SLOT_RELEASE_ON_RESERVE_ITEM                 :Release slot: {PUSH_COLOUR}{STRING1}{POP_COLOUR} (on path reserve)
+STR_TRACE_RESTRICT_SLOT_PBS_RES_END_ACQUIRE_WAIT_ITEM           :Path reservation ending here: Acquire slot: {PUSH_COLOUR}{STRING1}{POP_COLOUR}, or wait at start
+STR_TRACE_RESTRICT_SLOT_PBS_RES_END_TRY_ACQUIRE_ITEM            :Path reservation ending here: Acquire slot: {PUSH_COLOUR}{STRING1}{POP_COLOUR}, or continue anyway
+STR_TRACE_RESTRICT_SLOT_PBS_RES_END_RELEASE_ITEM                :Path reservation ending here: Release slot: {PUSH_COLOUR}{STRING1}{POP_COLOUR}
 STR_TRACE_RESTRICT_SLOT_NAME                                    :{TRSLOT}
 STR_TRACE_RESTRICT_SLOT_NAME_PREFIXED                           :[{STRING}] {TRSLOT}
+STR_TRACE_RESTRICT_SLOT_GROUP_NAME                              :{TRSLOTGROUP}
+STR_TRACE_RESTRICT_SLOT_GROUP_NAME_DOWN                         :{DOWN_ARROW} {TRSLOTGROUP}
+STR_TRACE_RESTRICT_SLOT_GROUP_NAME_DOWN_PREFIXED                :{DOWN_ARROW} [{STRING}] {TRSLOTGROUP}
 STR_TRACE_RESTRICT_SLOT_LIST_HEADER                             :{BLACK}Slot{CONSUME_ARG}{P "" s}: {LTBLUE}
 STR_TRACE_RESTRICT_SLOT_LIST_SEPARATOR                          :{BLACK}, {LTBLUE}
 STR_TRACE_RESTRICT_COUNTER_NAME                                 :{TRCOUNTER}
@@ -999,16 +1020,18 @@ STR_TRACE_RESTRICT_TRAIN_STATUS_REQUIRES_SERVICE                :requires servic
 STR_TRACE_RESTRICT_TRAIN_STATUS_STOPPING_AT_STATION_WAYPOINT    :stopping at station/waypoint
 STR_TRACE_RESTRICT_REVERSE_SIG                                  :Reverse behind signal
 STR_TRACE_RESTRICT_REVERSE_SIG_CANCEL                           :Cancel reverse behind signal
+STR_TRACE_RESTRICT_REVERSE_AT_SIG                               :Reverse at path signal
+STR_TRACE_RESTRICT_REVERSE_AT_SIG_CANCEL                        :Cancel reverse at path signal
 STR_TRACE_RESTRICT_SET_SPEED_RESTRICTION                        :Restrict train speed to: {VELOCITY}
 STR_TRACE_RESTRICT_REMOVE_SPEED_RESTRICTION                     :Remove train speed restriction
-STR_TRACE_RESTRICT_TRAIN_NOT_STUCK                              :Train is not stuck, do not show news reports about waiting at this PBS signal
-STR_TRACE_RESTRICT_TRAIN_NOT_STUCK_CANCEL                       :Cancel train is not stuck, do not show news reports about waiting at this PBS signal
+STR_TRACE_RESTRICT_TRAIN_NOT_STUCK                              :Train is not stuck, do not show news reports about waiting at this path signal
+STR_TRACE_RESTRICT_TRAIN_NOT_STUCK_CANCEL                       :Cancel train is not stuck, do not show news reports about waiting at this path signal
 STR_TRACE_RESTRICT_TRAIN_NOT_STUCK_SHORT                        :Train is not stuck...
 STR_TRACE_RESTRICT_TRAIN_NOT_STUCK_CANCEL_SHORT                 :Cancel train is not stuck...
-STR_TRACE_RESTRICT_NO_PBS_BACK_PENALTY                          :Do not apply the penalty for passing this PBS signal from the back
-STR_TRACE_RESTRICT_NO_PBS_BACK_PENALTY_CANCEL                   :Cancel do not apply the penalty for passing this PBS signal from the back
-STR_TRACE_RESTRICT_NO_PBS_BACK_PENALTY_SHORT                    :No PBS back penalty
-STR_TRACE_RESTRICT_NO_PBS_BACK_PENALTY_CANCEL_SHORT             :Cancel no PBS back penalty
+STR_TRACE_RESTRICT_NO_PBS_BACK_PENALTY                          :Do not apply the penalty for passing this path signal from the back
+STR_TRACE_RESTRICT_NO_PBS_BACK_PENALTY_CANCEL                   :Cancel do not apply the penalty for passing this path signal from the back
+STR_TRACE_RESTRICT_NO_PBS_BACK_PENALTY_SHORT                    :No path signal back penalty
+STR_TRACE_RESTRICT_NO_PBS_BACK_PENALTY_CANCEL_SHORT             :Cancel no path signal back penalty
 STR_TRACE_RESTRICT_MAKE_TRAIN_SPEED_ADAPTATION_EXEMPT           :Make train exempt from automatic speed adaptation
 STR_TRACE_RESTRICT_REMOVE_TRAIN_SPEED_ADAPTATION_EXEMPT         :Remove train exemption from automatic speed adaptation
 STR_TRACE_RESTRICT_MAKE_TRAIN_SPEED_ADAPTATION_EXEMPT_SHORT     :Make exempt
@@ -1034,10 +1057,18 @@ STR_TRACE_RESTRICT_TIME_DAY_ITEM_SHORT                          :day
 STR_TRACE_RESTRICT_TIME_MONTH_ITEM_SHORT                        :month
 STR_TRACE_RESTRICT_TIMETABLE_LATENESS                           :lateness
 STR_TRACE_RESTRICT_TIMETABLE_EARLINESS                          :earliness
+STR_TRACE_RESTRICT_OTHER_COMPANY_GROUP                          :{GROUP} {COMPANY_NUM}
+
+###length 3
 STR_TRACE_RESTRICT_DISPATCH_SLOT_NEXT                           :next departure slot
 STR_TRACE_RESTRICT_DISPATCH_SLOT_LAST                           :last departure slot
+STR_TRACE_RESTRICT_DISPATCH_SLOT_VEH                            :vehicle's departure slot
+
+###length 3
 STR_TRACE_RESTRICT_DISPATCH_SLOT_SHORT_NEXT                     :next
 STR_TRACE_RESTRICT_DISPATCH_SLOT_SHORT_LAST                     :last
+STR_TRACE_RESTRICT_DISPATCH_SLOT_SHORT_VEH                      :vehicle
+
 STR_TRACE_RESTRICT_VALUE_CAPTION                                :{WHITE}Value
 STR_TRACE_RESTRICT_CAPTION                                      :{WHITE}Routefinding restriction
 STR_TRACE_RESTRICT_CAPTION_SHARED                               :{WHITE}Routefinding restriction - shared by {COMMA} signals
@@ -1053,12 +1084,17 @@ STR_TRACE_RESTRICT_SLOT_GUI_LIST_TOOLTIP                        :{BLACK}Slots - 
 STR_TRACE_RESTRICT_SLOT_CREATE_TOOLTIP                          :{BLACK}Click to create a slot
 STR_TRACE_RESTRICT_SLOT_DELETE_TOOLTIP                          :{BLACK}Delete the selected slot
 STR_TRACE_RESTRICT_SLOT_RENAME_TOOLTIP                          :{BLACK}Rename the selected slot
+STR_TRACE_RESTRICT_NEW_SLOT_GROUP                               :{BLACK}New slot group
+STR_TRACE_RESTRICT_NEW_SLOT_GROUP_TOOLTIP                       :{BLACK}Create a new slot group
+STR_TRACE_RESTRICT_SLOT_PUBLIC_TOOLTIP                          :{BLACK}Set whether the selected slot is public.{}Public slots can be used by signals and order lists of other companies if infrastructure sharing is enabled
 STR_TRACE_RESTRICT_SLOT_SET_MAX_OCCUPANCY_TOOLTIP               :{BLACK}Set the maximum occupancy of the selected slot
 STR_TRACE_RESTRICT_SLOT_CAPTION                                 :{WHITE}Routing Restrictions - Slot Management ({STRING})
 STR_TRACE_RESTRICT_SLOT_MANAGE                                  :Manage slots
 STR_TRACE_RESTRICT_SLOT_MAX_OCCUPANCY                           :{TINY_FONT}{COMMA} / {COMMA}
 STR_TRACE_RESTRICT_SLOT_RENAME_CAPTION                          :{BLACK}Rename a slot
+STR_TRACE_RESTRICT_SLOT_GROUP_RENAME_CAPTION                    :{BLACK}Rename a slot group
 STR_TRACE_RESTRICT_SLOT_CREATE_CAPTION                          :{BLACK}Create a slot
+STR_TRACE_RESTRICT_SLOT_GROUP_CREATE_CAPTION                    :{BLACK}Create a slot group
 STR_TRACE_RESTRICT_SLOT_SET_MAX_OCCUPANCY_CAPTION               :{BLACK}Set maximum occupancy of a slot
 STR_TRACE_RESTRICT_SLOT_QUERY_DELETE_CAPTION                    :{WHITE}Delete Slot
 STR_TRACE_RESTRICT_SLOT_DELETE_QUERY_TEXT                       :{WHITE}Are you sure you want to delete this slot?
@@ -1067,10 +1103,12 @@ STR_TRACE_RESTRICT_COUNTER_GUI_LIST_TOOLTIP                     :{BLACK}Counters
 STR_TRACE_RESTRICT_COUNTER_CREATE                               :{BLACK}Create
 STR_TRACE_RESTRICT_COUNTER_DELETE                               :{BLACK}Delete
 STR_TRACE_RESTRICT_COUNTER_RENAME                               :{BLACK}Rename
+STR_TRACE_RESTRICT_COUNTER_PUBLIC                               :{BLACK}Public
 STR_TRACE_RESTRICT_COUNTER_SET_VALUE                            :{BLACK}Set Value
 STR_TRACE_RESTRICT_COUNTER_CREATE_TOOLTIP                       :{BLACK}Click to create a counter
 STR_TRACE_RESTRICT_COUNTER_DELETE_TOOLTIP                       :{BLACK}Delete the selected counter
 STR_TRACE_RESTRICT_COUNTER_RENAME_TOOLTIP                       :{BLACK}Rename the selected counter
+STR_TRACE_RESTRICT_COUNTER_PUBLIC_TOOLTIP                       :{BLACK}Set whether the selected counter is public.{}Public counters can be used by signals and order lists of other companies if infrastructure sharing is enabled
 STR_TRACE_RESTRICT_COUNTER_SET_VALUE_TOOLTIP                    :{BLACK}Set the value of the selected counter
 STR_TRACE_RESTRICT_COUNTER_CAPTION                              :{WHITE}Routing Restrictions - Counter Management
 STR_TRACE_RESTRICT_COUNTER_MANAGE                               :Manage counters
@@ -1102,6 +1140,8 @@ STR_TRACE_RESTRICT_SHARE_TOOLTIP_EXTRA                          :{STRING}{}{BLAC
 STR_TRACE_RESTRICT_SIGNAL_GUI_TOOLTIP                           :{BLACK}Routefinding restriction
 STR_TRACE_RESTRICT_INSTRUCTION_LIST_TOOLTIP                     :{BLACK}Click an instruction to select it{}Ctrl+Click to scroll to the instruction's target (if any)
 STR_TRACE_RESTRICT_HIGHLIGHT_TOOLTIP                            :{BLACK}Toggle highlighting all signals sharing this program
+STR_TRACE_RESTRICT_RECENTLY_USED_TOOLTIP_EXTRA                  :{STRING}{}{BLACK}Ctrl+Click to list recently used
+STR_TRACE_RESTRICT_OTHER_COMPANY_TOOLTIP_EXTRA                  :{STRING1}{}{BLACK}Shift+Click to list other company items
 STR_TRACE_RESTRICT_WARNING_REQUIRES_REALISTIC_BRAKING           :{STRING} {PUSH_COLOUR}{RED}(requires realistic braking){POP_COLOUR}
 STR_TRACE_RESTRICT_WARNING_SIGNAL_MODE_CONTROL_ONLY             :{STRING} {PUSH_COLOUR}{RED}(only for signal mode control actions){POP_COLOUR}
 STR_TRACE_RESTRICT_WARNING_NO_SIGNAL_MODE_CONTROL               :{STRING} {PUSH_COLOUR}{RED}(not for signal mode control actions){POP_COLOUR}
@@ -1213,38 +1253,9 @@ STR_ERROR_CANNOT_USE_SELF                                       :{WHITE}Can't co
 STR_ERROR_CAN_T_DEPEND_UPON_BIDIRECTIONAL_SIGNALS               :{WHITE}Cannot conditionally depend upon bidirectional signals
 STR_ERROR_INVALID_SIGNAL                                        :{WHITE}Invalid signal
 
-STR_ROAD_TOOLBAR_TOOLTIP_CONVERT_ROAD_TO_WAYPOINT               :{BLACK}Convert road to waypoint. Ctrl enables joining waypoints. Shift toggles building/showing cost estimate
-STR_ROAD_TOOLBAR_TOOLTIP_CONVERT_TRAM_TO_WAYPOINT               :{BLACK}Convert tram to waypoint. Ctrl enables joining waypoints. Shift toggles building/showing cost estimate
-
 STR_WATERWAYS_TOOLBAR_CREATE_RIVER_IN_GAME_TOOLTIP              :{BLACK}Place rivers
 
 STR_LANDSCAPING_TOOLTIP_RULER_TOOL                              :{BLACK}Use a virtual ruler to measure distance and height
-
-#House construction window (for SE only)
-STR_HOUSE_BUILD_CAPTION                                         :{WHITE}House Selection
-STR_HOUSE_BUILD_CUSTOM_CAPTION                                  :{WHITE}{RAW_STRING}
-STR_HOUSE_BUILD_HOUSESET_LIST_TOOLTIP                           :{BLACK}Select set of houses
-STR_HOUSE_BUILD_SELECT_HOUSE_TOOLTIP                            :{BLACK}Select house to build
-STR_HOUSE_BUILD_HOUSE_NAME                                      :{GOLD}{STRING1}
-STR_HOUSE_BUILD_HISTORICAL_BUILDING                             :{GOLD}(historical building)
-STR_HOUSE_BUILD_HOUSE_POPULATION                                :{BLACK}Population: {GOLD}{NUM}
-STR_HOUSE_BUILD_HOUSE_ZONES                                     :{BLACK}House zones: {STRING1} {STRING1} {STRING1} {STRING1} {STRING1}
-STR_HOUSE_BUILD_HOUSE_ZONE_DISABLED                             :{GRAY}{NUM}
-STR_HOUSE_BUILD_HOUSE_ZONE_ENABLED                              :{GOLD}{NUM}
-STR_HOUSE_BUILD_LANDSCAPE                                       :{BLACK}Landscape: {STRING}
-STR_HOUSE_BUILD_LANDSCAPE_ABOVE_OR_BELOW_SNOWLINE               :{GOLD}above or below snowline
-STR_HOUSE_BUILD_LANDSCAPE_ONLY_ABOVE_SNOWLINE                   :{GOLD}only above snowline
-STR_HOUSE_BUILD_LANDSCAPE_ONLY_BELOW_SNOWLINE                   :{GOLD}only below snowline
-STR_HOUSE_BUILD_YEARS                                           :{BLACK}Years: {STRING1}{GOLD} - {STRING1}
-STR_HOUSE_BUILD_YEARS_BAD_YEAR                                  :{RED}{NUM}
-STR_HOUSE_BUILD_YEARS_GOOD_YEAR                                 :{GOLD}{NUM}
-STR_HOUSE_BUILD_SUPPLIED_CARGO                                  :{BLACK}Supplies: {GOLD}{CARGO_LIST}
-STR_HOUSE_BUILD_ACCEPTED_CARGO                                  :{BLACK}Accepts: {GOLD}{RAW_STRING}
-STR_HOUSE_BUILD_CARGO_FIRST                                     :{STRING2}
-STR_HOUSE_BUILD_CARGO_SEPARATED                                 :, {STRING2}
-STR_HOUSE_BUILD_CARGO_VALUE_JUST_NAME                           :{1:STRING}
-STR_HOUSE_BUILD_CARGO_VALUE_EIGHTS                              :({COMMA}/8 {STRING})
-STR_BASIC_HOUSE_SET_NAME                                        :Basic houses
 
 #Town select window (for SE only)
 STR_SELECT_TOWN_CAPTION                                         :{WHITE}Select town
@@ -1253,8 +1264,13 @@ STR_SELECT_TOWN_LIST_ITEM                                       :{BLACK}{TOWN}
 STR_TREES_REMOVE_TREES_BUTTON                                   :{BLACK}Remove all Trees
 STR_TREES_REMOVE_TREES_TOOLTIP                                  :{BLACK}Remove all Trees over landscape
 
+STR_TERRAFORM_PUBLIC_ROADS_GENERATION_CAPTION                   :{WHITE}Public Roads
 STR_TERRAFORM_PUBLIC_ROADS                                      :{BLACK}Build public roads
 STR_TERRAFORM_PUBLIC_ROADS_TOOLTIP                              :{BLACK}Build public roads between the towns on the map
+STR_TERRAFORM_PUBLIC_ROADS_TYPE                                 :{BLACK}Public roads type
+
+STR_SCENEDIT_LANDSCAPE_MENU_LAND_GENERATION                     :Land generation
+STR_SCENEDIT_LANDSCAPE_MENU_PUBLIC_ROADS                        :Public roads
 
 STR_INDUSTRY_CARGOES_NOTIFY_SMALLMAP_ALL                        :All industries
 
@@ -1335,6 +1351,8 @@ STR_NEWGRF_TOO_MANY_STRINGS_DETAIL                              :{WHITE}Some nam
 
 STR_TOWN_VIEW_NOISE_IN_TOWN_NO_LIMIT                            :{BLACK}Noise limit in town: {ORANGE}{COMMA}
 
+STR_TOWN_VIEW_CARGO_LAST_PRODUCTION_INTERVAL_MAX                :{BLACK}{CARGO_LIST} last interval: {ORANGE}{COMMA}{BLACK}  max: {ORANGE}{COMMA}
+
 ###length 6
 STR_LOCAL_AUTHORITY_SETTING_OVERRIDE_ALLOW_ROADS                :Allowed to build roads
 STR_LOCAL_AUTHORITY_SETTING_OVERRIDE_ALLOW_LEVEL_CROSSINGS      :Allowed to build level crossings
@@ -1354,45 +1372,57 @@ STR_STATION_VIEW_DEPARTURES_TOOLTIP                             :{BLACK}Show lis
 STR_STATION_VIEW_HISTORY_BUTTON                                 :{BLACK}History
 STR_STATION_VIEW_HISTORY_TOOLTIP                                :{BLACK}Show waiting cargo history
 
-STR_DEPARTURES_CAPTION                                          :{WHITE}{STATION} Live Travel Information
-STR_DEPARTURES_CAPTION_WAYPOINT                                 :{WHITE}{WAYPOINT} Live Travel Information
-STR_DEPARTURES_PAX                                              :{BLACK}{TINY_FONT}P
-STR_DEPARTURES_FREIGHT                                          :{BLACK}{TINY_FONT}F
-STR_DEPARTURES_DEPARTURES                                       :{BLACK}{TINY_FONT}D
-STR_DEPARTURES_ARRIVALS                                         :{BLACK}{TINY_FONT}A
-STR_DEPARTURES_VIA_BUTTON                                       :{BLACK}{TINY_FONT}via
-STR_DEPARTURES_PAX_TOOLTIP                                      :{BLACK}Show passenger arrivals/departures
-STR_DEPARTURES_FREIGHT_TOOLTIP                                  :{BLACK}Show freight arrivals/departures
-STR_DEPARTURES_DEPARTURES_TOOLTIP                               :{BLACK}Show timetabled departures
-STR_DEPARTURES_ARRIVALS_TOOLTIP                                 :{BLACK}Show timetabled arrivals
+STR_DEPARTURES_CAPTION                                          :{WHITE}{STRING2} Live Travel Information
+STR_DEPARTURES_CAPTION_FILTER                                   :{WHITE}{STRING3} - Calling at {STRING1}
+STR_DEPARTURES_CARGO_MODE_TOOLTIP                               :{BLACK}Set cargo filter mode for arrivals/departures
+STR_DEPARTURES_DEPARTURES                                       :Departures
+STR_DEPARTURES_ARRIVALS                                         :Arrivals
+STR_DEPARTURES_BOTH_COMBINED                                    :Combined
+STR_DEPARTURES_BOTH_SEPARATE                                    :Separate
+STR_DEPARTURES_DEPARTURE_MODE_TOOLTIP                           :{BLACK}Set whether to show departures and/or arrivals
+STR_DEPARTURES_TIMES_BUTTON                                     :{BLACK}Times
+STR_DEPARTURES_TIMES_TOOLTIP                                    :{BLACK}Show timetabled destination arrival times
+STR_DEPARTURES_EMPTY_BUTTON                                     :{BLACK}Empty
+STR_DEPARTURES_EMPTY_TOOLTIP                                    :{BLACK}Include departures, arrivals and stations called at where the vehicle is running empty or does not load/unload cargo.
+STR_DEPARTURES_VIA_BUTTON                                       :{BLACK}Via
 STR_DEPARTURES_VIA_TOOLTIP                                      :{BLACK}Show timetabled vehicles that do not stop here
-STR_DEPARTURES_SHOW_TRAINS_TOOLTIP                              :{BLACK}Show upcoming trains on this station's timetable
-STR_DEPARTURES_SHOW_ROAD_VEHICLES_TOOLTIP                       :{BLACK}Show upcoming road vehicles on this station's timetable
-STR_DEPARTURES_SHOW_SHIPS_TOOLTIP                               :{BLACK}Show upcoming ships on this station's timetable
-STR_DEPARTURES_SHOW_AIRCRAFT_TOOLTIP                            :{BLACK}Show upcoming aircraft on this station's timetable
+STR_DEPARTURES_FILTER_BUTTON                                    :{BLACK}Filter
+STR_DEPARTURES_FILTER_TOOLTIP                                   :{BLACK}Only show departures/arrivals calling at a particular destination.
+STR_DEPARTURES_SHOW_TRAINS_TOOLTIP                              :{BLACK}Show timetabled trains
+STR_DEPARTURES_SHOW_ROAD_VEHICLES_TOOLTIP                       :{BLACK}Show timetabled road vehicles
+STR_DEPARTURES_SHOW_SHIPS_TOOLTIP                               :{BLACK}Show timetabled ships
+STR_DEPARTURES_SHOW_AIRCRAFT_TOOLTIP                            :{BLACK}Show timetabled aircraft
 STR_DEPARTURES_SHOW_TYPE_TOOLTIP_CTRL_SUFFIX                    :{BLACK}{STRING}. Ctrl+Click to show exclusively.
-STR_DEPARTURES_EMPTY                                            :{ORANGE}No vehicles are currently timetabled for this station.
+STR_DEPARTURES_EMPTY                                            :{ORANGE}No vehicles are currently timetabled.
 STR_DEPARTURES_NONE_SELECTED                                    :{ORANGE}No timetable information has been requested.
-STR_DEPARTURES_TIME                                             :{ORANGE}{STRING1}
-STR_DEPARTURES_TIME_DEP                                         :{ORANGE}{STRING1} {GREEN}{UP_ARROW}
-STR_DEPARTURES_TIME_ARR                                         :{ORANGE}{STRING1} {RED}{DOWN_ARROW}
-STR_DEPARTURES_TIME_BOTH                                        :{ORANGE}{STRING1} {RED}{DOWN_ARROW} {ORANGE}{STRING1} {GREEN}{UP_ARROW}
-STR_DEPARTURES_TERMINUS                                         :{ORANGE}{STATION}{STRING}
-STR_DEPARTURES_TERMINUS_VIA_STATION                             :{ORANGE}{STATION}{STRING} via {STRING}
-STR_DEPARTURES_TERMINUS_VIA                                     :{ORANGE}{STATION}{STRING} via
+STR_DEPARTURES_TIME                                             :{COLOUR}{STRING1}
+STR_DEPARTURES_TIME_DEP                                         :{COLOUR}{STRING1} {GREEN}{UP_ARROW}
+STR_DEPARTURES_TIME_ARR                                         :{COLOUR}{STRING1} {RED}{DOWN_ARROW}
+STR_DEPARTURES_TIME_BOTH                                        :{COLOUR}{STRING1} {RED}{DOWN_ARROW} {COLOUR}{STRING1} {GREEN}{UP_ARROW}
+STR_DEPARTURES_TERMINUS                                         :{ORANGE}{STRING2}{STRING}
+STR_DEPARTURES_TERMINUS_VIA_STATION                             :{ORANGE}{STRING2}{STRING} via {STRING}
+STR_DEPARTURES_TERMINUS_VIA                                     :{ORANGE}{STRING2}{STRING} via
 STR_DEPARTURES_VIA                                              :{ORANGE}via {STRING}
 STR_DEPARTURES_TOC                                              :{ORANGE}{COMPANY}
 STR_DEPARTURES_GROUP                                            :{ORANGE}{GROUP}
 STR_DEPARTURES_VEH                                              :{ORANGE}{VEHICLE}
 STR_DEPARTURES_CALLING_AT                                       :{ORANGE}Calling at:
-STR_DEPARTURES_CALLING_AT_FIRST_STATION                         :{STATION}
-STR_DEPARTURES_CALLING_AT_STATION                               :{RAW_STRING}, {STATION}
-STR_DEPARTURES_CALLING_AT_LAST_STATION                          :{RAW_STRING} and {STATION}
+STR_DEPARTURES_CALLING_AT_STATION                               :{RAW_STRING}, {STRING4}
+STR_DEPARTURES_CALLING_AT_LAST_STATION                          :{RAW_STRING} and {STRING4}
 STR_DEPARTURES_CALLING_AT_LIST                                  :{ORANGE}{RAW_STRING}.
-STR_DEPARTURES_CALLING_AT_LIST_SMART_TERMINUS                   :{ORANGE}{RAW_STRING}. This service continues to {STATION}.
+STR_DEPARTURES_CALLING_AT_LIST_SMART_TERMINUS                   :{ORANGE}{RAW_STRING}. This service continues to {STRING4}.
+STR_DEPARTURES_CALLING_AT_STATION_WITH_TIME                     :{STRING2} ({TT_TIME_ABS})
 STR_DEPARTURES_TINY                                             :{TINY_FONT}{STRING2}
 STR_DEPARTURES_VIA_DESCRIPTOR                                   :{STRING1}{STRING}
 STR_DEPARTURES_VIA_AND                                          :{STRING} and {STRING}
+STR_DEPARTURES_SOURCE_MODE_TOOLTIP                              :{BLACK}Set whether to show live departures, or a 24 hour timetable of scheduled dispatch departures.
+STR_DEPARTURES_SOURCE_MODE_LIVE                                 :Live
+STR_DEPARTURES_SOURCE_MODE_SCHEDULE_24_HOUR                     :24 hour schedule
+
+##default-translation STR_TRACE_RESTRICT_DUPLICATE
+STR_DEPARTURES_DUPLICATE                                        :{BLACK}Duplicate
+##default-translation STR_NEWGRF_INSPECT_DUPLICATE_TOOLTIP
+STR_DEPARTURES_DUPLICATE_TOOLTIP                                :{BLACK}Duplicate this window
 
 STR_DEPARTURES_TYPE_TRAIN                                       :{ORANGE}{TRAIN}
 STR_DEPARTURES_TYPE_TRAIN_SILVER                                :{SILVER}{TRAIN}
@@ -1415,6 +1445,7 @@ STR_DEPARTURES_ARRIVED                                          :{GREEN}Arrived
 STR_DEPARTURES_DELAYED                                          :{YELLOW}Delayed
 STR_DEPARTURES_EXPECTED                                         :{YELLOW}Expt {STRING1}
 STR_DEPARTURES_CANCELLED                                        :{RED}Cancelled
+STR_DEPARTURES_SCHEDULED                                        :{GREEN}Scheduled
 
 STR_CONFIG_SETTING_DEPARTUREBOARDS                              :{ORANGE}Departure boards
 STR_CONFIG_MAX_DEPARTURES                                       :Show at most {STRING2} departure board entries for each station
@@ -1439,10 +1470,6 @@ STR_CONFIG_DEPARTURE_LARGER_FONT                                :Use larger font
 STR_CONFIG_DEPARTURE_LARGER_FONT_HELPTEXT                       :Whether to use a larger font for lists of stations called at
 STR_CONFIG_DEPARTURE_DESTINATION_TYPE                           :Show icons for destinations that are docks or airports: {STRING2}
 STR_CONFIG_DEPARTURE_DESTINATION_TYPE_HELPTEXT                  :Whether to show icons next to destinations that are docks or airports
-STR_CONFIG_DEPARTURE_SHOW_BOTH                                  :Show arrival and departure times on the same line: {STRING2}
-STR_CONFIG_DEPARTURE_SHOW_BOTH_HELPTEXT                         :Whether arrival and departure times for a vehicle are combined into a single entry instead of being listed separately
-STR_CONFIG_DEPARTURE_ONLY_PASSENGERS                            :Only show entries for vehicles that can carry passengers: {STRING2}
-STR_CONFIG_DEPARTURE_ONLY_PASSENGERS_HELPTEXT                   :Whether to only show arrivals and departures of vehicles that can carry passengers
 STR_CONFIG_DEPARTURE_SMART_TERMINUS                             :Don't show termini that can be reached sooner on a later vehicle: {STRING2}
 STR_CONFIG_DEPARTURE_SMART_TERMINUS_HELPTEXT                    :Whether to show termini that can be reached sooner on another vehicle that departs later
 STR_CONFIG_DEPARTURE_CONDITIONALS                               :Handle unpredictable conditional order jumps for departures by: {STRING2}
@@ -1450,8 +1477,6 @@ STR_CONFIG_DEPARTURE_CONDITIONALS_HELPTEXT                      :How unpredictab
 STR_CONFIG_DEPARTURE_CONDITIONALS_1                             :giving up
 STR_CONFIG_DEPARTURE_CONDITIONALS_2                             :assuming they will be taken
 STR_CONFIG_DEPARTURE_CONDITIONALS_3                             :assuming they will not be taken
-STR_CONFIG_DEPARTURE_SHOW_ALL_STOPS                             :Show all stations called at regardless of loading/unloading: {STRING2}
-STR_CONFIG_DEPARTURE_SHOW_ALL_STOPS_HELPTEXT                    :Whether stations that a vehicle only loads from will be shown in the calling at list
 STR_CONFIG_DEPARTURE_MERGE_IDENTICAL                            :Merge identical entries: {STRING2}
 STR_CONFIG_DEPARTURE_MERGE_IDENTICAL_HELPTEXT                   :Whether identical departure board entries should be merged into a single one
 
@@ -1473,6 +1498,8 @@ STR_INDUSTRY_VIEW_REQUIRED_TOOLTIP_NEXT                         :, {STRING}{RAW_
 STR_INDUSTRY_VIEW_STOCKPILED_TOOLTIP                            :{CARGO_LONG} waiting{RAW_STRING}
 STR_INDUSTRY_VIEW_TRANSPORTED_TOOLTIP_EXTENSION                 :{CARGO_LONG}{RAW_STRING} ({COMMA}%)
 
+STR_INDUSTRY_VIEW_PRODUCTION_LAST_PRODUCTION_INTERVAL_TITLE     :{BLACK}Production last interval:
+
 STR_DEPOT_VIEW_COUNT_TOOLTIP                                    :{BLACK}{COMMA} vehicle{P "" s} inside
 STR_DEPOT_VIEW_COUNT_STOPPED_TOOLTIP                            :{BLACK}{COMMA} stopped vehicle{P "" s} inside
 STR_DEPOT_VIEW_COUNT_WAITING_TOOLTIP                            :{BLACK}{COMMA} waiting vehicle{P "" s} inside
@@ -1484,6 +1511,8 @@ STR_DEPOT_VIEW_MIXED_CONTENTS_TOOLTIP                           :{BLACK}{STRING1
 
 STR_STATION_VIEW_NAME_TOOLTIP                                   :{STATION}{NBSP}{STATION_FEATURES}
 STR_STATION_VIEW_CARGO_LINE_TOOLTIP                             :{STRING} ({COMMA}%): {CARGO_SHORT}
+
+STR_STATION_VIEW_SUPPLY_RATINGS_TITLE_PRODUCTION_INTERVAL       :{BLACK}Supply per production interval and local rating:
 
 STR_VEHICLE_LIST_AGE                                            :{STRING2}, Age: {COMMA} year{P "" s} ({COMMA})
 STR_VEHICLE_LIST_AGE_RED                                        :{STRING2}, Age: {RED}{COMMA} {BLACK}year{P "" s} ({COMMA})
@@ -1501,6 +1530,9 @@ STR_VEHICLE_LIST_TIMETABLE_DELAY_LATE                           :{STRING2}, Time
 STR_VEHICLE_LIST_TIMETABLE_DELAY_EARLY                          :{STRING2}, Timetable status: {STRING1} early
 STR_VEHICLE_LIST_TIMETABLE_DELAY_ON_TIME                        :{STRING2}, Timetable status: On time
 STR_VEHICLE_LIST_ORDER_OCCUPANCY_AVERAGE                        :{STRING2}, Average order occupancy: {COMMA}%
+STR_VEHICLE_LIST_TIMETABLE_TYPE                                 :{STRING2}, Timetable type: {RAW_STRING}
+
+STR_VEHICLE_LIST_TIMETABLE_TYPE_EXTRA_ITEM                      :, {STRING}
 
 STR_VEHICLE_LIST_PROFIT_THIS_YEAR_LAST_YEAR_LIFETIME            :{STRING2} (lifetime: {CURRENCY_LONG})
 STR_VEHICLE_LIST_CANCEL_DEPOT_SERVICE                           :Cancel servicing/send to
@@ -1518,6 +1550,8 @@ STR_VEHICLE_LIST_CHANGE_ORDER_AIRCRAFT_HANGAR                   :Move order to a
 
 STR_GROUP_EXPAND_ALL                                            :{BLACK}Expand all
 STR_GROUP_COLLAPSE_ALL                                          :{BLACK}Collapse all
+
+STR_GROUP_RENAME_TOOLTIP_EXTRA                                  :{BLACK}{STRING}{}Ctrl+Click to auto-generate the name
 
 STR_BUY_VEHICLE_TRAIN_LOCOMOTIVES                               :Locomotives and Power Cars
 STR_BUY_VEHICLE_TRAIN_WAGONS                                    :Wagons
@@ -1540,6 +1574,7 @@ STR_BUY_VEHICLE_TRAIN_RENAME_LOCOMOTIVE_BUTTON                  :{BLACK}Rename L
 STR_BUY_VEHICLE_TRAIN_RENAME_WAGON_BUTTON                       :{BLACK}Rename Wagon
 STR_BUY_VEHICLE_TRAIN_RENAME_LOCOMOTIVE_TOOLTIP                 :{BLACK}Rename locomotive or power car
 STR_BUY_VEHICLE_TRAIN_RENAME_WAGON_TOOLTIP                      :{BLACK}Rename wagon
+STR_BUY_VEHICLE_TRAIN_TOGGLE_DUAL_PANE_TOOLTIP                  :{BLACK}Toggle separate locomotives and wagons
 
 STR_QUERY_RENAME_TRAIN_TYPE_LOCOMOTIVE_CAPTION                  :{WHITE}Rename locomotive type
 STR_QUERY_RENAME_TRAIN_TYPE_WAGON_CAPTION                       :{WHITE}Rename wagon type
@@ -1548,6 +1583,8 @@ STR_VEHICLE_VIEW_SEND_TO_DEPOT_TOOLTIP_SHIFT                    :{STRING}. Shift
 STR_VEHICLE_VIEW_SEND_TO_DEPOT_MENU                             :{BLACK}Cancel send vehicle to depot/hangar. Ctrl+Click for menu. Shift+Click to select depot/hangar
 
 STR_VEHICLE_VIEW_TRAIN_CENTER_TOOLTIP_EXTRA                     :{STRING}{BLACK}{}Shift+Click to toggle showing route overlay even when window is not focused
+
+STR_VEHICLE_VIEW_SHOW_ORDERS_TOOLTIP_EXTRA                      :{STRING}{BLACK}{}Shift+Click to show timetable scheduled dispatch window
 
 STR_VEHICLE_VIEW_ORDER_NUMBER                                   :{COMMA}: {STRING}
 
@@ -1571,6 +1608,14 @@ STR_VEHICLE_STATUS_CANNOT_REACH_WAYPOINT_VEL_END                :{LTBLUE}Cannot 
 STR_VEHICLE_STATUS_CANNOT_REACH_DEPOT_VEL_END                   :{ORANGE}Cannot reach {DEPOT}, {VELOCITY}
 STR_VEHICLE_STATUS_CANNOT_REACH_DEPOT_SERVICE_VEL_END           :{LTBLUE}Cannot reach {DEPOT}, {VELOCITY}
 
+STR_VEHICLE_STATUS_HEADING_FOR_STATION_VEL_SHORT                :{LTBLUE}{1:VELOCITY} - {0:STATION}
+STR_VEHICLE_STATUS_HEADING_FOR_WAYPOINT_VEL_SHORT               :{LTBLUE}{1:VELOCITY} - {0:WAYPOINT}
+STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_VEL_SHORT                  :{ORANGE}{1:VELOCITY} - {0:DEPOT}
+
+STR_VEHICLE_STATUS_HEADING_FOR_STATION_VEL_SHORT_END            :{LTBLUE}{STATION}, {VELOCITY}
+STR_VEHICLE_STATUS_HEADING_FOR_WAYPOINT_VEL_SHORT_END           :{LTBLUE}{WAYPOINT}, {VELOCITY}
+STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_VEL_SHORT_END              :{ORANGE}{DEPOT}, {VELOCITY}
+
 STR_BREAKDOWN_TYPE_CRITICAL                                     :Mechanical failure
 STR_BREAKDOWN_TYPE_EM_STOP                                      :Emergency stop
 STR_BREAKDOWN_TYPE_LOW_SPEED                                    :Limited to {VELOCITY}
@@ -1586,6 +1631,7 @@ STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_SELL_VEL                   :{CREAM}Heading 
 
 STR_VEHICLE_LOAD_THROUGH_ABORTED_INSUFFICIENT_TRACK             :{WHITE}{VEHICLE}: through load aborted due to insufficient track at {STATION}
 STR_VEHICLE_LOAD_THROUGH_ABORTED_DEPOT                          :{WHITE}{VEHICLE}: through load aborted due to depot at {STATION}
+STR_VEHICLE_LOAD_THROUGH_NOT_ALLOWED_PASSENGERS                 :{WHITE}{VEHICLE}: through load is not allowed for passengers
 
 STR_RUNNING                                                     :{LTBLUE}Running
 
@@ -1614,6 +1660,8 @@ STR_VEHICLE_AUTO_GROUP_CARGO_LIST                               : ({CARGO_LIST})
 
 STR_VEHICLE_INFO_SPEED_RESTRICTION                              :{BLACK}Speed restriction: {LTBLUE}{VELOCITY}
 STR_VEHICLE_INFO_SPEED_ADAPTATION_EXEMPT                        :{BLACK}Exempt from speed adaptation
+STR_VEHICLE_INFO_SPEED_ADAPTATION_LIMIT                         :{BLACK}Speed adaptation: {LTBLUE}{VELOCITY}
+STR_VEHICLE_INFO_SPEED_ADAPTATION_NONE                          :{BLACK}Speed adaptation: {LTBLUE}None
 
 STR_VEHICLE_DETAILS_TRAIN_ENGINE_BUILT_AND_VALUE_AND_SPEED      :{LTBLUE}{ENGINE}{BLACK}   Built: {LTBLUE}{NUM}{BLACK} Value: {LTBLUE}{CURRENCY_LONG} {BLACK}Max. speed: {LTBLUE}{VELOCITY}
 STR_VEHICLE_DETAILS_TRAIN_WAGON_VALUE_AND_SPEED                 :{LTBLUE}{ENGINE}{BLACK}   Value: {LTBLUE}{CURRENCY_LONG} {BLACK}Max. speed: {LTBLUE}{VELOCITY}
@@ -1624,6 +1672,14 @@ STR_VEHICLE_DETAILS_EXTRA_ACTIONS_TOOLTIP                       :{BLACK}Extra ve
 STR_VEHICLE_DETAILS_REMOVE_SPEED_RESTRICTION                    :Remove speed restriction
 STR_VEHICLE_DETAILS_SET_SPEED_RESTRICTION                       :Set speed restriction
 STR_VEHICLE_DETAILS_REMOVE_FROM_SLOT                            :Remove from slot:
+
+STR_VEHICLE_DETAILS_PRODUCTION_INTERVALS                        :Production intervals
+
+STR_VEHICLE_DETAILS_LAST_SERVICE_PRODUCTION_INTERVALS_AGO       :Last service: {LTBLUE}{NUM} interval{P "" s} ago
+STR_VEHICLE_DETAILS_SERVICING_INTERVAL_PRODUCTION_INTERVALS     :{BLACK}Servicing interval: {LTBLUE}{COMMA}{NBSP}interval{P "" s}{BLACK}   {STRING1}
+
+STR_VEHICLE_DETAILS_INCREASE_SERVICING_INTERVAL_TOOLTIP_PRODINT :{BLACK}Increase servicing interval by 5 production intervals. Ctrl+Click to increase servicing interval by 1 production interval
+STR_VEHICLE_DETAILS_DECREASE_SERVICING_INTERVAL_TOOLTIP_PRODINT :{BLACK}Decrease servicing interval by 5 production intervals. Ctrl+Click to decrease servicing interval by 1 production interval
 
 STR_ORDER_DROP_CARGO_TYPE_LOAD                                  :Load by cargo type
 STR_ORDER_DROP_CARGO_TYPE_UNLOAD                                :Unload by cargo type
@@ -1647,6 +1703,8 @@ STR_ORDER_CONDITIONAL_VIA                                       :{BLACK}Via
 STR_ORDER_CONDITIONAL_VIA_TOOLTIP                               :{BLACK}The via station to check the waiting cargo amount for
 STR_ORDER_CONDITIONAL_STATION                                   :{BLACK}Station
 STR_ORDER_CONDITIONAL_STATION_TOOLTIP                           :{BLACK}The station to check
+STR_ORDER_CONDITIONAL_REFIT_MODE                                :{BLACK}Refit
+STR_ORDER_CONDITIONAL_REFIT_MODE_TOOLTIP                        :{BLACK}Whether to use the estimated cargo capacity after refitting
 
 STR_ORDER_CONDITIONAL_COMPARATOR_ACCEPTS                        :accepts
 STR_ORDER_CONDITIONAL_COMPARATOR_DOES_NOT_ACCEPT                :does not accept
@@ -1672,8 +1730,14 @@ STR_ORDER_CONDITIONAL_COMPARATOR_DISPATCH_SLOT_IS_FIRST         :is first slot
 STR_ORDER_CONDITIONAL_COMPARATOR_DISPATCH_SLOT_IS_NOT_FIRST     :is not first slot
 STR_ORDER_CONDITIONAL_COMPARATOR_DISPATCH_SLOT_IS_LAST          :is last slot
 STR_ORDER_CONDITIONAL_COMPARATOR_DISPATCH_SLOT_IS_NOT_LAST      :is not last slot
+
+###length 2
 STR_ORDER_CONDITIONAL_COMPARATOR_DISPATCH_SLOT_HAS_TAG          :has tag {NUM}
+STR_ORDER_CONDITIONAL_COMPARATOR_DISPATCH_SLOT_HAS_TAG_NAMED    :has tag {NUM} ({RAW_STRING})
+
+###length 2
 STR_ORDER_CONDITIONAL_COMPARATOR_DISPATCH_SLOT_DOESNT_HAVE_TAG  :doesn't have tag {NUM}
+STR_ORDER_CONDITIONAL_COMPARATOR_DISPATCH_SLOT_DOESNT_HAVE_TAG_NAMED :doesn't have tag {NUM} ({RAW_STRING})
 
 STR_ORDERS_MANAGE_LIST                                          :{BLACK}Manage List
 STR_ORDERS_MANAGE_LIST_TOOLTIP                                  :{BLACK}Manage this order list
@@ -1755,11 +1819,16 @@ STR_ORDER_CONDITIONAL_IN_INVALID_SLOT                           :Jump to order {
 STR_ORDER_CONDITIONAL_LOAD_PERCENTAGE_DISPLAY                   :Jump to order {COMMA} when Load percentage of {STRING} {STRING} {COMMA}
 STR_ORDER_CONDITIONAL_CARGO_WAITING_AMOUNT_DISPLAY              :Jump to order {COMMA} when {STRING} at {STRING1} {STRING} {CARGO_SHORT}
 STR_ORDER_CONDITIONAL_CARGO_WAITING_AMOUNT_VIA_DISPLAY          :Jump to order {COMMA} when {STRING} at {STRING1} via {STRING1} {STRING} {CARGO_SHORT}
+STR_ORDER_CONDITIONAL_CARGO_WAITING_GENERAL_DISPLAY             :Jump to order {COMMA} when {STRING} at {STRING1} {STRING} {STRING}
+STR_ORDER_CONDITIONAL_CARGO_WAITING_GENERAL_VIA_DISPLAY         :Jump to order {COMMA} when {STRING} at {STRING1} via {STRING1} {STRING} {STRING}
 STR_ORDER_CONDITIONAL_COUNTER                                   :Jump to order {COMMA} when value of {TRCOUNTER} {STRING} {COMMA}
 STR_ORDER_CONDITIONAL_INVALID_COUNTER                           :Jump to order {COMMA} when value of {PUSH_COLOUR}{RED}{STRING}{POP_COLOUR} {STRING} {COMMA}
 STR_ORDER_CONDITIONAL_TIME_HHMM                                 :Jump to order {COMMA} when {STRING} {STRING} {TIME_HHMM}
 STR_ORDER_CONDITIONAL_TIMETABLE                                 :Jump to order {COMMA} when {STRING} {STRING} {TT_TICKS}
 STR_ORDER_CONDITIONAL_DISPATCH_SLOT_DISPLAY                     :Jump to order {COMMA} when {STRING} {STRING} {STRING}
+
+STR_ORDER_CONDITIONAL_CARGO_WAITING_PERCENT_CAPACITY            :{COMMA} percent of {STRING} capacity
+STR_ORDER_CONDITIONAL_CARGO_WAITING_PERCENT_CAPACITY_REFIT      :{COMMA} percent of refit to {STRING} capacity
 
 STR_ORDER_TRY_ACQUIRE_SLOT                                      :Try to acquire slot: {STRING1}
 STR_ORDER_RELEASE_SLOT                                          :Release slot: {STRING1}
@@ -1818,8 +1887,8 @@ STR_TIMETABLE_FILL_TIMETABLE_SUGGESTION_2                       :{BLACK}(Alterna
 
 STR_TIMETABLE_WARNINGS_OMITTED                                  :{BLACK}{NUM} further warnings omitted...
 
-STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :A:
-STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :D:
+STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :A:{SPACE}{SPACE}
+STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :D:{SPACE}{SPACE}
 
 STR_DATE_MINUTES_MINUTE_TOOLTIP                                 :{BLACK}Select minute
 STR_DATE_MINUTES_HOUR_TOOLTIP                                   :{BLACK}Select hour
@@ -1872,6 +1941,11 @@ STR_PLANS_LIST_ITEM_NAMED_PLAN                                  :{RAW_STRING}: {
 STR_PLANS_LIST_ITEM_LINE                                        : -- Line #{NUM}: {NUM} segment{P "" s}
 STR_PLANS_LIST_TOOLTIP                                          :{BLACK}Double click any item in the list to (un)fold the related plan.{}Ctrl+Click to scroll to.
 STR_PLANS_QUERY_RENAME_PLAN                                     :{WHITE}Rename plan
+STR_PLANS_OWN_ONLY                                              :{BLACK}Own only
+STR_PLANS_OWN_ONLY_TOOLTIP                                      :{BLACK}Own show plans which you own
+STR_SORT_BY_PLAN_ID                                             :Plan ID
+STR_SORT_BY_OWNER                                               :Owner
+STR_SORT_BY_DATE                                                :Date
 
 STR_WARNING_LOADGAME_REMOVED_UNCORRECTABLE_VEHICLES             :{WHITE}Removed {NUM} vehicles found to be uncorrectably invalid during load
 
@@ -1886,7 +1960,6 @@ STR_GAME_SAVELOAD_ERROR_HELI_OILRIG_BUG                         :Savegame has a 
 STR_QUERY_CLEAR_AREA_CAPTION                                    :{WHITE}Clear area
 STR_CLEAR_AREA_CONFIRMATION_TEXT                                :{YELLOW}You are about to destroy an important structure. Are you sure?
 
-STR_ERROR_CAN_T_BUILD_HOUSE_HERE                                :{WHITE}Can't build house here...
 STR_ERROR_BUILDING_NOT_ALLOWED_IN_THIS_TOWN_ZONE                :{WHITE}... not allowed in this town zone.
 STR_ERROR_BUILDING_NOT_ALLOWED_ABOVE_SNOW_LINE                  :{WHITE}... not allowed above the snow line.
 STR_ERROR_BUILDING_NOT_ALLOWED_BELOW_SNOW_LINE                  :{WHITE}... not allowed below the snow line.
@@ -1895,13 +1968,9 @@ STR_ERROR_TOO_MANY_HOUSE_TYPES                                  :{WHITE}... too 
 STR_ERROR_BUILDING_IS_TOO_OLD                                   :{WHITE}... building is too old.
 STR_ERROR_BUILDING_IS_TOO_MODERN                                :{WHITE}... building is too modern.
 STR_ERROR_ONLY_ONE_BUILDING_ALLOWED_PER_TOWN                    :{WHITE}... only one building of this type is allowed in a town.
-STR_ERROR_NO_MORE_BUILDINGS_ALLOWED_PER_TOWN                    :{WHITE}... too many buildings of this type in the town.
-STR_ERROR_BUILDING_NOT_ALLOWED                                  :{WHITE}... the building is not allowed.
 STR_ERROR_TOO_MANY_DOCKS                                        :{WHITE}Too many docks
-STR_ERROR_CAN_T_BUILD_ROAD_WAYPOINT                             :{WHITE}Can't build road waypoint here...
-STR_ERROR_CAN_T_REMOVE_ROAD_WAYPOINT                            :{WHITE}Can't remove road waypoint here...
-STR_ERROR_MUST_REMOVE_ROADWAYPOINT_FIRST                        :{WHITE}Must remove road waypoint first
 STR_ERROR_UNSUITABLE_SIGNAL_TYPE                                :{WHITE}... unsuitable signal type
+STR_ERROR_RESTRICTED_SIGNAL                                     :{WHITE}... signal has attached routing restriction program
 STR_ERROR_SIGNAL_CHANGES                                        :{WHITE}Number of programmable pre-signal evaluations exceeded limit
 
 STR_ERROR_BRIDGE_TOO_LOW_FOR_STATION                            :{WHITE}Bridge is too low for station
@@ -1918,12 +1987,9 @@ STR_ERROR_DEPOT_HAS_WRONG_RAIL_TYPE                             :{WHITE}Depot ca
 
 STR_ERROR_CANNOT_MODIFY_TRACK_TRAIN_APPROACHING                 :{WHITE}Moving train approaching...
 
-STR_ERROR_NO_ROAD_WAYPOINT                                      :{WHITE}There is no road waypoint
-
 # Plan related errors
 STR_ERROR_TOO_MANY_PLANS                                        :{WHITE}... too many plans
 STR_ERROR_TOO_MANY_NODES                                        :{WHITE}... too many nodes in plan line
-STR_ERROR_NO_MORE_SPACE_FOR_LINES                               :{WHITE}No more space for lines
 STR_ERROR_CAN_T_RENAME_PLAN                                     :{WHITE}Can't rename plan...
 
 STR_TRADITIONAL_TRAIN_NAME                                      :Train {COMMA}
@@ -1951,7 +2017,7 @@ STR_BLACK_PLUS                                                  :{BLACK}+
 
 STR_DECIMAL1_WITH_SCALE                                         :{DECIMAL1} ({DECIMAL}x)
 
-STR_HIERARCHY_SEPARATOR                                         :{SP}/{SP}
+STR_HIERARCHY_SEPARATOR                                         :{SPACE}/{SPACE}
 
 STR_ZONING_TOOLBAR                                              :{WHITE}Zoning toolbar
 STR_ZONING_OUTER                                                :{BLACK}Outer tile borders:
@@ -1979,7 +2045,7 @@ STR_STATION_RATING_TOOLTIP_USING_CHEAT                          :Cheat active
 STR_STATION_RATING_TOOLTIP_NEWGRF_RATING                        :NewGRF station rating: {STRING1} {BLACK}based on
 STR_STATION_RATING_TOOLTIP_NEWGRF_RATING_0                      :{GOLD}{PLUS_NUM}%
 STR_STATION_RATING_TOOLTIP_NEWGRF_RATING_1                      :{LTBLUE}{PLUS_NUM}%
-STR_STATION_RATING_TOOLTIP_NEWGRF_SPEED                         :Max speed of last vehicle: {LTBLUE}{VELOCITY} ({STRING2})
+STR_STATION_RATING_TOOLTIP_NEWGRF_SPEED                         :Max speed of last vehicle: {LTBLUE}{STRING1} ({STRING2})
 STR_STATION_RATING_TOOLTIP_NEWGRF_WAITUNITS                     :Cargo waiting (on average per next stop): {LTBLUE}{NUM}
 STR_STATION_RATING_TOOLTIP_NEWGRF_WAITTIME                      :Time since last pickup: {LTBLUE}{NUM} day{P "" s}
 
@@ -1987,7 +2053,8 @@ STR_STATION_RATING_MAX_PERCENTAGE                               : (max {PLUS_NUM
 STR_STATION_RATING_MAX_PERCENTAGE_COMMA                         :, max {PLUS_NUM}%
 STR_STATION_RATING_PERCENTAGE_COMMA                             :, {PLUS_NUM}%
 
-STR_STATION_RATING_TOOLTIP_SPEED                                :Max speed of last vehicle{STRING1}: {COLOUR}{VELOCITY}{STRING1} ({STRING})
+STR_STATION_RATING_TOOLTIP_AT_LEAST_VELOCITY                    :at least {VELOCITY}
+STR_STATION_RATING_TOOLTIP_SPEED                                :Max speed of last vehicle{STRING1}: {COLOUR}{STRING1}{STRING1} ({STRING})
 
 STR_STATION_RATING_TOOLTIP_AGE                                  :Age of last vehicle{STRING1}: {COLOUR}{NUM} year{P "" s}{STRING1}
 
@@ -2144,11 +2211,17 @@ STR_SCHDISPATCH_APPEND_VEHICLE_SCHEDULES                        :{BLACK}Append S
 STR_SCHDISPATCH_APPEND_VEHICLE_SCHEDULES_TOOLTIP                :{BLACK}Append the dispatch schedules from another vehicle.
 STR_SCHDISPATCH_REUSE_DEPARTURE_SLOTS                           :Re-use departure slots
 STR_SCHDISPATCH_REUSE_DEPARTURE_SLOTS_TOOLTIP                   :{BLACK}Set whether departure slots may be used more than once.
+STR_SCHDISPATCH_RENAME_DEPARTURE_TAG                            :Rename tag {NUM}
+STR_SCHDISPATCH_RENAME_DEPARTURE_TAG_NAMED                      :Rename tag {NUM}: {RAW_STRING}
+STR_SCHDISPATCH_RENAME_DEPARTURE_TAG_TOOLTIP                    :{BLACK}Rename departure slot tags (for use with conditional orders)
+STR_SCHDISPATCH_RENAME_DEPARTURE_TAG_CAPTION                    :{BLACK}Name departure slot tag
+STR_ERROR_CAN_T_RENAME_DEPARTURE_TAG                            :{WHITE}Can't name departure tag...
 STR_SCHDISPATCH_MANAGE_SLOT                                     :{BLACK}Manage Slot
 STR_SCHDISPATCH_REUSE_THIS_DEPARTURE_SLOT                       :Re-use departure slot
 STR_SCHDISPATCH_REUSE_THIS_DEPARTURE_SLOT_TOOLTIP               :{BLACK}Set whether the selected departure slot may be used more than once.
-STR_SCHDISPATCH_REUSE_THIS_DEPARTURE_TAG                        :Tag {NUM}
-STR_SCHDISPATCH_REUSE_THIS_DEPARTURE_TAG_TOOLTIP                :{BLACK}Tag the selected departure slot (for use with conditional orders).
+STR_SCHDISPATCH_TAG_DEPARTURE                                   :Tag {NUM}
+STR_SCHDISPATCH_TAG_DEPARTURE_NAMED                             :Tag {NUM}: {RAW_STRING}
+STR_SCHDISPATCH_TAG_DEPARTURE_TOOLTIP                           :{BLACK}Tag the selected departure slot (for use with conditional orders).
 STR_SCHDISPATCH_NO_SCHEDULES                                    :{BLACK}No Schedules
 STR_SCHDISPATCH_SCHEDULE_ID                                     :{BLACK}Schedule {NUM} of {NUM}
 STR_SCHDISPATCH_NAMED_SCHEDULE_ID                               :{BLACK}{RAW_STRING} ({NUM} of {NUM})
@@ -2159,16 +2232,32 @@ STR_SCHDISPATCH_MOVE_SCHEDULE                                   :{BLACK}Change p
 STR_SCHDISPATCH_DATE_WALLCLOCK_TINY_FLAGGED                     :{TT_TIME}*
 STR_SCHDISPATCH_SLOT_TOOLTIP                                    :{BLACK}{TT_TIME}
 STR_SCHDISPATCH_SLOT_TOOLTIP_RELATIVE                           : ({TIME_HHMM} from start)
+STR_SCHDISPATCH_SLOT_TOOLTIP_VEHICLE                            :{}Vehicle's departure slot
 STR_SCHDISPATCH_SLOT_TOOLTIP_LAST                               :{}Last departure slot
 STR_SCHDISPATCH_SLOT_TOOLTIP_NEXT                               :{}Next available departure slot
 STR_SCHDISPATCH_SLOT_TOOLTIP_REUSE                              :{}Departure slot may be used more than once
 STR_SCHDISPATCH_SLOT_TOOLTIP_TIME_SUFFIX                        : ({TT_TIME})
 STR_SCHDISPATCH_SLOT_TOOLTIP_TAG                                :{}Tag {NUM}
+STR_SCHDISPATCH_SLOT_TOOLTIP_TAG_NAMED                          :{}Tag {NUM}: {RAW_STRING}
 
 STR_SCHDISPATCH_SUMMARY_NO_LAST_DEPARTURE                       :{BLACK}No previous departures.
+STR_SCHDISPATCH_SUMMARY_VEHICLE_NO_LAST_DEPARTURE               :{BLACK}This vehicle has not departed.
+STR_SCHDISPATCH_SUMMARY_DEPARTURE_DETAILS                       : ({RAW_STRING})
+STR_SCHDISPATCH_SUMMARY_DEPARTURE_DETAIL_SEPARATOR              :, {STRING}
+STR_SCHDISPATCH_SUMMARY_DEPARTURE_DETAIL_WAS_FIRST              :first slot
+STR_SCHDISPATCH_SUMMARY_DEPARTURE_DETAIL_WAS_LAST               :last slot
+STR_SCHDISPATCH_SUMMARY_DEPARTURE_DETAIL_TAG                    :tag {NUM}
+STR_SCHDISPATCH_SUMMARY_DEPARTURE_DETAIL_TAG_NAMED              :tag {NUM} ({RAW_STRING})
+
+###length 2
 STR_SCHDISPATCH_SUMMARY_LAST_DEPARTURE_PAST                     :{BLACK}Last departure at {TT_TIME}.
 STR_SCHDISPATCH_SUMMARY_LAST_DEPARTURE_FUTURE                   :{BLACK}Last departure has not left yet, it will depart at {TT_TIME}.
-STR_SCHDISPATCH_SUMMARY_L1                                      :{BLACK}This schedule requires {COMMA} vehicle{P "" s}.
+
+###length 2
+STR_SCHDISPATCH_SUMMARY_VEHICLE_DEPARTURE_PAST                  :{BLACK}This vehicle departed at {TT_TIME}{STRING1}.
+STR_SCHDISPATCH_SUMMARY_VEHICLE_DEPARTURE_FUTURE                :{BLACK}This vehicle has not left yet, it will depart at {TT_TIME}{STRING1}.
+
+STR_SCHDISPATCH_SUMMARY_L1                                      :{BLACK}This schedule is estimated to require at least {COMMA} vehicle{P "" s}.
 STR_SCHDISPATCH_SUMMARY_L2                                      :{BLACK}This schedule repeats every {STRING1}.
 STR_SCHDISPATCH_SUMMARY_L3                                      :{BLACK}This schedule began at {TT_TIME}, and ends at {TT_TIME}.
 STR_SCHDISPATCH_SUMMARY_L4                                      :{BLACK}Maximum delay of {STRING1} is allowed before the slot is skipped.
@@ -2249,8 +2338,6 @@ STR_ERROR_CAN_T_BUY_25_SHARE_IN_THIS                            :{WHITE}Can't bu
 STR_ERROR_CAN_T_SELL_25_SHARE_IN                                :{WHITE}Can't sell 25% share in this company...
 STR_ERROR_PROTECTED                                             :{WHITE}This company is not old enough to trade shares yet...
 
-STR_TOWN_DIRECTORY_INFO                                         :{BLACK}{STRING1}, Towns: {COMMA}
-
 STR_GAME_OPTIONS_GUI_SCALE_MAIN_TOOLBAR                         :{BLACK}Bigger main toolbar
 STR_GAME_OPTIONS_GUI_SCALE_MAIN_TOOLBAR_TOOLTIP                 :{BLACK}Check this box to increase the scale of the main toolbar
 
@@ -2320,3 +2407,19 @@ STR_ABOUT_MENU_SHOW_PICKER_TOOL                                 :Picker tool
 STR_ABOUT_MENU_SHOW_TOGGLE_MODIFIER_KEYS                        :Modifier key window
 
 STR_ERROR_CAN_T_CHANGE_SPEED_RESTRICTION                        :{WHITE}Can't change vehicle's speed restriction...
+
+STR_WARNING_PASSWORD_SECURITY                                   :{YELLOW}Warning: Server administrators may be able to read any text entered here.
+STR_NETWORK_NEED_COMPANY_PASSWORD_CAPTION                       :{WHITE}Company is protected. Enter password
+STR_NETWORK_CLIENT_LIST_ADMIN_COMPANY_UNLOCK                    :Password unlock
+STR_NETWORK_CLIENT_LIST_ASK_COMPANY_UNLOCK                      :{YELLOW}Are you sure you want to reset the password of company '{COMPANY}'?
+
+# Network set password
+STR_COMPANY_PASSWORD_CANCEL                                     :{BLACK}Do not save the entered password
+STR_COMPANY_PASSWORD_OK                                         :{BLACK}Give the company the new password
+STR_COMPANY_PASSWORD_CAPTION                                    :{WHITE}Company password
+STR_COMPANY_PASSWORD_MAKE_DEFAULT                               :{BLACK}Default company password
+STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}Use this company password as default for new companies
+
+STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}Password
+STR_COMPANY_VIEW_PASSWORD_TOOLTIP                               :{BLACK}Password-protect your company to prevent unauthorised users from joining
+STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}Set company password

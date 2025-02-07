@@ -9,6 +9,7 @@
 
 #include "../stdafx.h"
 
+#include "../strings_builder.h"
 #include "../strings_func.h"
 #include "../command_func.h"
 #include "../date_func.h"
@@ -41,16 +42,20 @@
 #include "../core/serialisation.hpp"
 #include "../3rdparty/monocypher/monocypher.h"
 #include "../settings_internal.h"
-#include <sstream>
-#include <iomanip>
+#ifdef DEBUG_DUMP_COMMANDS
+#	include "../fileio_func.h"
+#	include "../command_aux.h"
+#	include "../3rdparty/nlohmann/json.hpp"
+#	include <charconv>
+#endif
 #include <tuple>
 
 #ifdef DEBUG_DUMP_COMMANDS
-#include "../fileio_func.h"
-#include "../command_aux.h"
-#include "../3rdparty/nlohmann/json.hpp"
-#include <charconv>
-/** When running the server till the wait point, run as fast as we can! */
+/** Helper variable to make the dedicated server go fast until the (first) join.
+ * Used to load the desync debug logs, i.e. for reproducing a desync.
+ * There's basically no need to ever enable this, unless you really know what
+ * you are doing, i.e. debugging a desync.
+ * See docs/desync.md for details. */
 bool _ddc_fastforward = true;
 #endif /* DEBUG_DUMP_COMMANDS */
 
@@ -98,10 +103,8 @@ ring_buffer<NetworkSyncRecord> _network_sync_records;
 ring_buffer<uint> _network_sync_record_counts;
 bool _record_sync_records = false;
 
-static_assert((int)NETWORK_COMPANY_NAME_LENGTH == MAX_LENGTH_COMPANY_NAME_CHARS * MAX_CHAR_LENGTH);
-
 /** The amount of clients connected */
-byte _network_clients_connected = 0;
+uint8_t _network_clients_connected = 0;
 
 extern std::string GenerateUid(std::string_view subject);
 
@@ -151,9 +154,62 @@ NetworkClientInfo::~NetworkClientInfo()
 	return nullptr;
 }
 
-byte NetworkSpectatorCount()
+
+/**
+ * Simple helper to find the location of the given authorized key in the authorized keys.
+ * @param authorized_keys The keys to look through.
+ * @param authorized_key The key to look for.
+ * @return The iterator to the location of the authorized key, or \c authorized_keys.end().
+ */
+static auto FindKey(auto *authorized_keys, std::string_view authorized_key)
 {
-	byte count = 0;
+	return std::ranges::find_if(*authorized_keys, [authorized_key](auto &value) { return StrEqualsIgnoreCase(value, authorized_key); });
+}
+
+/**
+ * Check whether the given key is contains in these authorized keys.
+ * @param key The key to look for.
+ * @return \c true when the key has been found, otherwise \c false.
+ */
+bool NetworkAuthorizedKeys::Contains(std::string_view key) const
+{
+	return FindKey(this, key) != this->end();
+}
+
+/**
+ * Add the given key to the authorized keys, when it is not already contained.
+ * @param key The key to add.
+ * @return \c true when the key was added, \c false when the key already existed or the key was empty.
+ */
+bool NetworkAuthorizedKeys::Add(std::string_view key)
+{
+	if (key.empty()) return false;
+
+	auto iter = FindKey(this, key);
+	if (iter != this->end()) return false;
+
+	this->emplace_back(key);
+	return true;
+}
+
+/**
+ * Remove the given key from the authorized keys, when it is exists.
+ * @param key The key to remove.
+ * @return \c true when the key was removed, \c false when the key did not exist.
+ */
+bool NetworkAuthorizedKeys::Remove(std::string_view key)
+{
+	auto iter = FindKey(this, key);
+	if (iter == this->end()) return false;
+
+	this->erase(iter);
+	return true;
+}
+
+
+uint8_t NetworkSpectatorCount()
+{
+	uint8_t count = 0;
 
 	for (const NetworkClientInfo *ci : NetworkClientInfo::Iterate()) {
 		if (ci->client_playas == COMPANY_SPECTATOR) count++;
@@ -202,24 +258,23 @@ std::string GenerateCompanyPasswordHash(const std::string &password, const std::
 	size_t password_length = password.size();
 	size_t password_server_id_length = password_server_id.size();
 
-	std::ostringstream salted_password;
+	std::string salted_password_string;
 	/* Add the password with the server's ID and game seed as the salt. */
 	for (uint i = 0; i < NETWORK_SERVER_ID_LENGTH - 1; i++) {
 		char password_char = (i < password_length ? password[i] : 0);
 		char server_id_char = (i < password_server_id_length ? password_server_id[i] : 0);
 		char seed_char = password_game_seed >> (i % 32);
-		salted_password << (char)(password_char ^ server_id_char ^ seed_char); // Cast needed, otherwise interpreted as integer to format
+		salted_password_string += (char)(password_char ^ server_id_char ^ seed_char); // Cast needed, otherwise interpreted as integer to format
 	}
 
 	Md5 checksum;
 	MD5Hash digest;
 
 	/* Generate the MD5 hash */
-	std::string salted_password_string = salted_password.str();
 	checksum.Append(salted_password_string.data(), salted_password_string.size());
 	checksum.Finish(digest);
 
-	return FormatArrayAsHex(digest);
+	return FormatArrayAsHex(digest, false);
 }
 
 /**
@@ -233,15 +288,15 @@ std::vector<uint8_t> GenerateGeneralPasswordHash(const std::string &password, co
 {
 	if (password.empty()) return {};
 
-	std::vector<byte> data;
+	std::vector<uint8_t> data;
 	data.reserve(password_server_id.size() + password.size() + 10);
-	BufferSerialiser buffer(data);
+	BufferSerialisationRef buffer(data);
 
 	buffer.Send_uint64(password_game_seed);
 	buffer.Send_string(password_server_id);
 	buffer.Send_string(password);
 
-	std::vector<byte> output;
+	std::vector<uint8_t> output;
 	output.resize(64);
 	crypto_blake2b(output.data(), output.size(), data.data(), data.size());
 
@@ -295,8 +350,8 @@ void NetworkTextMessage(NetworkAction action, TextColour colour, bool self_send,
 			SetDParam(1, data.auxdata >> 16);
 			SetDParamStr(0, GetString(STR_NETWORK_MESSAGE_MONEY_GIVE_SRC_DESCRIPTION));
 
-			extern byte GetCurrentGrfLangID();
-			byte lang_id = GetCurrentGrfLangID();
+			extern uint8_t GetCurrentGrfLangID();
+			uint8_t lang_id = GetCurrentGrfLangID();
 			bool use_specific_string = lang_id <= 2 || lang_id == 0x15 || lang_id == 0x3A || lang_id == 0x3D; // English, German, Korean, Czech
 			if (use_specific_string && self_send) {
 				strid = STR_NETWORK_MESSAGE_GAVE_MONEY_AWAY;
@@ -315,7 +370,7 @@ void NetworkTextMessage(NetworkAction action, TextColour colour, bool self_send,
 		default:                            strid = STR_NETWORK_CHAT_ALL; break;
 	}
 
-	std::string message;
+	format_buffer message;
 	StringBuilder builder(message);
 	SetDParamStr(1, str);
 	SetDParam(2, data.data);
@@ -328,9 +383,9 @@ void NetworkTextMessage(NetworkAction action, TextColour colour, bool self_send,
 	builder.Utf8Encode(_current_text_dir == TD_LTR ? CHAR_TD_LRM : CHAR_TD_RLM);
 	GetString(builder, strid);
 
-	DEBUG(desync, 1, "msg: %s; %s", debug_date_dumper().HexDate(), message.c_str());
-	IConsolePrintF(colour, "%s", message.c_str());
-	NetworkAddChatMessage(colour, _settings_client.gui.network_chat_timeout, message.c_str());
+	Debug(desync, 1, "msg: {}; {}", debug_date_dumper().HexDate(), message);
+	IConsolePrint(colour, message.to_string());
+	NetworkAddChatMessage(colour, _settings_client.gui.network_chat_timeout, message);
 }
 
 /* Calculate the frame-lag of a client */
@@ -386,6 +441,8 @@ StringID GetNetworkErrorMsg(NetworkErrorCode err)
 		STR_NETWORK_ERROR_CLIENT_TIMEOUT_MAP,
 		STR_NETWORK_ERROR_CLIENT_TIMEOUT_JOIN,
 		STR_NETWORK_ERROR_CLIENT_INVALID_CLIENT_NAME,
+		STR_NETWORK_ERROR_CLIENT_NOT_ON_ALLOW_LIST,
+		STR_NETWORK_ERROR_CLIENT_NO_AUTHENTICATION_METHOD_AVAILABLE,
 	};
 	static_assert(lengthof(network_error_strings) == NETWORK_ERROR_END);
 
@@ -693,7 +750,7 @@ static void NetworkInitialize(bool close_admins = true)
 
 	_network_reconnect = 0;
 
-	_last_sync_date = 0;
+	_last_sync_date = EconTime::Date{0};
 	_last_sync_date_fract = 0;
 	_last_sync_tick_skip_counter = 0;
 	_last_sync_frame_counter = 0;
@@ -924,14 +981,14 @@ static void CheckClientAndServerName()
 	static const std::string fallback_client_name = "Unnamed Client";
 	StrTrimInPlace(_settings_client.network.client_name);
 	if (_settings_client.network.client_name.empty() || _settings_client.network.client_name.compare(fallback_client_name) == 0) {
-		DEBUG(net, 1, "No \"client_name\" has been set, using \"%s\" instead. Please set this now using the \"name <new name>\" command", fallback_client_name.c_str());
+		Debug(net, 1, "No \"client_name\" has been set, using \"{}\" instead. Please set this now using the \"name <new name>\" command", fallback_client_name);
 		_settings_client.network.client_name = fallback_client_name;
 	}
 
 	static const std::string fallback_server_name = "Unnamed Server";
 	StrTrimInPlace(_settings_client.network.server_name);
 	if (_settings_client.network.server_name.empty() || _settings_client.network.server_name.compare(fallback_server_name) == 0) {
-		DEBUG(net, 1, "No \"server_name\" has been set, using \"%s\" instead. Please set this now using the \"server_name <new name>\" command", fallback_server_name.c_str());
+		Debug(net, 1, "No \"server_name\" has been set, using \"{}\" instead. Please set this now using the \"server_name <new name>\" command", fallback_server_name);
 		_settings_client.network.server_name = fallback_server_name;
 	}
 }
@@ -950,17 +1007,17 @@ bool NetworkServerStart()
 	NetworkDisconnect(false);
 	NetworkInitialize(false);
 	NetworkUDPInitialize();
-	DEBUG(net, 5, "Starting listeners for clients");
+	Debug(net, 5, "Starting listeners for clients");
 	if (!ServerNetworkGameSocketHandler::Listen(_settings_client.network.server_port)) return false;
 
-	/* Only listen for admins when the password isn't empty. */
-	if (!_settings_client.network.admin_password.empty()) {
-		DEBUG(net, 5, "Starting listeners for admins");
+	/* Only listen for admins when the authentication is configured. */
+	if (_settings_client.network.AdminAuthenticationConfigured()) {
+		Debug(net, 5, "Starting listeners for admins");
 		if (!ServerNetworkAdminSocketHandler::Listen(_settings_client.network.server_admin_port)) return false;
 	}
 
 	/* Try to start UDP-server */
-	DEBUG(net, 5, "Starting listeners for incoming server queries");
+	Debug(net, 5, "Starting listeners for incoming server queries");
 	NetworkUDPServerListen();
 
 	_network_company_states = new NetworkCompanyState[MAX_COMPANIES];
@@ -991,10 +1048,38 @@ bool NetworkServerStart()
 	/* if the server is dedicated ... add some other script */
 	if (_network_dedicated) IConsoleCmdExec("exec scripts/on_dedicated.scr 0");
 
-	/* welcome possibly still connected admins - this can only happen on a dedicated server. */
-	if (_network_dedicated) ServerNetworkAdminSocketHandler::WelcomeAll();
-
 	return true;
+}
+
+/**
+ * Perform tasks when the server is started. This consists of things
+ * like putting the server's client in a valid company and resetting the restart time.
+ */
+void NetworkOnGameStart()
+{
+	if (!_network_server) return;
+
+	/* Update the static game info to set the values from the new game. */
+	NetworkServerUpdateGameInfo();
+
+	ChangeNetworkRestartTime(true);
+
+	if (!_network_dedicated) {
+		Company *c = Company::GetIfValid(_local_company);
+		NetworkClientInfo *ci = NetworkClientInfo::GetByClientID(CLIENT_ID_SERVER);
+		if (c != nullptr && ci != nullptr) {
+			/*
+			 * If the company has not been named yet, the company was just started.
+			 * Otherwise it would have gotten a name already, so announce it as a new company.
+			 */
+			if (c->name_1 == STR_SV_UNNAMED && c->name.empty()) NetworkServerNewCompany(c, ci);
+		}
+
+		ShowClientList();
+	} else {
+		/* welcome possibly still connected admins - this can only happen on a dedicated server. */
+		ServerNetworkAdminSocketHandler::WelcomeAll();
+	}
 }
 
 /* The server is rebooting...
@@ -1166,38 +1251,38 @@ void NetworkGameLoop()
 			/* We don't want to log multiple times if paused. */
 			static EconTime::Date last_log;
 			if (last_log != EconTime::CurDate()) {
-				DEBUG(desync, 2, "sync: %s; %08x; %08x", debug_date_dumper().HexDate(), _random.state[0], _random.state[1]);
+				Debug(desync, 2, "sync: {}; {:08x}; {:08x}", debug_date_dumper().HexDate(), _random.state[0], _random.state[1]);
 				last_log = EconTime::CurDate();
 			}
 		}
 
 #ifdef DEBUG_DUMP_COMMANDS
 		/* Loading of the debug commands from -ddesync>=1 */
-		static FILE *f = FioFOpenFile("commands.log", "rb", SAVE_DIR);
+		static auto f = FioFOpenFile("commands.log", "rb", SAVE_DIR);
 		static EconTime::Date next_date = 0;
 		static uint next_date_fract;
 		static uint next_tick_skip_counter;
 		static std::unique_ptr<CommandPacket> cp;
 		static bool check_sync_state = false;
 		static uint32_t sync_state[2];
-		if (f == nullptr && next_date == 0) {
-			DEBUG(desync, 0, "Cannot open commands.log");
+		if (!f.has_value() && next_date == 0) {
+			Debug(desync, 0, "Cannot open commands.log");
 			next_date = 1;
 		}
 
-		while (f != nullptr && !feof(f)) {
-			if (EconTime::CurDate() == next_date && EconTime::CurDateFract() == next_date_fract) {
+		while (f.has_value() && !feof(*f)) {
+			if (EconTime::CurDate() == next_date && EconTime::CurDateFract() == next_date_fract && TickSkipCounter() == next_tick_skip_counter) {
 				if (cp != nullptr) {
 					NetworkSendCommand(cp->tile, cp->p1, cp->p2, cp->p3, cp->cmd & ~CMD_FLAGS_MASK, nullptr, cp->text.c_str(), cp->company, cp->aux_data.get());
-					DEBUG(net, 0, "injecting: %s; %02x; %06x; %08x; %08x; " OTTD_PRINTFHEX64PAD " %08x; \"%s\"%s (%s)",
+					Debug(net, 0, "injecting: {}; {:02x}; {:06x}; {:08x}; {:08x}; {:016x} {:08x}; \"{}\"{} ({})",
 							debug_date_dumper().HexDate(), (int)_current_company, cp->tile, cp->p1, cp->p2, cp->p3, cp->cmd, cp->text.c_str(), cp->aux_data != nullptr ? " (aux data present)" : "", GetCommandName(cp->cmd));
 					cp.reset();
 				}
 				if (check_sync_state) {
 					if (sync_state[0] == _random.state[0] && sync_state[1] == _random.state[1]) {
-						DEBUG(net, 0, "sync check: %s; match", debug_date_dumper().HexDate());
+						Debug(net, 0, "sync check: {}; match", debug_date_dumper().HexDate());
 					} else {
-						DEBUG(net, 0, "sync check: %s; mismatch expected {%08x, %08x}, got {%08x, %08x}",
+						Debug(net, 0, "sync check: {}; mismatch: expected {{{:08x}, {:08x}}}, got {{{:08x}, {:08x}}}",
 									debug_date_dumper().HexDate(), sync_state[0], sync_state[1], _random.state[0], _random.state[1]);
 						NOT_REACHED();
 					}
@@ -1205,10 +1290,17 @@ void NetworkGameLoop()
 				}
 			}
 
+			/* Skip all entries in the command-log till we caught up with the current game again. */
+			if (std::make_tuple(EconTime::CurDate(), EconTime::CurDateFract(), TickSkipCounter()) > std::make_tuple(next_date, next_date_fract, next_tick_skip_counter)) {
+				Debug(net, 0, "Skipping to next command at {}", debug_date_dumper().HexDate(next_date, next_date_fract, next_tick_skip_counter));
+				cp.reset();
+				check_sync_state = false;
+			}
+
 			if (cp != nullptr || check_sync_state) break;
 
 			static char buff[65536];
-			if (fgets(buff, lengthof(buff), f) == nullptr) break;
+			if (fgets(buff, lengthof(buff), *f) == nullptr) break;
 
 			char *p = buff;
 			/* Ignore the "[date time] " part of the message */
@@ -1254,7 +1346,7 @@ void NetworkGameLoop()
 				if (aux_str[0] == '<' && aux_str[1] != '>') {
 					auto aux = std::make_unique<CommandAuxiliarySerialised>();
 					for (const char *data = aux_str + 1; data[0] != 0 && data[1] != 0 && data[0] != '>'; data += 2) {
-						byte e = 0;
+						uint8_t e = 0;
 						std::from_chars(data, data + 2, e, 16);
 						aux->serialised_data.emplace_back(e);
 					}
@@ -1266,7 +1358,7 @@ void NetworkGameLoop()
 				/* Manually insert a pause when joining; this way the client can join at the exact right time. */
 				int ret = sscanf(p + 6, "date{%x; %x; %x}", &next_date.edit_base(), &next_date_fract, &next_tick_skip_counter);
 				assert(ret == 3);
-				DEBUG(net, 0, "injecting pause for join at %s; please join when paused", debug_date_dumper().HexDate(next_date, next_date_fract, next_tick_skip_counter));
+				Debug(net, 0, "injecting pause for join at {}; please join when paused", debug_date_dumper().HexDate(next_date, next_date_fract, next_tick_skip_counter));
 				cp.reset(new CommandPacket());
 				cp->tile = 0;
 				cp->company = COMPANY_SPECTATOR;
@@ -1284,22 +1376,22 @@ void NetworkGameLoop()
 			} else if (strncmp(p, "msg: ", 5) == 0 || strncmp(p, "client: ", 8) == 0 ||
 						strncmp(p, "load: ", 6) == 0 || strncmp(p, "save: ", 6) == 0 ||
 						strncmp(p, "new_company: ", 13) == 0 || strncmp(p, "new_company_ai: ", 16) == 0 ||
-						strncmp(p, "buy_company: ", 13) == 0 || strncmp(p, "delete_company: ", 16) == 0) {
+						strncmp(p, "buy_company: ", 13) == 0 || strncmp(p, "delete_company: ", 16) == 0 ||
+						strncmp(p, "merge_companies: ", 17) == 0) {
 				/* A message that is not very important to the log playback, but part of the log. */
 #ifndef DEBUG_FAILED_DUMP_COMMANDS
 			} else if (strncmp(p, "cmdf: ", 6) == 0) {
-				DEBUG(desync, 0, "Skipping replay of failed command: %s", p + 6);
+				Debug(desync, 0, "Skipping replay of failed command: {}", p + 6);
 #endif
 			} else {
 				/* Can't parse a line; what's wrong here? */
-				DEBUG(desync, 0, "Trying to parse: %s", p);
+				Debug(desync, 0, "Trying to parse: {}", p);
 				NOT_REACHED();
 			}
 		}
-		if (f != nullptr && feof(f)) {
-			DEBUG(desync, 0, "End of commands.log");
-			fclose(f);
-			f = nullptr;
+		if (f.has_value() && feof(*f)) {
+			Debug(desync, 0, "End of commands.log");
+			f.reset();
 		}
 #endif /* DEBUG_DUMP_COMMANDS */
 		if (_frame_counter >= _frame_counter_max) {
@@ -1372,16 +1464,16 @@ static void NetworkGenerateServerId()
 
 std::string NetworkGenerateRandomKeyString(uint bytes)
 {
-	uint8_t *key = AllocaM(uint8_t, bytes);
-	RandomBytesWithFallback({ key, bytes });
+	TempBufferST<uint8_t> key(bytes);
+	RandomBytesWithFallback({key.get(), bytes});
 
-	return FormatArrayAsHex({key, bytes});
+	return FormatArrayAsHex({key.get(), bytes}, false);
 }
 
 /** This tries to launch the network for a given OS */
 void NetworkStartUp()
 {
-	DEBUG(net, 3, "Starting network");
+	Debug(net, 3, "Starting network");
 
 	/* Network is available */
 	_network_available = NetworkCoreInitialize();
@@ -1399,7 +1491,7 @@ void NetworkStartUp()
 
 	NetworkInitialize();
 	NetworkUDPInitialize();
-	DEBUG(net, 3, "Network online, multiplayer available");
+	Debug(net, 3, "Network online, multiplayer available");
 	NetworkFindBroadcastIPs(&_broadcast_list);
 	NetworkHTTPInitialize();
 }
@@ -1411,7 +1503,7 @@ void NetworkShutDown()
 	NetworkHTTPUninitialize();
 	NetworkUDPClose();
 
-	DEBUG(net, 3, "Shutting down network");
+	Debug(net, 3, "Shutting down network");
 
 	_network_available = false;
 

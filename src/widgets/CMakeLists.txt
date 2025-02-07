@@ -12,9 +12,6 @@ add_files(
     departures_widget.h
     depot_widget.h
     dock_widget.h
-    dropdown.cpp
-    dropdown_func.h
-    dropdown_type.h
     dropdown_widget.h
     engine_widget.h
     error_widget.h
@@ -43,6 +40,7 @@ add_files(
     object_widget.h
     order_widget.h
     osk_widget.h
+    picker_widget.h
     plans_widget.h
     rail_widget.h
     road_widget.h
@@ -50,8 +48,6 @@ add_files(
     script_widget.h
     settings_widget.h
     sign_widget.h
-    slider.cpp
-    slider_func.h
     smallmap_widget.h
     station_widget.h
     statusbar_widget.h

@@ -15,10 +15,10 @@
 #include "gfx_func.h"
 #include "string_func.h"
 #include "textfile_gui.h"
-#include "widgets/dropdown_type.h"
+#include "dropdown_type.h"
+#include "dropdown_func.h"
 #include "gfx_layout.h"
 #include "debug.h"
-#include "debug_fmt.h"
 #include "openttd.h"
 
 #include "widgets/misc_widget.h"
@@ -80,10 +80,10 @@ static WindowDesc _textfile_desc(__FILE__, __LINE__,
 	WDP_CENTER, "textfile", 630, 460,
 	WC_TEXTFILE, WC_NONE,
 	0,
-	std::begin(_nested_textfile_widgets), std::end(_nested_textfile_widgets)
+	_nested_textfile_widgets
 );
 
-TextfileWindow::TextfileWindow(TextfileType file_type) : Window(&_textfile_desc), file_type(file_type)
+TextfileWindow::TextfileWindow(TextfileType file_type) : Window(_textfile_desc), file_type(file_type)
 {
 	/* Init of nested tree is deferred.
 	 * TextfileWindow::ConstructWindow must be called by the inheriting window. */
@@ -134,14 +134,14 @@ uint TextfileWindow::GetContentHeight()
 	return this->lines.back().bottom;
 }
 
-/* virtual */ void TextfileWindow::UpdateWidgetSize(WidgetID widget, Dimension *size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension *fill, [[maybe_unused]] Dimension *resize)
+/* virtual */ void TextfileWindow::UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize)
 {
 	switch (widget) {
 		case WID_TF_BACKGROUND:
-			resize->height = GetCharacterHeight(FS_MONO);
+			resize.height = GetCharacterHeight(FS_MONO);
 
-			size->height = 4 * resize->height + WidgetDimensions::scaled.frametext.Vertical(); // At least 4 lines are visible.
-			size->width = std::max(200u, size->width); // At least 200 pixels wide.
+			size.height = 4 * resize.height + WidgetDimensions::scaled.frametext.Vertical(); // At least 4 lines are visible.
+			size.width = std::max(200u, size.width); // At least 200 pixels wide.
 			break;
 	}
 }
@@ -157,7 +157,7 @@ void TextfileWindow::SetupScrollbars(bool force_reflow)
 	} else {
 		uint height = force_reflow ? this->ReflowContent() : this->GetContentHeight();
 		this->vscroll->SetCount(ClampTo<uint16_t>(height));
-		this->hscroll->SetCount(this->max_length + WidgetDimensions::scaled.frametext.Horizontal());
+		this->hscroll->SetCount(this->max_length);
 	}
 
 	this->SetWidgetDisabledState(WID_TF_HSCROLLBAR, IsWidgetLowered(WID_TF_WRAPTEXT));
@@ -313,7 +313,7 @@ void TextfileWindow::CheckHyperlinkClick(Point pt)
 	size_t line_index;
 	size_t subline;
 	if (IsWidgetLowered(WID_TF_WRAPTEXT)) {
-		auto it = std::find_if(std::begin(this->lines), std::end(this->lines), [clicked_row](const Line &l) { return l.top <= clicked_row && l.bottom > clicked_row; });
+		auto it = std::ranges::find_if(this->lines, [clicked_row](const Line &l) { return l.top <= clicked_row && l.bottom > clicked_row; });
 		if (it == this->lines.cend()) return;
 		line_index = it - this->lines.cbegin();
 		subline = clicked_row - it->top;
@@ -332,7 +332,7 @@ void TextfileWindow::CheckHyperlinkClick(Point pt)
 
 	/* Build line layout to figure out character position that was clicked. */
 	uint window_width = IsWidgetLowered(WID_TF_WRAPTEXT) ? this->GetWidget<NWidgetCore>(WID_TF_BACKGROUND)->current_x - WidgetDimensions::scaled.frametext.Horizontal() : INT_MAX;
-	Layouter layout(this->lines[line_index].text, window_width, this->lines[line_index].colour, FS_MONO);
+	Layouter layout(this->lines[line_index].text, window_width, FS_MONO);
 	assert(subline < layout.size());
 	ptrdiff_t char_index = layout.GetCharAtPosition(pt.x - WidgetDimensions::scaled.frametext.left, subline);
 	if (char_index < 0) return;
@@ -341,7 +341,7 @@ void TextfileWindow::CheckHyperlinkClick(Point pt)
 	/* Found character index in line, check if any links are at that position. */
 	for (const auto &link : found_links) {
 		Debug(misc, 4, "Checking link from char {} to {}", link.begin, link.end);
-		if ((size_t)char_index >= link.begin && (size_t)char_index < link.end) {
+		if (static_cast<size_t>(char_index) >= link.begin && static_cast<size_t>(char_index) < link.end) {
 			Debug(misc, 4, "Activating link with destination: {}", link.destination);
 			this->OnHyperlinkClick(link);
 			return;
@@ -404,7 +404,7 @@ void TextfileWindow::NavigateHistory(int delta)
 	switch (ClassifyHyperlink(link.destination, this->trusted)) {
 		case HyperlinkType::Internal:
 		{
-			auto it = std::find_if(this->link_anchors.cbegin(), this->link_anchors.cend(), [&](const Hyperlink &other) { return link.destination == other.destination; });
+			auto it = std::ranges::find(this->link_anchors, link.destination, &Hyperlink::destination);
 			if (it != this->link_anchors.cend()) {
 				this->AppendHistory(this->filepath);
 				this->ScrollToLine(it->line);
@@ -485,7 +485,7 @@ void TextfileWindow::NavigateToFile(std::string newfile, size_t line)
 	if (anchor.empty() || line != 0) {
 		this->ScrollToLine(line);
 	} else {
-		auto anchor_dest = std::find_if(this->link_anchors.cbegin(), this->link_anchors.cend(), [&](const Hyperlink &other) { return anchor == other.destination; });
+		auto anchor_dest = std::ranges::find(this->link_anchors, anchor, &Hyperlink::destination);
 		if (anchor_dest != this->link_anchors.cend()) {
 			this->ScrollToLine(anchor_dest->line);
 			this->UpdateHistoryScrollpos();
@@ -536,7 +536,7 @@ void TextfileWindow::AfterLoadMarkdown()
 			DropDownList list;
 			for (size_t line : this->jumplist) {
 				SetDParamStr(0, this->lines[line].text);
-				list.push_back(std::make_unique<DropDownListStringItem>(STR_TEXTFILE_JUMPLIST_ITEM, (int)line, false));
+				list.push_back(MakeDropDownListStringItem(STR_TEXTFILE_JUMPLIST_ITEM, (int)line));
 			}
 			ShowDropDownList(this, std::move(list), -1, widget);
 			break;
@@ -569,6 +569,9 @@ void TextfileWindow::AfterLoadMarkdown()
 	/* Draw content (now coordinates given to DrawString* are local to the new clipping region). */
 	fr = fr.Translate(-fr.left, -fr.top);
 	int line_height = GetCharacterHeight(FS_MONO);
+
+	if (!IsWidgetLowered(WID_TF_WRAPTEXT)) fr = ScrollRect(fr, *this->hscroll, 1);
+
 	int pos = this->vscroll->GetPosition();
 	int cap = this->vscroll->GetCapacity();
 
@@ -578,9 +581,9 @@ void TextfileWindow::AfterLoadMarkdown()
 
 		int y_offset = (line.top - pos) * line_height;
 		if (IsWidgetLowered(WID_TF_WRAPTEXT)) {
-			DrawStringMultiLine(0, fr.right, y_offset, fr.bottom, line.text, line.colour, SA_TOP | SA_LEFT, false, FS_MONO);
+			DrawStringMultiLine(fr.left, fr.right, y_offset, fr.bottom, line.text, line.colour, SA_TOP | SA_LEFT, false, FS_MONO);
 		} else {
-			DrawString(-this->hscroll->GetPosition(), fr.right, y_offset, line.text, line.colour, SA_TOP | SA_LEFT, false, FS_MONO);
+			DrawString(fr.left, fr.right, y_offset, line.text, line.colour, SA_TOP | SA_LEFT, false, FS_MONO);
 		}
 	}
 }
@@ -588,7 +591,7 @@ void TextfileWindow::AfterLoadMarkdown()
 /* virtual */ void TextfileWindow::OnResize()
 {
 	this->vscroll->SetCapacityFromWidget(this, WID_TF_BACKGROUND, WidgetDimensions::scaled.frametext.Vertical());
-	this->hscroll->SetCapacityFromWidget(this, WID_TF_BACKGROUND);
+	this->hscroll->SetCapacityFromWidget(this, WID_TF_BACKGROUND, WidgetDimensions::scaled.framerect.Horizontal());
 
 	this->SetupScrollbars(false);
 }
@@ -655,54 +658,38 @@ void TextfileWindow::ScrollToLine(size_t line)
 /**
  * Do an in-memory gunzip operation. This works on a raw deflate stream,
  * or a file with gzip or zlib header.
- * @param bufp  A pointer to a buffer containing the input data. This
- *              buffer will be freed and replaced by a buffer containing
- *              the uncompressed data.
- * @param sizep A pointer to the buffer size. Before the call, the value
- *              pointed to should contain the size of the input buffer.
- *              After the call, it contains the size of the uncompressed
- *              data.
+ * @param input Buffer containing the input data.
+ * @return Decompressed buffer.
  *
- * When decompressing fails, *bufp is set to nullptr and *sizep to 0. The
- * compressed buffer passed in is still freed in this case.
+ * When decompressing fails, an empty buffer is returned.
  */
-static void Gunzip(byte **bufp, size_t *sizep)
+static std::vector<char> Gunzip(std::span<char> input)
 {
-	static const int BLOCKSIZE  = 8192;
-	byte             *buf       = nullptr;
-	size_t           alloc_size = 0;
-	z_stream         z;
-	int              res;
+	static const int BLOCKSIZE = 8192;
+	std::vector<char> output;
 
+	z_stream z;
 	memset(&z, 0, sizeof(z));
-	z.next_in = *bufp;
-	z.avail_in = (uInt)*sizep;
+	z.next_in = reinterpret_cast<Bytef *>(input.data());
+	z.avail_in = static_cast<uInt>(input.size());
 
 	/* window size = 15, add 32 to enable gzip or zlib header processing */
-	res = inflateInit2(&z, 15 + 32);
+	int res = inflateInit2(&z, 15 + 32);
 	/* Z_BUF_ERROR just means we need more space */
 	while (res == Z_OK || (res == Z_BUF_ERROR && z.avail_out == 0)) {
 		/* When we get here, we're either just starting, or
 		 * inflate is out of output space - allocate more */
-		alloc_size += BLOCKSIZE;
 		z.avail_out += BLOCKSIZE;
-		buf = ReallocT(buf, alloc_size);
-		z.next_out = buf + alloc_size - z.avail_out;
+		output.resize(output.size() + BLOCKSIZE);
+		z.next_out = reinterpret_cast<Bytef *>(&*output.end() - z.avail_out);
 		res = inflate(&z, Z_FINISH);
 	}
 
-	free(*bufp);
 	inflateEnd(&z);
+	if (res != Z_STREAM_END) return {};
 
-	if (res == Z_STREAM_END) {
-		*bufp = buf;
-		*sizep = alloc_size - z.avail_out;
-	} else {
-		/* Something went wrong */
-		*bufp = nullptr;
-		*sizep = 0;
-		free(buf);
-	}
+	output.resize(output.size() - z.avail_out);
+	return output;
 }
 #endif
 
@@ -711,52 +698,36 @@ static void Gunzip(byte **bufp, size_t *sizep)
 /**
  * Do an in-memory xunzip operation. This works on a .xz or (legacy)
  * .lzma file.
- * @param bufp  A pointer to a buffer containing the input data. This
- *              buffer will be freed and replaced by a buffer containing
- *              the uncompressed data.
- * @param sizep A pointer to the buffer size. Before the call, the value
- *              pointed to should contain the size of the input buffer.
- *              After the call, it contains the size of the uncompressed
- *              data.
+ * @param input Buffer containing the input data.
+ * @return Decompressed buffer.
  *
- * When decompressing fails, *bufp is set to nullptr and *sizep to 0. The
- * compressed buffer passed in is still freed in this case.
+ * When decompressing fails, an empty buffer is returned.
  */
-static void Xunzip(byte **bufp, size_t *sizep)
+static std::vector<char> Xunzip(std::span<char> input)
 {
-	static const int BLOCKSIZE  = 8192;
-	byte             *buf       = nullptr;
-	size_t           alloc_size = 0;
-	lzma_stream      z = LZMA_STREAM_INIT;
-	int              res;
+	static const int BLOCKSIZE = 8192;
+	std::vector<char> output;
 
-	z.next_in = *bufp;
-	z.avail_in = *sizep;
+	lzma_stream z = LZMA_STREAM_INIT;
+	z.next_in = reinterpret_cast<uint8_t *>(input.data());
+	z.avail_in = input.size();
 
-	res = lzma_auto_decoder(&z, UINT64_MAX, LZMA_CONCATENATED);
+	int res = lzma_auto_decoder(&z, UINT64_MAX, LZMA_CONCATENATED);
 	/* Z_BUF_ERROR just means we need more space */
 	while (res == LZMA_OK || (res == LZMA_BUF_ERROR && z.avail_out == 0)) {
 		/* When we get here, we're either just starting, or
 		 * inflate is out of output space - allocate more */
-		alloc_size += BLOCKSIZE;
 		z.avail_out += BLOCKSIZE;
-		buf = ReallocT(buf, alloc_size);
-		z.next_out = buf + alloc_size - z.avail_out;
+		output.resize(output.size() + BLOCKSIZE);
+		z.next_out = reinterpret_cast<uint8_t *>(&*output.end() - z.avail_out);
 		res = lzma_code(&z, LZMA_FINISH);
 	}
 
-	free(*bufp);
 	lzma_end(&z);
+	if (res != LZMA_STREAM_END) return {};
 
-	if (res == LZMA_STREAM_END) {
-		*bufp = buf;
-		*sizep = alloc_size - z.avail_out;
-	} else {
-		/* Something went wrong */
-		*bufp = nullptr;
-		*sizep = 0;
-		free(buf);
-	}
+	output.resize(output.size() - z.avail_out);
+	return output;
 }
 #endif
 
@@ -764,49 +735,41 @@ static void Xunzip(byte **bufp, size_t *sizep)
 /**
  * Loads the textfile text from file and setup #lines.
  */
-/* virtual */ void TextfileWindow::LoadTextfile(const char *textfile, Subdirectory dir)
+/* virtual */ void TextfileWindow::LoadTextfile(const std::string &textfile, Subdirectory dir)
 {
 	this->lines.clear();
 	this->jumplist.clear();
 
 	if (this->GetWidget<NWidgetStacked>(WID_TF_SEL_JUMPLIST)->SetDisplayedPlane(SZSP_HORIZONTAL)) this->ReInit();
 
-	if (textfile == nullptr) return;
+	if (textfile.empty()) return;
 
 	/* Get text from file */
 	size_t filesize;
-	FILE *handle = FioFOpenFile(textfile, "rb", dir, &filesize);
-	if (handle == nullptr) return;
+	auto handle = FioFOpenFile(textfile, "rb", dir, &filesize);
+	if (!handle.has_value()) return;
 	/* Early return on empty files. */
 	if (filesize == 0) return;
 
-	char *buf = MallocT<char>(filesize);
-	size_t read = fread(buf, 1, filesize, handle);
-	fclose(handle);
+	std::vector<char> buf;
+	buf.resize(filesize);
+	size_t read = fread(buf.data(), 1, buf.size(), *handle);
 
-	if (read != filesize) {
-		free(buf);
-		return;
-	}
-
-#if defined(WITH_ZLIB) || defined(WITH_LIBLZMA)
-	const char *suffix = strrchr(textfile, '.');
-	if (suffix == nullptr) return;
-#endif
+	if (read != buf.size()) return;
 
 #if defined(WITH_ZLIB)
 	/* In-place gunzip */
-	if (std::string_view(textfile).ends_with(".gz")) Gunzip((byte**)&buf, &filesize);
+	if (textfile.ends_with(".gz")) buf = Gunzip(buf);
 #endif
 
 #if defined(WITH_LIBLZMA)
 	/* In-place xunzip */
-	if (std::string_view(textfile).ends_with(".xz")) Xunzip((byte**)&buf, &filesize);
+	if (textfile.ends_with(".xz")) buf = Xunzip(buf);
 #endif
 
-	if (buf == nullptr) return;
+	if (buf.empty()) return;
 
-	std::string_view sv_buf(buf, filesize);
+	std::string_view sv_buf(buf.data(), buf.size());
 
 	/* Check for the byte-order-mark, and skip it if needed. */
 	if (sv_buf.starts_with("\ufeff")) sv_buf.remove_prefix(3);
@@ -819,7 +782,6 @@ static void Xunzip(byte **bufp, size_t *sizep)
 
 	/* Process the loaded text into lines, and do any further parsing needed. */
 	this->LoadText(sv_buf);
-	free(buf);
 }
 
 /**
@@ -869,7 +831,7 @@ void TextfileWindow::LoadText(std::string_view buf)
  * @param filename The filename of the content to look for.
  * @return The path to the textfile, \c nullptr otherwise.
  */
-const char *GetTextfile(TextfileType type, Subdirectory dir, const char *filename)
+std::optional<std::string> GetTextfile(TextfileType type, Subdirectory dir, std::string_view filename)
 {
 	static const char * const prefixes[] = {
 		"readme",
@@ -879,19 +841,18 @@ const char *GetTextfile(TextfileType type, Subdirectory dir, const char *filenam
 	static_assert(lengthof(prefixes) == TFT_CONTENT_END);
 
 	/* Only the generic text file types allowed for this function */
-	if (type >= TFT_CONTENT_END) return nullptr;
+	if (type >= TFT_CONTENT_END) return std::nullopt;
 
-	const char *prefix = prefixes[type];
+	std::string_view prefix = prefixes[type];
 
-	if (filename == nullptr) return nullptr;
+	if (filename.empty()) return std::nullopt;
 
-	static char file_path[MAX_PATH];
-	strecpy(file_path, filename, lastof(file_path));
+	auto slash = filename.find_last_of(PATHSEPCHAR);
+	if (slash == std::string::npos) return std::nullopt;
 
-	char *slash = strrchr(file_path, PATHSEPCHAR);
-	if (slash == nullptr) return nullptr;
+	std::string_view base_path(filename.data(), slash + 1);
 
-	static const char * const exts[] = {
+	static const std::initializer_list<std::string_view> extensions{
 		"txt",
 		"md",
 #if defined(WITH_ZLIB)
@@ -904,15 +865,15 @@ const char *GetTextfile(TextfileType type, Subdirectory dir, const char *filenam
 #endif
 	};
 
-	for (size_t i = 0; i < lengthof(exts); i++) {
-		seprintf(slash + 1, lastof(file_path), "%s_%s.%s", prefix, GetCurrentLanguageIsoCode(), exts[i]);
+	for (auto &extension : extensions) {
+		std::string file_path = fmt::format("{}{}_{}.{}", base_path, prefix, GetCurrentLanguageIsoCode(), extension);
 		if (FioCheckFileExists(file_path, dir)) return file_path;
 
-		seprintf(slash + 1, lastof(file_path), "%s_%.2s.%s", prefix, GetCurrentLanguageIsoCode(), exts[i]);
+		file_path = fmt::format("{}{}_{:.2s}.{}", base_path, prefix, GetCurrentLanguageIsoCode(), extension);
 		if (FioCheckFileExists(file_path, dir)) return file_path;
 
-		seprintf(slash + 1, lastof(file_path), "%s.%s", prefix, exts[i]);
+		file_path = fmt::format("{}{}.{}", base_path, prefix, extension);
 		if (FioCheckFileExists(file_path, dir)) return file_path;
 	}
-	return nullptr;
+	return std::nullopt;
 }

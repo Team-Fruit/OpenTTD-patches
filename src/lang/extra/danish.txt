@@ -25,8 +25,6 @@ STR_TRANSPARENT_LOADING_TOOLTIP                                 :{BLACK}Slå gen
 
 # Programmable Pre-Signals
 
-#House construction window (for SE only)
-
 #Town select window (for SE only)
 
 STR_MAPGEN_SNOW_LINE_HEIGHT                                     :{BLACK}Snegrænse
@@ -52,8 +50,8 @@ STR_VEHICLE_STATUS_CANNOT_REACH_DEPOT_SERVICE_VEL_END           :{LTBLUE}Kan ikk
 
 STR_ORDERS_GO_TO_TOOLTIP_EXTRA                                  :{BLACK}Indsæt en ny ordre før den markerede, eller i slutningen af ordrelisten. Ctrl laver stationsordrer med 'Vilkårlig fuld last', rutepunkt ordrer med 'Uden stop', og depotordrer med 'Service'. 'Deleordrer' eller Ctrl lader dette køretøj dele ordrer med det valgte køretøj. At klikke på et køretøj kopierer ordrer fra det pågældende køretøj. En depot ordre deaktiverer automatisk servicering af køretøjet
 
-STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :Ank:
-STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :Afg:
+STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :Ank:{SPACE}{SPACE}
+STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :Afg:{SPACE}{SPACE}
 
 # Cargo type orders Window
 
@@ -92,3 +90,19 @@ STR_ERROR_CAN_T_SELL_25_SHARE_IN                                :{WHITE}Kan ikke
 STR_ERROR_PROTECTED                                             :{WHITE}Dette selskab sælger ikke aktier endnu...
 
 STR_CONFIG_SETTING_CYCLE_SIGNAL_PBS                             :Kun togvejssignaler
+
+STR_WARNING_PASSWORD_SECURITY                                   :{YELLOW}Advarsel: Server administratoren kan være i stand til at læse al tekst skrevet her.
+STR_NETWORK_NEED_COMPANY_PASSWORD_CAPTION                       :{WHITE}Selskabet er beskyttet. Indtast kodeord
+STR_NETWORK_CLIENT_LIST_ADMIN_COMPANY_UNLOCK                    :Lås adgangskode op
+STR_NETWORK_CLIENT_LIST_ASK_COMPANY_UNLOCK                      :{YELLOW}Er du sikker på du ønsker at nulstille adgangskoden til selskabet '{COMPANY}'?
+
+# Network set password
+STR_COMPANY_PASSWORD_CANCEL                                     :{BLACK}Gem ikke den indtastede adgangskode
+STR_COMPANY_PASSWORD_OK                                         :{BLACK}Giv firmaet den nye adgangskode
+STR_COMPANY_PASSWORD_CAPTION                                    :{WHITE}Firma-adgangskode
+STR_COMPANY_PASSWORD_MAKE_DEFAULT                               :{BLACK}Standard firma-adgangskode
+STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}Brug denne firma-adgangskode som standard for nye firmaer
+
+STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}Kodeord
+STR_COMPANY_VIEW_PASSWORD_TOOLTIP                               :{BLACK}Beskyt dit selskab med et kodeord for at undgå, at fremmede slutter sig til det.
+STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}Sæt selskabets kodeord

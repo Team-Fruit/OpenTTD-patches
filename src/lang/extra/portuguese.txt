@@ -26,8 +26,6 @@ STR_LINKGRAPH_STATS_TOOLTIP_CAPACITY                            :{}Capacidade: {
 
 # Programmable Pre-Signals
 
-#House construction window (for SE only)
-
 #Town select window (for SE only)
 
 STR_MAPGEN_SNOW_LINE_HEIGHT                                     :{BLACK}Altura linha neve:
@@ -53,8 +51,8 @@ STR_VEHICLE_STATUS_CANNOT_REACH_DEPOT_SERVICE_VEL_END           :{LTBLUE}Não é
 
 STR_ORDERS_GO_TO_TOOLTIP_EXTRA                                  :{BLACK}Inserir uma nova ordem antes da ordem selecionada, ou acrescentar ao fim da lista. Ctrl+Clique numa estação para 'encher completamente qualquer carga'; num ponto de controlo para inverter a definição 'sem paragem por omissão', ou num depósito para 'manutenção'. Clique noutro veículo para copiar as suas ordens ou Ctrl+Clique para partilhar ordens. Uma ordem para depósito desativa a manutenção programada automática do veículo.
 
-STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :C:
-STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :P:
+STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :C:{SPACE}{SPACE}
+STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :P:{SPACE}{SPACE}
 
 # Cargo type orders Window
 
@@ -93,3 +91,19 @@ STR_ERROR_CAN_T_SELL_25_SHARE_IN                                :{WHITE}Não é 
 STR_ERROR_PROTECTED                                             :{WHITE}Esta empresa ainda não troca acções...
 
 STR_CONFIG_SETTING_CYCLE_SIGNAL_PBS                             :Apenas sinais de trajeto
+
+STR_WARNING_PASSWORD_SECURITY                                   :{YELLOW}Aviso: Os administradores do servidor podem ser capazes de ler qualquer texto inserido aqui.
+STR_NETWORK_NEED_COMPANY_PASSWORD_CAPTION                       :{WHITE}Empresa protegida. Introduza palavra-chave
+STR_NETWORK_CLIENT_LIST_ADMIN_COMPANY_UNLOCK                    :desbloquear com palavra-passe
+STR_NETWORK_CLIENT_LIST_ASK_COMPANY_UNLOCK                      :{YELLOW}Tem a certeza que quer restabelecer a palavra-chave da empresa '{COMPANY}'?
+
+# Network set password
+STR_COMPANY_PASSWORD_CANCEL                                     :{BLACK}Não gravar a palavra-chave introduzida
+STR_COMPANY_PASSWORD_OK                                         :{BLACK}Atribuir nova palavra-chave à empresa
+STR_COMPANY_PASSWORD_CAPTION                                    :{WHITE}Palavra-chave da empresa
+STR_COMPANY_PASSWORD_MAKE_DEFAULT                               :{BLACK}Palavra-chave predefinida da empresa
+STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}Usar a palavra-chave desta empresa como predefinida para novas empresas
+
+STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}Palavra-chave
+STR_COMPANY_VIEW_PASSWORD_TOOLTIP                               :{BLACK}Use palavra-chave para prevenir utilizadores não autorizados de entrar na sua empresa.
+STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}Definir palavra-chave da empresa

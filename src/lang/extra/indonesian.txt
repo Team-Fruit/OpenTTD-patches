@@ -22,8 +22,6 @@ STR_TRANSPARENT_LOADING_TOOLTIP                                 :{BLACK}Hidup/ma
 
 # Programmable Pre-Signals
 
-#House construction window (for SE only)
-
 #Town select window (for SE only)
 
 STR_MAPGEN_SNOW_LINE_HEIGHT                                     :{BLACK}Tinggi garis salju:
@@ -48,8 +46,8 @@ STR_VEHICLE_STATUS_CANNOT_REACH_DEPOT_SERVICE_VEL_END           :{LTBLUE}Tidak d
 
 STR_ORDERS_GO_TO_TOOLTIP_EXTRA                                  :{BLACK}Masukkan pemberhentian baru sebelum pemberhentian yang terpilih, atau tambahkan pada akhir daftar. Ctrl, akan membuat pemberhentian ke stasiun menjadi 'muat penuh sembarang', penunjuk jalan menjadi 'non-stop', dan pemberhentian di bengkel/depo/galangan/hangar menjadi 'perbaikan'. 'Berbagi Perintah' atau Ctrl akan membuat perintah berbagi dengan kendaraan yg terpilih. Klik pada kendaraan untuk menduplikat daftar perintah dari kendaraan tersebut
 
-STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :A:
-STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :D:
+STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :A:{SPACE}{SPACE}
+STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :D:{SPACE}{SPACE}
 
 # Cargo type orders Window
 
@@ -86,3 +84,19 @@ STR_ERROR_CAN_T_SELL_25_SHARE_IN                                :{WHITE}Tidak da
 STR_ERROR_PROTECTED                                             :{WHITE}Perusahaan ini terlalu muda untuk diperjualbelikan saham kepemilikannya...
 
 STR_CONFIG_SETTING_CYCLE_SIGNAL_PBS                             :Hanya sinyal jalur
+
+STR_WARNING_PASSWORD_SECURITY                                   :{YELLOW}Peringatan: Administrator server mungkin dapat membaca teks apa pun yang dimasukkan di sini.
+STR_NETWORK_NEED_COMPANY_PASSWORD_CAPTION                       :{WHITE}Perusahaan terkunci, masukkan kata kunci
+STR_NETWORK_CLIENT_LIST_ADMIN_COMPANY_UNLOCK                    :Buka pakai kata sandi
+STR_NETWORK_CLIENT_LIST_ASK_COMPANY_UNLOCK                      :{YELLOW}Anda yakin ingin menyetel ulang sandi perusahaan '{COMPANY}'?
+
+# Network set password
+STR_COMPANY_PASSWORD_CANCEL                                     :{BLACK}Jangan simpan kata sandi yang telah dimasukkan
+STR_COMPANY_PASSWORD_OK                                         :{BLACK}Berikan perusahaan kata sandi baru
+STR_COMPANY_PASSWORD_CAPTION                                    :{WHITE}Kata Sandi Perusahaan
+STR_COMPANY_PASSWORD_MAKE_DEFAULT                               :{BLACK}Standar Kata Sandi Perusahaan
+STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}Pergunakan kata sandi perusahaan ini sebagai standar perusahaan baru
+
+STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}Kata Sandi
+STR_COMPANY_VIEW_PASSWORD_TOOLTIP                               :{BLACK}Kata Sandi-Melindungi perusahaanmu dari pemakai yang tidak bewenang untuk bergabung
+STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}Atur Kata Sandi Perusahaan

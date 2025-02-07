@@ -19,8 +19,6 @@ STR_CONFIG_SETTING_TIMETABLE_IN_TICKS_HELPTEXT                  :கால அ�
 
 # Programmable Pre-Signals
 
-#House construction window (for SE only)
-
 #Town select window (for SE only)
 
 STR_MAPGEN_SNOW_LINE_HEIGHT                                     :{BLACK}பனிக் கோடின் உயரம்:
@@ -43,8 +41,8 @@ STR_VEHICLE_STATUS_CANNOT_REACH_WAYPOINT_VEL_END                :{LTBLUE}{WAYPOI
 STR_VEHICLE_STATUS_CANNOT_REACH_DEPOT_VEL_END                   :{ORANGE}{DEPOT}-இனை அடைய முடியாது , {VELOCITY}
 STR_VEHICLE_STATUS_CANNOT_REACH_DEPOT_SERVICE_VEL_END           :{LTBLUE}{DEPOT} இனை அடைய முடியவில்லை, {VELOCITY}
 
-STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :A:
-STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :D:
+STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :A:{SPACE}{SPACE}
+STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :D:{SPACE}{SPACE}
 
 # Cargo type orders Window
 
@@ -78,3 +76,17 @@ STR_ERROR_CAN_T_SELL_25_SHARE_IN                                :{WHITE}இந�
 STR_ERROR_PROTECTED                                             :{WHITE}பங்குகளை பரிமாற்றம் செய்யும் அளவிற்கு இந்த நிறுவனம் இன்னும் வளரவில்லை...
 
 STR_CONFIG_SETTING_CYCLE_SIGNAL_PBS                             :பாதை சிக்னல்கள் மட்டும்
+
+STR_WARNING_PASSWORD_SECURITY                                   :{YELLOW}எச்சரிக்கை: சேவையக நிர்வாகிகளால் இங்கு உள்ளிட்டப்படும் எந்த உரையையும் படிக்க முடியும்.
+STR_NETWORK_NEED_COMPANY_PASSWORD_CAPTION                       :{WHITE}நிற்வனம் காக்கப்பட்டுள்ளது. கடவுச்சொல்லினை இடவும்
+STR_NETWORK_CLIENT_LIST_ADMIN_COMPANY_UNLOCK                    :கடவுச்சொல் திறத்தல்
+
+# Network set password
+STR_COMPANY_PASSWORD_CANCEL                                     :{BLACK}கடவுச்சொல்லினை நினைவில் வைத்திருக்காதே
+STR_COMPANY_PASSWORD_OK                                         :{BLACK}நிற்வனத்திற்கு புதிய கடவுச்சொல்லினை கொடுக்கவும்
+STR_COMPANY_PASSWORD_CAPTION                                    :{WHITE}நிறுவனத்தின் கடவுச்சொல்
+STR_COMPANY_PASSWORD_MAKE_DEFAULT                               :{BLACK}முதன்மையான நிறுவனத்தின் கடவுச்சொல்
+STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}இந்த நிறுவனத்தின் கடவுச்சொல்லையே புதிய நிறுவனங்களுக்கு பயன்படுத்து
+
+STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}கடவுச்சொல்
+STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}நிறுவனத்தின் கடவுச்சொல்லை அமை

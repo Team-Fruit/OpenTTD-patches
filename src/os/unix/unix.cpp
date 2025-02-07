@@ -11,11 +11,13 @@
 #include "../../textbuf_gui.h"
 #include "../../openttd.h"
 #include "../../crashlog.h"
+#include "../../core/format.hpp"
 #include "../../core/random_func.hpp"
 #include "../../debug.h"
 #include "../../string_func.h"
 #include "../../fios.h"
 #include "../../thread.h"
+#include "../../scope.h"
 
 
 #include <dirent.h>
@@ -24,6 +26,7 @@
 #include <time.h>
 #include <signal.h>
 #include <pthread.h>
+#include <fcntl.h>
 
 #ifdef WITH_SDL2
 #include <SDL.h>
@@ -57,9 +60,9 @@
 
 #include "../../safeguards.h"
 
-bool FiosIsRoot(const char *path)
+bool FiosIsRoot(std::string_view path)
 {
-	return path[1] == '\0';
+	return path == PATHSEP;
 }
 
 void FiosGetDrives(FileList &)
@@ -81,23 +84,60 @@ std::optional<uint64_t> FiosGetDiskFreeSpace(const std::string &path)
 	return std::nullopt;
 }
 
-bool FiosIsValidFile(const char *path, const struct dirent *ent, struct stat *sb)
+bool FiosIsValidFile(const char *fspath, const struct dirent *ent, struct stat *sb)
 {
-	char filename[MAX_PATH];
-	int res;
-	assert(path[strlen(path) - 1] == PATHSEPCHAR);
-	if (strlen(path) > 2) assert(path[strlen(path) - 2] != PATHSEPCHAR);
-	res = seprintf(filename, lastof(filename), "%s%s", path, ent->d_name);
+	format_buffer filename;
+	filename.append(fspath);
+	if (filename.size() == 0 || filename.data()[filename.size() - 1] != PATHSEPCHAR) return false;
+	if (filename.size() > 2 && filename.data()[filename.size() - 2] == PATHSEPCHAR) return false;
+	filename.append(ent->d_name);
 
-	/* Could we fully concatenate the path and filename? */
-	if (res >= (int)lengthof(filename) || res < 0) return false;
-
-	return stat(filename, sb) == 0;
+	return stat(filename.c_str(), sb) == 0;
 }
 
 bool FiosIsHiddenFile(const struct dirent *ent)
 {
 	return ent->d_name[0] == '.';
+}
+
+bool FioCopyFile(const char *old_name, const char *new_name)
+{
+	int old_fd = open(old_name, O_RDONLY, 0);
+	if (old_fd < 0) return false;
+	auto guard1 = scope_guard([=]() {
+		close(old_fd);
+	});
+	int new_fd = open(new_name, O_CREAT | O_WRONLY | O_TRUNC, 0666);
+	if (new_fd < 0) return false;
+	auto guard2 = scope_guard([=]() {
+		close(new_fd);
+	});
+
+	char buffer[4096 * 4];
+	while (true) {
+		ssize_t res = read(old_fd, buffer, lengthof(buffer));
+		if (res < 0) {
+			if (errno == EINTR) continue;
+			return false;
+		} else if (res == 0) {
+			break;
+		}
+
+		size_t pos = 0;
+		size_t len = (size_t)res;
+
+		while (pos < len) {
+			res = write(new_fd, buffer + pos, len - pos);
+			if (res < 0) {
+				if (errno != EINTR) return false;;
+			} else if (res == 0) {
+				return false;
+			} else {
+				pos += (size_t)res;
+			}
+		}
+	}
+	return true;
 }
 
 #ifdef WITH_ICONV
@@ -133,7 +173,7 @@ static const char *GetLocalCode()
  * Convert between locales, which from and which to is set in the calling
  * functions OTTD2FS() and FS2OTTD().
  */
-static std::string convert_tofrom_fs(iconv_t convd, const std::string &name)
+static std::string convert_tofrom_fs(iconv_t convd, std::string_view name)
 {
 	/* There are different implementations of iconv. The older ones,
 	 * e.g. SUSv2, pass a const pointer, whereas the newer ones, e.g.
@@ -152,8 +192,8 @@ static std::string convert_tofrom_fs(iconv_t convd, const std::string &name)
 	char *outbuf = buf.data();
 	iconv(convd, nullptr, nullptr, nullptr, nullptr);
 	if (iconv(convd, &inbuf, &inlen, &outbuf, &outlen) == (size_t)(-1)) {
-		DEBUG(misc, 0, "[iconv] error converting '%s'. Errno %d", name.c_str(), errno);
-		return name;
+		Debug(misc, 0, "[iconv] error converting '{}'. Errno {}", name, errno);
+		return {};
 	}
 
 	buf.resize(outbuf - buf.data());
@@ -165,15 +205,15 @@ static std::string convert_tofrom_fs(iconv_t convd, const std::string &name)
  * @param name pointer to a valid string that will be converted
  * @return pointer to a new stringbuffer that contains the converted string
  */
-std::string OTTD2FS(const std::string &name)
+std::string OTTD2FS(std::string_view name)
 {
 	static iconv_t convd = (iconv_t)(-1);
 	if (convd == (iconv_t)(-1)) {
 		const char *env = GetLocalCode();
 		convd = iconv_open(env, INTERNALCODE);
 		if (convd == (iconv_t)(-1)) {
-			DEBUG(misc, 0, "[iconv] conversion from codeset '%s' to '%s' unsupported", INTERNALCODE, env);
-			return name;
+			Debug(misc, 0, "[iconv] conversion from codeset '{}' to '{}' unsupported", INTERNALCODE, env);
+			return {};
 		}
 	}
 
@@ -185,15 +225,15 @@ std::string OTTD2FS(const std::string &name)
  * @param name valid string that will be converted
  * @return pointer to a new stringbuffer that contains the converted string
  */
-std::string FS2OTTD(const std::string &name)
+std::string FS2OTTD(std::string_view name)
 {
 	static iconv_t convd = (iconv_t)(-1);
 	if (convd == (iconv_t)(-1)) {
 		const char *env = GetLocalCode();
 		convd = iconv_open(INTERNALCODE, env);
 		if (convd == (iconv_t)(-1)) {
-			DEBUG(misc, 0, "[iconv] conversion from codeset '%s' to '%s' unsupported", env, INTERNALCODE);
-			return name;
+			Debug(misc, 0, "[iconv] conversion from codeset '{}' to '{}' unsupported", env, INTERNALCODE);
+			return {};
 		}
 	}
 
@@ -202,9 +242,17 @@ std::string FS2OTTD(const std::string &name)
 
 #endif /* WITH_ICONV */
 
-void ShowInfoI(const char *str)
+void ShowInfoI(std::string_view str)
 {
-	fprintf(stderr, "%s\n", str);
+	fmt::print(stderr, "{}\n", str);
+}
+
+void ShowInfoVFmt(fmt::string_view msg, fmt::format_args args)
+{
+	fmt::memory_buffer buf{};
+	fmt::vformat_to(std::back_inserter(buf), msg, args);
+	buf.push_back('\n');
+	fwrite(buf.data(), 1, buf.size(), stderr);
 }
 
 #if !defined(__APPLE__)
@@ -260,7 +308,7 @@ void OSOpenBrowser(const std::string &url)
 	args[1] = url.c_str();
 	args[2] = nullptr;
 	execvp(args[0], const_cast<char * const *>(args));
-	DEBUG(misc, 0, "Failed to open url: %s", url.c_str());
+	Debug(misc, 0, "Failed to open url: {}", url);
 	exit(0);
 }
 #endif /* __APPLE__ */
@@ -275,18 +323,17 @@ void SetCurrentThreadName([[maybe_unused]] const char *threadName)
 #endif /* defined(__APPLE__) */
 }
 
-int GetCurrentThreadName(char *str, const char *last)
+void GetCurrentThreadName(format_target &buf)
 {
 #if !defined(NO_THREADS) && defined(__GLIBC__)
 #if __GLIBC_PREREQ(2, 12)
 	char buffer[16];
 	int result = pthread_getname_np(pthread_self(), buffer, sizeof(buffer));
 	if (result == 0) {
-		return seprintf(str, last, "%s", buffer);
+		buf.append(buffer);
 	}
 #endif
 #endif
-	return 0;
 }
 
 #if !defined(NO_THREADS)
@@ -308,7 +355,7 @@ void SetSelfAsGameThread()
 #endif
 }
 
-void PerThreadSetup() { }
+void PerThreadSetup(bool non_main_thread) { }
 
 void PerThreadSetupInit() { }
 

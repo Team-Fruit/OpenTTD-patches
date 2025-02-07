@@ -18,6 +18,7 @@
 #include "../network/network.h"
 #include "../fios.h"
 #include "../load_check.h"
+#include "../error_func.h"
 
 #include "../safeguards.h"
 
@@ -70,7 +71,7 @@ static std::vector<SaveLoad> GetSettingsDesc(bool is_loading)
 				new_type |= SLE_FILE_STRING;
 				break;
 			default:
-				error("Unexpected save conv for %s: 0x%02X", sd->name, sd->save.conv);
+				FatalError("Unexpected save conv for {}: 0x{:02X}", sd->name, sd->save.conv);
 		}
 		switch (sd->save.conv & 0xF0) {
 			case ::SLE_VAR_BL:
@@ -113,7 +114,7 @@ static std::vector<SaveLoad> GetSettingsDesc(bool is_loading)
 				new_type |= SLE_VAR_STRQ;
 				break;
 			default:
-				error("Unexpected save conv for %s: 0x%02X", sd->name, sd->save.conv);
+				FatalError("Unexpected save conv for {}: 0x{:02X}", sd->name, sd->save.conv);
 		}
 
 		/* economy.town_growth_rate is int8_t here, but uint8_t in upstream saves */
@@ -133,21 +134,21 @@ static std::vector<SaveLoad> GetSettingsDesc(bool is_loading)
 				new_cmd = SL_STDSTR;
 				break;
 			default:
-				error("Unexpected save cmd for %s: %u", sd->name, sd->save.cmd);
+				FatalError("Unexpected save cmd for {}: {}", sd->name, sd->save.cmd);
 		}
 
 		if (is_loading && (sd->flags & SF_NO_NETWORK_SYNC) && _networking && !_network_server) {
 			if (IsSavegameVersionBefore(SLV_TABLE_CHUNKS)) {
 				/* We don't want to read this setting, so we do need to skip over it. */
-				saveloads.push_back({sd->name, new_cmd, GetVarFileType(new_type) | SLE_VAR_NULL, sd->save.length, SL_MIN_VERSION, SL_MAX_VERSION, 0, nullptr, 0, nullptr});
+				saveloads.push_back({sd->name, new_cmd, GetVarFileType(new_type) | SLE_VAR_NULL, sd->save.length, SL_MIN_VERSION, SL_MAX_VERSION, nullptr, 0, nullptr});
 			}
 			continue;
 		}
 
 		SaveLoadAddrProc *address_proc = [](void *base, size_t extra) -> void* {
-			return const_cast<byte *>((const byte *)base + (ptrdiff_t)extra);
+			return const_cast<uint8_t *>((const uint8_t *)base + (ptrdiff_t)extra);
 		};
-		saveloads.push_back({sd->name, new_cmd, new_type, sd->save.length, SL_MIN_VERSION, SL_MAX_VERSION, sd->save.size, address_proc, reinterpret_cast<uintptr_t>(sd->save.address), nullptr});
+		saveloads.push_back({sd->name, new_cmd, new_type, sd->save.length, SL_MIN_VERSION, SL_MAX_VERSION, address_proc, reinterpret_cast<uintptr_t>(sd->save.address), nullptr});
 	}
 
 	return saveloads;

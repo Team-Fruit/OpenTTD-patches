@@ -20,8 +20,6 @@
 #include "newgrf_storage.h"
 #include "newgrf_commons.h"
 
-#include "3rdparty/cpp-btree/btree_set.h"
-
 #include <map>
 #include <vector>
 
@@ -51,7 +49,6 @@ enum SpriteGroupType : uint8_t {
 struct SpriteGroup;
 typedef uint32_t SpriteGroupID;
 struct ResolverObject;
-struct AnalyseCallbackOperation;
 
 /* SPRITE_WIDTH is 24. ECS has roughly 30 sprite groups per real sprite.
  * Adding an 'extra' margin would be assuming 64 sprite groups per real
@@ -83,9 +80,8 @@ public:
 	SpriteGroupFlags sg_flags = SGF_NONE;
 
 	virtual SpriteID GetResult() const { return 0; }
-	virtual byte GetNumResults() const { return 0; }
+	virtual uint8_t GetNumResults() const { return 0; }
 	virtual uint16_t GetCallbackResult() const { return CALLBACK_FAILED; }
-	virtual void AnalyseCallbacks(AnalyseCallbackOperation &op) const {};
 
 	static const SpriteGroup *Resolve(const SpriteGroup *group, ResolverObject &object, bool top_level = true);
 };
@@ -105,8 +101,6 @@ struct RealSpriteGroup : SpriteGroup {
 
 	std::vector<const SpriteGroup *> loaded;  ///< List of loaded groups (can be SpriteIDs or Callback results)
 	std::vector<const SpriteGroup *> loading; ///< List of loading groups (can be SpriteIDs or Callback results)
-
-	void AnalyseCallbacks(AnalyseCallbackOperation &op) const override;
 
 protected:
 	const SpriteGroup *Resolve(ResolverObject &object) const override;
@@ -452,7 +446,7 @@ struct DeterministicSpriteGroupAdjust {
 	DeterministicSpriteGroupAdjustOperation operation;
 	DeterministicSpriteGroupAdjustType type;
 	uint16_t variable;
-	byte shift_num;
+	uint8_t shift_num;
 	DeterministicSpriteGroupAdjustFlags adjust_flags = DSGAF_NONE;
 	uint32_t parameter;  ///< Used for variables between 0x60 and 0x7F inclusive.
 	uint32_t and_mask;
@@ -470,7 +464,7 @@ struct DeterministicSpriteGroupRange {
 	uint32_t high;
 };
 
-enum DeterministicSpriteGroupFlags : uint8_t {
+enum DeterministicSpriteGroupFlags : uint16_t {
 	DSGF_NONE                    = 0,
 	DSGF_NO_DSE                  = 1 << 0,
 	DSGF_CB_RESULT               = 1 << 1,
@@ -480,15 +474,9 @@ enum DeterministicSpriteGroupFlags : uint8_t {
 	DSGF_CHECK_INSERT_JUMP       = 1 << 5,
 	DSGF_CB_HANDLER              = 1 << 6,
 	DSGF_INLINE_CANDIDATE        = 1 << 7,
+	DSGF_CALCULATED_RESULT       = 1 << 8,
 };
 DECLARE_ENUM_AS_BIT_SET(DeterministicSpriteGroupFlags)
-
-struct DeterministicSpriteGroupShadowCopy {
-	std::vector<DeterministicSpriteGroupAdjust> adjusts;
-	std::vector<DeterministicSpriteGroupRange> ranges;
-	const SpriteGroup *default_group;
-	bool calculated_result;
-};
 
 struct DeterministicSpriteGroup : SpriteGroup {
 	DeterministicSpriteGroup() : SpriteGroup(SGT_DETERMINISTIC) {}
@@ -496,7 +484,6 @@ struct DeterministicSpriteGroup : SpriteGroup {
 	VarSpriteGroupScope var_scope;
 	VarSpriteGroupScopeOffset var_scope_count;
 	DeterministicSpriteGroupSize size;
-	bool calculated_result;
 	DeterministicSpriteGroupFlags dsg_flags = DSGF_NONE;
 	std::vector<DeterministicSpriteGroupAdjust> adjusts;
 	std::vector<DeterministicSpriteGroupRange> ranges; // Dynamically allocated
@@ -506,8 +493,9 @@ struct DeterministicSpriteGroup : SpriteGroup {
 
 	const SpriteGroup *error_group; // was first range, before sorting ranges
 
-	void AnalyseCallbacks(AnalyseCallbackOperation &op) const override;
 	bool GroupMayBeBypassed() const;
+
+	bool IsCalculatedResult() const { return this->dsg_flags & DSGF_CALCULATED_RESULT; }
 
 protected:
 	const SpriteGroup *Resolve(ResolverObject &object) const override;
@@ -518,10 +506,6 @@ enum RandomizedSpriteGroupCompareMode : uint8_t {
 	RSG_CMP_ALL,
 };
 
-struct RandomizedSpriteGroupShadowCopy {
-	std::vector<const SpriteGroup *> groups;
-};
-
 struct RandomizedSpriteGroup : SpriteGroup {
 	RandomizedSpriteGroup() : SpriteGroup(SGT_RANDOMIZED) {}
 
@@ -529,20 +513,16 @@ struct RandomizedSpriteGroup : SpriteGroup {
 	VarSpriteGroupScopeOffset var_scope_count;
 
 	RandomizedSpriteGroupCompareMode cmp_mode; ///< Check for these triggers:
-	byte triggers;
+	uint8_t triggers;
 
-	byte lowest_randbit; ///< Look for this in the per-object randomized bitmask:
+	uint8_t lowest_randbit; ///< Look for this in the per-object randomized bitmask:
 
 	std::vector<const SpriteGroup *> groups; ///< Take the group with appropriate index:
-
-	void AnalyseCallbacks(AnalyseCallbackOperation &op) const override;
 
 protected:
 	const SpriteGroup *Resolve(ResolverObject &object) const override;
 };
 
-extern std::map<const DeterministicSpriteGroup *, DeterministicSpriteGroupShadowCopy> _deterministic_sg_shadows;
-extern std::map<const RandomizedSpriteGroup *, RandomizedSpriteGroupShadowCopy> _randomized_sg_shadows;
 extern bool _grfs_loaded_with_sg_shadow_enable;
 
 /* This contains a callback result. A failed callback has a value of
@@ -574,7 +554,6 @@ struct CallbackResultSpriteGroup : SpriteGroup {
 
 	uint16_t result;
 	uint16_t GetCallbackResult() const override { return this->result; }
-	void AnalyseCallbacks(AnalyseCallbackOperation &op) const override;
 };
 
 
@@ -587,17 +566,18 @@ struct ResultSpriteGroup : SpriteGroup {
 	 * @param num_sprites The number of sprites per set.
 	 * @return A spritegroup representing the sprite number result.
 	 */
-	ResultSpriteGroup(SpriteID sprite, byte num_sprites) :
+	ResultSpriteGroup(SpriteID sprite, uint8_t num_sprites) :
 		SpriteGroup(SGT_RESULT),
-		sprite(sprite),
-		num_sprites(num_sprites)
+		num_sprites(num_sprites),
+		sprite(sprite)
 	{
 	}
 
+	uint8_t num_sprites;
 	SpriteID sprite;
-	byte num_sprites;
+
 	SpriteID GetResult() const override { return this->sprite; }
-	byte GetNumResults() const override { return this->num_sprites; }
+	uint8_t GetNumResults() const override { return this->num_sprites; }
 };
 
 /**
@@ -649,7 +629,7 @@ struct ScopeResolver {
 	virtual uint32_t GetRandomBits() const;
 	virtual uint32_t GetTriggers() const;
 
-	virtual uint32_t GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra *extra) const;
+	virtual uint32_t GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra &extra) const;
 	virtual void StorePSA(uint reg, int32_t value);
 };
 
@@ -758,49 +738,6 @@ struct ResolverObject {
 	 * and should return an identifier recognisable by the NewGRF developer.
 	 */
 	virtual uint32_t GetDebugID() const { return 0; }
-};
-
-enum DumpSpriteGroupPrintOp {
-	DSGPO_PRINT,
-	DSGPO_START,
-	DSGPO_END,
-	DSGPO_NFO_LINE,
-};
-
-using DumpSpriteGroupPrinter = std::function<void(const SpriteGroup *, DumpSpriteGroupPrintOp, uint32_t, const char *)>;
-
-struct SpriteGroupDumper {
-	bool use_shadows = false;
-	bool more_details = false;
-
-private:
-	char buffer[1024];
-	DumpSpriteGroupPrinter print_fn;
-
-	const SpriteGroup *top_default_group = nullptr;
-	const SpriteGroup *top_graphics_group = nullptr;
-	btree::btree_set<const DeterministicSpriteGroup *> seen_dsgs;
-
-	enum SpriteGroupDumperFlags {
-		SGDF_DEFAULT          = 1 << 0,
-		SGDF_RANGE            = 1 << 1,
-	};
-
-	char *DumpSpriteGroupAdjust(char *p, const char *last, const DeterministicSpriteGroupAdjust &adjust, const char *padding, uint32_t &highlight_tag, uint &conditional_indent);
-	void DumpSpriteGroup(const SpriteGroup *sg, const char *prefix, uint flags);
-
-public:
-	SpriteGroupDumper(DumpSpriteGroupPrinter print) : print_fn(print) {}
-
-	void DumpSpriteGroup(const SpriteGroup *sg, uint flags)
-	{
-		this->DumpSpriteGroup(sg, "", flags);
-	}
-
-	void Print(const char *msg)
-	{
-		this->print_fn(nullptr, DSGPO_PRINT, 0, msg);
-	}
 };
 
 uint32_t EvaluateDeterministicSpriteGroupAdjust(DeterministicSpriteGroupSize size, const DeterministicSpriteGroupAdjust &adjust, ScopeResolver *scope, uint32_t last_value, uint32_t value);

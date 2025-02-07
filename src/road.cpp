@@ -11,8 +11,6 @@
 #include <algorithm>
 #include <memory>
 #include <numeric>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 #include "rail_map.h"
 #include "road_map.h"
@@ -25,7 +23,7 @@
 #include "landscape.h"
 #include "road.h"
 #include "town.h"
-#include "pathfinder/npf/aystar.h"
+#include "pathfinder/aystar.h"
 #include "tunnelbridge.h"
 #include "road_func.h"
 #include "roadveh.h"
@@ -41,13 +39,6 @@
 #include "safeguards.h"
 
 uint32_t _road_layout_change_counter = 0;
-
-/** Whether to build public roads */
-enum PublicRoadsConstruction {
-	PRC_NONE,         ///< Generate no public roads
-	PRC_WITH_CURVES,  ///< Generate roads with lots of curves
-	PRC_AVOID_CURVES, ///< Generate roads avoiding curves if possible
-};
 
 /**
  * Return if the tile is a valid tile for a crossing.
@@ -289,6 +280,8 @@ RoadTypes GetRoadTypes(bool introduces)
  */
 RoadType GetRoadTypeByLabel(RoadTypeLabel label, bool allow_alternate_labels)
 {
+	if (label == 0) return INVALID_ROADTYPE;
+
 	/* Loop through each road type until the label is found */
 	for (RoadType r = ROADTYPE_BEGIN; r != ROADTYPE_END; r++) {
 		const RoadTypeInfo *rti = GetRoadTypeInfo(r);
@@ -299,7 +292,7 @@ RoadType GetRoadTypeByLabel(RoadTypeLabel label, bool allow_alternate_labels)
 		/* Test if any road type defines the label as an alternate. */
 		for (RoadType r = ROADTYPE_BEGIN; r != ROADTYPE_END; r++) {
 			const RoadTypeInfo *rti = GetRoadTypeInfo(r);
-			if (std::find(rti->alternate_labels.begin(), rti->alternate_labels.end(), label) != rti->alternate_labels.end()) return r;
+			if (std::ranges::find(rti->alternate_labels, label) != rti->alternate_labels.end()) return r;
 		}
 	}
 
@@ -318,6 +311,7 @@ CommandCost CmdBuildRoad(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint3
 
 static RoadType _public_road_type;
 static const uint _public_road_hash_size = 8U; ///< The number of bits the hash for river finding should have.
+static PublicRoadsConstruction _public_road_mode = PRC_NONE;
 
 /** Helper function to check if a slope along a certain direction is going up an inclined slope. */
 static bool IsUpwardsSlope(const Slope slope, DiagDirection road_direction)
@@ -782,9 +776,9 @@ static void PublicRoad_GetNeighbours(AyStar *aystar, OpenListNode *current)
 }
 
 /** AyStar callback for checking whether we reached our destination. */
-static int32_t PublicRoad_EndNodeCheck(const AyStar *aystar, const OpenListNode *current)
+static AyStarStatus PublicRoad_EndNodeCheck(const AyStar *aystar, const OpenListNode *current)
 {
-	return current->path.node.tile == static_cast<TileIndex>(reinterpret_cast<uintptr_t>(aystar->user_target)) ? AYSTAR_FOUND_END_NODE : AYSTAR_DONE;
+	return current->path.node.tile == static_cast<TileIndex>(reinterpret_cast<uintptr_t>(aystar->user_target)) ? AyStarStatus::FoundEndNode : AyStarStatus::Done;
 }
 
 /** AyStar callback when an route has been found. */
@@ -828,7 +822,7 @@ static void PublicRoad_FoundEndNode(AyStar *aystar, OpenListNode *current)
 				// If it is already a road and has the right bits, we are good. Otherwise build the needed ones.
 				if (need_to_build_road) {
 					Backup cur_company(_current_company, OWNER_DEITY, FILE_LINE);
-					CmdBuildRoad(tile, DC_EXEC, _public_road_type << 4 | road_bits, 0);
+					CmdBuildRoad(tile, DC_EXEC, _public_road_type << 4 | road_bits, INVALID_TOWN);
 					cur_company.Restore();
 				}
 			}
@@ -902,7 +896,7 @@ static int32_t PublicRoad_CalculateG(AyStar *, AyStarNode *current, OpenListNode
 		}
 	}
 
-	if (_settings_game.game_creation.build_public_roads == PRC_AVOID_CURVES &&
+	if (_public_road_mode == PRC_AVOID_CURVES &&
 		parent->path.parent != nullptr &&
 		DiagdirBetweenTiles(parent->path.parent->node.tile, parent->path.node.tile) != DiagdirBetweenTiles(parent->path.node.tile, current->tile)) {
 		cost += 1;
@@ -941,13 +935,13 @@ static bool PublicRoadFindPath(AyStar& finder, const TileIndex from, TileIndex t
 	start.direction = INVALID_TRACKDIR;
 	finder.AddStartNode(&start, 0);
 
-	int result = AYSTAR_STILL_BUSY;
+	AyStarStatus result = AyStarStatus::StillBusy;
 
-	while (result == AYSTAR_STILL_BUSY) {
+	while (result == AyStarStatus::StillBusy) {
 		result = finder.Main();
 	}
 
-	const bool found_path = (result == AYSTAR_FOUND_END_NODE);
+	const bool found_path = (result == AyStarStatus::FoundEndNode);
 
 	finder.Clear();
 
@@ -985,10 +979,17 @@ void PostProcessNetworks(AyStar &finder, const std::vector<std::unique_ptr<TownN
 
 /**
 * Build the public road network connecting towns using AyStar.
+*
+* @param build_mode Whether to build public roads, and with or without curves.
+* @param road_type The road type to build public roads with. Defaults to the road type returned from GetTownRoadType().
+*
+* @see GetTownRoadType()
 */
-void GeneratePublicRoads()
+void GeneratePublicRoads(PublicRoadsConstruction build_mode, RoadType road_type = GetTownRoadType())
 {
-	if (_settings_game.game_creation.build_public_roads == PRC_NONE) return;
+	if (build_mode == PRC_NONE) return;
+
+	_public_road_mode = build_mode;
 
 	std::vector<TileIndex> towns;
 	towns.clear();
@@ -1018,7 +1019,7 @@ void GeneratePublicRoads()
 		towns.pop_back();
 	}
 
-	_public_road_type = GetTownRoadType();
+	_public_road_type = road_type;
 	robin_hood::unordered_flat_set<TileIndex> checked_towns;
 
 	std::unique_ptr<TownNetwork> new_main_network = std::make_unique<TownNetwork>();

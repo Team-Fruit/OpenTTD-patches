@@ -39,7 +39,7 @@ struct VehicleScopeResolver : public ScopeResolver {
 	void SetVehicle(const Vehicle *v) { this->v = v; }
 
 	uint32_t GetRandomBits() const override;
-	uint32_t GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra *extra) const override;
+	uint32_t GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra &extra) const override;
 	uint32_t GetTriggers() const override;
 };
 
@@ -76,9 +76,9 @@ static const uint VEHICLEINFO_FULL_VEHICLE_WIDTH    = 32;
 
 struct VehicleSpriteSeq;
 
-void SetWagonOverrideSprites(EngineID engine, CargoID cargo, const struct SpriteGroup *group, EngineID *train_id, uint trains);
+void SetWagonOverrideSprites(EngineID engine, CargoID cargo, const struct SpriteGroup *group, std::span<EngineID> engine_ids);
 const SpriteGroup *GetWagonOverrideSpriteSet(EngineID engine, CargoID cargo, EngineID overriding_engine);
-void SetCustomEngineSprites(EngineID engine, byte cargo, const struct SpriteGroup *group);
+void SetCustomEngineSprites(EngineID engine, uint8_t cargo, const struct SpriteGroup *group);
 
 void GetCustomEngineSprite(EngineID engine, const Vehicle *v, Direction direction, EngineImageType image_type, VehicleSpriteSeq *result);
 #define GetCustomVehicleSprite(v, direction, image_type, result) GetCustomEngineSprite(v->engine_type, v, direction, image_type, result)
@@ -122,7 +122,7 @@ enum VehicleTrigger {
 };
 void TriggerVehicle(Vehicle *veh, VehicleTrigger trigger);
 
-void AlterVehicleListOrder(EngineID engine, uint target);
+void AlterVehicleListOrder(EngineID engine, uint16_t target);
 void CommitVehicleListOrderChanges();
 
 EngineID GetNewEngineID(const GRFFile *file, VehicleType type, uint16_t internal_id);

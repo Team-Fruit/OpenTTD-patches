@@ -328,7 +328,7 @@ enum DisallowedRoadDirections : uint8_t {
 };
 DECLARE_ENUM_AS_BIT_SET(DisallowedRoadDirections)
 /** Helper information for extract tool. */
-template <> struct EnumPropsT<DisallowedRoadDirections> : MakeEnumPropsT<DisallowedRoadDirections, byte, DRD_NONE, DRD_END, DRD_END, 2> {};
+template <> struct EnumPropsT<DisallowedRoadDirections> : MakeEnumPropsT<DisallowedRoadDirections, uint8_t, DRD_NONE, DRD_END, DRD_END, 2> {};
 
 /**
  * Gets the disallowed directions
@@ -463,7 +463,7 @@ inline bool HasCrossingReservation(TileIndex t)
 inline void SetCrossingReservation(TileIndex t, bool b)
 {
 	assert_tile(IsLevelCrossingTile(t), t);
-	SB(_m[t].m5, 4, 1, b ? 1 : 0);
+	AssignBit(_m[t].m5, 4, b);
 }
 
 /**
@@ -498,7 +498,7 @@ inline bool IsCrossingBarred(TileIndex t)
 inline void SetCrossingBarred(TileIndex t, bool barred)
 {
 	assert_tile(IsLevelCrossing(t), t);
-	SB(_m[t].m5, 5, 1, barred ? 1 : 0);
+	AssignBit(_m[t].m5, 5, barred);
 }
 
 /**
@@ -522,7 +522,7 @@ inline bool IsCrossingPossiblyOccupiedByRoadVehicle(TileIndex t)
 inline void SetCrossingOccupiedByRoadVehicle(TileIndex t, bool occupied)
 {
 	assert_tile(IsLevelCrossing(t), t);
-	SB(_m[t].m5, 1, 1, occupied ? 1 : 0);
+	AssignBit(_m[t].m5, 1, occupied);
 }
 
 /** Check if a road tile has snow/desert. */

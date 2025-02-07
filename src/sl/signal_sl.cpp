@@ -8,6 +8,7 @@
 /** @file signal_sl.cpp Code handling saving and loading of signals */
 
 #include "../stdafx.h"
+#include "../debug.h"
 #include "../programmable_signals.h"
 #include "../core/alloc_type.hpp"
 #include "../core/bitmath_func.hpp"
@@ -15,7 +16,7 @@
 #include "saveload.h"
 #include "saveload_buffer.h"
 
-typedef std::vector<byte> Buffer;
+typedef std::vector<uint8_t> Buffer;
 
 // Variable length integers are stored in Variable Length Quantity
 // format (http://en.wikipedia.org/wiki/Variable-length_quantity)
@@ -25,18 +26,18 @@ static void WriteVLI(Buffer &b, uint i)
 	uint lsmask =  0x7F;
 	uint msmask = ~0x7F;
 	while(i & msmask) {
-		byte part = (i & lsmask) | 0x80;
+		uint8_t part = (i & lsmask) | 0x80;
 		b.push_back(part);
 		i >>= 7;
 	}
-	b.push_back((byte) i);
+	b.push_back((uint8_t) i);
 }
 
 static uint ReadVLI()
 {
 	uint shift = 0;
 	uint val = 0;
-	byte b;
+	uint8_t b;
 
 	b = SlReadByte();
 	while(b & 0x80) {
@@ -133,16 +134,16 @@ static void Save_SPRG()
 	// Check for, and dispose of, any signal information on a tile which doesn't have signals.
 	// This indicates that someone removed the signals from the tile but didn't clean them up.
 	// (This code is to detect bugs and limit their consquences, not to cover them up!)
-	for(ProgramList::iterator i = _signal_programs.begin(), e = _signal_programs.end();
-			i != e; ++i) {
+	for (ProgramList::iterator i = _signal_programs.begin(); i != _signal_programs.end();) {
 		SignalReference ref = i->first;
-		if(!HasProgrammableSignals(ref)) {
-			DEBUG(sl, 0, "Programmable pre-signal information for (%x, %d) has been leaked!",
+		if (!HasProgrammableSignals(ref)) {
+			Debug(sl, 0, "Programmable pre-signal information for ({:#X}, {}) has been leaked!",
 						ref.tile, ref.track);
-			++i;
-			FreeSignalProgram(ref);
-			if(i == e) break;
+			delete i->second;
+			i = _signal_programs.erase(i);
+			continue;
 		}
+		++i;
 	}
 
 	// OK, we can now write out our programs
@@ -236,7 +237,7 @@ static void DoFixups(FixupList &l, InstructionList &il)
 		*(i.ptr) = il[id];
 
 		if (i.type != PSO_INVALID && (*(i.ptr))->Opcode() != i.type) {
-			DEBUG(sl, 0, "Expected Id %d to be %d, but was in fact %d", id, i.type, (*(i.ptr))->Opcode());
+			Debug(sl, 0, "Expected Id {} to be {}, but was in fact {}", id, i.type, (*(i.ptr))->Opcode());
 			NOT_REACHED();
 		}
 	}

@@ -17,6 +17,7 @@
 #include "string_func.h"
 #include "strings_func.h"
 #include "gfx_func.h"
+#include "gfx_layout.h"
 #include "settings_type.h"
 #include "console_func.h"
 #include "rev.h"
@@ -108,7 +109,7 @@ static WindowDesc _console_window_desc(__FILE__, __LINE__,
 	WDP_MANUAL, nullptr, 0, 0,
 	WC_CONSOLE, WC_NONE,
 	0,
-	std::begin(_nested_console_window_widgets), std::end(_nested_console_window_widgets)
+	_nested_console_window_widgets
 );
 
 struct IConsoleWindow : Window
@@ -116,9 +117,10 @@ struct IConsoleWindow : Window
 	static size_t scroll;
 	int line_height;   ///< Height of one line of text in the console.
 	int line_offset;
+	int cursor_width;
 	GUITimer truncate_timer;
 
-	IConsoleWindow() : Window(&_console_window_desc)
+	IConsoleWindow() : Window(_console_window_desc)
 	{
 		_iconsole_mode = ICONSOLE_OPENED;
 
@@ -131,6 +133,7 @@ struct IConsoleWindow : Window
 	{
 		this->line_height = GetCharacterHeight(FS_NORMAL) + WidgetDimensions::scaled.hsep_normal;
 		this->line_offset = GetStringBoundingBox("] ").width + WidgetDimensions::scaled.frametext.left;
+		this->cursor_width = GetCharacterWidth(FS_NORMAL, '_');
 	}
 
 	void Close([[maybe_unused]] int data = 0) override
@@ -147,11 +150,11 @@ struct IConsoleWindow : Window
 	void Scroll(int amount)
 	{
 		if (amount < 0) {
-			size_t namount = (size_t) -amount;
+			size_t namount = static_cast<size_t>(-amount);
 			IConsoleWindow::scroll = (namount > IConsoleWindow::scroll) ? 0 : IConsoleWindow::scroll - namount;
 		} else {
 			assert(this->height >= 0 && this->line_height > 0);
-			size_t visible_lines = (size_t)(this->height / this->line_height);
+			size_t visible_lines = static_cast<size_t>(this->height / this->line_height);
 			size_t max_scroll = (visible_lines > _iconsole_buffer.size()) ? 0 : _iconsole_buffer.size() + 1 - visible_lines;
 			IConsoleWindow::scroll = std::min<size_t>(IConsoleWindow::scroll + amount, max_scroll);
 		}
@@ -163,7 +166,7 @@ struct IConsoleWindow : Window
 		const int right = this->width - WidgetDimensions::scaled.frametext.right;
 
 		GfxFillRect(0, 0, this->width - 1, this->height - 1, PC_BLACK);
-		int ypos = this->height - this->line_height;
+		int ypos = this->height - this->line_height - WidgetDimensions::scaled.hsep_normal;
 		for (size_t line_index = IConsoleWindow::scroll; line_index < _iconsole_buffer.size(); line_index++) {
 			const IConsoleLine &print = _iconsole_buffer[line_index];
 			SetDParamStr(0, print.buffer);
@@ -171,7 +174,7 @@ struct IConsoleWindow : Window
 			if (ypos < 0) break;
 		}
 		/* If the text is longer than the window, don't show the starting ']' */
-		int delta = this->width - this->line_offset - _iconsole_cmdline.pixels - ICON_RIGHT_BORDERWIDTH;
+		int delta = this->width - WidgetDimensions::scaled.frametext.right - cursor_width - this->line_offset - _iconsole_cmdline.pixels - ICON_RIGHT_BORDERWIDTH;
 		if (delta > 0) {
 			DrawString(WidgetDimensions::scaled.frametext.left, right, this->height - this->line_height, "]", (TextColour)CC_COMMAND, SA_LEFT | SA_FORCE);
 			delta = 0;
@@ -192,7 +195,7 @@ struct IConsoleWindow : Window
 		if (this->truncate_timer.CountElapsed(delta_ms) == 0) return;
 
 		assert(this->height >= 0 && this->line_height > 0);
-		size_t visible_lines = (size_t)(this->height / this->line_height);
+		size_t visible_lines = static_cast<size_t>(this->height / this->line_height);
 
 		if (TruncateBuffer() && IConsoleWindow::scroll + visible_lines > _iconsole_buffer.size()) {
 			size_t max_scroll = (visible_lines > _iconsole_buffer.size()) ? 0 : _iconsole_buffer.size() + 1 - visible_lines;
@@ -246,7 +249,7 @@ struct IConsoleWindow : Window
 				/* We always want the ] at the left side; we always force these strings to be left
 				 * aligned anyway. So enforce this in all cases by adding a left-to-right marker,
 				 * otherwise it will be drawn at the wrong side with right-to-left texts. */
-				IConsolePrintF(CC_COMMAND, LRM "] %s", _iconsole_cmdline.buf);
+				IConsolePrint(CC_COMMAND, LRM "] {}", _iconsole_cmdline.buf);
 				const char *cmd = IConsoleHistoryAdd(_iconsole_cmdline.buf);
 				IConsoleClearCommand();
 
@@ -307,10 +310,10 @@ struct IConsoleWindow : Window
 	{
 		int delta = std::min<int>(this->width - this->line_offset - _iconsole_cmdline.pixels - ICON_RIGHT_BORDERWIDTH, 0);
 
-		Point p1 = GetCharPosInString(_iconsole_cmdline.buf, from, FS_NORMAL);
-		Point p2 = from != to ? GetCharPosInString(_iconsole_cmdline.buf, to, FS_NORMAL) : p1;
+		const auto p1 = GetCharPosInString(_iconsole_cmdline.buf, from, FS_NORMAL);
+		const auto p2 = from != to ? GetCharPosInString(_iconsole_cmdline.buf, to, FS_NORMAL) : p1;
 
-		Rect r = {this->line_offset + delta + p1.x, this->height - this->line_height, this->line_offset + delta + p2.x, this->height};
+		Rect r = {this->line_offset + delta + p1.left, this->height - this->line_height, this->line_offset + delta + p2.right, this->height};
 		return r;
 	}
 
@@ -348,7 +351,7 @@ void IConsoleGUIInit()
 
 	IConsoleClearBuffer();
 
-	IConsolePrintF(CC_WARNING, "OpenTTD Game Console Revision 7 - %s", _openttd_revision);
+	IConsolePrint(CC_WARNING, "OpenTTD Game Console Revision 7 - {}", _openttd_revision);
 	IConsolePrint(CC_WHITE,  "------------------------------------");
 	IConsolePrint(CC_WHITE,  "use \"help\" for more information");
 	IConsolePrint(CC_WHITE,  "");
@@ -479,7 +482,7 @@ static void IConsoleTabCompletion()
 	match_input.prefix = std::string(input, cmdptr - input);
 	if (match_input.prefix.empty()) return;
 
-	extern std::string RemoveUnderscores(std::string name);
+	extern std::string RemoveUnderscores(std::string_view name);
 	match_input_no_underscores.prefix = RemoveUnderscores(match_input.prefix);
 	if (match_input_no_underscores.prefix.empty()) return;
 

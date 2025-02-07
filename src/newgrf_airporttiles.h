@@ -20,7 +20,7 @@
 /** Scope resolver for handling the tiles of an airport. */
 struct AirportTileScopeResolver : public ScopeResolver {
 	struct Station *st;  ///< %Station of the airport for which the callback is run, or \c nullptr for build gui.
-	byte airport_id;     ///< Type of airport for which the callback is run.
+	uint8_t airport_id;  ///< Type of airport for which the callback is run.
 	TileIndex tile;      ///< Tile for the callback, only valid for airporttile callbacks.
 	const AirportTileSpec *ats;
 
@@ -38,7 +38,7 @@ struct AirportTileScopeResolver : public ScopeResolver {
 	}
 
 	uint32_t GetRandomBits() const override;
-	uint32_t GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra *extra) const override;
+	uint32_t GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra &extra) const override;
 };
 
 /** Resolver for tiles of an airport. */

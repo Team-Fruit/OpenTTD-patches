@@ -10,6 +10,7 @@ macro(compile_flags)
 
         if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
             add_compile_options(
+                /Zc:preprocessor # Needed for __VA_OPT__() in macros.
                 /MP # Enable multi-threaded compilation.
                 /FC # Display the full path of source code files passed to the compiler in diagnostics.
             )
@@ -29,8 +30,8 @@ macro(compile_flags)
         "$<$<CONFIG:Debug>:-D_DEBUG>"
         "$<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2>" # FORTIFY_SOURCE should only be used in non-debug builds (requires -O1+)
     )
-    if(CMAKE_BUILD_TYPE AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(-DFEWER_ASSERTS)
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR OPTION_DBG_ASSERTS)
+        add_compile_options(-DDBG_ASSERTS)
     endif()
     if(MINGW)
         add_link_options(
@@ -40,6 +41,11 @@ macro(compile_flags)
             add_compile_options(
                 "$<$<CONFIG:Debug>:-Wa,-mbig-obj>" # Switch to pe-bigobj-x86-64 as x64 Debug builds push pe-x86-64 to the limits (linking errors with ASLR, ...)
             )
+        endif()
+        if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+            # Fix MinGW's incorrect assumption that the incoming stack at function calls is 16-byte aligned
+            # The Win32 API/calling convention only requires and guarantees 4-byte alignment, leading to alignment problems with SSE/AVX/etc
+            add_compile_options(-mincoming-stack-boundary=2 -mpreferred-stack-boundary=2)
         endif()
         add_compile_options(-Wno-stringop-overflow) # This warning false-positives on some MinGW versions so just turn it off
     endif()
@@ -58,6 +64,11 @@ macro(compile_flags)
             # Starting with version 19.30 (fixed in version 19.37), there is an optimisation bug, see #9966 for details
             # This flag disables the broken optimisation to work around the bug
             add_compile_options(/d2ssa-rse-)
+        endif()
+        if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+            add_compile_options(
+                -Wno-multichar
+            )
         endif()
     elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
         add_compile_options(
@@ -81,11 +92,9 @@ macro(compile_flags)
             # We use 'ABCD' multichar for SaveLoad chunks identifiers
             -Wno-multichar
 
-            # Compilers complains about that we break strict-aliasing.
-            #  On most places we don't see how to fix it, and it doesn't
-            #  break anything. So disable strict-aliasing to make the
-            #  compiler all happy.
-            -fno-strict-aliasing
+            # Prevent optimisation supposing enums are in a range specified by the standard
+            # For details, see http://gcc.gnu.org/PR43680 and PR#5246.
+            -fno-strict-enums
         )
 
         if(OPTION_TRIM_PATH_PREFIX)
@@ -123,10 +132,6 @@ macro(compile_flags)
                 # sure that they will not happen. It furthermore complains
                 # about its own optimized code in some places.
                 "-fno-strict-overflow"
-
-                # Prevent optimisation supposing enums are in a range specified by the standard
-                # For details, see http://gcc.gnu.org/PR43680
-                "-fno-tree-vrp"
 
                 # -flifetime-dse=2 (default since GCC 6) doesn't play
                 # well with our custom pool item allocator
@@ -211,10 +216,5 @@ macro(compile_flags)
     if(NOT WIN32 AND NOT HAIKU)
         # rdynamic is used to get useful stack traces from crash reports.
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -rdynamic")
-    endif()
-
-    if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-        # workaround for MacOS 10.13 and below which does not support std::variant, etc
-        add_definitions(-D_LIBCPP_DISABLE_AVAILABILITY)
     endif()
 endmacro()

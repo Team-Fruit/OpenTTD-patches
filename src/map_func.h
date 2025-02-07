@@ -115,6 +115,26 @@ inline uint MapMaxY()
 }
 
 /**
+ * Get the number of base-10 digits required for the size of the map along the X
+ * @return the number of digits required
+ */
+inline uint MapDigitsX()
+{
+	extern uint _map_digits_x;
+	return _map_digits_x;
+}
+
+/**
+ * Get the number of base-10 digits required for the size of the map along the Y
+ * @return the number of digits required
+ */
+inline uint MapDigitsY()
+{
+	extern uint _map_digits_y;
+	return _map_digits_y;
+}
+
+/**
  * Scales the given value by the map size, where the given value is
  * for a 256 by 256 map.
  * @param n the value to scale
@@ -141,18 +161,6 @@ inline uint ScaleByMapSize1D(uint n)
 	 * just half of it. */
 	return CeilDiv((n << MapLogX()) + (n << MapLogY()), 1 << 9);
 }
-
-/**
- * An offset value between two tiles.
- *
- * This value is used for the difference between
- * two tiles. It can be added to a TileIndex to get
- * the resulting TileIndex of the start tile applied
- * with this saved difference.
- *
- * @see TileDiffXY(int, int)
- */
-typedef int32_t TileIndexDiff;
 
 /**
  * Returns the TileIndex of a coordinate.
@@ -243,7 +251,7 @@ debug_inline static uint TileY(TileIndex tile)
  */
 inline TileIndexDiff ToTileIndexDiff(TileIndexDiffC tidc)
 {
-	return (((uint) tidc.y) << MapLogX()) + tidc.x;
+	return TileDiffXY(tidc.x, tidc.y);
 }
 
 
@@ -342,11 +350,26 @@ inline TileIndexDiffC TileIndexToTileIndexDiffC(TileIndex tile_a, TileIndex tile
 
 /* Functions to calculate distances */
 uint DistanceManhattan(TileIndex, TileIndex); ///< also known as L1-Norm. Is the shortest distance one could go over diagonal tracks (or roads)
-uint DistanceSquare(TileIndex, TileIndex); ///< euclidian- or L2-Norm squared
+uint64_t DistanceSquare64(TileIndex, TileIndex); ///< euclidian- or L2-Norm squared
+inline uint DistanceSquare(TileIndex t0, TileIndex t1) { return ClampTo<uint>(DistanceSquare64(t0, t1)); }
 uint DistanceMax(TileIndex, TileIndex); ///< also known as L-Infinity-Norm
 uint DistanceMaxPlusManhattan(TileIndex, TileIndex); ///< Max + Manhattan
 uint DistanceFromEdge(TileIndex); ///< shortest distance from any edge of the map
 uint DistanceFromEdgeDir(TileIndex, DiagDirection); ///< distance from the map edge in given direction
+
+/**
+ * Convert an Axis to a TileIndexDiff
+ *
+ * @param axis The Axis
+ * @return The resulting TileIndexDiff in southern direction (either SW or SE).
+ */
+inline TileIndexDiff TileOffsByAxis(Axis axis)
+{
+	extern const TileIndexDiffC _tileoffs_by_axis[];
+
+	assert(IsValidAxis(axis));
+	return ToTileIndexDiff(_tileoffs_by_axis[axis]);
+}
 
 /**
  * Convert a DiagDirection to a TileIndexDiff
@@ -472,6 +495,6 @@ inline TileIndex RandomTileSeed(uint32_t r)
 
 uint GetClosestWaterDistance(TileIndex tile, bool water);
 
-char *DumpTileInfo(char *b, const char *last, TileIndex tile);
+void DumpTileInfo(struct format_target &buffer, TileIndex tile);
 
 #endif /* MAP_FUNC_H */

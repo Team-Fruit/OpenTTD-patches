@@ -44,7 +44,7 @@ static inline bool StoryPageElementTypeRequiresText(StoryPageElementType type)
 
 /* static */ ScriptStoryPage::StoryPageID ScriptStoryPage::New(ScriptCompany::CompanyID company, Text *title)
 {
-	CCountedPtr<Text> counter(title);
+	ScriptObjectRef counter(title);
 
 	EnforceDeityMode(STORY_PAGE_INVALID);
 	EnforcePrecondition(STORY_PAGE_INVALID, company == ScriptCompany::COMPANY_INVALID || ScriptCompany::ResolveCompanyID(company) != ScriptCompany::COMPANY_INVALID);
@@ -65,7 +65,7 @@ static inline bool StoryPageElementTypeRequiresText(StoryPageElementType type)
 
 /* static */ ScriptStoryPage::StoryPageElementID ScriptStoryPage::NewElement(StoryPageID story_page_id, StoryPageElementType type, SQInteger reference, Text *text)
 {
-	CCountedPtr<Text> counter(text);
+	ScriptObjectRef counter(text);
 
 	::StoryPageElementType btype = static_cast<::StoryPageElementType>(type);
 
@@ -86,7 +86,7 @@ static inline bool StoryPageElementTypeRequiresText(StoryPageElementType type)
 	TileIndex reftile = 0;
 	switch (type) {
 		case SPET_LOCATION:
-			reftile = reference;
+			reftile = TileIndex(reference);
 			break;
 		case SPET_GOAL:
 		case SPET_BUTTON_PUSH:
@@ -113,13 +113,13 @@ static inline bool StoryPageElementTypeRequiresText(StoryPageElementType type)
 
 /* static */ bool ScriptStoryPage::UpdateElement(StoryPageElementID story_page_element_id, SQInteger reference, Text *text)
 {
-	CCountedPtr<Text> counter(text);
+	ScriptObjectRef counter(text);
 
 	EnforceDeityMode(false);
 	EnforcePrecondition(false, IsValidStoryPageElement(story_page_element_id));
 
-	StoryPageElement *pe = StoryPageElement::Get(story_page_element_id);
-	StoryPage *p = StoryPage::Get(pe->page);
+	const StoryPageElement *pe = StoryPageElement::Get(story_page_element_id);
+	const StoryPage *p = StoryPage::Get(pe->page);
 	::StoryPageElementType type = pe->type;
 
 	std::string encoded_text;
@@ -136,7 +136,7 @@ static inline bool StoryPageElementTypeRequiresText(StoryPageElementType type)
 	TileIndex reftile = 0;
 	switch (type) {
 		case ::SPET_LOCATION:
-			reftile = reference;
+			reftile = TileIndex(reference);
 			break;
 		case ::SPET_GOAL:
 		case ::SPET_BUTTON_PUSH:
@@ -173,7 +173,7 @@ static inline bool StoryPageElementTypeRequiresText(StoryPageElementType type)
 
 /* static */ bool ScriptStoryPage::SetTitle(StoryPageID story_page_id, Text *title)
 {
-	CCountedPtr<Text> counter(title);
+	ScriptObjectRef counter(title);
 
 	EnforcePrecondition(false, IsValidStoryPage(story_page_id));
 	EnforceDeityMode(false);

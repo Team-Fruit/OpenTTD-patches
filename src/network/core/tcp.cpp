@@ -69,7 +69,7 @@ void NetworkTCPSocketHandler::SendPacket(std::unique_ptr<Packet> packet)
 {
 	assert(packet != nullptr);
 
-	packet->PrepareToSend();
+	packet->PrepareForSendQueue();
 
 	this->packet_queue.push_back(std::move(packet));
 }
@@ -84,11 +84,11 @@ void NetworkTCPSocketHandler::SendPrependPacket(std::unique_ptr<Packet> packet, 
 {
 	assert(packet != nullptr);
 
-	packet->PrepareToSend();
+	packet->PrepareForSendQueue();
 
 	if (queue_after_packet_type >= 0) {
 		for (auto iter = this->packet_queue.begin(); iter != this->packet_queue.end(); ++iter) {
-			if ((*iter)->GetPacketType() == queue_after_packet_type) {
+			if ((*iter)->GetTransmitPacketType() == queue_after_packet_type) {
 				++iter;
 				this->packet_queue.insert(iter, std::move(packet));
 				return;
@@ -131,13 +131,14 @@ SendPacketsState NetworkTCPSocketHandler::SendPackets(bool closing_down)
 
 	while (!this->packet_queue.empty()) {
 		Packet &p = *this->packet_queue.front();
+		p.CheckPendingPreSendEncryption();
 		ssize_t res = p.TransferOut<int>(send, this->sock, 0);
 		if (res == -1) {
 			NetworkError err = NetworkError::GetLast();
 			if (!err.WouldBlock()) {
 				/* Something went wrong.. close client! */
 				if (!closing_down) {
-					DEBUG(net, 0, "Send failed: %s", err.AsString());
+					Debug(net, 0, "Send failed: {}", err.AsString());
 					this->CloseConnection();
 				}
 				return SPS_CLOSED;
@@ -153,7 +154,7 @@ SendPacketsState NetworkTCPSocketHandler::SendPackets(bool closing_down)
 		/* Is this packet sent? */
 		if (p.RemainingBytesToTransfer() == 0) {
 			/* Go to the next packet */
-			if (_debug_net_level >= 5) this->LogSentPacket(p);
+			if (GetDebugLevel(DebugLevelID::net) >= 5) this->LogSentPacket(p);
 			this->packet_queue.pop_front();
 		} else {
 			return SPS_PARTLY_SENT;
@@ -174,7 +175,7 @@ std::unique_ptr<Packet> NetworkTCPSocketHandler::ReceivePacket()
 	if (!this->IsConnected()) return nullptr;
 
 	if (this->packet_recv == nullptr) {
-		this->packet_recv = std::make_unique<Packet>(this, TCP_MTU);
+		this->packet_recv = std::make_unique<Packet>(Packet::ReadTag{}, this, TCP_MTU);
 	}
 
 	Packet &p = *this->packet_recv.get();
@@ -187,7 +188,7 @@ std::unique_ptr<Packet> NetworkTCPSocketHandler::ReceivePacket()
 				NetworkError err = NetworkError::GetLast();
 				if (!err.WouldBlock()) {
 					/* Something went wrong... */
-					if (!err.IsConnectionReset()) DEBUG(net, 0, "Recv failed: %s", err.AsString());
+					if (!err.IsConnectionReset()) Debug(net, 0, "Recv failed: {}", err.AsString());
 					this->CloseConnection();
 					return nullptr;
 				}
@@ -203,7 +204,7 @@ std::unique_ptr<Packet> NetworkTCPSocketHandler::ReceivePacket()
 
 		/* Parse the size in the received packet and if not valid, close the connection. */
 		if (!p.ParsePacketSize()) {
-			DEBUG(net, 0, "ParsePacketSize failed, possible packet stream corruption");
+			Debug(net, 0, "ParsePacketSize failed, possible packet stream corruption");
 			this->CloseConnection();
 			return nullptr;
 		}
@@ -216,7 +217,7 @@ std::unique_ptr<Packet> NetworkTCPSocketHandler::ReceivePacket()
 			NetworkError err = NetworkError::GetLast();
 			if (!err.WouldBlock()) {
 				/* Something went wrong... */
-				if (!err.IsConnectionReset()) DEBUG(net, 0, "Recv failed: %s", err.AsString());
+				if (!err.IsConnectionReset()) Debug(net, 0, "Recv failed: {}", err.AsString());
 				this->CloseConnection();
 				return nullptr;
 			}
@@ -230,10 +231,11 @@ std::unique_ptr<Packet> NetworkTCPSocketHandler::ReceivePacket()
 		}
 	}
 
-
-	p.PrepareToRead();
-
-	/* Prepare for receiving a new packet */
+	if (!p.PrepareToRead()) {
+		Debug(net, 0, "Invalid packet received (too small / decryption error)");
+		this->CloseConnection();
+		return nullptr;
+	}
 	return std::move(this->packet_recv);
 }
 

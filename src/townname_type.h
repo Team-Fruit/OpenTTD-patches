@@ -16,10 +16,11 @@
 #include "newgrf_townname.h"
 #include "town_type.h"
 #include "string_type.h"
-#include "3rdparty/cpp-btree/btree_set.h"
+#include "3rdparty/robin_hood/robin_hood.h"
+
 #include <string>
 
-typedef btree::btree_set<std::string> TownNames;
+typedef robin_hood::unordered_set<std::string> TownNames;
 
 static constexpr uint BUILTIN_TOWNNAME_GENERATOR_COUNT = SPECSTR_TOWNNAME_LAST - SPECSTR_TOWNNAME_START + 1; ///< Number of built-in town name generators.
 
@@ -35,7 +36,7 @@ struct TownNameParams {
 	 * Initializes this struct from language ID
 	 * @param town_name town name 'language' ID
 	 */
-	TownNameParams(byte town_name)
+	TownNameParams(uint8_t town_name)
 	{
 		bool grf = town_name >= BUILTIN_TOWNNAME_GENERATOR_COUNT;
 		this->grfid = grf ? GetGRFTownNameId(town_name - BUILTIN_TOWNNAME_GENERATOR_COUNT) : 0;

@@ -12,7 +12,7 @@
 
 #include "script_object.hpp"
 #include "script_companymode.hpp"
-#include <map>
+#include "../../3rdparty/robin_hood/robin_hood.h"
 #include <optional>
 
 /**
@@ -122,6 +122,8 @@ public:
 
 	/**
 	 * All general related error messages.
+	 *
+	 * @see ScriptErrorType
 	 */
 	enum ErrorMessages {
 		/** Initial error value */
@@ -221,8 +223,8 @@ public:
 	static void RegisterErrorMapString(ScriptErrorType ai_error_msg, const char *message);
 
 private:
-	typedef std::map<StringID, ScriptErrorType> ScriptErrorMap;           ///< The type for mapping between error (internal OpenTTD) StringID to the script error type.
-	typedef std::map<ScriptErrorType, const char *> ScriptErrorMapString; ///< The type for mapping between error type and textual representation.
+	typedef robin_hood::unordered_flat_map<StringID, ScriptErrorType> ScriptErrorMap;           ///< The type for mapping between error (internal OpenTTD) StringID to the script error type.
+	typedef robin_hood::unordered_flat_map<ScriptErrorType, const char *> ScriptErrorMapString; ///< The type for mapping between error type and textual representation.
 
 	static ScriptErrorMap error_map;              ///< The mapping between error (internal OpenTTD) StringID to the script error type.
 	static ScriptErrorMapString error_map_string; ///< The mapping between error type and textual representation.

@@ -22,13 +22,19 @@
 /** The maximum amount of roadstops a single GRF is allowed to add */
 static const int NUM_ROADSTOPS_PER_GRF = 64000;
 
-enum RoadStopClassID : byte {
-	ROADSTOP_CLASS_BEGIN = 0,    ///< The lowest valid value
-	ROADSTOP_CLASS_DFLT = 0,     ///< Default road stop class.
-	ROADSTOP_CLASS_WAYP,         ///< Waypoint class.
-	ROADSTOP_CLASS_MAX = 255,    ///< Maximum number of classes.
+static const uint32_t ROADSTOP_CLASS_LABEL_DEFAULT = 'DFLT';
+static const uint32_t ROADSTOP_CLASS_LABEL_WAYPOINT = 'WAYP';
+
+enum RoadStopClassID : uint16_t {
+	ROADSTOP_CLASS_BEGIN = 0,          ///< The lowest valid value
+	ROADSTOP_CLASS_DFLT  = 0,          ///< Default road stop class.
+	ROADSTOP_CLASS_WAYP,               ///< Waypoint class (unimplemented: this is reserved for future use with road waypoints).
+	ROADSTOP_CLASS_MAX   = UINT16_MAX, ///< Maximum number of classes.
 };
 DECLARE_POSTFIX_INCREMENT(RoadStopClassID)
+
+template <>
+struct EnumPropsT<RoadStopClassID> : MakeEnumPropsT<RoadStopClassID, uint8_t, ROADSTOP_CLASS_BEGIN, ROADSTOP_CLASS_MAX, ROADSTOP_CLASS_MAX, 16> {};
 
 /* Some Triggers etc. */
 enum RoadStopRandomTrigger {
@@ -43,7 +49,7 @@ enum RoadStopRandomTrigger {
  * Various different options for availability, restricting
  * the roadstop to be only for busses or for trucks.
  */
-enum RoadStopAvailabilityType : byte {
+enum RoadStopAvailabilityType : uint8_t {
 	ROADSTOPTYPE_PASSENGER,    ///< This RoadStop is for passenger (bus) stops.
 	ROADSTOPTYPE_FREIGHT,      ///< This RoadStop is for freight (truck) stops.
 	ROADSTOPTYPE_ALL,          ///< This RoadStop is for both types of station road stops.
@@ -55,7 +61,7 @@ enum RoadStopAvailabilityType : byte {
  * Different draw modes to disallow rendering of some parts of the stop
  * or road.
  */
-enum RoadStopDrawMode : byte {
+enum RoadStopDrawMode : uint8_t {
 	ROADSTOP_DRAW_MODE_NONE        = 0,
 	ROADSTOP_DRAW_MODE_ROAD        = 1 << 0, ///< Bay stops: Draw the road itself
 	ROADSTOP_DRAW_MODE_OVERLAY     = 1 << 1, ///< Drive-through stops: Draw the road overlay, e.g. pavement
@@ -71,13 +77,22 @@ enum RoadStopSpecFlags {
 	RSF_NO_AUTO_ROAD_CONNECTION, ///< No auto road connection.
 	RSF_BUILD_MENU_ROAD_ONLY, ///< Only show in the road build menu (not tram).
 	RSF_BUILD_MENU_TRAM_ONLY, ///< Only show in the tram build menu (not road).
-	RSF_BUILD_MENU_DRAW_DISABLED_VIEWS, ///< Use custom road stop graphics for disabled views
-	RSF_DRAW_MODE_REGISTER,   ///< Use custom road stop graphics for disabled views
+	RSF_BUILD_MENU_DRAW_DISABLED_VIEWS, ///< Use custom road stop graphics for disabled views.
+	RSF_DRAW_MODE_REGISTER,   ///< Read draw mode from register 0x100.
 };
 
 enum RoadStopSpecIntlFlags {
-	RSIF_BRIDGE_HEIGHTS_SET,            ///< byte bridge_height[6] is set.
-	RSIF_BRIDGE_DISALLOWED_PILLARS_SET, ///< byte bridge_disallowed_pillars[6] is set.
+	RSIF_BRIDGE_HEIGHTS_SET,            ///< bridge_height[6] is set.
+	RSIF_BRIDGE_DISALLOWED_PILLARS_SET, ///< bridge_disallowed_pillars[6] is set.
+};
+
+enum RoadStopView {
+	RSV_BAY_NE                  = 0, ///< Bay road stop, facing Northeast
+	RSV_BAY_SE                  = 1, ///< Bay road stop, facing Southeast
+	RSV_BAY_SW                  = 2, ///< Bay road stop, facing Southwest
+	RSV_BAY_NW                  = 3, ///< Bay road stop, facing Northwest
+	RSV_DRIVE_THROUGH_X         = 4, ///< Drive through road stop, X axis
+	RSV_DRIVE_THROUGH_Y         = 5, ///< Drive through road stop, Y axis
 };
 
 /** Scope resolver for road stops. */
@@ -99,7 +114,7 @@ struct RoadStopScopeResolver : public ScopeResolver {
 	uint32_t GetRandomBits() const override;
 	uint32_t GetTriggers() const override;
 
-	uint32_t GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra *extra) const override;
+	uint32_t GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra &extra) const override;
 
 private:
 	enum class NearbyRoadStopInfoMode {
@@ -113,10 +128,9 @@ private:
 /** Road stop resolver. */
 struct RoadStopResolverObject : public ResolverObject {
 	RoadStopScopeResolver roadstop_scope; ///< The stop scope resolver.
-	TownScopeResolver *town_scope;        ///< The town scope resolver (created on the first call).
+	std::optional<TownScopeResolver> town_scope = std::nullopt; ///< The town scope resolver (created on the first call).
 
 	RoadStopResolverObject(const RoadStopSpec *roadstopspec, BaseStation *st, TileIndex tile, RoadType roadtype, StationType type, uint8_t view, CallbackID callback = CBID_NO_CALLBACK, uint32_t param1 = 0, uint32_t param2 = 0);
-	~RoadStopResolverObject();
 
 	ScopeResolver* GetScope(VarSpriteGroupScope scope = VSG_SCOPE_SELF, VarSpriteGroupScopeOffset relative = 0) override {
 		switch (scope) {
@@ -136,7 +150,7 @@ struct RoadStopResolverObject : public ResolverObject {
 };
 
 /** Road stop specification. */
-struct RoadStopSpec {
+struct RoadStopSpec : NewGRFSpecBase<RoadStopClassID> {
 	/**
 	 * Properties related the the grf file.
 	 * NUM_CARGO real cargo plus three pseudo cargo sprite groups.
@@ -144,8 +158,6 @@ struct RoadStopSpec {
 	 * evaluating callbacks.
 	 */
 	GRFFilePropsBase<NUM_CARGO + 3> grf_prop;
-	RoadStopClassID cls_id;     ///< The class to which this spec belongs.
-	int spec_id;                ///< The ID of this spec inside the class.
 	StringID name;              ///< Name of this stop
 
 	RoadStopAvailabilityType stop_type = ROADSTOPTYPE_ALL;
@@ -158,8 +170,8 @@ struct RoadStopSpec {
 
 	AnimationInfo animation;
 
-	byte bridge_height[6];               ///< Minimum height for a bridge above, 0 for none
-	byte bridge_disallowed_pillars[6];   ///< Disallowed pillar flags for a bridge above
+	uint8_t bridge_height[6];             ///< Minimum height for a bridge above, 0 for none
+	uint8_t bridge_disallowed_pillars[6]; ///< Disallowed pillar flags for a bridge above
 
 	uint8_t build_cost_multiplier = 16;  ///< Build cost multiplier per tile.
 	uint8_t clear_cost_multiplier = 16;  ///< Clear cost multiplier per tile.
@@ -181,10 +193,7 @@ struct RoadStopSpec {
 	static const RoadStopSpec *Get(uint16_t index);
 };
 
-template <>
-struct EnumPropsT<RoadStopClassID> : MakeEnumPropsT<RoadStopClassID, byte, ROADSTOP_CLASS_BEGIN, ROADSTOP_CLASS_MAX, ROADSTOP_CLASS_MAX, 8> {};
-
-typedef NewGRFClass<RoadStopSpec, RoadStopClassID, ROADSTOP_CLASS_MAX> RoadStopClass;
+using RoadStopClass = NewGRFClass<RoadStopSpec, RoadStopClassID, ROADSTOP_CLASS_MAX>;
 
 void DrawRoadStopTile(int x, int y, RoadType roadtype, const RoadStopSpec *spec, StationType type, int view);
 
@@ -201,7 +210,17 @@ bool GetIfStopIsForType(const RoadStopSpec *roadstopspec, RoadStopType rs, RoadT
 
 const RoadStopSpec *GetRoadStopSpec(TileIndex t);
 int AllocateRoadStopSpecToStation(const RoadStopSpec *statspec, BaseStation *st, bool exec);
-void DeallocateRoadStopSpecFromStation(BaseStation *st, byte specindex);
+void DeallocateRoadStopSpecFromStation(BaseStation *st, uint8_t specindex);
 void StationUpdateRoadStopCachedTriggers(BaseStation *st);
+
+/**
+ * Test if a RoadStopClass is the waypoint class.
+ * @param cls RoadStopClass to test.
+ * @return true if the class is the waypoint class.
+ */
+inline bool IsWaypointClass(const RoadStopClass &cls)
+{
+	return cls.global_id == ROADSTOP_CLASS_LABEL_WAYPOINT || GB(cls.global_id, 24, 8) == UINT8_MAX;
+}
 
 #endif /* NEWGRF_ROADSTATION_H */

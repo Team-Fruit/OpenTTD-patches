@@ -21,8 +21,6 @@ STR_TRANSPARENT_LOADING_TOOLTIP                                 :{BLACK}Zama adi
 
 # Programmable Pre-Signals
 
-#House construction window (for SE only)
-
 #Town select window (for SE only)
 
 STR_MAPGEN_SNOW_LINE_HEIGHT                                     :{BLACK}Elur garaiera:
@@ -43,8 +41,8 @@ STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_SERVICE_VEL_END            :{LTBLUE}Berriku
 
 STR_ORDERS_GO_TO_TOOLTIP_EXTRA                                  :{BLACK}Agindu berria sartu piztutakoaren aurretik, edo zerrendaren amaieran. Ktrl hurrengo aginduak ezartzen ditu: Geltokietan "Edozein zama osorik kargatu", bidepuntuetan "Ez gelditu" eta gordailuetan "Mantenimendua". "Aginduak konpartitu" edo Ktrl ibilgailuaren aginduak konpartituko ditu. Ibilgailu batean klik eginez aginduak kopiatuko dira. Gordailu aginduek mantenimendu automatikoa desgaitzen dute
 
-STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :A:
-STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :D:
+STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :A:{SPACE}{SPACE}
+STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :D:{SPACE}{SPACE}
 
 # Cargo type orders Window
 
@@ -78,3 +76,16 @@ STR_ERROR_CAN_T_SELL_25_SHARE_IN                                :{WHITE}Ezin iza
 STR_ERROR_PROTECTED                                             :{WHITE}Konpainia gazteegia da akzioak izateko...
 
 STR_CONFIG_SETTING_CYCLE_SIGNAL_PBS                             :Bide-seinaleak bakarrik
+
+STR_NETWORK_NEED_COMPANY_PASSWORD_CAPTION                       :{WHITE}Konpainia babestua dago. Pasahitza sartu
+
+# Network set password
+STR_COMPANY_PASSWORD_CANCEL                                     :{BLACK}Ez gorde sartutako pasahitza
+STR_COMPANY_PASSWORD_OK                                         :{BLACK}Konpainiari pasahitz berria ezarri
+STR_COMPANY_PASSWORD_CAPTION                                    :{WHITE}Konpainiaren pasahitza
+STR_COMPANY_PASSWORD_MAKE_DEFAULT                               :{BLACK}Konpainiaren pasahitz lehenetsia
+STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}Konpainia pasahitz hau kopainia berrientzako lehenetsi
+
+STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}Pasahitza
+STR_COMPANY_VIEW_PASSWORD_TOOLTIP                               :{BLACK}Pasahitzak zure konpainia babestuko du ez baimendutako bezeroetaz
+STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}Konpainia pasahitza ezarri

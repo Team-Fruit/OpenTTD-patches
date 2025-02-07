@@ -13,9 +13,11 @@
 #include "../strings_type.h"
 
 struct SaveLoad;
+struct NamedSaveLoad;
 
 /** A table of SaveLoad entries. */
 using SaveLoadTable = std::span<const SaveLoad>;
+using NamedSaveLoadTable = std::span<const NamedSaveLoad>;
 
 namespace upstream_sl {
 	struct SaveLoad;
@@ -391,6 +393,24 @@ enum SaveLoadVersion : uint16_t {
 	SLV_SCRIPT_RANDOMIZER,                  ///< 333  PR#12063 v14.0 Save script randomizers.
 	SLV_VEHICLE_ECONOMY_AGE,                ///< 334  PR#12141 Add vehicle age in economy year, for profit stats minimum age
 
+	SLV_COMPANY_ALLOW_LIST,                 ///< 335  PR#12337 Saving of list of client keys that are allowed to join this company.
+	SLV_GROUP_NUMBERS,                      ///< 336  PR#12297 Add per-company group numbers.
+	SLV_INCREASE_STATION_TYPE_FIELD_SIZE,   ///< 337  PR#12572 Increase size of StationType field in map array
+	SLV_ROAD_WAYPOINTS,                     ///< 338  PR#12572 Road waypoints
+	SLV_COMPANY_INAUGURATED_PERIOD,         ///< 339  PR#12798 Companies show the period inaugurated in wallclock mode.
+
+	SLV_ROAD_STOP_TILE_DATA,                ///< 340  PR#12883 Move storage of road stop tile data, also save for road waypoints.
+	SLV_COMPANY_ALLOW_LIST_V2,              ///< 341  PR#12908 Fixed savegame format for saving of list of client keys that are allowed to join this company.
+	SLV_WATER_TILE_TYPE,                    ///< 342  PR#13030 Simplify water tile type.
+	SLV_PRODUCTION_HISTORY,                 ///< 343  PR#10541 Industry production history.
+	SLV_ROAD_TYPE_LABEL_MAP,                ///< 344  PR#13021 Add road type label map to allow upgrade/conversion of road types.
+
+	SLV_NONFLOODING_WATER_TILES,            ///< 345  PR#13013 Store water tile non-flooding state.
+	SLV_PATH_CACHE_FORMAT,                  ///< 346  PR#12345 Vehicle path cache format changed.
+	SLV_ANIMATED_TILE_STATE_IN_MAP,         ///< 347  PR#13082 Animated tile state saved for improved performance.
+	SLV_INCREASE_HOUSE_LIMIT,               ///< 348  PR#12288 Increase house limit to 4096.
+	SLV_COMPANY_INAUGURATED_PERIOD_V2,      ///< 349  PR#13448 Fix savegame storage for company inaugurated year in wallclock mode.
+
 	SL_MAX_VERSION,                         ///< Highest possible saveload version
 
 	SL_SPRING_2013_v2_0_102 = 220,
@@ -418,10 +438,10 @@ enum SaveLoadVersion : uint16_t {
 	SL_CHILLPP_233 = 233,
 };
 
-byte SlReadByte();
-void SlWriteByte(byte b);
+uint8_t SlReadByte();
+void SlWriteByte(uint8_t b);
 
-int SlReadUint16();
+uint16_t SlReadUint16();
 uint32_t SlReadUint32();
 uint64_t SlReadUint64();
 
@@ -436,7 +456,8 @@ size_t SlGetBytesWritten();
 
 [[noreturn]] void SlError(StringID string, std::string extra_msg = {});
 [[noreturn]] void SlErrorCorrupt(std::string msg);
-[[noreturn]] void CDECL SlErrorCorruptFmt(const char *format, ...) WARN_FORMAT(1, 2);
+
+#define SlErrorCorruptFmt(format_string, ...) SlErrorCorrupt(fmt::format(FMT_STRING(format_string) __VA_OPT__(,) __VA_ARGS__))
 
 bool SaveLoadFileTypeIsScenario();
 

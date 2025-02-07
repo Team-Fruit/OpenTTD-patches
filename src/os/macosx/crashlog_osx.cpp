@@ -18,6 +18,7 @@
 #include "../../video/video_driver.hpp"
 #include "../../scope.h"
 #include "../../walltime_func.h"
+#include "../../core/format.hpp"
 #include "macos.h"
 
 #include <errno.h>
@@ -41,24 +42,17 @@
 #define IS_ALIGNED(addr) (((uintptr_t)(addr) & 0xf) == 0)
 #endif
 
-/* printf format specification for 32/64-bit addresses. */
-#ifdef __LP64__
-#define PRINTF_PTR "0x%016lx"
-#else
-#define PRINTF_PTR "0x%08lx"
-#endif
-
 #define MAX_STACK_FRAMES 64
 
 #if !defined(WITHOUT_DBG_LLDB)
-static bool ExecReadStdoutThroughFile(const char *file, char *const *args, char *&buffer, const char *last)
+static bool ExecReadStdoutThroughFile(const char *file, char *const *args, format_target &buffer)
 {
 	int null_fd = open("/dev/null", O_RDWR);
 	if (null_fd == -1) return false;
 
 	char name[MAX_PATH];
 	extern std::string _personal_dir;
-	seprintf(name, lastof(name), "%sopenttd-tmp-XXXXXX", _personal_dir.c_str());
+	format_to_fixed_z::format_to(name, lastof(name), "{}openttd-tmp-XXXXXX", _personal_dir);
 	int fd = mkstemp(name);
 	if (fd == -1) {
 		close(null_fd);
@@ -101,18 +95,22 @@ static bool ExecReadStdoutThroughFile(const char *file, char *const *args, char 
 	} else {
 		/* command executed successfully */
 		lseek(fd, 0, SEEK_SET);
-		while (buffer < last) {
-			ssize_t res = read(fd, buffer, last - buffer);
-			if (res < 0) {
-				if (errno == EINTR) continue;
-				break;
-			} else if (res == 0) {
-				break;
-			} else {
-				buffer += res;
-			}
+		bool ok = true;
+		while (ok && !buffer.has_overflowed()) {
+			buffer.append_span_func(2048, [&](std::span<char> buf) -> size_t {
+				ssize_t res = read(fd, buf.data(), buf.size());
+				if (res < 0) {
+					if (errno != EINTR) ok = false;
+					return 0;
+				} else if (res == 0) {
+					ok = false;
+					return 0;
+				} else {
+					return (size_t)res;
+				}
+			});
 		}
-		buffer += seprintf(buffer, last, "\n");
+		buffer.push_back('\n');
 		close(fd);
 		return true;
 	}
@@ -122,7 +120,7 @@ static bool ExecReadStdoutThroughFile(const char *file, char *const *args, char 
 /**
  * OSX implementation for the crash logger.
  */
-class CrashLogOSX : public CrashLog {
+class CrashLogOSX final : public CrashLog {
 	/** Signal that has been thrown. */
 	int signum;
 	siginfo_t *si;
@@ -130,24 +128,63 @@ class CrashLogOSX : public CrashLog {
 	bool signal_instruction_ptr_valid;
 	void *signal_instruction_ptr;
 
-	char filename_log[MAX_PATH];        ///< Path of crash.log
-	char filename_save[MAX_PATH];       ///< Path of crash.sav
-	char filename_screenshot[MAX_PATH]; ///< Path of crash.(png|bmp|pcx)
+	int crash_file = -1;
 
-	char *LogOSVersion(char *buffer, const char *last) const override
+	bool OpenLogFile(const char *filename) override
+	{
+		int fd = open(filename, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+		if (fd >= 0) {
+			this->crash_file = fd;
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	void WriteToFd(int fd, std::string_view data)
+	{
+		while (!data.empty()) {
+			ssize_t res = write(fd, data.data(), data.size());
+			if (res < 0) {
+				if (errno != EINTR) break;
+			} else if (res == 0) {
+				break;
+			} else {
+				data.remove_prefix(res);
+			}
+		}
+	}
+
+	void WriteToLogFile(std::string_view data) override
+	{
+		this->WriteToFd(this->crash_file, data);
+	}
+
+	void WriteToStdout(std::string_view data) override
+	{
+		this->WriteToFd(STDOUT_FILENO, data);
+	}
+
+	void CloseLogFile() override
+	{
+		close(this->crash_file);
+		this->crash_file = -1;
+	}
+
+	void LogOSVersion(format_target &buffer) const override
 	{
 		int ver_maj, ver_min, ver_bug;
 		GetMacOSVersion(&ver_maj, &ver_min, &ver_bug);
 
 		const NXArchInfo *arch = NXGetLocalArchInfo();
 
-		return buffer + seprintf(buffer, last,
+		buffer.format(
 				"Operating system:\n"
 				" Name:     Mac OS X\n"
-				" Release:  %d.%d.%d\n"
-				" Machine:  %s\n"
-				" Min Ver:  %d\n"
-				" Max Ver:  %d\n",
+				" Release:  {}.{}.{}\n"
+				" Machine:  {}\n"
+				" Min Ver:  {}\n"
+				" Max Ver:  {}\n",
 				ver_maj, ver_min, ver_bug,
 				arch != nullptr ? arch->description : "unknown",
 				MAC_OS_X_VERSION_MIN_REQUIRED,
@@ -155,50 +192,49 @@ class CrashLogOSX : public CrashLog {
 		);
 	}
 
-	char *LogError(char *buffer, const char *last, const char *message) const override
+	void LogError(format_target &buffer, const char *message) const override
 	{
-		buffer += seprintf(buffer, last,
+		buffer.format(
 				"Crash reason:\n"
-				" Signal:  %s (%d)\n",
+				" Signal:  {} ({})\n",
 				strsignal(this->signum),
 				this->signum
 		);
 		if (this->si) {
-			buffer += seprintf(buffer, last,
-					"          si_code: %d\n",
+			buffer.format(
+					"          si_code: {}\n",
 					this->si->si_code);
 			if (this->signum != SIGABRT) {
-				buffer += seprintf(buffer, last,
-						"          Fault address: %p\n",
-						this->si->si_addr);
+				buffer.format(
+						"          Fault address: {}\n",
+						fmt::ptr(this->si->si_addr));
 				if (this->signal_instruction_ptr_valid) {
-					buffer += seprintf(buffer, last,
-							"          Instruction address: %p\n",
-							this->signal_instruction_ptr);
+					buffer.format(
+							"          Instruction address: {}\n",
+							fmt::ptr(this->signal_instruction_ptr));
 				}
 			}
 		}
-		buffer += seprintf(buffer, last,
-				" Message: %s\n\n",
+		buffer.format(
+				" Message: {}\n\n",
 				message == nullptr ? "<none>" : message
 		);
-		return buffer;
 	}
 
-	char *LogStacktrace(char *buffer, const char *last) const override
+	void LogStacktrace(format_target &buffer) const override
 	{
-		buffer += seprintf(buffer, last, "\nStacktrace:\n");
+		buffer.append("\nStacktrace:\n");
 
 		void *trace[64];
 		int trace_size = backtrace(trace, lengthof(trace));
 
 		char **messages = backtrace_symbols(trace, trace_size);
 		for (int i = 0; i < trace_size; i++) {
-			buffer += seprintf(buffer, last, "%s\n", messages[i]);
+			buffer.format("{}\n", messages[i]);
 		}
 		free(messages);
 
-		return buffer + seprintf(buffer, last, "\n");
+		buffer.push_back('\n');
 	}
 
 	/**
@@ -210,69 +246,73 @@ class CrashLogOSX : public CrashLog {
 	 * and there is some potentially useful information in the output from LogStacktrace
 	 * which is not in lldb's output.
 	 */
-	char *LogLldbInfo(char *buffer, const char *last) const
+	void LogLldbInfo(format_target &buffer) const
 	{
 
 #if !defined(WITHOUT_DBG_LLDB)
 		pid_t pid = getpid();
 
-		char *buffer_orig = buffer;
-		buffer += seprintf(buffer, last, "LLDB info:\n");
+		size_t buffer_orig = buffer.size();
+		buffer.append("LLDB info:\n");
 
 		char pid_buffer[16];
 		char disasm_buffer[64];
 
-		seprintf(pid_buffer, lastof(pid_buffer), "%d", pid);
+		format_to_fixed_z::format_to(pid_buffer, lastof(pid_buffer), "{:d}", pid);
 
-		std::vector<const char *> args;
-		args.push_back("lldb");
-		args.push_back("-x");
-		args.push_back("-p");
-		args.push_back(pid_buffer);
-		args.push_back("--batch");
+		std::array<const char *, 32> args;
+		size_t next_arg = 0;
+		auto add_arg = [&](const char *str) {
+			assert(next_arg < args.size());
+			args[next_arg++] = str;
+		};
 
-		args.push_back("-o");
-		args.push_back(IsNonMainThread() ? "bt all" : "bt 100");
+		add_arg("lldb");
+		add_arg("-x");
+		add_arg("-p");
+		add_arg(pid_buffer);
+		add_arg("--batch");
+
+		add_arg("-o");
+		add_arg(IsNonMainThread() ? "bt all" : "bt 100");
 
 		if (this->GetMessage() == nullptr && this->signal_instruction_ptr_valid) {
-			seprintf(disasm_buffer, lastof(disasm_buffer), "disassemble -b -F intel -c 1 -s %p", this->signal_instruction_ptr);
-			args.push_back("-o");
-			args.push_back(disasm_buffer);
+			format_to_fixed_z::format_to(disasm_buffer, lastof(disasm_buffer), "disassemble -b -F intel -c 1 -s {:#x}", reinterpret_cast<uintptr_t>(this->signal_instruction_ptr));
+			add_arg("-o");
+			add_arg(disasm_buffer);
 		}
 
-		args.push_back(nullptr);
-		if (!ExecReadStdoutThroughFile("lldb", const_cast<char* const*>(&(args[0])), buffer, last)) {
-			buffer = buffer_orig;
+		add_arg(nullptr);
+		if (!ExecReadStdoutThroughFile("lldb", const_cast<char* const*>(&(args[0])), buffer)) {
+			buffer.restore_size(buffer_orig);
 		}
 #endif /* !WITHOUT_DBG_LLDB */
-
-		return buffer;
 	}
 
 	/**
 	 * Log LLDB information if available
 	 */
-	char *LogDebugExtra(char *buffer, const char *last) const override
+	void LogDebugExtra(format_target &buffer) const override
 	{
-		return this->LogLldbInfo(buffer, last);
+		this->LogLldbInfo(buffer);
 	}
 
 	/**
 	 * Log registers if available
 	 */
-	char *LogRegisters(char *buffer, const char *last) const override
+	void LogRegisters(format_target &buffer) const override
 	{
 #ifdef WITH_UCONTEXT
 		ucontext_t *ucontext = static_cast<ucontext_t *>(context);
 #if defined(__x86_64__)
 		const auto &gregs = ucontext->uc_mcontext->__ss;
-		buffer += seprintf(buffer, last,
+		buffer.format(
 			"Registers:\n"
-			" rax: %#16llx rbx: %#16llx rcx: %#16llx rdx: %#16llx\n"
-			" rsi: %#16llx rdi: %#16llx rbp: %#16llx rsp: %#16llx\n"
-			" r8:  %#16llx r9:  %#16llx r10: %#16llx r11: %#16llx\n"
-			" r12: %#16llx r13: %#16llx r14: %#16llx r15: %#16llx\n"
-			" rip: %#16llx rflags: %#8llx\n\n",
+			" rax: {:#16x} rbx: {:#16x} rcx: {:#16x} rdx: {:#16x}\n"
+			" rsi: {:#16x} rdi: {:#16x} rbp: {:#16x} rsp: {:#16x}\n"
+			" r8:  {:#16x} r9:  {:#16x} r10: {:#16x} r11: {:#16x}\n"
+			" r12: {:#16x} r13: {:#16x} r14: {:#16x} r15: {:#16x}\n"
+			" rip: {:#16x} rflags: {:#8x}\n\n",
 			gregs.__rax,
 			gregs.__rbx,
 			gregs.__rcx,
@@ -294,11 +334,11 @@ class CrashLogOSX : public CrashLog {
 		);
 #elif defined(__i386)
 		const auto &gregs = ucontext->uc_mcontext->__ss;
-		buffer += seprintf(buffer, last,
+		buffer.format(
 			"Registers:\n"
-			" eax: %#8x ebx: %#8x ecx: %#8x edx: %#8x\n"
-			" esi: %#8x edi: %#8x ebp: %#8x esp: %#8x\n"
-			" eip: %#8x eflags: %#8x\n\n",
+			" eax: {:#8x} ebx: {:#8x} ecx: {:#8x} edx: {:#8x}\n"
+			" esi: {:#8x} edi: {:#8x} ebp: {:#8x} esp: {:#8x}\n"
+			" eip: {:#8x} eflags: {:#8x}\n\n",
 			gregs.__eax,
 			gregs.__ebx,
 			gregs.__ecx,
@@ -312,8 +352,6 @@ class CrashLogOSX : public CrashLog {
 		);
 #endif
 #endif
-
-		return buffer;
 	}
 
 public:
@@ -325,10 +363,6 @@ public:
 	 */
 	CrashLogOSX(int signum, siginfo_t *si, void *context) : signum(signum), si(si), context(context)
 	{
-		filename_log[0] = '\0';
-		filename_save[0] = '\0';
-		filename_screenshot[0] = '\0';
-
 		this->signal_instruction_ptr_valid = false;
 
 #ifdef WITH_UCONTEXT
@@ -343,49 +377,52 @@ public:
 #endif /* WITH_UCONTEXT */
 	}
 
-	CrashLogOSX(DesyncTag tag) : signum(0), si(nullptr), context(nullptr), signal_instruction_ptr_valid(false)
-	{
-		filename_log[0] = '\0';
-		filename_save[0] = '\0';
-		filename_screenshot[0] = '\0';
-	}
+	CrashLogOSX(DesyncTag tag) : signum(0), si(nullptr), context(nullptr), signal_instruction_ptr_valid(false) {}
 
 	/** Generate the crash log. */
 	bool MakeOSXCrashLog(char *buffer, const char *last)
 	{
 		bool ret = true;
 
-		printf("Crash encountered, generating crash log...\n");
+		this->WriteToStdout("Crash encountered, generating crash log...\n");
 
-		char *name_buffer_date = this->name_buffer + seprintf(this->name_buffer, lastof(this->name_buffer), "crash-");
-		UTCTime::Format(name_buffer_date, lastof(this->name_buffer), "%Y%m%dT%H%M%SZ");
+		char name_buffer[64];
+		{
+			format_to_fixed_z buf(name_buffer, lastof(name_buffer));
+			buf.append("crash-");
+			UTCTime::FormatTo(buf, "%Y%m%dT%H%M%SZ");
+			buf.finalise();
+		}
 
-		printf("Writing crash log to disk...\n");
-		bool bret = this->WriteCrashLog("", this->filename_log, lastof(this->filename_log), this->name_buffer, &(this->crash_file));
+		this->WriteToStdout("Writing crash log to disk...\n");
+		this->PrepareLogFileName(this->crashlog_filename, lastof(this->crashlog_filename), name_buffer);
+		bool bret = this->OpenLogFile(this->crashlog_filename);
 		if (bret) {
-			printf("Crash log written to %s. Please add this file to any bug reports.\n\n", this->filename_log);
+			format_buffer_fixed<1024> buf;
+			buf.format("Crash log written to {}. Please add this file to any bug reports.\n\n", this->crashlog_filename);
+			this->WriteToStdout(buf);
 		} else {
-			printf("Writing crash log failed. Please attach the output above to any bug reports.\n\n");
+			this->WriteToStdout("Writing crash log failed. Please attach the output above to any bug reports.\n\n");
 			ret = false;
 		}
 		this->crash_buffer_write = buffer;
 
-		this->FillCrashLog(buffer, last);
-		this->CloseCrashLogFile();
-		printf("Crash log generated.\n\n");
+		char *end = this->FillCrashLog(buffer, last);
+		this->CloseCrashLogFile(end);
+		this->WriteToStdout("Crash log generated.\n\n");
 
-		printf("Writing crash savegame...\n");
+		this->WriteToStdout("Writing crash savegame...\n");
 		_savegame_DBGL_data = buffer;
 		_save_DBGC_data = true;
-		if (!this->WriteSavegame(filename_save, lastof(filename_save), this->name_buffer)) {
-			filename_save[0] = '\0';
+		if (!this->WriteSavegame(this->savegame_filename, lastof(this->savegame_filename), name_buffer)) {
+			this->savegame_filename[0] = '\0';
 			ret = false;
 		}
 
-		printf("Writing crash screenshot...\n");
+		this->WriteToStdout("Writing crash screenshot...\n");
 		SetScreenshotAuxiliaryText("Crash Log", buffer);
-		if (!this->WriteScreenshot(filename_screenshot, lastof(filename_screenshot), this->name_buffer)) {
-			filename_screenshot[0] = '\0';
+		if (!this->WriteScreenshot(this->screenshot_filename, lastof(this->screenshot_filename), name_buffer)) {
+			this->screenshot_filename[0] = '\0';
 			ret = false;
 		}
 
@@ -406,15 +443,15 @@ public:
 		static const char crash_title[] =
 			"A serious fault condition occurred in the game. The game will shut down.";
 
-		char message[1024];
-		seprintf(message, lastof(message),
-				 "Please send the generated crash information and the last (auto)save to the patchpack developer. "
-				 "This will greatly help debugging. The correct place to do this is https://www.tt-forums.net/viewtopic.php?f=33&t=73469"
-				 " or https://github.com/JGRennison/OpenTTD-patches\n\n"
-				 "Generated file(s):\n%s\n%s\n%s",
-				 this->filename_log, this->filename_save, this->filename_screenshot);
+		format_buffer_sized<1024> message;
+		message.format(
+				"Please send the generated crash information and the last (auto)save to the patchpack developer. "
+				"This will greatly help debugging. The correct place to do this is https://www.tt-forums.net/viewtopic.php?f=33&t=73469"
+				" or https://github.com/JGRennison/OpenTTD-patches\n\n"
+				"Generated file(s):\n{}\n{}\n{}",
+				this->crashlog_filename, this->savegame_filename, this->screenshot_filename);
 
-		ShowMacDialog(crash_title, message, "Quit");
+		ShowMacDialog(crash_title, message.c_str(), "Quit");
 	}
 };
 
@@ -473,10 +510,6 @@ void CDECL HandleCrash(int signum, siginfo_t *si, void *context)
 	}
 }
 
-/* static */ void CrashLog::InitThread()
-{
-}
-
 /* static */ void CrashLog::DesyncCrashLog(const std::string *log_in, std::string *log_out, const DesyncExtraInfo &info)
 {
 	CrashLogOSX log(CrashLogOSX::DesyncTag{});
@@ -490,8 +523,8 @@ void CDECL HandleCrash(int signum, siginfo_t *si, void *context)
 }
 
 
-/* static */ void CrashLog::VersionInfoLog(char *buffer, const char *last)
+/* static */ void CrashLog::VersionInfoLog(format_target &buffer)
 {
 	CrashLogOSX log(CrashLogOSX::DesyncTag{});
-	log.FillVersionInfoLog(buffer, last);
+	log.FillVersionInfoLog(buffer);
 }

@@ -20,8 +20,6 @@ STR_TRANSPARENT_LOADING_TOOLTIP                                 :{BLACK}Byt gjen
 
 # Programmable Pre-Signals
 
-#House construction window (for SE only)
-
 #Town select window (for SE only)
 
 STR_MAPGEN_SNOW_LINE_HEIGHT                                     :{BLACK}Høgd på snøgrensa:
@@ -42,8 +40,8 @@ STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_SERVICE_VEL_END            :{LTBLUE}Vedlike
 
 STR_ORDERS_GO_TO_TOOLTIP_EXTRA                                  :{BLACK}Set inn ein ny ordre før den valde ordren, eller legg til i slutten av lista. Ctrl gjer ordren 'full last, einkvar varetype', kontrollpunktordre 'direkte' og verkstadsordre 'vedlikehald'. 'Del ordre' eller Ctrl let dette køyretyget dele ordrer med det valde køyretyget. Ved å klikke på eit køyretyg, kopierast ordrene frå dette køyretyget. Ein verkstadsordre slår av automatisk vedlikehald av kjøyretyget
 
-STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :Ank:
-STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :Avg:
+STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :Ank:{SPACE}{SPACE}
+STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :Avg:{SPACE}{SPACE}
 
 # Cargo type orders Window
 
@@ -76,3 +74,16 @@ STR_ERROR_CAN_T_SELL_25_SHARE_IN                                :{WHITE}Kan ikkj
 STR_ERROR_PROTECTED                                             :{WHITE}Det her firmaet sel ikkje aksjer enno...
 
 STR_CONFIG_SETTING_CYCLE_SIGNAL_PBS                             :Kun avanserte signaler
+
+STR_NETWORK_NEED_COMPANY_PASSWORD_CAPTION                       :{WHITE}Firmaet er beskytta. Skriv inn passord
+
+# Network set password
+STR_COMPANY_PASSWORD_CANCEL                                     :{BLACK}Ikkje lagre passordet
+STR_COMPANY_PASSWORD_OK                                         :{BLACK}Gje firmaet det nye passordet
+STR_COMPANY_PASSWORD_CAPTION                                    :{WHITE}Firmapassord
+STR_COMPANY_PASSWORD_MAKE_DEFAULT                               :{BLACK}Standard passord for firma
+STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}Bruk passordet fra dette firmaet som standard for nye firma
+
+STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}Passord
+STR_COMPANY_VIEW_PASSWORD_TOOLTIP                               :{BLACK}Passordbeskytt firmaet ditt slik at ikkje alle og einkvar kan verte med.
+STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}Vel firmapassord

@@ -219,6 +219,7 @@ STR_UNITS_VOLUME_LONG_SI                                        :{DECIMAL} m³
 
 
 
+
 # Common window strings
 STR_LIST_FILTER_TITLE                                           :{BLACK}शब्द गाळा:
 STR_LIST_FILTER_OSKTITLE                                        :{BLACK}गाळेला शब्द प्रविष्ट करा
@@ -335,15 +336,15 @@ STR_TOOLBAR_TOOLTIP_SWITCH_TOOLBAR                              :{BLACK}सा�
 
 # Extra tooltips for the scenario editor toolbar
 STR_SCENEDIT_TOOLBAR_OPENTTD                                    :{YELLOW}ओपेन टीटीडी
-STR_SCENEDIT_TOOLBAR_TOOLTIP_MOVE_THE_STARTING_DATE_BACKWARD    :{BLACK}सुरुवातीची तारीख एक वर्ष मागे न्या
-STR_SCENEDIT_TOOLBAR_TOOLTIP_MOVE_THE_STARTING_DATE_FORWARD     :{BLACK}सुरुवातीची तारीख एक वर्ष पुढे न्या
-STR_SCENEDIT_TOOLBAR_TOOLTIP_SET_DATE                           :{BLACK}सुरुवातीचं वर्ष पुरवण्यासाठी क्लिक करा
-STR_SCENEDIT_TOOLBAR_TOOLTIP_DISPLAY_MAP_TOWN_DIRECTORY         :{BLACK}नकाशा, शहरांची यादी दाखवा
-STR_SCENEDIT_TOOLBAR_LANDSCAPE_GENERATION                       :{BLACK}प्रदेश उत्पन्न करणे
-STR_SCENEDIT_TOOLBAR_TOWN_GENERATION                            :{BLACK}गावे उत्पन्न करणे
-STR_SCENEDIT_TOOLBAR_INDUSTRY_GENERATION                        :{BLACK}इंडस्ट्री उत्पन्न करणे
-STR_SCENEDIT_TOOLBAR_ROAD_CONSTRUCTION                          :{BLACK}रस्तेबांधणी
-STR_SCENEDIT_TOOLBAR_PLACE_SIGN                                 :{BLACK}चिन्ह लावा
+STR_SCENEDIT_TOOLBAR_MOVE_THE_STARTING_DATE_BACKWARD_TOOLTIP    :{BLACK}सुरुवातीची तारीख एक वर्ष मागे न्या
+STR_SCENEDIT_TOOLBAR_MOVE_THE_STARTING_DATE_FORWARD_TOOLTIP     :{BLACK}सुरुवातीची तारीख एक वर्ष पुढे न्या
+STR_SCENEDIT_TOOLBAR_SET_DATE_TOOLTIP                           :{BLACK}सुरुवातीचं वर्ष पुरवण्यासाठी क्लिक करा
+STR_SCENEDIT_TOOLBAR_DISPLAY_MAP_TOWN_DIRECTORY_TOOLTIP         :{BLACK}नकाशा, शहरांची यादी दाखवा
+STR_SCENEDIT_TOOLBAR_LANDSCAPE_GENERATION_TOOLTIP               :{BLACK}प्रदेश उत्पन्न करणे
+STR_SCENEDIT_TOOLBAR_TOWN_GENERATION_TOOLTIP                    :{BLACK}गावे उत्पन्न करणे
+STR_SCENEDIT_TOOLBAR_INDUSTRY_GENERATION_TOOLTIP                :{BLACK}इंडस्ट्री उत्पन्न करणे
+STR_SCENEDIT_TOOLBAR_ROAD_CONSTRUCTION_TOOLTIP                  :{BLACK}रस्तेबांधणी
+STR_SCENEDIT_TOOLBAR_PLACE_SIGN_TOOLTIP                         :{BLACK}चिन्ह लावा
 
 # Scenario editor file menu
 ###length 7
@@ -351,6 +352,7 @@ STR_SCENEDIT_FILE_MENU_SAVE_SCENARIO                            :उद्दे
 STR_SCENEDIT_FILE_MENU_LOAD_SCENARIO                            :उद्देश उघडा
 STR_SCENEDIT_FILE_MENU_SEPARATOR                                :
 STR_SCENEDIT_FILE_MENU_QUIT                                     :बंद करा
+
 
 # Settings menu
 ###length 16
@@ -518,6 +520,7 @@ STR_GRAPH_CARGO_TOOLTIP_ENABLE_ALL                              :{BLACK}दे�
 STR_GRAPH_CARGO_TOOLTIP_DISABLE_ALL                             :{BLACK}देयक दर आलेखावरील नाही मालवाहू प्रदर्शित
 STR_GRAPH_CARGO_PAYMENT_TOGGLE_CARGO                            :{BLACK}मालवाहू प्रकारासाठी टॉगल आलेख - वर / बंद
 STR_GRAPH_CARGO_PAYMENT_CARGO                                   :{TINY_FONT}{BLACK}{STRING}
+
 
 STR_GRAPH_PERFORMANCE_DETAIL_TOOLTIP                            :{BLACK}सविस्तर कामगिरी रेटिंग दाखवा
 
@@ -724,6 +727,7 @@ STR_GAME_OPTIONS_RESOLUTION_OTHER                               :अन्य
 
 
 
+
 # Custom currency window
 
 
@@ -847,6 +851,7 @@ STR_CONFIG_SETTING_WARN_LOST_VEHICLE                            : वाहन �
 ###length 2
 
 
+
 ###length 2
 
 
@@ -952,6 +957,8 @@ STR_CONFIG_SETTING_COMMAND_PAUSE_LEVEL_ALL_ACTIONS              :सर्व �
 
 
 
+###length 3
+
 ###setting-zero-is-special
 
 
@@ -1027,7 +1034,6 @@ STR_CONFIG_SETTING_STATUSBAR_POS                                :स्टेट
 ###length 3
 
 
-###length 2
 
 
 # Config errors
@@ -1071,9 +1077,9 @@ STR_FACE_SIMPLE                                                 :{BLACK}सु�
 STR_FACE_SIMPLE_TOOLTIP                                         :{BLACK}सुटसुटीत चेहेरा निवड
 STR_FACE_FACECODE                                               :{BLACK}खेळाडू चेहेरा क्र.
 STR_FACE_EUROPEAN                                               :{BLACK}युरोपिअन
-STR_FACE_SELECT_EUROPEAN                                        :{BLACK}युरोपिअन चेहेरा निवडा
+STR_FACE_EUROPEAN_TOOLTIP                                       :{BLACK}युरोपिअन चेहेरा निवडा
 STR_FACE_AFRICAN                                                :{BLACK}अफ्रिकन
-STR_FACE_SELECT_AFRICAN                                         :{BLACK}आफ्रिकन चेहेरा निवडा
+STR_FACE_AFRICAN_TOOLTIP                                        :{BLACK}आफ्रिकन चेहेरा निवडा
 STR_FACE_YES                                                    :हो
 STR_FACE_NO                                                     :नाही
 STR_FACE_MOUSTACHE_EARRING_TOOLTIP                              :{BLACK}मिशी अथवा कर्णफुले असू द्या
@@ -1135,8 +1141,6 @@ STR_NETWORK_CONNECTING_DOWNLOADING_2                            :{BLACK}{BYTES} 
 
 
 
-# Network set password
-
 # Network company info join/password
 
 # Network chat
@@ -1147,7 +1151,7 @@ STR_NETWORK_CONNECTING_DOWNLOADING_2                            :{BLACK}{BYTES} 
 STR_NETWORK_ERROR_CLIENT_GUI_LOST_CONNECTION_CAPTION            :{WHITE} संपर्क तुटला असण्याची शक्यता
 STR_NETWORK_ERROR_CLIENT_GUI_LOST_CONNECTION                    :{WHITE} गेल्या {NUM} सेकंदांत सर्वरकडून काहीच माहिती आलेली नाही
 
-###length 21
+###length 23
 
 # Network related errors
 STR_NETWORK_SERVER_MESSAGE                                      :*** {1:STRING}
@@ -1193,6 +1197,9 @@ STR_NETWORK_SERVER_MESSAGE                                      :*** {1:STRING}
 # Rail waypoint construction window
 
 # Rail station construction window
+
+
+
 
 
 
@@ -1330,6 +1337,8 @@ STR_MAPGEN_HEIGHTMAP_SIZE                                       :{ORANGE}{NUM} x
 # Map generation progress
 STR_GENERATION_PROGRESS                                         :{WHITE}{NUM}% पूर्ण
 STR_GENERATION_PROGRESS_NUM                                     :{BLACK}{NUM} / {NUM}
+
+
 
 # NewGRF settings
 
@@ -1634,9 +1643,6 @@ STR_VEHICLE_VIEW_CAPTION                                        :{WHITE}{VEHICLE
 
 
 # Vehicle stopped/started animations
-###length 2
-
-###length 2
 
 # Vehicle details
 
@@ -1758,17 +1764,12 @@ STR_AI_SETTINGS_SETTING                                         :{STRING}: {ORAN
 
 
 # Vehicle loading indicators
-STR_PERCENT_UP_SMALL                                            :{TINY_FONT}{WHITE}{NUM}%{UP_ARROW}
 STR_PERCENT_UP                                                  :{WHITE}{NUM}%{UP_ARROW}
-STR_PERCENT_DOWN_SMALL                                          :{TINY_FONT}{WHITE}{NUM}%{DOWN_ARROW}
 STR_PERCENT_DOWN                                                :{WHITE}{NUM}%{DOWN_ARROW}
-STR_PERCENT_UP_DOWN_SMALL                                       :{TINY_FONT}{WHITE}{NUM}%{UP_ARROW}{DOWN_ARROW}
 STR_PERCENT_UP_DOWN                                             :{WHITE}{NUM}%{UP_ARROW}{DOWN_ARROW}
 
 # Income 'floats'
-STR_INCOME_FLOAT_COST_SMALL                                     :{TINY_FONT}{RED}किंमत: {CURRENCY_LONG}
 STR_INCOME_FLOAT_COST                                           :{RED}किंमत: {CURRENCY_LONG}
-STR_INCOME_FLOAT_INCOME_SMALL                                   :{TINY_FONT}{GREEN}कमाई: {CURRENCY_LONG}
 STR_INCOME_FLOAT_INCOME                                         :{GREEN}कमाई: {CURRENCY_LONG}
 STR_MESSAGE_ESTIMATED_COST                                      :{WHITE}अंदाजी किंमत: {CURRENCY_LONG}
 STR_MESSAGE_ESTIMATED_INCOME                                    :{WHITE}अंदाजी कमाई: {CURRENCY_LONG}
@@ -1862,6 +1863,7 @@ STR_ERROR_BRIDGE_THROUGH_MAP_BORDER                             :{WHITE}पू�
 ###length VEHICLE_TYPES
 
 ###length VEHICLE_TYPES
+
 
 
 

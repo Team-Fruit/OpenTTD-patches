@@ -19,7 +19,7 @@ public:
 	struct SpriteData {
 		BlitterSpriteFlags flags;
 		uint32_t offset[ZOOM_LVL_SPR_COUNT][2]; ///< Offsets (from .data) to streams for different zoom levels, and the normal and remap image information.
-		byte data[];                            ///< Data, all zoomlevels.
+		uint8_t data[];                         ///< Data, all zoomlevels.
 	};
 
 	Blitter_32bppOptimized()
@@ -28,7 +28,7 @@ public:
 	}
 
 	void Draw(Blitter::BlitterParams *bp, BlitterMode mode, ZoomLevel zoom) override;
-	Sprite *Encode(const SpriteLoader::SpriteCollection &sprite, AllocatorProc *allocator) override;
+	Sprite *Encode(const SpriteLoader::SpriteCollection &sprite, SpriteAllocator &allocator) override;
 
 	const char *GetName() override { return "32bpp-optimized"; }
 
@@ -36,7 +36,7 @@ public:
 
 protected:
 	template <bool Tpal_to_rgb> void Draw(Blitter::BlitterParams *bp, BlitterMode mode, ZoomLevel zoom);
-	template <bool Tpal_to_rgb> Sprite *EncodeInternal(const SpriteLoader::SpriteCollection &sprite, AllocatorProc *allocator);
+	template <bool Tpal_to_rgb> Sprite *EncodeInternal(const SpriteLoader::SpriteCollection &sprite, SpriteAllocator &allocator);
 };
 
 /** Factory for the optimised 32 bpp blitter (without palette animation). */

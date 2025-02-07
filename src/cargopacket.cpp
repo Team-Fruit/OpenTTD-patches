@@ -8,6 +8,7 @@
 /** @file cargopacket.cpp Implementation of the cargo packets. */
 
 #include "stdafx.h"
+#include "debug.h"
 #include "station_base.h"
 #include "core/pool_func.hpp"
 #include "core/random_func.hpp"
@@ -80,24 +81,24 @@ std::string DumpCargoPacketDeferredPaymentStats()
 		payments[GB(it.first, 24, 8)][GB(it.first, 22, 2)] += it.second;
 	}
 
-	std::string buffer;
+	format_buffer buffer;
 	for (uint i = 0; i < 256; i++) {
 		for (uint j = 0; j < 4; j++) {
 			if (payments[i][j] != 0) {
 				SetDParam(0, i);
-				GetString(StringBuilder(buffer), STR_COMPANY_NAME);
-				buffer += " (";
-				GetString(StringBuilder(buffer), STR_REPLACE_VEHICLE_TRAIN + j);
-				buffer += "): ";
+				AppendStringInPlace(buffer, STR_COMPANY_NAME);
+				buffer.append(" (");
+				AppendStringInPlace(buffer, STR_REPLACE_VEHICLE_TRAIN + j);
+				buffer.append("): ");
 				SetDParam(0, payments[i][j]);
-				GetString(StringBuilder(buffer), STR_JUST_CURRENCY_LONG);
-				buffer += '\n';
+				AppendStringInPlace(buffer, STR_JUST_CURRENCY_LONG);
+				buffer.push_back('\n');
 			}
 		}
 	}
-	buffer += stdstr_fmt("Deferred payment count: %u\n", (uint) _cargo_packet_deferred_payments.size());
-	buffer += stdstr_fmt("Total cargo packets: %u\n", (uint)CargoPacket::GetNumItems());
-	return buffer;
+	buffer.format("Deferred payment count: {}\n", _cargo_packet_deferred_payments.size());
+	buffer.format("Total cargo packets: {}\n", CargoPacket::GetNumItems());
+	return buffer.to_string();
 }
 
 /**
@@ -524,6 +525,22 @@ void VehicleCargoList::PopCargo(Taction action)
 	}
 }
 
+void VehicleCargoList::AssertCountConsistencyError() const
+{
+	assert_msg(this->action_counts[MTA_KEEP] +
+			this->action_counts[MTA_DELIVER] +
+			this->action_counts[MTA_TRANSFER] +
+			this->action_counts[MTA_LOAD] == this->count,
+			"{} + {} + {} + {} != {}, ({} in {} packets)",
+			this->action_counts[MTA_KEEP],
+			this->action_counts[MTA_DELIVER],
+			this->action_counts[MTA_TRANSFER],
+			this->action_counts[MTA_LOAD],
+			this->count,
+			this->RecalculateCargoTotal(),
+			this->packets.size());
+}
+
 /**
  * Update the cached values to reflect the removal of this packet or part of it.
  * Decreases count, feeder share and periods_in_transit.
@@ -622,11 +639,12 @@ void VehicleCargoList::AgeCargo()
  * @param next_station ID of the station the vehicle will go to next.
  * @param order_flags OrderUnloadFlags that will apply to the unload operation.
  * @param ge GoodsEntry for getting the flows.
+ * @param cargo The cargo type of the cargo.
  * @param payment Payment object for registering transfers.
  * @param current_tile Current tile the cargo handling is happening on.
  * return If any cargo will be unloaded.
  */
-bool VehicleCargoList::Stage(bool accepted, StationID current_station, StationIDStack next_station, uint8_t order_flags, const GoodsEntry *ge, CargoPayment *payment, TileIndex current_tile)
+bool VehicleCargoList::Stage(bool accepted, StationID current_station, StationIDStack next_station, uint8_t order_flags, const GoodsEntry *ge, CargoID cargo, CargoPayment *payment, TileIndex current_tile)
 {
 	this->AssertCountConsistency();
 	dbg_assert(this->action_counts[MTA_LOAD] == 0);
@@ -636,7 +654,7 @@ bool VehicleCargoList::Stage(bool accepted, StationID current_station, StationID
 	CargoPacketList transfer_deliver;
 	std::vector<CargoPacket *> keep;
 
-	const FlowStatMap &flows = ge->CreateData().flows;
+	const FlowStatMap &flows = ge->ConstFlows();
 
 	bool force_keep = (order_flags & OUFB_NO_UNLOAD) != 0;
 	bool force_unload = (order_flags & OUFB_UNLOAD) != 0;
@@ -704,7 +722,7 @@ bool VehicleCargoList::Stage(bool accepted, StationID current_station, StationID
 			case MTA_TRANSFER:
 				transfer_deliver.push_front(cp);
 				/* Add feeder share here to allow reusing field for next station. */
-				share = payment->PayTransfer(cp, cp->count, current_tile);
+				share = payment->PayTransfer(cargo, cp, cp->count, current_tile);
 				cp->AddFeederShare(share);
 				this->feeder_share += share;
 				cp->next_hop = cargo_next;
@@ -818,11 +836,12 @@ uint VehicleCargoList::Shift(uint max_move, VehicleCargoList *dest)
  * ranges defined by designation_counts.
  * @param dest StationCargoList to add transferred cargo to.
  * @param max_move Maximum amount of cargo to move.
+ * @param cargo The cargo type of the cargo.
  * @param payment Payment object to register payments in.
  * @param current_tile Current tile the cargo handling is happening on.
  * @return Amount of cargo actually unloaded.
  */
-uint VehicleCargoList::Unload(uint max_move, StationCargoList *dest, CargoPayment *payment, TileIndex current_tile)
+uint VehicleCargoList::Unload(uint max_move, StationCargoList *dest, CargoID cargo, CargoPayment *payment, TileIndex current_tile)
 {
 	uint moved = 0;
 	if (this->action_counts[MTA_TRANSFER] > 0) {
@@ -832,7 +851,7 @@ uint VehicleCargoList::Unload(uint max_move, StationCargoList *dest, CargoPaymen
 	}
 	if (this->action_counts[MTA_TRANSFER] == 0 && this->action_counts[MTA_DELIVER] > 0 && moved < max_move) {
 		uint move = std::min(this->action_counts[MTA_DELIVER], max_move - moved);
-		this->ShiftCargo(CargoDelivery(this, move, payment, current_tile));
+		this->ShiftCargo(CargoDelivery(this, move, cargo, payment, current_tile));
 		moved += move;
 	}
 	return moved;

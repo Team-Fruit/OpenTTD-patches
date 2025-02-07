@@ -42,8 +42,8 @@ void GroundVehicle<T, Type>::PowerChanged()
 		if (track_speed > 0) max_track_speed = std::min(max_track_speed, track_speed);
 	}
 
-	byte air_drag;
-	byte air_drag_value = v->GetAirDrag();
+	uint8_t air_drag;
+	uint8_t air_drag_value = v->GetAirDrag();
 
 	/* If air drag is set to zero (default), the resulting air drag coefficient is dependent on max speed. */
 	if (air_drag_value == 0) {
@@ -252,7 +252,7 @@ GroundVehicleAcceleration GroundVehicle<T, Type>::GetAcceleration()
 		 * This yields a number x on a 0-1 scale, but shifted 16 bits to the left.
 		 * We then calculate 64 + 128x, clamped to 0-255, but still shifted 16 bits to the left.
 		 * Then we apply a correction for multiengine trains, and in the end we shift it 16 bits to the right to get a 0-255 number.
-		 * @note A seperate correction for multiheaded engines is done in CheckVehicleBreakdown. We can't do that here because it would affect the whole consist.
+		 * @note A separate correction for multiheaded engines is done in CheckVehicleBreakdown. We can't do that here because it would affect the whole consist.
 		 */
 		uint64_t breakdown_factor = (uint64_t)abs(resistance) * (uint64_t)(this->cur_speed << 16);
 		breakdown_factor /= (std::max(force, (int64_t)100) * this->gcache.cached_max_track_speed);
@@ -309,8 +309,14 @@ GroundVehicleAcceleration GroundVehicle<T, Type>::GetAcceleration()
 				ShowTrainTooHeavyAdviceMessage(this);
 			}
 
-			if (Train::From(this)->UsingRealisticBraking() && _settings_game.vehicle.limit_train_acceleration) {
+			bool using_realistic_braking = Train::From(this)->UsingRealisticBraking();
+
+			if (using_realistic_braking && _settings_game.vehicle.limit_train_acceleration) {
 				accel = std::min(accel, 250);
+			}
+
+			if (using_realistic_braking) {
+				accel = DivTowardsPositiveInf(accel * _settings_game.vehicle.train_acc_braking_percent, 100);
 			}
 		}
 
@@ -401,6 +407,93 @@ void GroundVehicle<T, Type>::UpdateZPositionInWormhole()
 	}
 
 	if (slope != SLOPE_FLAT) this->z_pos += GetPartialPixelZ(this->x_pos & 0xF, this->y_pos & 0xF, slope);
+}
+
+/**
+ * Update the speed of the vehicle.
+ *
+ * It updates the cur_speed and subspeed variables depending on the state
+ * of the vehicle; in this case the current acceleration, minimum and
+ * maximum speeds of the vehicle. It returns the distance that that the
+ * vehicle can drive this tick. #Vehicle::GetAdvanceDistance() determines
+ * the distance to drive before moving a step on the map.
+ * @param accel     The acceleration we would like to give this vehicle.
+ * @param min_speed The minimum speed here, in vehicle specific units.
+ * @param max_speed The maximum speed here, in vehicle specific units.
+ * @param advisory_max_speed The advisory maximum speed here, in vehicle specific units.
+ * @return Distance to drive.
+ */
+template <class T, VehicleType Type>
+uint GroundVehicle<T, Type>::DoUpdateSpeed(GroundVehicleAcceleration accel, int min_speed, int max_speed, int advisory_max_speed, bool use_realistic_braking)
+{
+	int new_subspeed = ((int)this->subspeed + accel.acceleration) + (this->cur_speed << 8);
+	int new_lb_subspeed = 0;
+
+	if (use_realistic_braking) {
+		new_lb_subspeed = ((int)this->subspeed + accel.braking) + (this->cur_speed << 8);
+	} else {
+		max_speed = std::min(max_speed, advisory_max_speed);
+	}
+
+	int tempmax = max_speed;
+
+	/* When we are going faster than the maximum speed, reduce the speed
+	 * somewhat gradually. But never lower than the maximum speed. */
+	if (this->breakdown_ctr == 1) {
+		if (this->breakdown_type == BREAKDOWN_LOW_POWER) {
+			if ((this->tick_counter & 0x7) == 0 && _settings_game.vehicle.train_acceleration_model == AM_ORIGINAL) {
+				if (this->cur_speed > (this->breakdown_severity * max_speed) >> 8) {
+					tempmax = this->cur_speed - (this->cur_speed / 10) - 1;
+				} else {
+					tempmax = (this->breakdown_severity * max_speed) >> 8;
+				}
+			}
+		} else if (this->breakdown_type == BREAKDOWN_LOW_SPEED) {
+			tempmax = std::min<int>(max_speed, this->breakdown_severity);
+		} else {
+			tempmax = this->cur_speed;
+		}
+	}
+
+	bool brake_overheated = false;
+	if (this->cur_speed > max_speed) {
+		if (use_realistic_braking && accel.braking >= 0) {
+			extern void TrainBrakesOverheatedBreakdown(Vehicle *v, int speed, int max_speed);
+			TrainBrakesOverheatedBreakdown(this, this->cur_speed, max_speed);
+			brake_overheated = true;
+		}
+		tempmax = std::max(this->cur_speed - (this->cur_speed / 10) - 1, max_speed);
+	}
+
+	if (use_realistic_braking && new_subspeed > (advisory_max_speed << 8) && new_lb_subspeed < new_subspeed) {
+		new_subspeed = Clamp(advisory_max_speed << 8, new_lb_subspeed, new_subspeed);
+
+		if ((new_subspeed >> 8) > tempmax) {
+			if (use_realistic_braking && accel.braking >= 0 && !brake_overheated) {
+				extern void TrainBrakesOverheatedBreakdown(Vehicle *v, int speed, int max_speed);
+				TrainBrakesOverheatedBreakdown(this, (new_subspeed >> 8), tempmax);
+			}
+			new_subspeed = tempmax << 8;
+		}
+	}
+
+	/* Enforce a maximum and minimum speed. Normally we would use something like
+	 * Clamp for this, but in this case min_speed might be below the maximum speed
+	 * threshold for some reason. That makes acceleration fail and assertions
+	 * happen in Clamp. So make it explicit that min_speed overrules the maximum
+	 * speed by explicit ordering of min and max. */
+	new_subspeed = std::min(new_subspeed, (tempmax << 8) + 255);
+
+	new_subspeed = std::max(new_subspeed, min_speed << 8);
+
+	this->cur_speed = new_subspeed >> 8;
+	this->subspeed = (uint8_t)new_subspeed;
+
+	int scaled_spd = this->GetAdvanceSpeed(this->cur_speed);
+
+	scaled_spd += this->progress;
+	this->progress = 0; // set later in *Handler or *Controller
+	return scaled_spd;
 }
 
 /* Instantiation for Train */

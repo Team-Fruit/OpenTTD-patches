@@ -14,6 +14,7 @@
 #include "../../gamelog.h"
 #include "../../sl/saveload.h"
 #include "../../scope.h"
+#include "../../core/format.hpp"
 
 #include <errno.h>
 #include <signal.h>
@@ -93,7 +94,7 @@ static int GetTemporaryFD()
 {
 	char name[MAX_PATH];
 	extern std::string _personal_dir;
-	seprintf(name, lastof(name), "%sopenttd-tmp-XXXXXX", _personal_dir.c_str());
+	format_to_fixed_z::format_to(name, lastof(name), "{}openttd-tmp-XXXXXX", _personal_dir);
 	int fd = mkstemp(name);
 	if (fd != -1) {
 		/* Unlink file but leave fd open until finished with */
@@ -131,7 +132,7 @@ struct ExecReadNullHandler {
 	}
 };
 
-static bool ExecReadStdout(const char *file, char *const *args, char *&buffer, const char *last)
+static bool ExecReadStdout(const char *file, char *const *args, format_target &buffer)
 {
 	ExecReadNullHandler nulls;
 	if (!nulls.Init()) return false;
@@ -169,18 +170,22 @@ static bool ExecReadStdout(const char *file, char *const *args, char *&buffer, c
 	nulls.Close();
 	close(pipefd[1]); /* Close unused write end */
 
-	while (buffer < last) {
-		ssize_t res = read(pipefd[0], buffer, last - buffer);
-		if (res < 0) {
-			if (errno == EINTR) continue;
-			break;
-		} else if (res == 0) {
-			break;
-		} else {
-			buffer += res;
-		}
+	bool ok = true;
+	while (ok && !buffer.has_overflowed()) {
+		buffer.append_span_func(2048, [&](std::span<char> buf) -> size_t {
+			ssize_t res = read(pipefd[0], buf.data(), buf.size());
+			if (res < 0) {
+				if (errno != EINTR) ok = false;
+				return 0;
+			} else if (res == 0) {
+				ok = false;
+				return 0;
+			} else {
+				return (size_t)res;
+			}
+		});
 	}
-	buffer += seprintf(buffer, last, "\n");
+	buffer.push_back('\n');
 
 	close(pipefd[0]); /* close read end */
 
@@ -196,7 +201,7 @@ static bool ExecReadStdout(const char *file, char *const *args, char *&buffer, c
 }
 
 #if defined(WITH_DBG_GDB)
-static bool ExecReadStdoutThroughFile(const char *file, char *const *args, char *&buffer, const char *last)
+static bool ExecReadStdoutThroughFile(const char *file, char *const *args, format_target &buffer)
 {
 	ExecReadNullHandler nulls;
 	if (!nulls.Init()) return false;
@@ -240,18 +245,22 @@ static bool ExecReadStdoutThroughFile(const char *file, char *const *args, char 
 	} else {
 		/* command executed successfully */
 		lseek(fd, 0, SEEK_SET);
-		while (buffer < last) {
-			ssize_t res = read(fd, buffer, last - buffer);
-			if (res < 0) {
-				if (errno == EINTR) continue;
-				break;
-			} else if (res == 0) {
-				break;
-			} else {
-				buffer += res;
-			}
+		bool ok = true;
+		while (ok && !buffer.has_overflowed()) {
+			buffer.append_span_func(2048, [&](std::span<char> buf) -> size_t {
+				ssize_t res = read(fd, buf.data(), buf.size());
+				if (res < 0) {
+					if (errno != EINTR) ok = false;
+					return 0;
+				} else if (res == 0) {
+					ok = false;
+					return 0;
+				} else {
+					return (size_t)res;
+				}
+			});
 		}
-		buffer += seprintf(buffer, last, "\n");
+		buffer.push_back('\n');
 		close(fd);
 		return true;
 	}
@@ -261,7 +270,7 @@ static bool ExecReadStdoutThroughFile(const char *file, char *const *args, char 
 /**
  * Unix implementation for the crash logger.
  */
-class CrashLogUnix : public CrashLog {
+class CrashLogUnix final : public CrashLog {
 	/** Signal that has been thrown. */
 	int signum;
 #ifdef WITH_SIGACTION
@@ -270,20 +279,63 @@ class CrashLogUnix : public CrashLog {
 	bool signal_instruction_ptr_valid;
 	void *signal_instruction_ptr;
 #endif
+	int crash_file = -1;
 
-	char *LogOSVersion(char *buffer, const char *last) const override
+	bool OpenLogFile(const char *filename) override
+	{
+		int fd = open(filename, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+		if (fd >= 0) {
+			this->crash_file = fd;
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	void WriteToFd(int fd, std::string_view data)
+	{
+		while (!data.empty()) {
+			ssize_t res = write(fd, data.data(), data.size());
+			if (res < 0) {
+				if (errno != EINTR) break;
+			} else if (res == 0) {
+				break;
+			} else {
+				data.remove_prefix(res);
+			}
+		}
+	}
+
+	void WriteToLogFile(std::string_view data) override
+	{
+		this->WriteToFd(this->crash_file, data);
+	}
+
+	void WriteToStdout(std::string_view data) override
+	{
+		this->WriteToFd(STDOUT_FILENO, data);
+	}
+
+	void CloseLogFile() override
+	{
+		close(this->crash_file);
+		this->crash_file = -1;
+	}
+
+	void LogOSVersion(format_target &buffer) const override
 	{
 		struct utsname name;
 		if (uname(&name) < 0) {
-			return buffer + seprintf(buffer, last, "Could not get OS version: %s\n", strerror(errno));
+			buffer.format("Could not get OS version: {}\n", StrErrorDumper().GetLast());
+			return;
 		}
 
-		return buffer + seprintf(buffer, last,
+		buffer.format(
 				"Operating system:\n"
-				" Name:     %s\n"
-				" Release:  %s\n"
-				" Version:  %s\n"
-				" Machine:  %s\n",
+				" Name:     {}\n"
+				" Release:  {}\n"
+				" Version:  {}\n"
+				" Machine:  {}\n",
 				name.sysname,
 				name.release,
 				name.version,
@@ -291,64 +343,63 @@ class CrashLogUnix : public CrashLog {
 		);
 	}
 
-	char *LogOSVersionDetail(char *buffer, const char *last) const override
+	void LogOSVersionDetail(format_target &buffer) const override
 	{
 		struct utsname name;
-		if (uname(&name) < 0) return buffer;
+		if (uname(&name) < 0) return;
 
 		if (strcmp(name.sysname, "Linux") == 0) {
-			char *buffer_orig = buffer;
-			buffer += seprintf(buffer, last, "Distro version:\n");
+			size_t orig = buffer.size();
+			buffer.append("Distro version:\n");
 
 			const char *args[] = { "/bin/sh", "-c", "lsb_release -a || find /etc -maxdepth 1 -type f -a \\( -name '*release' -o -name '*version' \\) -exec head -v {} \\+", nullptr };
-			if (!ExecReadStdout("/bin/sh", const_cast<char* const*>(args), buffer, last)) {
-				buffer = buffer_orig;
+			if (!ExecReadStdout("/bin/sh", const_cast<char* const*>(args), buffer)) {
+				buffer.restore_size(orig);
 			}
 		}
-		return buffer;
 	}
 
-	char *LogError(char *buffer, const char *last, const char *message) const override
+	void LogError(format_target &buffer, const char *message) const override
 	{
-		buffer += seprintf(buffer, last,
+		buffer.format(
 				"Crash reason:\n"
-				" Signal:  %s (%d)\n",
+				" Signal:  {} ({})\n",
 				strsignal(this->signum),
 				this->signum);
 #ifdef WITH_SIGACTION
 		if (this->si) {
-			buffer += seprintf(buffer, last,
-					"          si_code: %d",
+			buffer.format(
+					"          si_code: {}",
 					this->si->si_code);
 			if (this->signum == SIGSEGV) {
 				switch (this->si->si_code) {
 					case SEGV_MAPERR:
-						buffer += seprintf(buffer, last, " (SEGV_MAPERR)");
+						buffer.append(" (SEGV_MAPERR)");
 						break;
 					case SEGV_ACCERR:
-						buffer += seprintf(buffer, last, " (SEGV_ACCERR)");
+						buffer.append(" (SEGV_ACCERR)");
 						break;
 					default:
 						break;
 				}
 			}
-			buffer += seprintf(buffer, last, "\n");
+			buffer.push_back('\n');
 			if (this->signum != SIGABRT) {
-				buffer += seprintf(buffer, last,
-						"          Fault address: %p\n",
-						this->si->si_addr);
+				buffer.format(
+						"          Fault address: {}\n",
+						fmt::ptr(this->si->si_addr));
 				if (this->signal_instruction_ptr_valid) {
-					buffer += seprintf(buffer, last,
-							"          Instruction address: %p\n",
-							this->signal_instruction_ptr);
+					buffer.format(
+							"          Instruction address: {}\n",
+							fmt::ptr(this->signal_instruction_ptr));
 				}
 			}
 
 #if defined(WITH_UCONTEXT) && (defined(__x86_64__) || defined(__i386))
 			if (this->signal_instruction_ptr_valid && this->signum == SIGSEGV) {
 				auto err = static_cast<ucontext_t *>(this->context)->uc_mcontext.gregs[REG_ERR];
-				buffer += seprintf(buffer, last,
-						"          REG_ERR: %s%s%s%s%s\n",
+				buffer.format(
+						"          REG_ERR: {}{}{}{}{}\n",
 							(err & 1) ? "protection fault" : "no page",
 							(err & 2) ? ", write" : ", read",
 							(err & 4) ? "" : ", kernel",
@@ -361,50 +412,47 @@ class CrashLogUnix : public CrashLog {
 		}
 #endif /* WITH_SIGACTION */
 		this->CrashLogFaultSectionCheckpoint(buffer);
-		buffer += seprintf(buffer, last,
-				" Message: %s\n\n",
+		buffer.format(
+				" Message: {}\n\n",
 				message == nullptr ? "<none>" : message
 		);
-
-		return buffer;
 	}
 
 	/**
 	 * Log GDB information if available
 	 */
-	char *LogDebugExtra(char *buffer, const char *last) const override
+	void LogDebugExtra(format_target &buffer) const override
 	{
-		return this->LogGdbInfo(buffer, last);
+		this->LogGdbInfo(buffer);
 	}
 
 	/**
 	 * Log crash trailer
 	 */
-	char *LogCrashTrailer(char *buffer, const char *last) const override
+	void LogCrashTrailer(format_target &buffer) const override
 	{
 		uint32_t other_crashed_threads = _crash_other_threads.load();
 		if (other_crashed_threads > 0) {
-			buffer += seprintf(buffer, last, "\n*** %u other threads have also crashed ***\n\n", other_crashed_threads);
+			buffer.format("\n*** {} other threads have also crashed ***\n\n", other_crashed_threads);
 		}
-		return buffer;
 	}
 
 	/**
 	 * Show registers if possible
 	 */
-	char *LogRegisters(char *buffer, const char *last) const override
+	void LogRegisters(format_target &buffer) const override
 	{
 #ifdef WITH_UCONTEXT
 		ucontext_t *ucontext = static_cast<ucontext_t *>(context);
 #if defined(__x86_64__)
 		const gregset_t &gregs = ucontext->uc_mcontext.gregs;
-		buffer += seprintf(buffer, last,
+		buffer.format(
 			"Registers:\n"
-			" rax: %#16llx rbx: %#16llx rcx: %#16llx rdx: %#16llx\n"
-			" rsi: %#16llx rdi: %#16llx rbp: %#16llx rsp: %#16llx\n"
-			" r8:  %#16llx r9:  %#16llx r10: %#16llx r11: %#16llx\n"
-			" r12: %#16llx r13: %#16llx r14: %#16llx r15: %#16llx\n"
-			" rip: %#16llx eflags: %#8llx, err: %#llx\n\n",
+			" rax: 0x{:016X} rbx: 0x{:016X} rcx: 0x{:016X} rdx: 0x{:016X}\n"
+			" rsi: 0x{:016X} rdi: 0x{:016X} rbp: 0x{:016X} rsp: 0x{:016X}\n"
+			" r8:  0x{:016X} r9:  0x{:016X} r10: 0x{:016X} r11: 0x{:016X}\n"
+			" r12: 0x{:016X} r13: 0x{:016X} r14: 0x{:016X} r15: 0x{:016X}\n"
+			" rip: 0x{:016X} eflags: 0x{:08X}, err: 0x{:X}\n\n",
 			gregs[REG_RAX],
 			gregs[REG_RBX],
 			gregs[REG_RCX],
@@ -427,11 +475,11 @@ class CrashLogUnix : public CrashLog {
 		);
 #elif defined(__i386)
 		const gregset_t &gregs = ucontext->uc_mcontext.gregs;
-		buffer += seprintf(buffer, last,
+		buffer.format(
 			"Registers:\n"
-			" eax: %#8x ebx: %#8x ecx: %#8x edx: %#8x\n"
-			" esi: %#8x edi: %#8x ebp: %#8x esp: %#8x\n"
-			" eip: %#8x eflags: %#8x, err: %#x\n\n",
+			" eax: 0x{:08X} ebx: 0x{:08X} ecx: 0x{:08X} edx: 0x{:08X}\n"
+			" esi: 0x{:08X} edi: 0x{:08X} ebp: 0x{:08X} esp: 0x{:08X}\n"
+			" eip: 0x{:08X} eflags: 0x{:08X}, err: 0x{:X}\n\n",
 			gregs[REG_EAX],
 			gregs[REG_EBX],
 			gregs[REG_ECX],
@@ -446,7 +494,6 @@ class CrashLogUnix : public CrashLog {
 		);
 #endif
 #endif
-		return buffer;
 	}
 
 	/**
@@ -458,7 +505,7 @@ class CrashLogUnix : public CrashLog {
 	 * and there is some potentially useful information in the output from LogStacktrace
 	 * which is not in gdb's output.
 	 */
-	char *LogGdbInfo(char *buffer, const char *last) const
+	void LogGdbInfo(format_target &buffer) const
 	{
 #if defined(WITH_DBG_GDB)
 
@@ -468,45 +515,49 @@ class CrashLogUnix : public CrashLog {
 
 		pid_t tid = syscall(SYS_gettid);
 
-		char *buffer_orig = buffer;
-		buffer += seprintf(buffer, last, "GDB info:\n");
+		size_t orig = buffer.size();
+		buffer.append("GDB info:\n");
 
 		char tid_buffer[16];
 		char disasm_buffer[32];
 
-		seprintf(tid_buffer, lastof(tid_buffer), "%d", tid);
+		format_to_fixed_z::format_to(tid_buffer, lastof(tid_buffer), "{:d}", tid);
 
-		std::vector<const char *> args;
-		args.push_back("gdb");
-		args.push_back("-n");
-		args.push_back("-p");
-		args.push_back(tid_buffer);
-		args.push_back("-batch");
+		std::array<const char *, 32> args;
+		size_t next_arg = 0;
+		auto add_arg = [&](const char *str) {
+			assert(next_arg < args.size());
+			args[next_arg++] = str;
+		};
 
-		args.push_back("-ex");
-		args.push_back("echo \\nBacktrace:\\n");
-		args.push_back("-ex");
-		args.push_back("bt full 100");
+		add_arg("gdb");
+		add_arg("-n");
+		add_arg("-p");
+		add_arg(tid_buffer);
+		add_arg("-batch");
+
+		add_arg("-ex");
+		add_arg("echo \\nBacktrace:\\n");
+		add_arg("-ex");
+		add_arg("bt full 100");
 
 #ifdef WITH_SIGACTION
 		if (this->GetMessage() == nullptr && this->signal_instruction_ptr_valid) {
-			seprintf(disasm_buffer, lastof(disasm_buffer), "x/1i %p", this->signal_instruction_ptr);
-			args.push_back("-ex");
-			args.push_back("set disassembly-flavor intel");
-			args.push_back("-ex");
-			args.push_back("echo \\nFault instruction:\\n");
-			args.push_back("-ex");
-			args.push_back(disasm_buffer);
+			format_to_fixed_z::format_to(disasm_buffer, lastof(disasm_buffer), "x/1i {:#x}", reinterpret_cast<uintptr_t>(this->signal_instruction_ptr));
+			add_arg("-ex");
+			add_arg("set disassembly-flavor intel");
+			add_arg("-ex");
+			add_arg("echo \\nFault instruction:\\n");
+			add_arg("-ex");
+			add_arg(disasm_buffer);
 		}
 #endif
 
-		args.push_back(nullptr);
-		if (!ExecReadStdoutThroughFile("gdb", const_cast<char* const*>(&(args[0])), buffer, last)) {
-			buffer = buffer_orig;
+		add_arg(nullptr);
+		if (!ExecReadStdoutThroughFile("gdb", const_cast<char* const*>(&(args[0])), buffer)) {
+			buffer.restore_size(orig);
 		}
 #endif /* WITH_DBG_GDB */
-
-		return buffer;
 	}
 
 	/**
@@ -527,9 +578,9 @@ class CrashLogUnix : public CrashLog {
 	 * If demangling support is available, try to demangle whatever symbol name we got back.
 	 * If we could find a symbol address from libdl or libbfd, show the offset from that to the frame address.
 	 */
-	char *LogStacktrace(char *buffer, const char *last) const override
+	void LogStacktrace(format_target &buffer) const override
 	{
-		buffer += seprintf(buffer, last, "Stacktrace:\n");
+		buffer.append("Stacktrace:\n");
 
 #if defined(__GLIBC__)
 		void *trace[64];
@@ -561,10 +612,10 @@ class CrashLogUnix : public CrashLog {
 			const int ptr_str_size = (2 + sizeof(void*) * 2);
 #if defined(WITH_DL2)
 			if (dladdr_result && info.dli_fname && dl_lm != nullptr) {
-				char *saved_buffer = buffer;
+				size_t saved_position = buffer.size();
 				char addr_ptr_buffer[64];
 				/* subtract one to get the line before the return address, i.e. the function call line */
-				seprintf(addr_ptr_buffer, lastof(addr_ptr_buffer), PRINTF_SIZEX, (char *)trace[i] - (char *)dl_lm->l_addr - 1);
+				format_to_fixed_z::format_to(addr_ptr_buffer, lastof(addr_ptr_buffer), "{:x}", (char *)trace[i] - (char *)dl_lm->l_addr - 1);
 				const char *args[] = {
 					"addr2line",
 					"-e",
@@ -576,16 +627,18 @@ class CrashLogUnix : public CrashLog {
 					addr_ptr_buffer,
 					nullptr,
 				};
-				buffer += seprintf(buffer, last, " [%02i] %*p %-40s ", i, ptr_str_size, trace[i], info.dli_fname);
-				const char *buffer_start = buffer;
-				bool result = ExecReadStdout("addr2line", const_cast<char* const*>(args), buffer, last);
-				if (result && strstr(buffer_start, "??") == nullptr) {
-					while (buffer[-1] == '\n' && buffer[-2] == '\n') buffer--;
-					*buffer = 0;
-					continue;
+				buffer.format(" [{:02}] {:{}} {:<40} ", i, fmt::ptr(trace[i]), ptr_str_size, info.dli_fname);
+				size_t start_pos = buffer.size();
+				bool result = ExecReadStdout("addr2line", const_cast<char* const*>(args), buffer);
+				if (result) {
+					std::string_view result_str = std::string_view(buffer.data() + start_pos, buffer.size() - start_pos);
+					if (result_str.find("??") == result_str.npos) {
+						while (result_str.ends_with("\n\n")) result_str.remove_suffix(1); // Replace double newlines with single newlines
+						buffer.restore_size(start_pos + result_str.size());
+						continue;
+					}
 				}
-				buffer = saved_buffer;
-				*buffer = 0;
+				buffer.restore_size(saved_position);
 			}
 #endif /* WITH_DL2 */
 #if defined(WITH_BFD)
@@ -607,19 +660,19 @@ class CrashLogUnix : public CrashLog {
 				demangled = abi::__cxa_demangle(func_name, nullptr, 0, &status);
 #endif /* WITH_DEMANGLE */
 				const char *name = (demangled != nullptr && status == 0) ? demangled : func_name;
-				buffer += seprintf(buffer, last, " [%02i] %*p %-40s %s + 0x%zx", i, ptr_str_size,
-						trace[i], info.dli_fname, name, (char *)trace[i] - (char *)func_addr);
+				buffer.format(" [{:02}] {:{}} {:<40} {} + 0x{:X}", i,
+						fmt::ptr(trace[i]), ptr_str_size, info.dli_fname, name, (char *)trace[i] - (char *)func_addr);
 				free(demangled);
 			} else if (dladdr_result && info.dli_fname) {
-				buffer += seprintf(buffer, last, " [%02i] %*p %-40s + 0x%zx", i, ptr_str_size,
-						trace[i], info.dli_fname, (char *)trace[i] - (char *)info.dli_fbase);
+				buffer.format(" [{:02}] {:{}} {:<40} + 0x{:X}", i,
+						fmt::ptr(trace[i]), ptr_str_size, info.dli_fname, (char *)trace[i] - (char *)info.dli_fbase);
 			} else {
 				ok = false;
 			}
 			if (ok && file_name != nullptr) {
-				buffer += seprintf(buffer, last, " at %s:%u", file_name, line_num);
+				buffer.format(" at {}:{}", file_name, line_num);
 			}
-			if (ok) buffer += seprintf(buffer, last, "\n");
+			if (ok) buffer.push_back('\n');
 #if defined(WITH_BFD)
 			if (ok && bfd_info.found && bfd_info.abfd) {
 				uint iteration_limit = 32;
@@ -631,30 +684,29 @@ class CrashLogUnix : public CrashLog {
 						demangled = abi::__cxa_demangle(func_name, nullptr, 0, &status);
 #endif /* WITH_DEMANGLE */
 						const char *name = (demangled != nullptr && status == 0) ? demangled : func_name;
-						buffer += seprintf(buffer, last, " [inlined] %*s %s", ptr_str_size + 36, "",
-								name);
+						buffer.format(" [inlined] {:{}} {}", "", ptr_str_size + 36, name);
 						free(demangled);
 					} else if (file_name) {
-						buffer += seprintf(buffer, last, " [inlined]");
+						buffer.append(" [inlined]");
 					}
 					if (file_name != nullptr) {
-						buffer += seprintf(buffer, last, " at %s:%u", file_name, line_num);
+						buffer.format(" at {}:{}", file_name, line_num);
 					}
-					buffer += seprintf(buffer, last, "\n");
+					buffer.push_back('\n');
 				}
 			}
 #endif /* WITH_BFD */
 			if (ok) continue;
 #endif /* WITH_DL */
-			buffer += seprintf(buffer, last, " [%02i] %s\n", i, messages[i]);
+			buffer.format(" [{:02}] {}\n", i, messages[i]);
 		}
 		free(messages);
 
 /* end of __GLIBC__ */
 #else
-		buffer += seprintf(buffer, last, " Not supported.\n");
+		buffer.append(" Not supported.\n");
 #endif
-		return buffer + seprintf(buffer, last, "\n");
+		buffer.push_back('\n');
 	}
 
 #if defined(__GLIBC__) && defined(WITH_SIGACTION)
@@ -693,7 +745,7 @@ class CrashLogUnix : public CrashLog {
 	 */
 	/* virtual */ char *TryCrashLogFaultSection(char *buffer, const char *last, const char *section_name, CrashLogSectionWriter writer) override
 	{
-		this->FlushCrashLogBuffer();
+		this->FlushCrashLogBuffer(buffer);
 		internal_fault_saved_buffer = buffer;
 
 		int signum = setjmp(internal_fault_jmp_buf);
@@ -706,8 +758,10 @@ class CrashLogUnix : public CrashLog {
 			buffer = internal_fault_saved_buffer;
 			internal_fault_saved_buffer = nullptr;
 
-			buffer += seprintf(buffer, last, "\nSomething went seriously wrong when attempting to fill the '%s' section of the crash log: signal: %s (%d).\n", section_name, strsignal(signum), signum);
-			buffer += seprintf(buffer, last, "This is probably due to an invalid pointer or other corrupt data.\n\n");
+			buffer = format_to_fixed_z::format_to(buffer, last,
+					"\nSomething went seriously wrong when attempting to fill the '{}' section of the crash log: signal: {} ({}).\n"
+					"This is probably due to an invalid pointer or other corrupt data.\n\n",
+					section_name, strsignal(signum), signum);
 
 			sigset_t sigs;
 			sigemptyset(&sigs);
@@ -719,18 +773,23 @@ class CrashLogUnix : public CrashLog {
 			return buffer;
 		}
 
-		buffer = writer(this, buffer, last);
+		format_to_fixed buf(buffer, last - buffer);
+		writer(this, buf);
+		buffer += buf.size();
+
 		internal_fault_saved_buffer = nullptr;
 		return buffer;
 	}
 
-	/* virtual */ void CrashLogFaultSectionCheckpoint(char *buffer) const override
+	/* virtual */ void CrashLogFaultSectionCheckpoint(format_target &buffer) const override
 	{
-		if (internal_fault_saved_buffer != nullptr && buffer > internal_fault_saved_buffer) {
-			internal_fault_saved_buffer = buffer;
-		}
+		if (internal_fault_saved_buffer == nullptr) return;
 
-		const_cast<CrashLogUnix *>(this)->FlushCrashLogBuffer();
+		char *b = buffer.end();
+		if (b > internal_fault_saved_buffer) {
+			internal_fault_saved_buffer = b;
+			const_cast<CrashLogUnix *>(this)->FlushCrashLogBuffer(b);
+		}
 	}
 #endif /* __GLIBC__ && WITH_SIGACTION */
 
@@ -883,10 +942,6 @@ static void CDECL HandleCrash(int signum)
 #endif
 }
 
-/* static */ void CrashLog::InitThread()
-{
-}
-
 /* static */ void CrashLog::DesyncCrashLog(const std::string *log_in, std::string *log_out, const DesyncExtraInfo &info)
 {
 	CrashLogUnix log(CrashLogUnix::DesyncTag{});
@@ -899,8 +954,8 @@ static void CDECL HandleCrash(int signum)
 	log.MakeInconsistencyLog(info);
 }
 
-/* static */ void CrashLog::VersionInfoLog(char *buffer, const char *last)
+/* static */ void CrashLog::VersionInfoLog(format_target &buffer)
 {
 	CrashLogUnix log(CrashLogUnix::DesyncTag{});
-	log.FillVersionInfoLog(buffer, last);
+	log.FillVersionInfoLog(buffer);
 }

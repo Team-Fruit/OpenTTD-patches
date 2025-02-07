@@ -28,13 +28,15 @@
 #include "scope_info.h"
 #include "newgrf_extension.h"
 #include "newgrf_analysis.h"
+#include "newgrf_dump.h"
+#include "engine_override.h"
 
 #include "safeguards.h"
 
 bool _sprite_group_resolve_check_veh_check = false;
 bool _sprite_group_resolve_check_veh_curvature_check = false;
 
-void SetWagonOverrideSprites(EngineID engine, CargoID cargo, const SpriteGroup *group, EngineID *train_id, uint trains)
+void SetWagonOverrideSprites(EngineID engine, CargoID cargo, const SpriteGroup *group, std::span<EngineID> engine_ids)
 {
 	Engine *e = Engine::Get(engine);
 
@@ -43,7 +45,7 @@ void SetWagonOverrideSprites(EngineID engine, CargoID cargo, const SpriteGroup *
 	WagonOverride *wo = &e->overrides.emplace_back();
 	wo->group = group;
 	wo->cargo = cargo;
-	wo->engines.assign(train_id, train_id + trains);
+	wo->engines.assign(engine_ids.begin(), engine_ids.end());
 }
 
 const SpriteGroup *GetWagonOverrideSpriteSet(EngineID engine, CargoID cargo, EngineID overriding_engine)
@@ -52,18 +54,18 @@ const SpriteGroup *GetWagonOverrideSpriteSet(EngineID engine, CargoID cargo, Eng
 
 	for (const WagonOverride &wo : e->overrides) {
 		if (wo.cargo != cargo && wo.cargo != SpriteGroupCargo::SG_DEFAULT) continue;
-		if (std::find(wo.engines.begin(), wo.engines.end(), overriding_engine) != wo.engines.end()) return wo.group;
+		if (std::ranges::find(wo.engines, overriding_engine) != wo.engines.end()) return wo.group;
 	}
 	return nullptr;
 }
 
-void SetCustomEngineSprites(EngineID engine, byte cargo, const SpriteGroup *group)
+void SetCustomEngineSprites(EngineID engine, uint8_t cargo, const SpriteGroup *group)
 {
 	Engine *e = Engine::Get(engine);
-	assert(cargo < lengthof(e->grf_prop.spritegroup));
+	assert(cargo < std::size(e->grf_prop.spritegroup));
 
 	if (e->grf_prop.spritegroup[cargo] != nullptr) {
-		grfmsg(6, "SetCustomEngineSprites: engine %d cargo %d already has group -- replacing", engine, cargo);
+		GrfMsg(6, "SetCustomEngineSprites: engine {} cargo {} already has group -- replacing", engine, cargo);
 	}
 	e->grf_prop.spritegroup[cargo] = group;
 }
@@ -78,6 +80,7 @@ void SetCustomEngineSprites(EngineID engine, byte cargo, const SpriteGroup *grou
 void SetEngineGRF(EngineID engine, const GRFFile *file)
 {
 	Engine *e = Engine::Get(engine);
+	e->grf_prop.grfid = file->grfid;
 	e->grf_prop.grffile = file;
 }
 
@@ -137,7 +140,7 @@ enum TTDPAircraftMovementStates {
  * Map OTTD aircraft movement states to TTDPatch style movement states
  * (VarAction 2 Variable 0xE2)
  */
-byte MapAircraftMovementState(const Aircraft *v)
+uint8_t MapAircraftMovementState(const Aircraft *v)
 {
 	const Station *st = GetTargetAirportIfValid(v);
 	if (st == nullptr) return AMS_TTDP_FLIGHT_TO_TOWER;
@@ -264,7 +267,7 @@ enum TTDPAircraftMovementActions {
  * (VarAction 2 Variable 0xE6)
  * This is not fully supported yet but it's enough for Planeset.
  */
-static byte MapAircraftMovementAction(const Aircraft *v)
+static uint8_t MapAircraftMovementAction(const Aircraft *v)
 {
 	switch (v->state) {
 		case HANGAR:
@@ -412,8 +415,8 @@ static const Livery *LiveryHelper(EngineID engine, const Vehicle *v)
 static uint32_t PositionHelper(const Vehicle *v, bool consecutive)
 {
 	const Vehicle *u;
-	byte chain_before = 0;
-	byte chain_after  = 0;
+	uint8_t chain_before = 0;
+	uint8_t chain_after  = 0;
 
 	for (u = v->First(); u != v; u = u->Next()) {
 		chain_before++;
@@ -428,7 +431,7 @@ static uint32_t PositionHelper(const Vehicle *v, bool consecutive)
 	return chain_before | chain_after << 8 | (chain_before + chain_after + consecutive) << 16;
 }
 
-static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *object, uint16_t variable, uint32_t parameter, GetVariableExtra *extra)
+static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *object, uint16_t variable, uint32_t parameter, GetVariableExtra &extra)
 {
 	if (_sprite_group_resolve_check_veh_check) {
 		switch (variable) {
@@ -474,7 +477,7 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 				break;
 
 			case 0x80 + 0x32:
-				if (extra->mask & (VS_HIDDEN | VS_TRAIN_SLOWING)) {
+				if (extra.mask & (VS_HIDDEN | VS_TRAIN_SLOWING)) {
 					_sprite_group_resolve_check_veh_check = false;
 				}
 				break;
@@ -505,7 +508,7 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 				switch (v->type) {
 					case VEH_TRAIN:
 					case VEH_SHIP:
-						if (extra->mask & 0x7F) {
+						if (extra.mask & 0x7F) {
 							_sprite_group_resolve_check_veh_check = false;
 						}
 						break;
@@ -561,9 +564,9 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 			return v->grf_cache.position_same_id_length;
 
 		case 0x42: { // Consist cargo information
-			if ((extra->mask & 0x00FFFFFF) == 0) {
+			if ((extra.mask & 0x00FFFFFF) == 0) {
 				if (!HasBit(v->grf_cache.cache_valid, NCVV_CONSIST_CARGO_INFORMATION_UD)) {
-					byte user_def_data = 0;
+					uint8_t user_def_data = 0;
 					if (v->type == VEH_TRAIN) {
 						for (const Vehicle *u = v; u != nullptr; u = u->Next()) {
 							user_def_data |= Train::From(u)->tcache.user_def_data;
@@ -576,8 +579,8 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 			}
 			if (!HasBit(v->grf_cache.cache_valid, NCVV_CONSIST_CARGO_INFORMATION)) {
 				std::array<uint8_t, NUM_CARGO> common_cargoes{};
-				byte cargo_classes = 0;
-				byte user_def_data = 0;
+				uint8_t cargo_classes = 0;
+				uint8_t user_def_data = 0;
 
 				for (const Vehicle *u = v; u != nullptr; u = u->Next()) {
 					if (v->type == VEH_TRAIN) user_def_data |= Train::From(u)->tcache.user_def_data;
@@ -647,7 +650,7 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 				const Vehicle *w = v->Next();
 				assert(w != nullptr);
 				uint16_t altitude = ClampTo<uint16_t>(v->z_pos - w->z_pos); // Aircraft height - shadow height
-				byte airporttype = ATP_TTDP_LARGE;
+				uint8_t airporttype = ATP_TTDP_LARGE;
 
 				const Station *st = GetTargetAirportIfValid(Aircraft::From(v));
 
@@ -680,7 +683,7 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 		}
 
 		case 0x46: // Motion counter
-			return v->motion_counter;
+			return v->First()->motion_counter;
 
 		case 0x47: { // Vehicle cargo info
 			/* Format: ccccwwtt
@@ -737,9 +740,9 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 
 		case 0x4D: // Position within articulated vehicle
 			if (!HasBit(v->grf_cache.cache_valid, NCVV_POSITION_IN_VEHICLE)) {
-				byte artic_before = 0;
+				uint8_t artic_before = 0;
 				for (const Vehicle *u = v; u->IsArticulatedPart(); u = u->Previous()) artic_before++;
-				byte artic_after = 0;
+				uint8_t artic_after = 0;
 				for (const Vehicle *u = v; u->HasArticulatedPart(); u = u->Next()) artic_after++;
 				v->grf_cache.position_in_vehicle = artic_before | artic_after << 8;
 				SetBit(v->grf_cache.cache_valid, NCVV_POSITION_IN_VEHICLE);
@@ -826,7 +829,12 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 				case VEH_TRAIN: {
 					RailType param_type = GetRailTypeTranslation(parameter, object->ro.grffile);
 					if (param_type == INVALID_RAILTYPE) return 0x00;
-					RailType tile_type = GetTileRailTypeByTrackBit(v->tile, Train::From(v)->track);
+					RailType tile_type;
+					if (Train::From(v)->IsVirtual()) {
+						tile_type = Train::From(v)->railtype;
+					} else {
+						tile_type = GetTileRailTypeByTrackBit(v->tile, Train::From(v)->track);
+					}
 					if (tile_type == param_type) return 0x0F;
 					return (HasPowerOnRail(param_type, tile_type) ? 0x04 : 0x00) |
 							(IsCompatibleRail(param_type, tile_type) ? 0x02 : 0x00) |
@@ -1093,13 +1101,13 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 		default: break;
 	}
 
-	DEBUG(grf, 1, "Unhandled vehicle variable 0x%X, type 0x%X", variable, (uint)v->type);
+	Debug(grf, 1, "Unhandled vehicle variable 0x{:X}, type 0x{:X}", variable, (uint)v->type);
 
-	extra->available = false;
+	extra.available = false;
 	return UINT_MAX;
 }
 
-/* virtual */ uint32_t VehicleScopeResolver::GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra *extra) const
+/* virtual */ uint32_t VehicleScopeResolver::GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra &extra) const
 {
 	if (this->v == nullptr) {
 		/* Vehicle does not exist, so we're in a purchase list */
@@ -1128,7 +1136,7 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 			case 0xF2: return 0; // Cargo subtype
 		}
 
-		extra->available = false;
+		extra.available = false;
 		return UINT_MAX;
 	}
 
@@ -1232,7 +1240,7 @@ VehicleResolverObject::VehicleResolverObject(EngineID engine_type, const Vehicle
 		if (this->root_spritegroup == nullptr) {
 			const Engine *e = Engine::Get(engine_type);
 			CargoID cargo = v != nullptr ? v->cargo_type : SpriteGroupCargo::SG_PURCHASE;
-			assert(cargo < lengthof(e->grf_prop.spritegroup));
+			assert(cargo < std::size(e->grf_prop.spritegroup));
 			this->root_spritegroup = e->grf_prop.spritegroup[cargo] != nullptr ? e->grf_prop.spritegroup[cargo] : e->grf_prop.spritegroup[SpriteGroupCargo::SG_DEFAULT];
 		}
 	}
@@ -1380,7 +1388,7 @@ int GetEngineProperty(EngineID engine, PropertyID property, int orig_value, cons
  */
 bool TestVehicleBuildProbability(Vehicle *v, EngineID engine, BuildProbabilityType type)
 {
-	uint16_t p = GetVehicleCallback(CBID_VEHICLE_BUILD_PROBABILITY, std::underlying_type<BuildProbabilityType>::type(type), 0, engine, v);
+	uint16_t p = GetVehicleCallback(CBID_VEHICLE_BUILD_PROBABILITY, to_underlying(type), 0, engine, v);
 	if (p == CALLBACK_FAILED) return false;
 
 	const uint16_t PROBABILITY_RANGE = 100;
@@ -1413,7 +1421,7 @@ static void DoTriggerVehicle(Vehicle *v, VehicleTrigger trigger, uint16_t base_r
 	}
 
 	/* Rerandomise bits. Scopes other than SELF are invalid for rerandomisation. For bug-to-bug-compatibility with TTDP we ignore the scope. */
-	byte new_random_bits = Random();
+	uint8_t new_random_bits = Random();
 	v->random_bits &= ~reseed;
 	v->random_bits |= (first ? new_random_bits : base_random_bits) & reseed;
 
@@ -1476,8 +1484,10 @@ void TriggerVehicle(Vehicle *v, VehicleTrigger trigger)
 /* Functions for changing the order of vehicle purchase lists */
 
 struct ListOrderChange {
-	EngineID engine;
-	uint target;      ///< local ID
+	EngineID engine; ///< Engine ID
+	uint16_t target; ///< GRF-local ID
+
+	ListOrderChange(EngineID engine, uint16_t target) : engine(engine), target(target) {}
 };
 
 static std::vector<ListOrderChange> _list_order_changes;
@@ -1488,10 +1498,10 @@ static std::vector<ListOrderChange> _list_order_changes;
  * @param target Local engine ID to move \a engine in front of
  * @note All sorting is done later in CommitVehicleListOrderChanges
  */
-void AlterVehicleListOrder(EngineID engine, uint target)
+void AlterVehicleListOrder(EngineID engine, uint16_t target)
 {
 	/* Add the list order change to a queue */
-	_list_order_changes.push_back({engine, target});
+	_list_order_changes.emplace_back(engine, target);
 }
 
 /**
@@ -1502,8 +1512,8 @@ void AlterVehicleListOrder(EngineID engine, uint target)
  */
 static bool EnginePreSort(const EngineID &a, const EngineID &b)
 {
-	const EngineIDMapping &id_a = _engine_mngr.at(a);
-	const EngineIDMapping &id_b = _engine_mngr.at(b);
+	const EngineIDMapping &id_a = _engine_mngr.mappings.at(a);
+	const EngineIDMapping &id_b = _engine_mngr.mappings.at(b);
 
 	/* 1. Sort by engine type */
 	if (id_a.type != id_b.type) return (int)id_a.type < (int)id_b.type;
@@ -1520,44 +1530,35 @@ static bool EnginePreSort(const EngineID &a, const EngineID &b)
  */
 void CommitVehicleListOrderChanges()
 {
+	/* Build a list of EngineIDs. EngineIDs are sequential from 0 up to the number of pool items with no gaps. */
+	std::vector<EngineID> ordering(Engine::GetNumItems());
+	std::iota(std::begin(ordering), std::end(ordering), 0);
+
 	/* Pre-sort engines by scope-grfid and local index */
-	std::vector<EngineID> ordering;
-	for (const Engine *e : Engine::Iterate()) {
-		ordering.push_back(e->index);
-	}
-	std::sort(ordering.begin(), ordering.end(), EnginePreSort);
+	std::ranges::sort(ordering, EnginePreSort);
 
 	/* Apply Insertion-Sort operations */
-	for (const ListOrderChange &it : _list_order_changes) {
-		EngineID source = it.engine;
-		uint local_target = it.target;
+	for (const ListOrderChange &loc : _list_order_changes) {
+		EngineID source = loc.engine;
 
-		const EngineIDMapping *id_source = _engine_mngr.data() + source;
-		if (id_source->internal_id == local_target) continue;
+		const EngineIDMapping &id_source = _engine_mngr.mappings[source];
+		if (id_source.internal_id == loc.target) continue;
 
-		EngineID target = _engine_mngr.GetID(id_source->type, local_target, id_source->grfid);
+		EngineID target = _engine_mngr.GetID(id_source.type, loc.target, id_source.grfid);
 		if (target == INVALID_ENGINE) continue;
 
-		int source_index = find_index(ordering, source);
-		int target_index = find_index(ordering, target);
+		auto it_source = std::ranges::find(ordering, source);
+		auto it_target = std::ranges::find(ordering, target);
 
-		assert(source_index >= 0 && target_index >= 0);
-		assert(source_index != target_index);
+		assert(it_source != std::end(ordering) && it_target != std::end(ordering));
+		assert(it_source != it_target);
 
-		EngineID *list = ordering.data();
-		if (source_index < target_index) {
-			--target_index;
-			for (int i = source_index; i < target_index; ++i) list[i] = list[i + 1];
-			list[target_index] = source;
-		} else {
-			for (int i = source_index; i > target_index; --i) list[i] = list[i - 1];
-			list[target_index] = source;
-		}
+		/* Move just this item to before the target. */
+		Slide(it_source, std::next(it_source), it_target);
 	}
 
 	/* Store final sort-order */
-	uint index = 0;
-	for (const EngineID &eid : ordering) {
+	for (uint16_t index = 0; const EngineID &eid : ordering) {
 		Engine::Get(eid)->list_position = index;
 		++index;
 	}
@@ -1589,11 +1590,11 @@ void FillNewGRFVehicleCache(const Vehicle *v)
 	static_assert(NCVV_END == lengthof(cache_entries) + lengthof(partial_cache_entries));
 
 	/* Resolve all the variables, so their caches are set. */
-	for (size_t i = 0; i < lengthof(cache_entries); i++) {
+	for (const auto &cache_entry : cache_entries) {
 		/* Only resolve when the cache isn't valid. */
-		if (HasBit(v->grf_cache.cache_valid, cache_entries[i][1])) continue;
+		if (HasBit(v->grf_cache.cache_valid, cache_entry[1])) continue;
 		GetVariableExtra extra;
-		ro.GetScope(VSG_SCOPE_SELF)->GetVariable(cache_entries[i][0], 0, &extra);
+		ro.GetScope(VSG_SCOPE_SELF)->GetVariable(cache_entry[0], 0, extra);
 	}
 
 	/* Make sure really all bits are set. */
@@ -1617,11 +1618,11 @@ void AnalyseEngineCallbacks()
 		auto process_sg = [&](const SpriteGroup *sg, bool is_purchase) {
 			if (sg == nullptr) return;
 
-			AnalyseCallbackOperation op(ACOM_CB_VAR);
-			sg->AnalyseCallbacks(op);
+			CallbackOperationAnalyser op(ACOM_CB_VAR);
+			op.AnalyseGroup(sg);
 			callbacks_used |= op.callbacks_used;
-			cb36_properties_used |= op.properties_used;
-			sg_cb36[sg] = op.properties_used;
+			cb36_properties_used |= op.cb36_properties_used;
+			sg_cb36[sg] = op.cb36_properties_used;
 			if ((op.result_flags & ACORF_CB_REFIT_CAP_NON_WHITELIST_FOUND) && !is_purchase) refit_cap_whitelist_ok = false;
 			if ((op.result_flags & ACORF_CB_REFIT_CAP_SEEN_VAR_47) && !is_purchase) refit_cap_no_var_47 = false;
 			if (!is_purchase) non_purchase_groups++;
@@ -1672,29 +1673,26 @@ void AnalyseEngineCallbacks()
 
 void DumpVehicleSpriteGroup(const Vehicle *v, SpriteGroupDumper &dumper)
 {
-	char buffer[512];
 	const Engine *e = Engine::Get(v->engine_type);
 	const SpriteGroup *root_spritegroup = nullptr;
 
 	if (v->IsGroundVehicle()) {
 		root_spritegroup = GetWagonOverrideSpriteSet(v->engine_type, v->cargo_type, v->GetGroundVehicleCache()->first_engine);
 		if (root_spritegroup != nullptr) {
-			seprintf(buffer, lastof(buffer), "Wagon Override for cargo: %u, engine type: %u", v->cargo_type, v->GetGroundVehicleCache()->first_engine);
-			dumper.Print(buffer);
+			dumper.Print(fmt::format("Wagon Override for cargo: {}, engine type: {}", v->cargo_type, v->GetGroundVehicleCache()->first_engine));
 		}
 	}
 
 	if (root_spritegroup == nullptr) {
 		CargoID cargo = v->cargo_type;
-		assert(cargo < lengthof(e->grf_prop.spritegroup));
+		assert(cargo < std::size(e->grf_prop.spritegroup));
 		if (e->grf_prop.spritegroup[cargo] != nullptr) {
 			root_spritegroup = e->grf_prop.spritegroup[cargo];
-			seprintf(buffer, lastof(buffer), "Cargo: %u", cargo);
+			dumper.Print(fmt::format("Cargo: {}", cargo));
 		} else {
 			root_spritegroup = e->grf_prop.spritegroup[SpriteGroupCargo::SG_DEFAULT];
-			seprintf(buffer, lastof(buffer), "SG_DEFAULT");
+			dumper.Print("SG_DEFAULT");
 		}
-		dumper.Print(buffer);
 	}
 
 	dumper.DumpSpriteGroup(root_spritegroup, 0);
@@ -1704,16 +1702,15 @@ void DumpVehicleSpriteGroup(const Vehicle *v, SpriteGroupDumper &dumper)
 			dumper.Print("");
 			switch (i) {
 				case SpriteGroupCargo::SG_DEFAULT:
-					seprintf(buffer, lastof(buffer), "OTHER SPRITE GROUP: SG_DEFAULT");
+					dumper.Print("OTHER SPRITE GROUP: SG_DEFAULT");
 					break;
 				case SpriteGroupCargo::SG_PURCHASE:
-					seprintf(buffer, lastof(buffer), "OTHER SPRITE GROUP: SG_PURCHASE");
+					dumper.Print("OTHER SPRITE GROUP: SG_PURCHASE");
 					break;
 				default:
-					seprintf(buffer, lastof(buffer), "OTHER SPRITE GROUP: Cargo: %u", i);
+					dumper.Print(fmt::format("OTHER SPRITE GROUP: Cargo: {}", i));
 					break;
 			}
-			dumper.Print(buffer);
 			dumper.DumpSpriteGroup(e->grf_prop.spritegroup[i], 0);
 		}
 	}

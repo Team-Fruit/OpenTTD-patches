@@ -11,7 +11,7 @@
 #define THREAD_H
 
 #include "debug.h"
-#include "crashlog.h"
+#include "error_func.h"
 #include <system_error>
 #include <thread>
 #include <mutex>
@@ -33,11 +33,9 @@ void SetCurrentThreadName(const char *name);
 
 /**
  * Get the name of the current thread, if any.
- * @param str The start of the buffer.
- * @param last The last char of the buffer.
- * @return Number of chars written to str.
+ * @param buffer The output buffer.
  */
-int GetCurrentThreadName(char *str, const char *last);
+void GetCurrentThreadName(struct format_target &buffer);
 
 /**
  * Set the current thread as the "main" thread
@@ -52,7 +50,7 @@ void SetSelfAsGameThread();
 /**
  * Perform per-thread setup
  */
-void PerThreadSetup();
+void PerThreadSetup(bool non_main_thread);
 
 /**
  * Setup thread functionality required for later calls to PerThreadSetup
@@ -106,13 +104,12 @@ inline bool StartNewThread(std::thread *thr, const char *name, TFn&& _Fx, TArgs&
 				}
 
 				SetCurrentThreadName(name);
-				PerThreadSetup();
-				CrashLog::InitThread();
+				PerThreadSetup(true);
 				try {
 					/* Call user function with the given arguments. */
 					F(A...);
 				} catch (std::exception &e) {
-					error("Unhandled exception in %s thread: %s", name, e.what());
+					FatalError("Unhandled exception in {} thread: {}", name, e.what());
 				} catch (...) {
 					NOT_REACHED();
 				}
@@ -127,7 +124,7 @@ inline bool StartNewThread(std::thread *thr, const char *name, TFn&& _Fx, TArgs&
 		return true;
 	} catch (const std::system_error &e) {
 		/* Something went wrong, the system we are running on might not support threads. */
-		DEBUG(misc, 1, "Can't create thread '%s': %s", name, e.what());
+		Debug(misc, 1, "Can't create thread '{}': {}", name, e.what());
 	}
 
 	return false;

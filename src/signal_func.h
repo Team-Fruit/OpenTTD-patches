@@ -15,7 +15,6 @@
 #include "tile_type.h"
 #include "direction_type.h"
 #include "company_type.h"
-#include "debug.h"
 #include "settings_type.h"
 #include "vehicle_type.h"
 
@@ -31,10 +30,12 @@ struct SignalStyleMasks {
 	uint16_t non_aspect_inc = 0;
 	uint16_t next_only = 0;
 	uint16_t always_reserve_through = 0;
-	uint16_t no_tunnel_bridge = 0;
+	uint16_t no_tunnel_bridge_entrance = 0;
+	uint16_t no_tunnel_bridge_exit = 0;
 	uint16_t signal_opposite_side = 0;
 	uint16_t signal_both_sides = 0;
 	uint16_t combined_normal_shunt = 0;
+	uint16_t no_auto_green = 0;
 };
 extern SignalStyleMasks _signal_style_masks;
 
@@ -44,9 +45,9 @@ extern bool _signal_sprite_oversized;
  * Maps a trackdir to the bit that stores its status in the map arrays, in the
  * direction along with the trackdir.
  */
-inline byte SignalAlongTrackdir(Trackdir trackdir)
+inline uint8_t SignalAlongTrackdir(Trackdir trackdir)
 {
-	extern const byte _signal_along_trackdir[TRACKDIR_END];
+	extern const uint8_t _signal_along_trackdir[TRACKDIR_END];
 	return _signal_along_trackdir[trackdir];
 }
 
@@ -54,9 +55,9 @@ inline byte SignalAlongTrackdir(Trackdir trackdir)
  * Maps a trackdir to the bit that stores its status in the map arrays, in the
  * direction against the trackdir.
  */
-inline byte SignalAgainstTrackdir(Trackdir trackdir)
+inline uint8_t SignalAgainstTrackdir(Trackdir trackdir)
 {
-	extern const byte _signal_against_trackdir[TRACKDIR_END];
+	extern const uint8_t _signal_against_trackdir[TRACKDIR_END];
 	return _signal_against_trackdir[trackdir];
 }
 
@@ -64,9 +65,9 @@ inline byte SignalAgainstTrackdir(Trackdir trackdir)
  * Maps a Track to the bits that store the status of the two signals that can
  * be present on the given track.
  */
-inline byte SignalOnTrack(Track track)
+inline uint8_t SignalOnTrack(Track track)
 {
-	extern const byte _signal_on_track[TRACK_END];
+	extern const uint8_t _signal_on_track[TRACK_END];
 	return _signal_on_track[track];
 }
 
@@ -173,7 +174,8 @@ uint8_t GetForwardAspectFollowingTrack(TileIndex tile, Trackdir trackdir);
 uint8_t GetSignalAspectGeneric(TileIndex tile, Trackdir trackdir, bool check_non_inc_style);
 void PropagateAspectChange(TileIndex tile, Trackdir trackdir, uint8_t aspect);
 void UpdateAspectDeferred(TileIndex tile, Trackdir trackdir);
-void UpdateAspectDeferredWithVehicle(const Train *v, TileIndex tile, Trackdir trackdir, bool check_combined_normal_aspect);
+void UpdateAspectDeferredWithVehicleRail(const Train *v, TileIndex tile, Trackdir trackdir);
+void UpdateAspectDeferredWithVehicleTunnelBridgeExit(const Train *v, TileIndex tile, Trackdir trackdir);
 void UpdateLookaheadCombinedNormalShuntSignalDeferred(TileIndex tile, Trackdir trackdir, int lookahead_position);
 void FlushDeferredAspectUpdates();
 void FlushDeferredDetermineCombineNormalShuntMode(Train *v);
@@ -181,6 +183,7 @@ void UpdateAllSignalAspects();
 void UpdateExtraAspectsVariable(bool update_always_reserve_through = false);
 void InitialiseExtraAspectsVariable();
 bool IsRailSpecialSignalAspect(TileIndex tile, Track track);
+bool IsTunnelBridgeSpecialExitSignalAspect(TileIndex tile);
 
 inline void AdjustSignalAspectIfNonIncStyle(TileIndex tile, Track track, uint8_t &aspect)
 {
@@ -202,5 +205,10 @@ inline uint8_t GetForwardAspectFollowingTrackAndIncrement(TileIndex tile, Trackd
 
 void UpdateSignalReserveThroughBit(TileIndex tile, Track track, bool update_signal);
 void UpdateAllSignalReserveThroughBits();
+void UpdateSignalSpecialPropagationFlag(TileIndex tile, Track track, const struct TraceRestrictProgram *prog, bool update_signal);
+void UpdateRailSignalSpecialPropagationFlag(TileIndex tile, Track track, const struct TraceRestrictProgram *prog, bool update_signal);
+void UpdateTunnelBridgeSignalSpecialPropagationFlag(TileIndex tile, bool update_signal);
+void UpdateTunnelBridgeSignalSpecialPropagationFlag(TileIndex tile, Track track, const TraceRestrictProgram *prog, bool update_signal);
+void UpdateAllSignalsSpecialPropagationFlag();
 
 #endif /* SIGNAL_FUNC_H */

@@ -48,13 +48,13 @@
  */
 struct IntroGameViewportCommand {
 	/** Horizontal alignment value. */
-	enum AlignmentH : byte {
+	enum AlignmentH : uint8_t {
 		LEFT,
 		CENTRE,
 		RIGHT,
 	};
 	/** Vertical alignment value. */
-	enum AlignmentV : byte {
+	enum AlignmentV : uint8_t {
 		TOP,
 		MIDDLE,
 		BOTTOM,
@@ -176,7 +176,7 @@ struct SelectGameWindow : public Window {
 		}
 	}
 
-	SelectGameWindow(WindowDesc *desc) : Window(desc)
+	SelectGameWindow(WindowDesc &desc) : Window(desc)
 	{
 		this->CreateNestedTree();
 		this->FinishInitNested(0);
@@ -184,7 +184,7 @@ struct SelectGameWindow : public Window {
 
 		this->ReadIntroGameViewportCommands();
 
-		this->cur_viewport_command_index = (size_t)-1;
+		this->cur_viewport_command_index = SIZE_MAX;
 		this->cur_viewport_command_time = 0;
 		this->mouse_idle_time = 0;
 		this->mouse_idle_pos = _cursor.pos;
@@ -298,13 +298,13 @@ struct SelectGameWindow : public Window {
 		}
 	}
 
-	void UpdateWidgetSize(WidgetID widget, Dimension *size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension *fill, [[maybe_unused]] Dimension *resize) override
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
 	{
 		switch (widget) {
 			case WID_SGI_TEMPERATE_LANDSCAPE: case WID_SGI_ARCTIC_LANDSCAPE:
 			case WID_SGI_TROPIC_LANDSCAPE: case WID_SGI_TOYLAND_LANDSCAPE:
-				size->width += WidgetDimensions::scaled.fullbevel.Horizontal();
-				size->height += WidgetDimensions::scaled.fullbevel.Vertical();
+				size.width += WidgetDimensions::scaled.fullbevel.Horizontal();
+				size.height += WidgetDimensions::scaled.fullbevel.Vertical();
 				break;
 		}
 	}
@@ -413,13 +413,13 @@ static constexpr NWidgetPart _nested_select_game_widgets[] = {
 
 			NWidget(NWID_SELECTION, INVALID_COLOUR, WID_SGI_BASESET_SELECTION),
 				NWidget(NWID_VERTICAL),
-					NWidget(WWT_EMPTY, COLOUR_ORANGE, WID_SGI_BASESET), SetFill(1, 0),
+					NWidget(WWT_EMPTY, INVALID_COLOUR, WID_SGI_BASESET), SetFill(1, 0),
 				EndContainer(),
 			EndContainer(),
 
 			NWidget(NWID_SELECTION, INVALID_COLOUR, WID_SGI_TRANSLATION_SELECTION),
 				NWidget(NWID_VERTICAL),
-					NWidget(WWT_EMPTY, COLOUR_ORANGE, WID_SGI_TRANSLATION), SetFill(1, 0),
+					NWidget(WWT_EMPTY, INVALID_COLOUR, WID_SGI_TRANSLATION), SetFill(1, 0),
 				EndContainer(),
 			EndContainer(),
 
@@ -461,12 +461,12 @@ static WindowDesc _select_game_desc(__FILE__, __LINE__,
 	WDP_CENTER, nullptr, 0, 0,
 	WC_SELECT_GAME, WC_NONE,
 	WDF_NO_CLOSE,
-	std::begin(_nested_select_game_widgets), std::end(_nested_select_game_widgets)
+	_nested_select_game_widgets
 );
 
 void ShowSelectGameWindow()
 {
-	new SelectGameWindow(&_select_game_desc);
+	new SelectGameWindow(_select_game_desc);
 }
 
 static void AskExitGameCallback(Window *, bool confirmed)

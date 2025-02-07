@@ -32,7 +32,7 @@ static const uint MAX_STATION_CARGO_HISTORY_DAYS = 24;
 typedef SmallStack<StationID, StationID, INVALID_STATION, 8, 0xFFFD> StationIDStack;
 
 /** Station types */
-enum StationType {
+enum StationType : uint8_t {
 	STATION_RAIL,
 	STATION_AIRPORT,
 	STATION_TRUCK,
@@ -42,16 +42,17 @@ enum StationType {
 	STATION_BUOY,
 	STATION_WAYPOINT,
 	STATION_ROADWAYPOINT,
+	STATION_END,
 };
 
 /** Types of RoadStops */
-enum RoadStopType {
+enum RoadStopType : uint8_t {
 	ROADSTOP_BUS,    ///< A standard stop for buses
 	ROADSTOP_TRUCK,  ///< A standard stop for trucks
 };
 
 /** The facilities a station might be having */
-enum StationFacility : byte {
+enum StationFacility : uint8_t {
 	FACIL_NONE       = 0,      ///< The station has no facilities at all
 	FACIL_TRAIN      = 1 << 0, ///< Station with train station
 	FACIL_TRUCK_STOP = 1 << 1, ///< Station with truck stops
@@ -63,7 +64,7 @@ enum StationFacility : byte {
 DECLARE_ENUM_AS_BIT_SET(StationFacility)
 
 /** The vehicles that may have visited a station */
-enum StationHadVehicleOfType : byte {
+enum StationHadVehicleOfType : uint8_t {
 	HVOT_NONE     = 0,      ///< Station has seen no vehicles
 	HVOT_TRAIN    = 1 << 1, ///< Station has seen a train
 	HVOT_BUS      = 1 << 2, ///< Station has seen a bus
@@ -75,20 +76,18 @@ enum StationHadVehicleOfType : byte {
 };
 DECLARE_ENUM_AS_BIT_SET(StationHadVehicleOfType)
 
-/** The different catchment areas used */
-enum CatchmentArea {
-	CA_NONE            =  0, ///< Catchment when the station has no facilities
-	CA_BUS             =  3, ///< Catchment for bus stops with "modified catchment" enabled
-	CA_TRUCK           =  3, ///< Catchment for truck stops with "modified catchment" enabled
-	CA_TRAIN           =  4, ///< Catchment for train stations with "modified catchment" enabled
-	CA_DOCK            =  5, ///< Catchment for docks with "modified catchment" enabled
+/* The different catchment area sizes. */
+static constexpr uint CA_NONE = 0; ///< Catchment when the station has no facilities
+static constexpr uint CA_BUS = 3; ///< Catchment for bus stops with "modified catchment" enabled
+static constexpr uint CA_TRUCK = 3; ///< Catchment for truck stops with "modified catchment" enabled
+static constexpr uint CA_TRAIN = 4; ///< Catchment for train stations with "modified catchment" enabled
+static constexpr uint CA_DOCK = 5; ///< Catchment for docks with "modified catchment" enabled
 
-	CA_UNMODIFIED      =  4, ///< Catchment for all stations with "modified catchment" disabled
+static constexpr uint CA_UNMODIFIED = 4; ///< Catchment for all stations with "modified catchment" disabled
 
-	MAX_CATCHMENT      = 10, ///< Maximum catchment for airports with "modified catchment" enabled
-};
+static constexpr uint MAX_CATCHMENT = 10; ///< Maximum catchment for airports with "modified catchment" enabled
 
-enum StationDelivery : byte {
+enum StationDelivery : uint8_t {
 	SD_NEAREST_FIRST = 0, ///< Station delivers cargo only to the nearest accepting industry
 	SD_BALANCED      = 1  ///< Station delivers cargo equally among accepting industries
 };
@@ -114,7 +113,7 @@ public:
 	 * @param area the area to search from
 	 */
 	StationFinder(const TileArea &area) : TileArea(area) {}
-	const StationList *GetStations();
+	const StationList &GetStations();
 };
 
 #endif /* STATION_TYPE_H */

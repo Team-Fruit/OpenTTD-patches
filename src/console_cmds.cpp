@@ -9,6 +9,7 @@
 
 #include "stdafx.h"
 #include "console_internal.h"
+#include "crashlog.h"
 #include "debug.h"
 #include "engine_func.h"
 #include "landscape.h"
@@ -32,6 +33,8 @@
 #include "viewport_func.h"
 #include "window_func.h"
 #include "date_func.h"
+#include "timer/timer.h"
+#include "timer/timer_game_calendar.h"
 #include "company_func.h"
 #include "gamelog.h"
 #include "ai/ai.hpp"
@@ -40,6 +43,7 @@
 #include "newgrf_profiling.h"
 #include "console_func.h"
 #include "engine_base.h"
+#include "engine_override.h"
 #include "road.h"
 #include "rail.h"
 #include "game/game.hpp"
@@ -65,6 +69,8 @@
 #include "object_base.h"
 #include "newgrf_newsignals.h"
 #include "roadstop_base.h"
+#include "core/backup_type.hpp"
+#include "3rdparty/fmt/chrono.h"
 #include <time.h>
 
 #include "3rdparty/cpp-btree/btree_set.h"
@@ -75,6 +81,24 @@
 
 /* scriptfile handling */
 static uint _script_current_depth; ///< Depth of scripts running (used to abort execution when #ConReturn is encountered).
+
+/* Scheduled execution handling. */
+static std::string _scheduled_monthly_script; ///< Script scheduled to execute by the 'schedule' console command (empty if no script is scheduled).
+
+/** Timer that runs every month of game time for the 'schedule' console command. */
+static IntervalTimer<TimerGameCalendar> _scheduled_monthly_timer = {{TimerGameCalendar::MONTH, TimerGameCalendar::Priority::NONE}, [](auto) {
+	if (_scheduled_monthly_script.empty()) {
+		return;
+	}
+
+	/* Clear the schedule before rather than after the script to allow the script to itself call
+	 * schedule without it getting immediately cleared. */
+	const std::string filename = _scheduled_monthly_script;
+	_scheduled_monthly_script.clear();
+
+	IConsolePrint(CC_DEFAULT, "Executing scheduled script file '{}'...", filename);
+	IConsoleCmdExec(std::string("exec") + " " + filename);
+}};
 
 /** File list storage for the console, for caching the last 'ls' command. */
 class ConsoleFileList : public FileList {
@@ -112,8 +136,9 @@ static ConsoleFileList _console_file_list_scenario{FT_SCENARIO, false}; ///< Fil
 static ConsoleFileList _console_file_list_heightmap{FT_HEIGHTMAP, false}; ///< File storage cache for heightmaps.
 
 /* console command defines */
-#define DEF_CONSOLE_CMD(function) static bool function([[maybe_unused]] byte argc, [[maybe_unused]] char *argv[])
+#define DEF_CONSOLE_CMD(function) static bool function([[maybe_unused]] uint8_t argc, [[maybe_unused]] char *argv[])
 #define DEF_CONSOLE_HOOK(function) static ConsoleHookResult function(bool echo)
+
 
 /****************
  * command hooks
@@ -126,7 +151,7 @@ static ConsoleFileList _console_file_list_heightmap{FT_HEIGHTMAP, false}; ///< F
 static inline bool NetworkAvailable(bool echo)
 {
 	if (!_network_available) {
-		if (echo) IConsoleError("You cannot use this command because there is no network available.");
+		if (echo) IConsolePrint(CC_ERROR, "You cannot use this command because there is no network available.");
 		return false;
 	}
 	return true;
@@ -141,7 +166,7 @@ DEF_CONSOLE_HOOK(ConHookServerOnly)
 	if (!NetworkAvailable(echo)) return CHR_DISALLOW;
 
 	if (!_network_server) {
-		if (echo) IConsoleError("This command is only available to a network server.");
+		if (echo) IConsolePrint(CC_ERROR, "This command is only available to a network server.");
 		return CHR_DISALLOW;
 	}
 	return CHR_ALLOW;
@@ -156,7 +181,7 @@ DEF_CONSOLE_HOOK(ConHookClientOnly)
 	if (!NetworkAvailable(echo)) return CHR_DISALLOW;
 
 	if (_network_server) {
-		if (echo) IConsoleError("This command is not available to a network server.");
+		if (echo) IConsolePrint(CC_ERROR, "This command is not available to a network server.");
 		return CHR_DISALLOW;
 	}
 	return CHR_ALLOW;
@@ -171,7 +196,7 @@ DEF_CONSOLE_HOOK(ConHookNeedNetwork)
 	if (!NetworkAvailable(echo)) return CHR_DISALLOW;
 
 	if (!_networking || (!_network_server && !MyClient::IsConnected())) {
-		if (echo) IConsoleError("Not connected. This command is only available in multiplayer.");
+		if (echo) IConsolePrint(CC_ERROR, "Not connected. This command is only available in multiplayer.");
 		return CHR_DISALLOW;
 	}
 	return CHR_ALLOW;
@@ -199,7 +224,7 @@ DEF_CONSOLE_HOOK(ConHookNeedNonDedicatedNetwork)
 DEF_CONSOLE_HOOK(ConHookNoNetwork)
 {
 	if (_networking) {
-		if (echo) IConsoleError("This command is forbidden in multiplayer.");
+		if (echo) IConsolePrint(CC_ERROR, "This command is forbidden in multiplayer.");
 		return CHR_DISALLOW;
 	}
 	return CHR_ALLOW;
@@ -212,7 +237,7 @@ DEF_CONSOLE_HOOK(ConHookNoNetwork)
 DEF_CONSOLE_HOOK(ConHookServerOrNoNetwork)
 {
 	if (_networking && !_network_server) {
-		if (echo) IConsoleError("This command is only available to a network server, or in single-player.");
+		if (echo) IConsolePrint(CC_ERROR, "This command is only available to a network server, or in single-player.");
 		return CHR_DISALLOW;
 	}
 	return CHR_ALLOW;
@@ -222,7 +247,7 @@ DEF_CONSOLE_HOOK(ConHookNewGRFDeveloperTool)
 {
 	if (_settings_client.gui.newgrf_developer_tools) {
 		if (_game_mode == GM_MENU) {
-			if (echo) IConsoleError("This command is only available in-game and in the editor.");
+			if (echo) IConsolePrint(CC_ERROR, "This command is only available in-game and in the editor.");
 			return CHR_DISALLOW;
 		}
 		return ConHookNoNetwork(echo);
@@ -239,22 +264,13 @@ DEF_CONSOLE_HOOK(ConHookSpecialCmd)
 }
 
 /**
- * Show help for the console.
- * @param str String to print in the console.
- */
-static void IConsoleHelp(const char *str)
-{
-	IConsolePrintF(CC_WARNING, "- %s", str);
-}
-
-/**
  * Reset status of all engines.
  * @return Will always succeed.
  */
 DEF_CONSOLE_CMD(ConResetEngines)
 {
 	if (argc == 0) {
-		IConsoleHelp("Reset status data of all engines. This might solve some issues with 'lost' engines. Usage: 'resetengines'");
+		IConsolePrint(CC_HELP, "Reset status data of all engines. This might solve some issues with 'lost' engines. Usage: 'resetengines'.");
 		return true;
 	}
 
@@ -270,17 +286,17 @@ DEF_CONSOLE_CMD(ConResetEngines)
 DEF_CONSOLE_CMD(ConResetEnginePool)
 {
 	if (argc == 0) {
-		IConsoleHelp("Reset NewGRF allocations of engine slots. This will remove invalid engine definitions, and might make default engines available again.");
+		IConsolePrint(CC_HELP, "Reset NewGRF allocations of engine slots. This will remove invalid engine definitions, and might make default engines available again.");
 		return true;
 	}
 
 	if (_game_mode == GM_MENU) {
-		IConsoleError("This command is only available in-game and in the editor.");
+		IConsolePrint(CC_ERROR, "This command is only available in-game and in the editor.");
 		return true;
 	}
 
 	if (!EngineOverrideManager::ResetToCurrentNewGRFConfig()) {
-		IConsoleError("This can only be done when there are no vehicles in the game.");
+		IConsolePrint(CC_ERROR, "This can only be done when there are no vehicles in the game.");
 		return true;
 	}
 
@@ -296,8 +312,8 @@ DEF_CONSOLE_CMD(ConResetEnginePool)
 DEF_CONSOLE_CMD(ConResetTile)
 {
 	if (argc == 0) {
-		IConsoleHelp("Reset a tile to bare land. Usage: 'resettile <tile>'");
-		IConsoleHelp("Tile can be either decimal (34161) or hexadecimal (0x4a5B)");
+		IConsolePrint(CC_HELP, "Reset a tile to bare land. Usage: 'resettile <tile>'.");
+		IConsolePrint(CC_HELP, "Tile can be either decimal (34161) or hexadecimal (0x4a5B).");
 		return true;
 	}
 
@@ -322,26 +338,19 @@ DEF_CONSOLE_CMD(ConZoomToLevel)
 {
 	switch (argc) {
 		case 0:
-			IConsoleHelp("Set the current zoom level of the main viewport.");
-			IConsoleHelp("Usage: 'zoomto <level>'.");
-			IConsolePrintF(
-				CC_WARNING,
-				ZOOM_LVL_MIN < _settings_client.gui.zoom_min ?
-					"- The lowest zoom-in level allowed by current client settings is %u." :
-					"- The lowest supported zoom-in level is %u.",
-				std::max(ZOOM_LVL_MIN, _settings_client.gui.zoom_min)
-			);
+			IConsolePrint(CC_HELP, "Set the current zoom level of the main viewport.");
+			IConsolePrint(CC_HELP, "Usage: 'zoomto <level>'.");
 
 			if (ZOOM_LVL_MIN < _settings_client.gui.zoom_min) {
-				IConsolePrintF(CC_WARNING, "The lowest zoom-in level allowed by current client settings is %u.", std::max(ZOOM_LVL_MIN, _settings_client.gui.zoom_min));
+				IConsolePrint(CC_HELP, "The lowest zoom-in level allowed by current client settings is {}.", std::max(ZOOM_LVL_MIN, _settings_client.gui.zoom_min));
 			} else {
-				IConsolePrintF(CC_WARNING, "The lowest supported zoom-in level is %u.", std::max(ZOOM_LVL_MIN, _settings_client.gui.zoom_min));
+				IConsolePrint(CC_HELP, "The lowest supported zoom-in level is {}.", std::max(ZOOM_LVL_MIN, _settings_client.gui.zoom_min));
 			}
 
 			if (_settings_client.gui.zoom_max < ZOOM_LVL_MAX) {
-				IConsolePrintF(CC_WARNING, "The highest zoom-out level allowed by current client settings is %u.", std::min(_settings_client.gui.zoom_max, ZOOM_LVL_MAX));
+				IConsolePrint(CC_HELP, "The highest zoom-out level allowed by current client settings is {}.", std::min(_settings_client.gui.zoom_max, ZOOM_LVL_MAX));
 			} else {
-				IConsolePrintF(CC_WARNING, "The highest supported zoom-out level is %u.", std::min(_settings_client.gui.zoom_max, ZOOM_LVL_MAX));
+				IConsolePrint(CC_HELP, "The highest supported zoom-out level is {}.", std::min(_settings_client.gui.zoom_max, ZOOM_LVL_MAX));
 			}
 			return true;
 
@@ -353,13 +362,13 @@ DEF_CONSOLE_CMD(ConZoomToLevel)
 				 * reading an unsigned integer from the console, so just check for a '-' char. */
 				static_assert(ZOOM_LVL_MIN == 0);
 				if (argv[1][0] == '-') {
-					IConsolePrintF(CC_ERROR, "Zoom-in levels below %u are not supported.", ZOOM_LVL_MIN);
+					IConsolePrint(CC_ERROR, "Zoom-in levels below {} are not supported.", ZOOM_LVL_MIN);
 				} else if (level < _settings_client.gui.zoom_min) {
-					IConsolePrintF(CC_ERROR, "Current client settings do not allow zooming in below level %u.", _settings_client.gui.zoom_min);
+					IConsolePrint(CC_ERROR, "Current client settings do not allow zooming in below level {}.", _settings_client.gui.zoom_min);
 				} else if (level > ZOOM_LVL_MAX) {
-					IConsolePrintF(CC_ERROR, "Zoom-in levels above %u are not supported.", ZOOM_LVL_MAX);
+					IConsolePrint(CC_ERROR, "Zoom-in levels above {} are not supported.", ZOOM_LVL_MAX);
 				} else if (level > _settings_client.gui.zoom_max) {
-					IConsolePrintF(CC_ERROR, "Current client settings do not allow zooming out beyond level %u.", _settings_client.gui.zoom_max);
+					IConsolePrint(CC_ERROR, "Current client settings do not allow zooming out beyond level {}.", _settings_client.gui.zoom_max);
 				} else {
 					Window *w = GetMainWindow();
 					Viewport *vp = w->viewport;
@@ -387,10 +396,10 @@ DEF_CONSOLE_CMD(ConZoomToLevel)
 DEF_CONSOLE_CMD(ConScrollToTile)
 {
 	if (argc == 0) {
-		IConsoleHelp("Center the screen on a given tile.");
-		IConsoleHelp("Usage: 'scrollto [instant] <tile>' or 'scrollto [instant] <x> <y>'.");
-		IConsoleHelp("Numbers can be either decimal (34161) or hexadecimal (0x4a5B).");
-		IConsoleHelp("'instant' will immediately move and redraw viewport without smooth scrolling.");
+		IConsolePrint(CC_HELP, "Center the screen on a given tile.");
+		IConsolePrint(CC_HELP, "Usage: 'scrollto [instant] <tile>' or 'scrollto [instant] <x> <y>'.");
+		IConsolePrint(CC_HELP, "Numbers can be either decimal (34161) or hexadecimal (0x4a5B).");
+		IConsolePrint(CC_HELP, "'instant' will immediately move and redraw viewport without smooth scrolling.");
 		return true;
 	}
 	if (argc < 2) return false;
@@ -407,7 +416,7 @@ DEF_CONSOLE_CMD(ConScrollToTile)
 			uint32_t result;
 			if (GetArgumentInteger(&result, argv[arg_index])) {
 				if (result >= MapSize()) {
-					IConsolePrint(CC_ERROR, "Tile does not exist");
+					IConsolePrint(CC_ERROR, "Tile does not exist.");
 					return true;
 				}
 				ScrollMainWindowToTile((TileIndex)result, instant);
@@ -420,7 +429,7 @@ DEF_CONSOLE_CMD(ConScrollToTile)
 			uint32_t x, y;
 			if (GetArgumentInteger(&x, argv[arg_index]) && GetArgumentInteger(&y, argv[arg_index + 1])) {
 				if (x >= MapSizeX() || y >= MapSizeY()) {
-					IConsolePrint(CC_ERROR, "Tile does not exist");
+					IConsolePrint(CC_ERROR, "Tile does not exist.");
 					return true;
 				}
 				ScrollMainWindowToTile(TileXY(x, y), instant);
@@ -446,16 +455,16 @@ DEF_CONSOLE_CMD(ConHighlightTile)
 {
 	switch (argc) {
 		case 0:
-			IConsoleHelp("Highlight a given tile.");
-			IConsoleHelp("Usage: 'highlight_tile <tile>' or 'highlight_tile <x> <y>'");
-			IConsoleHelp("Numbers can be either decimal (34161) or hexadecimal (0x4a5B).");
+			IConsolePrint(CC_HELP, "Highlight a given tile.");
+			IConsolePrint(CC_HELP, "Usage: 'highlight_tile <tile>' or 'highlight_tile <x> <y>'");
+			IConsolePrint(CC_HELP, "Numbers can be either decimal (34161) or hexadecimal (0x4a5B).");
 			return true;
 
 		case 2: {
 			uint32_t result;
 			if (GetArgumentInteger(&result, argv[1])) {
 				if (result >= MapSize()) {
-					IConsolePrint(CC_ERROR, "Tile does not exist");
+					IConsolePrint(CC_ERROR, "Tile does not exist.");
 					return true;
 				}
 				SetRedErrorSquare((TileIndex)result);
@@ -468,7 +477,7 @@ DEF_CONSOLE_CMD(ConHighlightTile)
 			uint32_t x, y;
 			if (GetArgumentInteger(&x, argv[1]) && GetArgumentInteger(&y, argv[2])) {
 				if (x >= MapSizeX() || y >= MapSizeY()) {
-					IConsolePrint(CC_ERROR, "Tile does not exist");
+					IConsolePrint(CC_ERROR, "Tile does not exist.");
 					return true;
 				}
 				SetRedErrorSquare(TileXY(x, y));
@@ -489,18 +498,19 @@ DEF_CONSOLE_CMD(ConHighlightTile)
 DEF_CONSOLE_CMD(ConSave)
 {
 	if (argc == 0) {
-		IConsoleHelp("Save the current game. Usage: 'save <filename>'");
+		IConsolePrint(CC_HELP, "Save the current game. Usage: 'save <filename>'.");
 		return true;
 	}
 
 	if (argc == 2) {
-		std::string filename = stdstr_fmt("%s.sav", argv[1]);
+		std::string filename = argv[1];
+		filename += ".sav";
 		IConsolePrint(CC_DEFAULT, "Saving map...");
 
 		if (SaveOrLoad(filename, SLO_SAVE, DFT_GAME_FILE, SAVE_DIR) != SL_OK) {
-			IConsolePrint(CC_ERROR, "Saving map failed");
+			IConsolePrint(CC_ERROR, "Saving map failed.");
 		} else {
-			IConsolePrintF(CC_DEFAULT, "Map successfully saved to %s", filename.c_str());
+			IConsolePrint(CC_INFO, "Map successfully saved to '{}'.", filename);
 		}
 		return true;
 	}
@@ -515,8 +525,8 @@ DEF_CONSOLE_CMD(ConSave)
 DEF_CONSOLE_CMD(ConSaveConfig)
 {
 	if (argc == 0) {
-		IConsoleHelp("Saves the configuration for new games to the configuration file, typically 'openttd.cfg'.");
-		IConsoleHelp("It does not save the configuration of the current game to the configuration file.");
+		IConsolePrint(CC_HELP, "Saves the configuration for new games to the configuration file, typically 'openttd.cfg'.");
+		IConsolePrint(CC_HELP, "It does not save the configuration of the current game to the configuration file.");
 		return true;
 	}
 
@@ -528,7 +538,7 @@ DEF_CONSOLE_CMD(ConSaveConfig)
 DEF_CONSOLE_CMD(ConLoad)
 {
 	if (argc == 0) {
-		IConsoleHelp("Load a game by name or index. Usage: 'load <file | number>'");
+		IConsolePrint(CC_HELP, "Load a game by name or index. Usage: 'load <file | number>'.");
 		return true;
 	}
 
@@ -542,10 +552,10 @@ DEF_CONSOLE_CMD(ConLoad)
 			_switch_mode = SM_LOAD_GAME;
 			_file_to_saveload.Set(*item);
 		} else {
-			IConsolePrintF(CC_ERROR, "%s: Not a savegame.", file);
+			IConsolePrint(CC_ERROR, "'{}' is not a savegame.", file);
 		}
 	} else {
-		IConsolePrintF(CC_ERROR, "%s: No such file or directory.", file);
+		IConsolePrint(CC_ERROR, "'{}' cannot be found.", file);
 	}
 
 	return true;
@@ -554,7 +564,7 @@ DEF_CONSOLE_CMD(ConLoad)
 DEF_CONSOLE_CMD(ConLoadScenario)
 {
 	if (argc == 0) {
-		IConsoleHelp("Load a scenario by name or index. Usage: 'load_scenario <file | number>'.");
+		IConsolePrint(CC_HELP, "Load a scenario by name or index. Usage: 'load_scenario <file | number>'.");
 		return true;
 	}
 
@@ -568,10 +578,10 @@ DEF_CONSOLE_CMD(ConLoadScenario)
 			_switch_mode = SM_LOAD_GAME;
 			_file_to_saveload.Set(*item);
 		} else {
-			IConsolePrintF(CC_ERROR, "'%s' is not a scenario.", file);
+			IConsolePrint(CC_ERROR, "'{}' is not a scenario.", file);
 		}
 	} else {
-		IConsolePrintF(CC_ERROR, "'%s' cannot be found.", file);
+		IConsolePrint(CC_ERROR, "'{}' cannot be found.", file);
 	}
 
 	return true;
@@ -580,7 +590,7 @@ DEF_CONSOLE_CMD(ConLoadScenario)
 DEF_CONSOLE_CMD(ConLoadHeightmap)
 {
 	if (argc == 0) {
-		IConsoleHelp("Load a heightmap by name or index. Usage: 'load_heightmap <file | number>'.");
+		IConsolePrint(CC_HELP, "Load a heightmap by name or index. Usage: 'load_heightmap <file | number>'.");
 		return true;
 	}
 
@@ -594,10 +604,10 @@ DEF_CONSOLE_CMD(ConLoadHeightmap)
 			_switch_mode = SM_START_HEIGHTMAP;
 			_file_to_saveload.Set(*item);
 		} else {
-			IConsolePrintF(CC_ERROR, "'%s' is not a heightmap.", file);
+			IConsolePrint(CC_ERROR, "'{}' is not a heightmap.", file);
 		}
 	} else {
-		IConsolePrintF(CC_ERROR, "'%s' cannot be found.", file);
+		IConsolePrint(CC_ERROR, "'{}' cannot be found.", file);
 	}
 
 	return true;
@@ -606,7 +616,7 @@ DEF_CONSOLE_CMD(ConLoadHeightmap)
 DEF_CONSOLE_CMD(ConRemove)
 {
 	if (argc == 0) {
-		IConsoleHelp("Remove a savegame by name or index. Usage: 'rm <file | number>'");
+		IConsolePrint(CC_HELP, "Remove a savegame by name or index. Usage: 'rm <file | number>'.");
 		return true;
 	}
 
@@ -616,11 +626,11 @@ DEF_CONSOLE_CMD(ConRemove)
 	_console_file_list_savegame.ValidateFileList();
 	const FiosItem *item = _console_file_list_savegame.FindItem(file);
 	if (item != nullptr) {
-		if (unlink(item->name.c_str()) != 0) {
-			IConsolePrintF(CC_ERROR, "%s: Failed to delete file", file);
+		if (!FioRemove(item->name)) {
+			IConsolePrint(CC_ERROR, "Failed to delete '{}'.", item->name);
 		}
 	} else {
-		IConsolePrintF(CC_ERROR, "%s: No such file or directory.", file);
+		IConsolePrint(CC_ERROR, "'{}' could not be found.", file);
 	}
 
 	_console_file_list_savegame.InvalidateFileList();
@@ -632,13 +642,13 @@ DEF_CONSOLE_CMD(ConRemove)
 DEF_CONSOLE_CMD(ConListFiles)
 {
 	if (argc == 0) {
-		IConsoleHelp("List all loadable savegames and directories in the current dir via console. Usage: 'ls | dir'");
+		IConsolePrint(CC_HELP, "List all loadable savegames and directories in the current dir via console. Usage: 'ls | dir'.");
 		return true;
 	}
 
 	_console_file_list_savegame.ValidateFileList(true);
 	for (uint i = 0; i < _console_file_list_savegame.size(); i++) {
-		IConsolePrintF(CC_DEFAULT, "%d) %s", i, _console_file_list_savegame[i].title.c_str());
+		IConsolePrint(CC_DEFAULT, "{}) {}", i, _console_file_list_savegame[i].title);
 	}
 
 	return true;
@@ -648,13 +658,13 @@ DEF_CONSOLE_CMD(ConListFiles)
 DEF_CONSOLE_CMD(ConListScenarios)
 {
 	if (argc == 0) {
-		IConsoleHelp("List all loadable scenarios. Usage: 'list_scenarios'.");
+		IConsolePrint(CC_HELP, "List all loadable scenarios. Usage: 'list_scenarios'.");
 		return true;
 	}
 
 	_console_file_list_scenario.ValidateFileList(true);
 	for (uint i = 0; i < _console_file_list_scenario.size(); i++) {
-		IConsolePrintF(CC_DEFAULT, "%d) %s", i, _console_file_list_scenario[i].title.c_str());
+		IConsolePrint(CC_DEFAULT, "{}) {}", i, _console_file_list_scenario[i].title);
 	}
 
 	return true;
@@ -664,13 +674,13 @@ DEF_CONSOLE_CMD(ConListScenarios)
 DEF_CONSOLE_CMD(ConListHeightmaps)
 {
 	if (argc == 0) {
-		IConsoleHelp("List all loadable heightmaps. Usage: 'list_heightmaps'.");
+		IConsolePrint(CC_HELP, "List all loadable heightmaps. Usage: 'list_heightmaps'.");
 		return true;
 	}
 
 	_console_file_list_heightmap.ValidateFileList(true);
 	for (uint i = 0; i < _console_file_list_heightmap.size(); i++) {
-		IConsolePrintF(CC_DEFAULT, "%d) %s", i, _console_file_list_heightmap[i].title.c_str());
+		IConsolePrint(CC_DEFAULT, "{}) {}", i, _console_file_list_heightmap[i].title);
 	}
 
 	return true;
@@ -680,7 +690,7 @@ DEF_CONSOLE_CMD(ConListHeightmaps)
 DEF_CONSOLE_CMD(ConChangeDirectory)
 {
 	if (argc == 0) {
-		IConsoleHelp("Change the dir via console. Usage: 'cd <directory | number>'");
+		IConsolePrint(CC_HELP, "Change the dir via console. Usage: 'cd <directory | number>'.");
 		return true;
 	}
 
@@ -694,10 +704,10 @@ DEF_CONSOLE_CMD(ConChangeDirectory)
 			case FIOS_TYPE_DIR: case FIOS_TYPE_DRIVE: case FIOS_TYPE_PARENT:
 				FiosBrowseTo(item);
 				break;
-			default: IConsolePrintF(CC_ERROR, "%s: Not a directory.", file);
+			default: IConsolePrint(CC_ERROR, "{}: Not a directory.", file);
 		}
 	} else {
-		IConsolePrintF(CC_ERROR, "%s: No such file or directory.", file);
+		IConsolePrint(CC_ERROR, "{}: No such file or directory.", file);
 	}
 
 	_console_file_list_savegame.InvalidateFileList();
@@ -707,7 +717,7 @@ DEF_CONSOLE_CMD(ConChangeDirectory)
 DEF_CONSOLE_CMD(ConPrintWorkingDirectory)
 {
 	if (argc == 0) {
-		IConsoleHelp("Print out the current working directory. Usage: 'pwd'");
+		IConsolePrint(CC_HELP, "Print out the current working directory. Usage: 'pwd'.");
 		return true;
 	}
 
@@ -715,14 +725,14 @@ DEF_CONSOLE_CMD(ConPrintWorkingDirectory)
 	_console_file_list_savegame.ValidateFileList(true);
 	_console_file_list_savegame.InvalidateFileList();
 
-	IConsolePrint(CC_DEFAULT, FiosGetCurrentPath().c_str());
+	IConsolePrint(CC_DEFAULT, FiosGetCurrentPath());
 	return true;
 }
 
 DEF_CONSOLE_CMD(ConClearBuffer)
 {
 	if (argc == 0) {
-		IConsoleHelp("Clear the console buffer. Usage: 'clear'");
+		IConsolePrint(CC_HELP, "Clear the console buffer. Usage: 'clear'.");
 		return true;
 	}
 
@@ -748,13 +758,13 @@ static bool ConKickOrBan(const char *argv, bool ban, const std::string &reason)
 		 * would be reading from and writing to after returning. So we would read or write data
 		 * from freed memory up till the segfault triggers. */
 		if (client_id == CLIENT_ID_SERVER || client_id == _redirect_console_to_client) {
-			IConsolePrintF(CC_ERROR, "ERROR: You can not %s yourself!", ban ? "ban" : "kick");
+			IConsolePrint(CC_ERROR, "You can not {} yourself!", ban ? "ban" : "kick");
 			return true;
 		}
 
 		NetworkClientInfo *ci = NetworkClientInfo::GetByClientID(client_id);
 		if (ci == nullptr) {
-			IConsoleError("Invalid client");
+			IConsolePrint(CC_ERROR, "Invalid client ID.");
 			return true;
 		}
 
@@ -771,9 +781,9 @@ static bool ConKickOrBan(const char *argv, bool ban, const std::string &reason)
 	}
 
 	if (n == 0) {
-		IConsolePrint(CC_DEFAULT, ban ? "Client not online, address added to banlist" : "Client not found");
+		IConsolePrint(CC_DEFAULT, ban ? "Client not online, address added to banlist." : "Client not found.");
 	} else {
-		IConsolePrintF(CC_DEFAULT, "%sed %u client(s)", ban ? "Bann" : "Kick", n);
+		IConsolePrint(CC_DEFAULT, "{}ed {} client(s).", ban ? "Bann" : "Kick", n);
 	}
 
 	return true;
@@ -782,8 +792,8 @@ static bool ConKickOrBan(const char *argv, bool ban, const std::string &reason)
 DEF_CONSOLE_CMD(ConKick)
 {
 	if (argc == 0) {
-		IConsoleHelp("Kick a client from a network game. Usage: 'kick <ip | client-id> [<kick-reason>]'");
-		IConsoleHelp("For client-id's, see the command 'clients'");
+		IConsolePrint(CC_HELP, "Kick a client from a network game. Usage: 'kick <ip | client-id> [<kick-reason>]'.");
+		IConsolePrint(CC_HELP, "For client-id's, see the command 'clients'.");
 		return true;
 	}
 
@@ -795,7 +805,7 @@ DEF_CONSOLE_CMD(ConKick)
 	/* Reason for kicking supplied */
 	size_t kick_message_length = strlen(argv[2]);
 	if (kick_message_length >= 255) {
-		IConsolePrintF(CC_ERROR, "ERROR: Maximum kick message length is 254 characters. You entered " PRINTF_SIZE " characters.", kick_message_length);
+		IConsolePrint(CC_ERROR, "Maximum kick message length is 254 characters. You entered {} characters.", kick_message_length);
 		return false;
 	} else {
 		return ConKickOrBan(argv[1], false, argv[2]);
@@ -805,9 +815,9 @@ DEF_CONSOLE_CMD(ConKick)
 DEF_CONSOLE_CMD(ConBan)
 {
 	if (argc == 0) {
-		IConsoleHelp("Ban a client from a network game. Usage: 'ban <ip | client-id> [<ban-reason>]'");
-		IConsoleHelp("For client-id's, see the command 'clients'");
-		IConsoleHelp("If the client is no longer online, you can still ban their IP");
+		IConsolePrint(CC_HELP, "Ban a client from a network game. Usage: 'ban <ip | client-id> [<ban-reason>]'.");
+		IConsolePrint(CC_HELP, "For client-id's, see the command 'clients'.");
+		IConsolePrint(CC_HELP, "If the client is no longer online, you can still ban their IP.");
 		return true;
 	}
 
@@ -819,7 +829,7 @@ DEF_CONSOLE_CMD(ConBan)
 	/* Reason for kicking supplied */
 	size_t kick_message_length = strlen(argv[2]);
 	if (kick_message_length >= 255) {
-		IConsolePrintF(CC_ERROR, "ERROR: Maximum kick message length is 254 characters. You entered " PRINTF_SIZE " characters.", kick_message_length);
+		IConsolePrint(CC_ERROR, "Maximum kick message length is 254 characters. You entered {} characters.", kick_message_length);
 		return false;
 	} else {
 		return ConKickOrBan(argv[1], true, argv[2]);
@@ -829,8 +839,8 @@ DEF_CONSOLE_CMD(ConBan)
 DEF_CONSOLE_CMD(ConUnBan)
 {
 	if (argc == 0) {
-		IConsoleHelp("Unban a client from a network game. Usage: 'unban <ip | banlist-index>'");
-		IConsoleHelp("For a list of banned IP's, see the command 'banlist'");
+		IConsolePrint(CC_HELP, "Unban a client from a network game. Usage: 'unban <ip | banlist-index>'.");
+		IConsolePrint(CC_HELP, "For a list of banned IP's, see the command 'banlist'.");
 		return true;
 	}
 
@@ -848,13 +858,11 @@ DEF_CONSOLE_CMD(ConUnBan)
 	}
 
 	if (index < _network_ban_list.size()) {
-		char msg[64];
-		seprintf(msg, lastof(msg), "Unbanned %s", _network_ban_list[index].c_str());
-		IConsolePrint(CC_DEFAULT, msg);
+		IConsolePrint(CC_DEFAULT, "Unbanned {}.", _network_ban_list[index]);
 		_network_ban_list.erase(_network_ban_list.begin() + index);
 	} else {
 		IConsolePrint(CC_DEFAULT, "Invalid list index or IP not in ban-list.");
-		IConsolePrint(CC_DEFAULT, "For a list of banned IP's, see the command 'banlist'");
+		IConsolePrint(CC_DEFAULT, "For a list of banned IP's, see the command 'banlist'.");
 	}
 
 	return true;
@@ -863,15 +871,15 @@ DEF_CONSOLE_CMD(ConUnBan)
 DEF_CONSOLE_CMD(ConBanList)
 {
 	if (argc == 0) {
-		IConsoleHelp("List the IP's of banned clients: Usage 'banlist'");
+		IConsolePrint(CC_HELP, "List the IP's of banned clients: Usage 'banlist'.");
 		return true;
 	}
 
-	IConsolePrint(CC_DEFAULT, "Banlist: ");
+	IConsolePrint(CC_DEFAULT, "Banlist:");
 
 	uint i = 1;
 	for (const auto &entry : _network_ban_list) {
-		IConsolePrintF(CC_DEFAULT, "  %d) %s", i, entry.c_str());
+		IConsolePrint(CC_DEFAULT, "  {}) {}", i, entry);
 		i++;
 	}
 
@@ -881,12 +889,12 @@ DEF_CONSOLE_CMD(ConBanList)
 DEF_CONSOLE_CMD(ConPauseGame)
 {
 	if (argc == 0) {
-		IConsoleHelp("Pause a network game. Usage: 'pause'");
+		IConsolePrint(CC_HELP, "Pause a network game. Usage: 'pause'.");
 		return true;
 	}
 
 	if (_game_mode == GM_MENU) {
-		IConsoleError("This command is only available in-game and in the editor.");
+		IConsolePrint(CC_ERROR, "This command is only available in-game and in the editor.");
 		return true;
 	}
 
@@ -903,12 +911,12 @@ DEF_CONSOLE_CMD(ConPauseGame)
 DEF_CONSOLE_CMD(ConUnpauseGame)
 {
 	if (argc == 0) {
-		IConsoleHelp("Unpause a network game. Usage: 'unpause'");
+		IConsolePrint(CC_HELP, "Unpause a network game. Usage: 'unpause'.");
 		return true;
 	}
 
 	if (_game_mode == GM_MENU) {
-		IConsoleError("This command is only available in-game and in the editor.");
+		IConsolePrint(CC_ERROR, "This command is only available in-game and in the editor.");
 		return true;
 	}
 
@@ -929,7 +937,7 @@ DEF_CONSOLE_CMD(ConUnpauseGame)
 DEF_CONSOLE_CMD(ConStepGame)
 {
 	if (argc == 0 || argc > 2) {
-		IConsoleHelp("Advances the game for a certain amount of ticks (default 1). Usage: 'step [n]'");
+		IConsolePrint(CC_HELP, "Advances the game for a certain amount of ticks (default 1). Usage: 'step [n]'");
 		return true;
 	}
 	auto n = (argc > 1 ? atoi(argv[1]) : 1);
@@ -942,8 +950,9 @@ DEF_CONSOLE_CMD(ConStepGame)
 DEF_CONSOLE_CMD(ConRcon)
 {
 	if (argc == 0) {
-		IConsoleHelp("Remote control the server from another client. Usage: 'rcon <password> <command>'");
-		IConsoleHelp("Remember to enclose the command in quotes, otherwise only the first parameter is sent");
+		IConsolePrint(CC_HELP, "Remote control the server from another client. Usage: 'rcon <password> <command>'.");
+		IConsolePrint(CC_HELP, "Remember to enclose the command in quotes, otherwise only the first parameter is sent.");
+		IConsolePrint(CC_HELP, "When your client's public key is in the 'authorized keys' for 'rcon', '*' may be used instead of the password.");
 		return true;
 	}
 
@@ -960,8 +969,9 @@ DEF_CONSOLE_CMD(ConRcon)
 DEF_CONSOLE_CMD(ConSettingsAccess)
 {
 	if (argc == 0) {
-		IConsoleHelp("Enable changing game settings from this client. Usage: 'settings_access <password>'");
-		IConsoleHelp("Send an empty password \"\" to drop access");
+		IConsolePrint(CC_HELP, "Enable changing game settings from this client. Usage: 'settings_access <password>'");
+		IConsolePrint(CC_HELP, "Send an empty password \"\" to drop access");
+		IConsolePrint(CC_HELP, "When your client's public key is in the 'authorized keys' for 'settings', the password is not checked and may be '*'.");
 		return true;
 	}
 
@@ -976,7 +986,7 @@ DEF_CONSOLE_CMD(ConSettingsAccess)
 DEF_CONSOLE_CMD(ConStatus)
 {
 	if (argc == 0) {
-		IConsoleHelp("List the status of all clients connected to the server. Usage 'status'");
+		IConsolePrint(CC_HELP, "List the status of all clients connected to the server. Usage 'status'.");
 		return true;
 	}
 
@@ -987,15 +997,15 @@ DEF_CONSOLE_CMD(ConStatus)
 DEF_CONSOLE_CMD(ConServerInfo)
 {
 	if (argc == 0) {
-		IConsoleHelp("List current and maximum client/company limits. Usage 'server_info'");
-		IConsoleHelp("You can change these values by modifying settings 'network.max_clients' and 'network.max_companies'");
+		IConsolePrint(CC_HELP, "List current and maximum client/company limits. Usage 'server_info'.");
+		IConsolePrint(CC_HELP, "You can change these values by modifying settings 'network.max_clients' and 'network.max_companies'.");
 		return true;
 	}
 
-	IConsolePrintF(CC_DEFAULT, "Invite code:                %s", _network_server_invite_code.c_str());
-	IConsolePrintF(CC_DEFAULT, "Current/maximum clients:    %3d/%3d", _network_game_info.clients_on, _settings_client.network.max_clients);
-	IConsolePrintF(CC_DEFAULT, "Current/maximum companies:  %3d/%3d", (int)Company::GetNumItems(), _settings_client.network.max_companies);
-	IConsolePrintF(CC_DEFAULT, "Current spectators:         %3d", NetworkSpectatorCount());
+	IConsolePrint(CC_DEFAULT, "Invite code:                {}", _network_server_invite_code);
+	IConsolePrint(CC_DEFAULT, "Current/maximum clients:    {:3d}/{:3d}", _network_game_info.clients_on, _settings_client.network.max_clients);
+	IConsolePrint(CC_DEFAULT, "Current/maximum companies:  {:3d}/{:3d}", Company::GetNumItems(), _settings_client.network.max_companies);
+	IConsolePrint(CC_DEFAULT, "Current spectators:         {:3d}", NetworkSpectatorCount());
 
 	return true;
 }
@@ -1003,32 +1013,32 @@ DEF_CONSOLE_CMD(ConServerInfo)
 DEF_CONSOLE_CMD(ConClientNickChange)
 {
 	if (argc != 3) {
-		IConsoleHelp("Change the nickname of a connected client. Usage: 'client_name <client-id> <new-name>'");
-		IConsoleHelp("For client-id's, see the command 'clients'");
+		IConsolePrint(CC_HELP, "Change the nickname of a connected client. Usage: 'client_name <client-id> <new-name>'.");
+		IConsolePrint(CC_HELP, "For client-id's, see the command 'clients'.");
 		return true;
 	}
 
 	ClientID client_id = (ClientID)atoi(argv[1]);
 
 	if (client_id == CLIENT_ID_SERVER) {
-		IConsoleError("Please use the command 'name' to change your own name!");
+		IConsolePrint(CC_ERROR, "Please use the command 'name' to change your own name!");
 		return true;
 	}
 
 	if (NetworkClientInfo::GetByClientID(client_id) == nullptr) {
-		IConsoleError("Invalid client");
+		IConsolePrint(CC_ERROR, "Invalid client ID.");
 		return true;
 	}
 
 	std::string client_name(argv[2]);
 	StrTrimInPlace(client_name);
 	if (!NetworkIsValidClientName(client_name)) {
-		IConsoleError("Cannot give a client an empty name");
+		IConsolePrint(CC_ERROR, "Cannot give a client an empty name.");
 		return true;
 	}
 
 	if (!NetworkServerChangeClientName(client_id, client_name)) {
-		IConsoleError("Cannot give a client a duplicate name");
+		IConsolePrint(CC_ERROR, "Cannot give a client a duplicate name.");
 	}
 
 	return true;
@@ -1037,8 +1047,8 @@ DEF_CONSOLE_CMD(ConClientNickChange)
 DEF_CONSOLE_CMD(ConJoinCompany)
 {
 	if (argc < 2) {
-		IConsoleHelp("Request joining another company. Usage: join <company-id> [<password>]");
-		IConsoleHelp("For valid company-id see company list, use 255 for spectator");
+		IConsolePrint(CC_HELP, "Request joining another company. Usage: 'join <company-id> [<password>]'.");
+		IConsolePrint(CC_HELP, "For valid company-id see company list, use 255 for spectator.");
 		return true;
 	}
 
@@ -1046,29 +1056,29 @@ DEF_CONSOLE_CMD(ConJoinCompany)
 
 	const NetworkClientInfo *info = NetworkClientInfo::GetByClientID(_network_own_client_id);
 	if (info == nullptr) {
-		IConsoleError("You have not joined the game yet!");
+		IConsolePrint(CC_ERROR, "You have not joined the game yet!");
 		return true;
 	}
 
 	/* Check we have a valid company id! */
 	if (!Company::IsValidID(company_id) && company_id != COMPANY_SPECTATOR) {
-		IConsolePrintF(CC_ERROR, "Company does not exist. Company-id must be between 1 and %d.", MAX_COMPANIES);
+		IConsolePrint(CC_ERROR, "Company does not exist. Company-id must be between 1 and {}.", MAX_COMPANIES);
 		return true;
 	}
 
 	if (info->client_playas == company_id) {
-		IConsoleError("You are already there!");
+		IConsolePrint(CC_ERROR, "You are already there!");
 		return true;
 	}
 
 	if (company_id != COMPANY_SPECTATOR && !Company::IsHumanID(company_id)) {
-		IConsoleError("Cannot join AI company.");
+		IConsolePrint(CC_ERROR, "Cannot join AI company.");
 		return true;
 	}
 
 	/* Check if the company requires a password */
 	if (NetworkCompanyIsPassworded(company_id) && argc < 3) {
-		IConsolePrintF(CC_ERROR, "Company %d requires a password to join.", company_id + 1);
+		IConsolePrint(CC_ERROR, "Company {} requires a password to join.", company_id + 1);
 		return true;
 	}
 
@@ -1085,8 +1095,8 @@ DEF_CONSOLE_CMD(ConJoinCompany)
 DEF_CONSOLE_CMD(ConMoveClient)
 {
 	if (argc < 3) {
-		IConsoleHelp("Move a client to another company. Usage: move <client-id> <company-id>");
-		IConsoleHelp("For valid client-id see 'clients', for valid company-id see 'companies', use 255 for moving to spectators");
+		IConsolePrint(CC_HELP, "Move a client to another company. Usage: 'move <client-id> <company-id>'.");
+		IConsolePrint(CC_HELP, "For valid client-id see 'clients', for valid company-id see 'companies', use 255 for moving to spectators.");
 		return true;
 	}
 
@@ -1095,27 +1105,27 @@ DEF_CONSOLE_CMD(ConMoveClient)
 
 	/* check the client exists */
 	if (ci == nullptr) {
-		IConsoleError("Invalid client-id, check the command 'clients' for valid client-id's.");
+		IConsolePrint(CC_ERROR, "Invalid client-id, check the command 'clients' for valid client-id's.");
 		return true;
 	}
 
 	if (!Company::IsValidID(company_id) && company_id != COMPANY_SPECTATOR) {
-		IConsolePrintF(CC_ERROR, "Company does not exist. Company-id must be between 1 and %d.", MAX_COMPANIES);
+		IConsolePrint(CC_ERROR, "Company does not exist. Company-id must be between 1 and {}.", MAX_COMPANIES);
 		return true;
 	}
 
 	if (company_id != COMPANY_SPECTATOR && !Company::IsHumanID(company_id)) {
-		IConsoleError("You cannot move clients to AI companies.");
+		IConsolePrint(CC_ERROR, "You cannot move clients to AI companies.");
 		return true;
 	}
 
 	if (ci->client_id == CLIENT_ID_SERVER && _network_dedicated) {
-		IConsoleError("You cannot move the server!");
+		IConsolePrint(CC_ERROR, "You cannot move the server!");
 		return true;
 	}
 
 	if (ci->client_playas == company_id) {
-		IConsoleError("You cannot move someone to where they already are!");
+		IConsolePrint(CC_ERROR, "You cannot move someone to where they already are!");
 		return true;
 	}
 
@@ -1128,8 +1138,8 @@ DEF_CONSOLE_CMD(ConMoveClient)
 DEF_CONSOLE_CMD(ConResetCompany)
 {
 	if (argc == 0) {
-		IConsoleHelp("Remove an idle company from the game. Usage: 'reset_company <company-id>'");
-		IConsoleHelp("For company-id's, see the list of companies from the dropdown menu. Company 1 is 1, etc.");
+		IConsolePrint(CC_HELP, "Remove an idle company from the game. Usage: 'reset_company <company-id>'.");
+		IConsolePrint(CC_HELP, "For company-id's, see the list of companies from the dropdown menu. Company 1 is 1, etc.");
 		return true;
 	}
 
@@ -1139,23 +1149,23 @@ DEF_CONSOLE_CMD(ConResetCompany)
 
 	/* Check valid range */
 	if (!Company::IsValidID(index)) {
-		IConsolePrintF(CC_ERROR, "Company does not exist. Company-id must be between 1 and %d.", MAX_COMPANIES);
+		IConsolePrint(CC_ERROR, "Company does not exist. Company-id must be between 1 and {}.", MAX_COMPANIES);
 		return true;
 	}
 
 	if (!Company::IsHumanID(index)) {
-		IConsoleError("Company is owned by an AI.");
+		IConsolePrint(CC_ERROR, "Company is owned by an AI.");
 		return true;
 	}
 
 	if (NetworkCompanyHasClients(index)) {
-		IConsoleError("Cannot remove company: a client is connected to that company.");
+		IConsolePrint(CC_ERROR, "Cannot remove company: a client is connected to that company.");
 		return false;
 	}
 	const NetworkClientInfo *ci = NetworkClientInfo::GetByClientID(CLIENT_ID_SERVER);
 	assert(ci != nullptr);
 	if (ci->client_playas == index) {
-		IConsoleError("Cannot remove company: the server is connected to that company.");
+		IConsolePrint(CC_ERROR, "Cannot remove company: the server is connected to that company.");
 		return true;
 	}
 
@@ -1169,8 +1179,8 @@ DEF_CONSOLE_CMD(ConResetCompany)
 DEF_CONSOLE_CMD(ConOfferCompanySale)
 {
 	if (argc == 0) {
-		IConsoleHelp("Offer a company for sale. Usage: 'offer_company_sale <company-id>'");
-		IConsoleHelp("For company-id's, see the list of companies from the dropdown menu. Company 1 is 1, etc.");
+		IConsolePrint(CC_HELP, "Offer a company for sale. Usage: 'offer_company_sale <company-id>'");
+		IConsolePrint(CC_HELP, "For company-id's, see the list of companies from the dropdown menu. Company 1 is 1, etc.");
 		return true;
 	}
 
@@ -1180,7 +1190,7 @@ DEF_CONSOLE_CMD(ConOfferCompanySale)
 
 	/* Check valid range */
 	if (!Company::IsValidID(index)) {
-		IConsolePrintF(CC_ERROR, "Company does not exist. Company-id must be between 1 and %d.", MAX_COMPANIES);
+		IConsolePrint(CC_ERROR, "Company does not exist. Company-id must be between 1 and {}.", MAX_COMPANIES);
 		return true;
 	}
 
@@ -1190,10 +1200,39 @@ DEF_CONSOLE_CMD(ConOfferCompanySale)
 	return true;
 }
 
+DEF_CONSOLE_CMD(ConMergeCompanies)
+{
+	if (argc != 3) {
+		IConsolePrint(CC_HELP, "Merge two companies together. Usage: 'merge_companies <main-company-id> <to-merge-company-id>'");
+		IConsolePrint(CC_HELP, "The first company ID <main-company-id> will be left with the combined assets of both companies.");
+		IConsolePrint(CC_HELP, "The second company ID <to-merge-company-id> will be removed, with all assets transfered to the first company ID.");
+		IConsolePrint(CC_HELP, "For company-id's, see the list of companies from the dropdown menu. Company 1 is 1, etc.");
+		return true;
+	}
+
+	CompanyID main_company = (CompanyID)(atoi(argv[1]) - 1);
+	CompanyID to_merge_company = (CompanyID)(atoi(argv[2]) - 1);
+
+	/* Check valid range */
+	if (!Company::IsValidID(main_company)) {
+		IConsolePrint(CC_ERROR, "Main company does not exist. Company-id must be between 1 and {}.", MAX_COMPANIES);
+		return true;
+	}
+	if (!Company::IsValidID(to_merge_company)) {
+		IConsolePrint(CC_ERROR, "Company to merge does not exist. Company-id must be between 1 and {}.", MAX_COMPANIES);
+		return true;
+	}
+
+	DoCommandP(0, CCA_MERGE | (main_company << 16) | (to_merge_company << 24), 0, CMD_COMPANY_CTRL);
+	IConsolePrint(CC_DEFAULT, "Companies merged.");
+
+	return true;
+}
+
 DEF_CONSOLE_CMD(ConNetworkClients)
 {
 	if (argc == 0) {
-		IConsoleHelp("Get a list of connected clients including their ID, name, company-id, and IP. Usage: 'clients'");
+		IConsolePrint(CC_HELP, "Get a list of connected clients including their ID, name, company-id, and IP. Usage: 'clients'.");
 		return true;
 	}
 
@@ -1205,9 +1244,9 @@ DEF_CONSOLE_CMD(ConNetworkClients)
 DEF_CONSOLE_CMD(ConNetworkReconnect)
 {
 	if (argc == 0) {
-		IConsoleHelp("Reconnect to server to which you were connected last time. Usage: 'reconnect [<company>]'");
-		IConsoleHelp("Company 255 is spectator (default, if not specified), 0 means creating new company.");
-		IConsoleHelp("All others are a certain company with Company 1 being #1");
+		IConsolePrint(CC_HELP, "Reconnect to server to which you were connected last time. Usage: 'reconnect [<company>]'.");
+		IConsolePrint(CC_HELP, "Company 255 is spectator (default, if not specified), 0 means creating new company.");
+		IConsolePrint(CC_HELP, "All others are a certain company with Company 1 being #1.");
 		return true;
 	}
 
@@ -1228,7 +1267,7 @@ DEF_CONSOLE_CMD(ConNetworkReconnect)
 	}
 
 	/* Don't resolve the address first, just print it directly as it comes from the config file. */
-	IConsolePrintF(CC_DEFAULT, "Reconnecting to %s ...", _settings_client.network.last_joined.c_str());
+	IConsolePrint(CC_DEFAULT, "Reconnecting to {} ...", _settings_client.network.last_joined);
 
 	return NetworkClientConnectGame(_settings_client.network.last_joined, playas);
 }
@@ -1236,9 +1275,9 @@ DEF_CONSOLE_CMD(ConNetworkReconnect)
 DEF_CONSOLE_CMD(ConNetworkConnect)
 {
 	if (argc == 0) {
-		IConsoleHelp("Connect to a remote OTTD server and join the game. Usage: 'connect <ip>'");
-		IConsoleHelp("IP can contain port and company: 'IP[:Port][#Company]', eg: 'server.ottd.org:443#2'");
-		IConsoleHelp("Company #255 is spectator all others are a certain company with Company 1 being #1");
+		IConsolePrint(CC_HELP, "Connect to a remote OTTD server and join the game. Usage: 'connect <ip>'.");
+		IConsolePrint(CC_HELP, "IP can contain port and company: 'IP[:Port][#Company]', eg: 'server.ottd.org:443#2'.");
+		IConsolePrint(CC_HELP, "Company #255 is spectator all others are a certain company with Company 1 being #1.");
 		return true;
 	}
 
@@ -1254,22 +1293,21 @@ DEF_CONSOLE_CMD(ConNetworkConnect)
 DEF_CONSOLE_CMD(ConExec)
 {
 	if (argc == 0) {
-		IConsoleHelp("Execute a local script file. Usage: 'exec <script> <?>'");
+		IConsolePrint(CC_HELP, "Execute a local script file. Usage: 'exec <script> <?>'.");
 		return true;
 	}
 
 	if (argc < 2) return false;
 
-	FILE *script_file = FioFOpenFile(argv[1], "r", BASE_DIR);
+	auto script_file = FioFOpenFile(argv[1], "r", BASE_DIR);
 
-	if (script_file == nullptr) {
-		if (argc == 2 || atoi(argv[2]) != 0) IConsoleError("script file not found");
+	if (!script_file.has_value()) {
+		if (argc == 2 || atoi(argv[2]) != 0) IConsolePrint(CC_ERROR, "Script file '{}' not found.", argv[1]);
 		return true;
 	}
 
 	if (_script_current_depth == 11) {
-		FioFCloseFile(script_file);
-		IConsoleError("Maximum 'exec' depth reached; script A is calling script B is calling script C ... more than 10 times.");
+		IConsolePrint(CC_ERROR, "Maximum 'exec' depth reached; script A is calling script B is calling script C ... more than 10 times.");
 		return true;
 	}
 
@@ -1277,7 +1315,7 @@ DEF_CONSOLE_CMD(ConExec)
 	uint script_depth = _script_current_depth;
 
 	char cmdline[ICON_CMDLN_SIZE];
-	while (fgets(cmdline, sizeof(cmdline), script_file) != nullptr) {
+	while (fgets(cmdline, sizeof(cmdline), *script_file) != nullptr) {
 		/* Remove newline characters from the executing script */
 		for (char *cmdptr = cmdline; *cmdptr != '\0'; cmdptr++) {
 			if (*cmdptr == '\n' || *cmdptr == '\r') {
@@ -1293,19 +1331,47 @@ DEF_CONSOLE_CMD(ConExec)
 		if (_script_current_depth == script_depth - 1) break;
 	}
 
-	if (ferror(script_file)) {
-		IConsoleError("Encountered error while trying to read from script file");
+	if (ferror(*script_file) != 0) {
+		IConsolePrint(CC_ERROR, "Encountered error while trying to read from script file '{}'.", argv[1]);
 	}
 
 	if (_script_current_depth == script_depth) _script_current_depth--;
-	FioFCloseFile(script_file);
+	return true;
+}
+
+DEF_CONSOLE_CMD(ConSchedule)
+{
+	if (argc < 3 || std::string_view(argv[1]) != "on-next-calendar-month") {
+		IConsolePrint(CC_HELP, "Schedule a local script to execute later. Usage: 'schedule on-next-calendar-month <script>'.");
+		return true;
+	}
+
+	/* Check if the file exists. It might still go away later, but helpful to show an error now. */
+	if (!FioCheckFileExists(argv[2], BASE_DIR)) {
+		IConsolePrint(CC_ERROR, "Script file '{}' not found.", argv[2]);
+		return true;
+	}
+
+	/* We only support a single script scheduled, so we tell the user what's happening if there was already one. */
+	const std::string_view filename = std::string_view(argv[2]);
+	if (!_scheduled_monthly_script.empty() && filename == _scheduled_monthly_script) {
+		IConsolePrint(CC_INFO, "Script file '{}' was already scheduled to execute at the start of next calendar month.", filename);
+	} else if (!_scheduled_monthly_script.empty() && filename != _scheduled_monthly_script) {
+		IConsolePrint(CC_INFO, "Script file '{}' scheduled to execute at the start of next calendar month, replacing the previously scheduled script file '{}'.", filename, _scheduled_monthly_script);
+	} else {
+		IConsolePrint(CC_INFO, "Script file '{}' scheduled to execute at the start of next calendar month.", filename);
+	}
+
+	/* Store the filename to be used by _schedule_timer on the start of next calendar month. */
+	_scheduled_monthly_script = filename;
+
 	return true;
 }
 
 DEF_CONSOLE_CMD(ConReturn)
 {
 	if (argc == 0) {
-		IConsoleHelp("Stop executing a running script. Usage: 'return'");
+		IConsolePrint(CC_HELP, "Stop executing a running script. Usage: 'return'.");
 		return true;
 	}
 
@@ -1323,20 +1389,23 @@ extern void ShowFramerateWindow();
 
 DEF_CONSOLE_CMD(ConScript)
 {
-	extern FILE *_iconsole_output_file;
+	extern std::optional<FileHandle> _iconsole_output_file;
 
 	if (argc == 0) {
-		IConsoleHelp("Start or stop logging console output to a file. Usage: 'script <filename>'");
-		IConsoleHelp("If filename is omitted, a running log is stopped if it is active");
+		IConsolePrint(CC_HELP, "Start or stop logging console output to a file. Usage: 'script <filename>'.");
+		IConsolePrint(CC_HELP, "If filename is omitted, a running log is stopped if it is active.");
 		return true;
 	}
 
 	if (!CloseConsoleLogIfActive()) {
 		if (argc < 2) return false;
 
-		IConsolePrintF(CC_DEFAULT, "file output started to: %s", argv[1]);
-		_iconsole_output_file = fopen(argv[1], "ab");
-		if (_iconsole_output_file == nullptr) IConsoleError("could not open file");
+		_iconsole_output_file = FileHandle::Open(argv[1], "ab");
+		if (!_iconsole_output_file.has_value()) {
+			IConsolePrint(CC_ERROR, "Could not open console log file '{}'.", argv[1]);
+		} else {
+			IConsolePrint(CC_INFO, "Console log output started to '{}'.", argv[1]);
+		}
 	}
 
 	return true;
@@ -1346,7 +1415,7 @@ DEF_CONSOLE_CMD(ConScript)
 DEF_CONSOLE_CMD(ConEcho)
 {
 	if (argc == 0) {
-		IConsoleHelp("Print back the first argument to the console. Usage: 'echo <arg>'");
+		IConsolePrint(CC_HELP, "Print back the first argument to the console. Usage: 'echo <arg>'.");
 		return true;
 	}
 
@@ -1358,7 +1427,7 @@ DEF_CONSOLE_CMD(ConEcho)
 DEF_CONSOLE_CMD(ConEchoC)
 {
 	if (argc == 0) {
-		IConsoleHelp("Print back the first argument to the console in a given colour. Usage: 'echoc <colour> <arg2>'");
+		IConsolePrint(CC_HELP, "Print back the first argument to the console in a given colour. Usage: 'echoc <colour> <arg2>'.");
 		return true;
 	}
 
@@ -1370,8 +1439,8 @@ DEF_CONSOLE_CMD(ConEchoC)
 DEF_CONSOLE_CMD(ConNewGame)
 {
 	if (argc == 0) {
-		IConsoleHelp("Start a new game. Usage: 'newgame [seed]'");
-		IConsoleHelp("The server can force a new game using 'newgame'; any client joined will rejoin after the server is done generating the new game.");
+		IConsolePrint(CC_HELP, "Start a new game. Usage: 'newgame [seed]'.");
+		IConsolePrint(CC_HELP, "The server can force a new game using 'newgame'; any client joined will rejoin after the server is done generating the new game.");
 		return true;
 	}
 
@@ -1382,10 +1451,10 @@ DEF_CONSOLE_CMD(ConNewGame)
 DEF_CONSOLE_CMD(ConRestart)
 {
 	if (argc == 0 || argc > 2) {
-		IConsoleHelp("Restart game. Usage: 'restart [current|newgame]'.");
-		IConsoleHelp("Restarts a game, using either the current or newgame (default) settings.");
-		IConsoleHelp(" * if you started from a new game, and your current/newgame settings haven't changed, the game will be identical to when you started it.");
-		IConsoleHelp(" * if you started from a savegame / scenario / heightmap, the game might be different, because the current/newgame settings might differ.");
+		IConsolePrint(CC_HELP, "Restart game. Usage: 'restart [current|newgame]'.");
+		IConsolePrint(CC_HELP, "Restarts a game, using either the current or newgame (default) settings.");
+		IConsolePrint(CC_HELP, " * if you started from a new game, and your current/newgame settings haven't changed, the game will be identical to when you started it.");
+		IConsolePrint(CC_HELP, " * if you started from a savegame / scenario / heightmap, the game might be different, because the current/newgame settings might differ.");
 		return true;
 	}
 
@@ -1403,8 +1472,8 @@ DEF_CONSOLE_CMD(ConRestart)
 DEF_CONSOLE_CMD(ConReload)
 {
 	if (argc == 0) {
-		IConsoleHelp("Reload game. Usage: 'reload'.");
-		IConsoleHelp("Reloads a game if loaded via savegame / scenario / heightmap.");
+		IConsolePrint(CC_HELP, "Reload game. Usage: 'reload'.");
+		IConsolePrint(CC_HELP, "Reloads a game if loaded via savegame / scenario / heightmap.");
 		return true;
 	}
 
@@ -1422,110 +1491,88 @@ DEF_CONSOLE_CMD(ConReload)
 
 /**
  * Print a text buffer line by line to the console. Lines are separated by '\n'.
- * @param buf The buffer to print.
- * @note All newlines are replace by '\0' characters.
- */
-static void PrintLineByLine(char *buf)
-{
-	ProcessLineByLine(buf, [&](const char *line) {
-		IConsolePrintF(CC_DEFAULT, "%s", line);
-	});
-}
-
-/**
- * Print a text buffer line by line to the console. Lines are separated by '\n'.
  * @param full_string The multi-line string to print.
  */
-static void PrintLineByLine(const std::string &full_string)
+static void PrintLineByLine(std::string_view full_string)
 {
-	std::istringstream in(full_string);
-	std::string line;
-	while (std::getline(in, line)) {
-		IConsolePrint(CC_DEFAULT, line.c_str());
-	}
+	ProcessLineByLine(full_string, [&](std::string_view line) {
+		IConsolePrint(CC_DEFAULT, std::string{line});
+	});
 }
 
 DEF_CONSOLE_CMD(ConListAILibs)
 {
 	if (argc == 0) {
-		IConsoleHelp("List installed AI libraries. Usage: 'list_ai_libs'.");
+		IConsolePrint(CC_HELP, "List installed AI libraries. Usage: 'list_ai_libs'.");
 		return true;
 	}
 
-	const std::string output_str = AI::GetConsoleLibraryList();
-	PrintLineByLine(output_str);
-
+	PrintLineByLine(AI::GetConsoleLibraryList());
 	return true;
 }
 
 DEF_CONSOLE_CMD(ConListAI)
 {
 	if (argc == 0) {
-		IConsoleHelp("List installed AIs. Usage: 'list_ai'.");
+		IConsolePrint(CC_HELP, "List installed AIs. Usage: 'list_ai'.");
 		return true;
 	}
 
-	const std::string output_str = AI::GetConsoleList();
-	PrintLineByLine(output_str);
-
+	PrintLineByLine(AI::GetConsoleList());
 	return true;
 }
 
 DEF_CONSOLE_CMD(ConListGameLibs)
 {
 	if (argc == 0) {
-		IConsoleHelp("List installed Game Script libraries. Usage: 'list_game_libs'.");
+		IConsolePrint(CC_HELP, "List installed Game Script libraries. Usage: 'list_game_libs'.");
 		return true;
 	}
 
-	const std::string output_str = Game::GetConsoleLibraryList();
-	PrintLineByLine(output_str);
-
+	PrintLineByLine(Game::GetConsoleLibraryList());
 	return true;
 }
 
 DEF_CONSOLE_CMD(ConListGame)
 {
 	if (argc == 0) {
-		IConsoleHelp("List installed Game Scripts. Usage: 'list_game'.");
+		IConsolePrint(CC_HELP, "List installed Game Scripts. Usage: 'list_game'.");
 		return true;
 	}
 
-	const std::string output_str = Game::GetConsoleList();
-	PrintLineByLine(output_str);
-
+	PrintLineByLine(Game::GetConsoleList());
 	return true;
 }
 
 DEF_CONSOLE_CMD(ConStartAI)
 {
 	if (argc == 0 || argc > 3) {
-		IConsoleHelp("Start a new AI. Usage: 'start_ai [<AI>] [<settings>]'");
-		IConsoleHelp("Start a new AI. If <AI> is given, it starts that specific AI (if found).");
-		IConsoleHelp("If <settings> is given, it is parsed and the AI settings are set to that.");
+		IConsolePrint(CC_HELP, "Start a new AI. Usage: 'start_ai [<AI>] [<settings>]'.");
+		IConsolePrint(CC_HELP, "Start a new AI. If <AI> is given, it starts that specific AI (if found).");
+		IConsolePrint(CC_HELP, "If <settings> is given, it is parsed and the AI settings are set to that.");
 		return true;
 	}
 
 	if (_game_mode != GM_NORMAL) {
-		IConsoleWarning("AIs can only be managed in a game.");
+		IConsolePrint(CC_ERROR, "AIs can only be managed in a game.");
 		return true;
 	}
 
 	if (Company::GetNumItems() == CompanyPool::MAX_SIZE) {
-		IConsoleWarning("Can't start a new AI (no more free slots).");
+		IConsolePrint(CC_ERROR, "Can't start a new AI (no more free slots).");
 		return true;
 	}
 	if (_networking && !_network_server) {
-		IConsoleWarning("Only the server can start a new AI.");
+		IConsolePrint(CC_ERROR, "Only the server can start a new AI.");
 		return true;
 	}
 	if (_networking && !_settings_game.ai.ai_in_multiplayer) {
-		IConsoleWarning("AIs are not allowed in multiplayer by configuration.");
-		IConsoleWarning("Switch AI -> AI in multiplayer to True.");
+		IConsolePrint(CC_ERROR, "AIs are not allowed in multiplayer by configuration.");
+		IConsolePrint(CC_ERROR, "Switch AI -> AI in multiplayer to True.");
 		return true;
 	}
 	if (!AI::CanStartNew()) {
-		IConsoleWarning("Can't start a new AI.");
+		IConsolePrint(CC_ERROR, "Can't start a new AI.");
 		return true;
 	}
 
@@ -1555,7 +1602,7 @@ DEF_CONSOLE_CMD(ConStartAI)
 		}
 
 		if (!config->HasScript()) {
-			IConsoleWarning("Failed to load the specified AI");
+			IConsolePrint(CC_ERROR, "Failed to load the specified AI.");
 			return true;
 		}
 		if (argc == 3) {
@@ -1572,30 +1619,30 @@ DEF_CONSOLE_CMD(ConStartAI)
 DEF_CONSOLE_CMD(ConReloadAI)
 {
 	if (argc != 2) {
-		IConsoleHelp("Reload an AI. Usage: 'reload_ai <company-id>'");
-		IConsoleHelp("Reload the AI with the given company id. For company-id's, see the list of companies from the dropdown menu. Company 1 is 1, etc.");
+		IConsolePrint(CC_HELP, "Reload an AI. Usage: 'reload_ai <company-id>'.");
+		IConsolePrint(CC_HELP, "Reload the AI with the given company id. For company-id's, see the list of companies from the dropdown menu. Company 1 is 1, etc.");
 		return true;
 	}
 
 	if (_game_mode != GM_NORMAL) {
-		IConsoleWarning("AIs can only be managed in a game.");
+		IConsolePrint(CC_ERROR, "AIs can only be managed in a game.");
 		return true;
 	}
 
 	if (_networking && !_network_server) {
-		IConsoleWarning("Only the server can reload an AI.");
+		IConsolePrint(CC_ERROR, "Only the server can reload an AI.");
 		return true;
 	}
 
 	CompanyID company_id = (CompanyID)(atoi(argv[1]) - 1);
 	if (!Company::IsValidID(company_id)) {
-		IConsolePrintF(CC_DEFAULT, "Unknown company. Company range is between 1 and %d.", MAX_COMPANIES);
+		IConsolePrint(CC_ERROR, "Unknown company. Company range is between 1 and {}.", MAX_COMPANIES);
 		return true;
 	}
 
 	/* In singleplayer mode the player can be in an AI company, after cheating or loading network save with an AI in first slot. */
 	if (Company::IsHumanID(company_id) || company_id == _local_company) {
-		IConsoleWarning("Company is not controlled by an AI.");
+		IConsolePrint(CC_ERROR, "Company is not controlled by an AI.");
 		return true;
 	}
 
@@ -1610,30 +1657,30 @@ DEF_CONSOLE_CMD(ConReloadAI)
 DEF_CONSOLE_CMD(ConStopAI)
 {
 	if (argc != 2) {
-		IConsoleHelp("Stop an AI. Usage: 'stop_ai <company-id>'");
-		IConsoleHelp("Stop the AI with the given company id. For company-id's, see the list of companies from the dropdown menu. Company 1 is 1, etc.");
+		IConsolePrint(CC_HELP, "Stop an AI. Usage: 'stop_ai <company-id>'.");
+		IConsolePrint(CC_HELP, "Stop the AI with the given company id. For company-id's, see the list of companies from the dropdown menu. Company 1 is 1, etc.");
 		return true;
 	}
 
 	if (_game_mode != GM_NORMAL) {
-		IConsoleWarning("AIs can only be managed in a game.");
+		IConsolePrint(CC_ERROR, "AIs can only be managed in a game.");
 		return true;
 	}
 
 	if (_networking && !_network_server) {
-		IConsoleWarning("Only the server can stop an AI.");
+		IConsolePrint(CC_ERROR, "Only the server can stop an AI.");
 		return true;
 	}
 
 	CompanyID company_id = (CompanyID)(atoi(argv[1]) - 1);
 	if (!Company::IsValidID(company_id)) {
-		IConsolePrintF(CC_DEFAULT, "Unknown company. Company range is between 1 and %d.", MAX_COMPANIES);
+		IConsolePrint(CC_ERROR, "Unknown company. Company range is between 1 and {}.", MAX_COMPANIES);
 		return true;
 	}
 
 	/* In singleplayer mode the player can be in an AI company, after cheating or loading network save with an AI in first slot. */
 	if (Company::IsHumanID(company_id) || company_id == _local_company) {
-		IConsoleWarning("Company is not controlled by an AI.");
+		IConsolePrint(CC_ERROR, "Company is not controlled by an AI.");
 		return true;
 	}
 
@@ -1647,12 +1694,12 @@ DEF_CONSOLE_CMD(ConStopAI)
 DEF_CONSOLE_CMD(ConRescanAI)
 {
 	if (argc == 0) {
-		IConsoleHelp("Rescan the AI dir for scripts. Usage: 'rescan_ai'");
+		IConsolePrint(CC_HELP, "Rescan the AI dir for scripts. Usage: 'rescan_ai'.");
 		return true;
 	}
 
 	if (_networking && !_network_server) {
-		IConsoleWarning("Only the server can rescan the AI dir for scripts.");
+		IConsolePrint(CC_ERROR, "Only the server can rescan the AI dir for scripts.");
 		return true;
 	}
 
@@ -1664,12 +1711,12 @@ DEF_CONSOLE_CMD(ConRescanAI)
 DEF_CONSOLE_CMD(ConRescanGame)
 {
 	if (argc == 0) {
-		IConsoleHelp("Rescan the Game Script dir for scripts. Usage: 'rescan_game'");
+		IConsolePrint(CC_HELP, "Rescan the Game Script dir for scripts. Usage: 'rescan_game'.");
 		return true;
 	}
 
 	if (_networking && !_network_server) {
-		IConsoleWarning("Only the server can rescan the Game Script dir for scripts.");
+		IConsolePrint(CC_ERROR, "Only the server can rescan the Game Script dir for scripts.");
 		return true;
 	}
 
@@ -1681,12 +1728,12 @@ DEF_CONSOLE_CMD(ConRescanGame)
 DEF_CONSOLE_CMD(ConRescanNewGRF)
 {
 	if (argc == 0) {
-		IConsoleHelp("Rescan the data dir for NewGRFs. Usage: 'rescan_newgrf'");
+		IConsolePrint(CC_HELP, "Rescan the data dir for NewGRFs. Usage: 'rescan_newgrf'.");
 		return true;
 	}
 
 	if (!RequestNewGRFScan()) {
-		IConsoleWarning("NewGRF scanning is already running. Please wait until completed to run again.");
+		IConsolePrint(CC_ERROR, "NewGRF scanning is already running. Please wait until completed to run again.");
 	}
 
 	return true;
@@ -1695,36 +1742,34 @@ DEF_CONSOLE_CMD(ConRescanNewGRF)
 DEF_CONSOLE_CMD(ConGetSeed)
 {
 	if (argc == 0) {
-		IConsoleHelp("Returns the seed used to create this game. Usage: 'getseed'");
-		IConsoleHelp("The seed can be used to reproduce the exact same map as the game started with.");
+		IConsolePrint(CC_HELP, "Returns the seed used to create this game. Usage: 'getseed'.");
+		IConsolePrint(CC_HELP, "The seed can be used to reproduce the exact same map as the game started with.");
 		return true;
 	}
 
-	IConsolePrintF(CC_DEFAULT, "Generation Seed: %u", _settings_game.game_creation.generation_seed);
+	IConsolePrint(CC_DEFAULT, "Generation Seed: {}", _settings_game.game_creation.generation_seed);
 	return true;
 }
 
 DEF_CONSOLE_CMD(ConGetDate)
 {
 	if (argc == 0) {
-		IConsoleHelp("Returns the current date (year-month-day) of the game. Usage: 'getdate'");
+		IConsolePrint(CC_HELP, "Returns the current date (year-month-day) of the game. Usage: 'getdate'.");
 		return true;
 	}
 
-	IConsolePrintF(CC_DEFAULT, "Date: %04d-%02d-%02d", CalTime::CurYear().base(), CalTime::CurMonth() + 1, CalTime::CurDay());
+	IConsolePrint(CC_DEFAULT, "Date: {:04}-{:02}-{:02}", CalTime::CurYear(), CalTime::CurMonth() + 1, CalTime::CurDay());
 	return true;
 }
 
 DEF_CONSOLE_CMD(ConGetSysDate)
 {
 	if (argc == 0) {
-		IConsoleHelp("Returns the current date (year-month-day) of your system. Usage: 'getsysdate'");
+		IConsolePrint(CC_HELP, "Returns the current date (year-month-day) of your system. Usage: 'getsysdate'.");
 		return true;
 	}
 
-	char buffer[lengthof("2000-01-02 03:04:05")];
-	LocalTime::Format(buffer, lastof(buffer), "%Y-%m-%d %H:%M:%S");
-	IConsolePrintF(CC_DEFAULT, "System Date: %s", buffer);
+	IConsolePrint(CC_DEFAULT, "System Date: {:%Y-%m-%d %H:%M:%S}", fmt::localtime(time(nullptr)));
 	return true;
 }
 
@@ -1734,7 +1779,7 @@ DEF_CONSOLE_CMD(ConAlias)
 	IConsoleAlias *alias;
 
 	if (argc == 0) {
-		IConsoleHelp("Add a new alias, or redefine the behaviour of an existing alias . Usage: 'alias <name> <command>'");
+		IConsolePrint(CC_HELP, "Add a new alias, or redefine the behaviour of an existing alias . Usage: 'alias <name> <command>'.");
 		return true;
 	}
 
@@ -1752,19 +1797,19 @@ DEF_CONSOLE_CMD(ConAlias)
 DEF_CONSOLE_CMD(ConScreenShot)
 {
 	if (argc == 0) {
-		IConsoleHelp("Create a screenshot of the game. Usage: 'screenshot [viewport | normal | big | giant | world | heightmap | minimap] [no_con] [size <width> <height>] [<filename>]'");
-		IConsoleHelp("  'viewport' (default) makes a screenshot of the current viewport (including menus, windows, ..).");
-		IConsoleHelp("  'normal' makes a screenshot of the visible area.");
-		IConsoleHelp("  'big' makes a zoomed-in screenshot of the visible area.");
-		IConsoleHelp("  'giant' makes a screenshot of the whole map using the default zoom level.");
-		IConsoleHelp("  'world' makes a screenshot of the whole map using the current zoom level.");
-		IConsoleHelp("  'heightmap' makes a heightmap screenshot of the map that can be loaded in as heightmap.");
-		IConsoleHelp("  'minimap' makes a top-viewed minimap screenshot of the whole world which represents one tile by one pixel.");
-		IConsoleHelp("  'topography' makes a top-viewed topography screenshot of the whole world which represents one tile by one pixel.");
-		IConsoleHelp("  'industry' makes a top-viewed industries screenshot of the whole world which represents one tile by one pixel.");
-		IConsoleHelp("  'no_con' hides the console to create the screenshot (only useful in combination with 'viewport').");
-		IConsoleHelp("  'size' sets the width and height of the viewport to make a screenshot of (only useful in combination with 'normal' or 'big').");
-		IConsoleHelp("  A filename ending in # will prevent overwriting existing files and will number files counting upwards.");
+		IConsolePrint(CC_HELP, "Create a screenshot of the game. Usage: 'screenshot [viewport | normal | big | giant | world | heightmap | minimap] [no_con] [size <width> <height>] [<filename>]'.");
+		IConsolePrint(CC_HELP, "  'viewport' (default) makes a screenshot of the current viewport (including menus, windows).");
+		IConsolePrint(CC_HELP, "  'normal' makes a screenshot of the visible area.");
+		IConsolePrint(CC_HELP, "  'big' makes a zoomed-in screenshot of the visible area.");
+		IConsolePrint(CC_HELP, "  'giant' makes a screenshot of the whole map using the default zoom level.");
+		IConsolePrint(CC_HELP, "  'world' makes a screenshot of the whole map using the current zoom level.");
+		IConsolePrint(CC_HELP, "  'heightmap' makes a heightmap screenshot of the map that can be loaded in as heightmap.");
+		IConsolePrint(CC_HELP, "  'minimap' makes a top-viewed minimap screenshot of the whole world which represents one tile by one pixel.");
+		IConsolePrint(CC_HELP, "  'topography' makes a top-viewed topography screenshot of the whole world which represents one tile by one pixel.");
+		IConsolePrint(CC_HELP, "  'industry' makes a top-viewed industries screenshot of the whole world which represents one tile by one pixel.");
+		IConsolePrint(CC_HELP, "  'no_con' hides the console to create the screenshot (only useful in combination with 'viewport').");
+		IConsolePrint(CC_HELP, "  'size' sets the width and height of the viewport to make a screenshot of (only useful in combination with 'normal' or 'big').");
+		IConsolePrint(CC_HELP, "  A filename ending in # will prevent overwriting existing files and will number files counting upwards.");
 		return true;
 	}
 
@@ -1809,7 +1854,7 @@ DEF_CONSOLE_CMD(ConScreenShot)
 
 	if (argc > arg_index && strcmp(argv[arg_index], "no_con") == 0) {
 		if (type != SC_VIEWPORT) {
-			IConsoleError("'no_con' can only be used in combination with 'viewport'");
+			IConsolePrint(CC_ERROR, "'no_con' can only be used in combination with 'viewport'.");
 			return true;
 		}
 		IConsoleClose();
@@ -1819,7 +1864,7 @@ DEF_CONSOLE_CMD(ConScreenShot)
 	if (argc > arg_index + 2 && strcmp(argv[arg_index], "size") == 0) {
 		/* size <width> <height> */
 		if (type != SC_DEFAULTZOOM && type != SC_ZOOMEDIN) {
-			IConsoleError("'size' can only be used in combination with 'normal' or 'big'");
+			IConsolePrint(CC_ERROR, "'size' can only be used in combination with 'normal' or 'big'.");
 			return true;
 		}
 		GetArgumentInteger(&width, argv[arg_index + 1]);
@@ -1845,8 +1890,8 @@ DEF_CONSOLE_CMD(ConScreenShot)
 DEF_CONSOLE_CMD(ConMinimap)
 {
 	if (argc == 0) {
-		IConsoleHelp("Create a flat image of the game minimap. Usage: 'minimap [owner] [file name]'");
-		IConsoleHelp("'owner' uses the tile owner to colour the minimap image, this is the only mode at present");
+		IConsolePrint(CC_HELP, "Create a flat image of the game minimap. Usage: 'minimap [owner] [file name]'");
+		IConsolePrint(CC_HELP, "'owner' uses the tile owner to colour the minimap image, this is the only mode at present");
 		return true;
 	}
 
@@ -1868,7 +1913,7 @@ DEF_CONSOLE_CMD(ConMinimap)
 DEF_CONSOLE_CMD(ConInfoCmd)
 {
 	if (argc == 0) {
-		IConsoleHelp("Print out debugging information about a command. Usage: 'info_cmd <cmd>'");
+		IConsolePrint(CC_HELP, "Print out debugging information about a command. Usage: 'info_cmd <cmd>'.");
 		return true;
 	}
 
@@ -1876,14 +1921,13 @@ DEF_CONSOLE_CMD(ConInfoCmd)
 
 	const IConsoleCmd *cmd = IConsole::CmdGet(argv[1]);
 	if (cmd == nullptr) {
-		IConsoleError("the given command was not found");
+		IConsolePrint(CC_ERROR, "The given command was not found.");
 		return true;
 	}
 
-	IConsolePrintF(CC_DEFAULT, "command name: %s", cmd->name.c_str());
-	IConsolePrintF(CC_DEFAULT, "command proc: %p", cmd->proc);
+	IConsolePrint(CC_DEFAULT, "Command name: '{}'", cmd->name);
 
-	if (cmd->hook != nullptr) IConsoleWarning("command is hooked");
+	if (cmd->hook != nullptr) IConsolePrint(CC_DEFAULT, "Command is hooked.");
 
 	return true;
 }
@@ -1891,17 +1935,17 @@ DEF_CONSOLE_CMD(ConInfoCmd)
 DEF_CONSOLE_CMD(ConDebugLevel)
 {
 	if (argc == 0) {
-		IConsoleHelp("Get/set the default debugging level for the game. Usage: 'debug_level [<level>]'");
-		IConsoleHelp("Level can be any combination of names, levels. Eg 'net=5 ms=4'. Remember to enclose it in \"'s");
+		IConsolePrint(CC_HELP, "Get/set the default debugging level for the game. Usage: 'debug_level [<level>]'.");
+		IConsolePrint(CC_HELP, "Level can be any combination of names, levels. Eg 'net=5 ms=4'. Remember to enclose it in \"'\"s.");
 		return true;
 	}
 
 	if (argc > 2) return false;
 
 	if (argc == 1) {
-		IConsolePrintF(CC_DEFAULT, "Current debug-level: '%s'", GetDebugString().c_str());
+		IConsolePrint(CC_DEFAULT, "Current debug-level: '{}'", GetDebugString());
 	} else {
-		SetDebugString(argv[1], [](const char *err) { IConsolePrint(CC_ERROR, err); });
+		SetDebugString(argv[1], [](std::string err) { IConsolePrint(CC_ERROR, err); });
 	}
 
 	return true;
@@ -1910,7 +1954,7 @@ DEF_CONSOLE_CMD(ConDebugLevel)
 DEF_CONSOLE_CMD(ConExit)
 {
 	if (argc == 0) {
-		IConsoleHelp("Exit the game. Usage: 'exit'");
+		IConsolePrint(CC_HELP, "Exit the game. Usage: 'exit'.");
 		return true;
 	}
 
@@ -1923,7 +1967,7 @@ DEF_CONSOLE_CMD(ConExit)
 DEF_CONSOLE_CMD(ConPart)
 {
 	if (argc == 0) {
-		IConsoleHelp("Leave the currently joined/running game (only ingame). Usage: 'part'");
+		IConsolePrint(CC_HELP, "Leave the currently joined/running game (only ingame). Usage: 'part'.");
 		return true;
 	}
 
@@ -1957,22 +2001,22 @@ DEF_CONSOLE_CMD(ConHelp)
 				cmd->proc(0, nullptr);
 				return true;
 			}
-			IConsolePrintF(CC_ERROR, "ERROR: alias is of special type, please see its execution-line: '%s'", alias->cmdline.c_str());
+			IConsolePrint(CC_ERROR, "Alias is of special type, please see its execution-line: '{}'.", alias->cmdline);
 			return true;
 		}
 
-		IConsoleError("command not found");
+		IConsolePrint(CC_ERROR, "Command not found.");
 		return true;
 	}
 
-	IConsolePrint(CC_WARNING, " ---- OpenTTD Console Help ---- ");
-	IConsolePrint(CC_DEFAULT, " - commands: [command to list all commands: list_cmds]");
+	IConsolePrint(TC_LIGHT_BLUE, " ---- OpenTTD Console Help ---- ");
+	IConsolePrint(CC_DEFAULT, " - commands: the command to list all commands is 'list_cmds'.");
 	IConsolePrint(CC_DEFAULT, " call commands with '<command> <arg2> <arg3>...'");
-	IConsolePrint(CC_DEFAULT, " - to assign strings, or use them as arguments, enclose it within quotes");
-	IConsolePrint(CC_DEFAULT, " like this: '<command> \"string argument with spaces\"'");
-	IConsolePrint(CC_DEFAULT, " - use 'help <command>' to get specific information");
-	IConsolePrint(CC_DEFAULT, " - scroll console output with shift + (up | down | pageup | pagedown)");
-	IConsolePrint(CC_DEFAULT, " - scroll console input history with the up or down arrows");
+	IConsolePrint(CC_DEFAULT, " - to assign strings, or use them as arguments, enclose it within quotes.");
+	IConsolePrint(CC_DEFAULT, " like this: '<command> \"string argument with spaces\"'.");
+	IConsolePrint(CC_DEFAULT, " - use 'help <command>' to get specific information.");
+	IConsolePrint(CC_DEFAULT, " - scroll console output with shift + (up | down | pageup | pagedown).");
+	IConsolePrint(CC_DEFAULT, " - scroll console input history with the up or down arrows.");
 	IConsolePrint(CC_DEFAULT, "");
 	return true;
 }
@@ -1980,14 +2024,14 @@ DEF_CONSOLE_CMD(ConHelp)
 DEF_CONSOLE_CMD(ConListCommands)
 {
 	if (argc == 0) {
-		IConsoleHelp("List all registered commands. Usage: 'list_cmds [<pre-filter>]'");
+		IConsolePrint(CC_HELP, "List all registered commands. Usage: 'list_cmds [<pre-filter>]'.");
 		return true;
 	}
 
 	for (auto &it : IConsole::Commands()) {
 		const IConsoleCmd *cmd = &it.second;
 		if (argv[1] == nullptr || cmd->name.find(argv[1]) != std::string::npos) {
-			if ((_settings_client.gui.console_show_unlisted || !cmd->unlisted) && (cmd->hook == nullptr || cmd->hook(false) != CHR_HIDE)) IConsolePrintF(CC_DEFAULT, "%s", cmd->name.c_str());
+			if ((_settings_client.gui.console_show_unlisted || !cmd->unlisted) && (cmd->hook == nullptr || cmd->hook(false) != CHR_HIDE)) IConsolePrint(CC_DEFAULT, cmd->name);
 		}
 	}
 
@@ -1997,14 +2041,14 @@ DEF_CONSOLE_CMD(ConListCommands)
 DEF_CONSOLE_CMD(ConListAliases)
 {
 	if (argc == 0) {
-		IConsoleHelp("List all registered aliases. Usage: 'list_aliases [<pre-filter>]'");
+		IConsolePrint(CC_HELP, "List all registered aliases. Usage: 'list_aliases [<pre-filter>]'.");
 		return true;
 	}
 
 	for (auto &it : IConsole::Aliases()) {
 		const IConsoleAlias *alias = &it.second;
 		if (argv[1] == nullptr || alias->name.find(argv[1]) != std::string::npos) {
-			IConsolePrintF(CC_DEFAULT, "%s => %s", alias->name.c_str(), alias->cmdline.c_str());
+			IConsolePrint(CC_DEFAULT, "{} => {}", alias->name, alias->cmdline);
 		}
 	}
 
@@ -2014,7 +2058,7 @@ DEF_CONSOLE_CMD(ConListAliases)
 DEF_CONSOLE_CMD(ConCompanies)
 {
 	if (argc == 0) {
-		IConsoleHelp("List the details of all companies in the game. Usage 'companies'");
+		IConsolePrint(CC_HELP, "List the details of all companies in the game. Usage 'companies'.");
 		return true;
 	}
 
@@ -2030,9 +2074,10 @@ DEF_CONSOLE_CMD(ConCompanies)
 			password_state = _network_company_states[c->index].password.empty() ? "unprotected" : "protected";
 		}
 
-		IConsolePrintF(CC_INFO, "#:%d(%s) Company Name: '%s'  Year Founded: %d  Age: %d  Money: " OTTD_PRINTF64 "  Loan: " OTTD_PRINTF64 "  Value: " OTTD_PRINTF64 "  (T:%d, R:%d, P:%d, S:%d) %s",
-			c->index + 1, GetStringPtr(STR_COLOUR_DARK_BLUE + _company_colours[c->index]), company_name.c_str(),
-			c->InauguratedDisplayYear(), c->age_years.base(), (int64_t)c->money, (int64_t)c->current_loan, (int64_t)CalculateCompanyValue(c),
+		std::string colour = GetString(STR_COLOUR_DARK_BLUE + _company_colours[c->index]);
+		IConsolePrint(CC_INFO, "#:{}({}) Company Name: '{}'  Year Founded: {}  Age: {}  Money: {}  Loan: {}  Value: {}  (T:{}, R:{}, P:{}, S:{}) {}",
+			c->index + 1, colour, company_name,
+			c->InauguratedDisplayYear(), c->age_years, (int64_t)c->money, (int64_t)c->current_loan, (int64_t)CalculateCompanyValue(c),
 			c->group_all[VEH_TRAIN].num_vehicle,
 			c->group_all[VEH_ROAD].num_vehicle,
 			c->group_all[VEH_AIRCRAFT].num_vehicle,
@@ -2046,7 +2091,7 @@ DEF_CONSOLE_CMD(ConCompanies)
 DEF_CONSOLE_CMD(ConSay)
 {
 	if (argc == 0) {
-		IConsoleHelp("Chat to your fellow players in a multiplayer game. Usage: 'say \"<msg>\"'");
+		IConsolePrint(CC_HELP, "Chat to your fellow players in a multiplayer game. Usage: 'say \"<msg>\"'.");
 		return true;
 	}
 
@@ -2065,8 +2110,8 @@ DEF_CONSOLE_CMD(ConSay)
 DEF_CONSOLE_CMD(ConSayCompany)
 {
 	if (argc == 0) {
-		IConsoleHelp("Chat to a certain company in a multiplayer game. Usage: 'say_company <company-no> \"<msg>\"'");
-		IConsoleHelp("CompanyNo is the company that plays as company <companyno>, 1 through max_companies");
+		IConsolePrint(CC_HELP, "Chat to a certain company in a multiplayer game. Usage: 'say_company <company-no> \"<msg>\"'.");
+		IConsolePrint(CC_HELP, "CompanyNo is the company that plays as company <companyno>, 1 through max_companies.");
 		return true;
 	}
 
@@ -2074,7 +2119,7 @@ DEF_CONSOLE_CMD(ConSayCompany)
 
 	CompanyID company_id = (CompanyID)(atoi(argv[1]) - 1);
 	if (!Company::IsValidID(company_id)) {
-		IConsolePrintF(CC_DEFAULT, "Unknown company. Company range is between 1 and %d.", MAX_COMPANIES);
+		IConsolePrint(CC_DEFAULT, "Unknown company. Company range is between 1 and {}.", MAX_COMPANIES);
 		return true;
 	}
 
@@ -2091,8 +2136,8 @@ DEF_CONSOLE_CMD(ConSayCompany)
 DEF_CONSOLE_CMD(ConSayClient)
 {
 	if (argc == 0) {
-		IConsoleHelp("Chat to a certain client in a multiplayer game. Usage: 'say_client <client-no> \"<msg>\"'");
-		IConsoleHelp("For client-id's, see the command 'clients'");
+		IConsolePrint(CC_HELP, "Chat to a certain client in a multiplayer game. Usage: 'say_client <client-no> \"<msg>\"'.");
+		IConsolePrint(CC_HELP, "For client-id's, see the command 'clients'.");
 		return true;
 	}
 
@@ -2111,18 +2156,15 @@ DEF_CONSOLE_CMD(ConSayClient)
 DEF_CONSOLE_CMD(ConCompanyPassword)
 {
 	if (argc == 0) {
-		const char *helpmsg;
-
 		if (_network_dedicated) {
-			helpmsg = "Change the password of a company. Usage: 'company_pw <company-no> \"<password>\"";
+			IConsolePrint(CC_HELP, "Change the password of a company. Usage: 'company_pw <company-no> \"<password>\".");
 		} else if (_network_server) {
-			helpmsg = "Change the password of your or any other company. Usage: 'company_pw [<company-no>] \"<password>\"'";
+			IConsolePrint(CC_HELP, "Change the password of your or any other company. Usage: 'company_pw [<company-no>] \"<password>\"'.");
 		} else {
-			helpmsg = "Change the password of your company. Usage: 'company_pw \"<password>\"'";
+			IConsolePrint(CC_HELP, "Change the password of your company. Usage: 'company_pw \"<password>\"'.");
 		}
 
-		IConsoleHelp(helpmsg);
-		IConsoleHelp("Use \"*\" to disable the password.");
+		IConsolePrint(CC_HELP, "Use \"*\" to disable the password.");
 		return true;
 	}
 
@@ -2143,26 +2185,161 @@ DEF_CONSOLE_CMD(ConCompanyPassword)
 	}
 
 	if (!Company::IsValidHumanID(company_id)) {
-		IConsoleError(errormsg);
+		IConsolePrint(CC_ERROR, errormsg);
 		return false;
 	}
 
 	password = NetworkChangeCompanyPassword(company_id, password);
 
 	if (password.empty()) {
-		IConsolePrintF(CC_WARNING, "Company password cleared");
+		IConsolePrint(CC_INFO, "Company password cleared.");
 	} else {
-		IConsolePrintF(CC_WARNING, "Company password changed to: %s", password.c_str());
+		IConsolePrint(CC_INFO, "Company password changed to '{}'.", password);
 	}
 
 	return true;
 }
 
+/** All the known authorized keys with their name. */
+static std::vector<std::pair<std::string_view, NetworkAuthorizedKeys *>> _console_cmd_authorized_keys{
+	{ "admin", &_settings_client.network.admin_authorized_keys },
+	{ "rcon", &_settings_client.network.rcon_authorized_keys },
+	{ "server", &_settings_client.network.server_authorized_keys },
+	{ "settings", &_settings_client.network.settings_authorized_keys },
+};
+
+enum ConNetworkAuthorizedKeyAction {
+	CNAKA_LIST,
+	CNAKA_ADD,
+	CNAKA_REMOVE,
+};
+
+static void PerformNetworkAuthorizedKeyAction(std::string_view name, NetworkAuthorizedKeys *authorized_keys, ConNetworkAuthorizedKeyAction action, const std::string &authorized_key, CompanyID company = INVALID_COMPANY)
+{
+	switch (action) {
+		case CNAKA_LIST:
+			IConsolePrint(CC_WHITE, "The authorized keys for {} are:", name);
+			for (auto &ak : *authorized_keys) IConsolePrint(CC_INFO, "  {}", ak);
+			return;
+
+		case CNAKA_ADD:
+			if (authorized_keys->Contains(authorized_key)) {
+				IConsolePrint(CC_WARNING, "Not added {} to {} as it already exists.", authorized_key, name);
+				return;
+			}
+
+			if (company == INVALID_COMPANY) {
+				authorized_keys->Add(authorized_key);
+			} else {
+				AutoRestoreBackup backup(_current_company, company);
+				DoCommandP(0, CALCA_ADD, 0, CMD_COMPANY_ALLOW_LIST_CTRL, nullptr, authorized_key.c_str());
+			}
+			IConsolePrint(CC_INFO, "Added {} to {}.", authorized_key, name);
+			return;
+
+		case CNAKA_REMOVE:
+			if (!authorized_keys->Contains(authorized_key)) {
+				IConsolePrint(CC_WARNING, "Not removed {} from {} as it does not exist.", authorized_key, name);
+				return;
+			}
+
+			if (company == INVALID_COMPANY) {
+				authorized_keys->Remove(authorized_key);
+			} else {
+				AutoRestoreBackup backup(_current_company, company);
+				DoCommandP(0, CALCA_REMOVE, 0, CMD_COMPANY_ALLOW_LIST_CTRL, nullptr, authorized_key.c_str());
+			}
+			IConsolePrint(CC_INFO, "Removed {} from {}.", authorized_key, name);
+			return;
+	}
+}
+
+DEF_CONSOLE_CMD(ConNetworkAuthorizedKey)
+{
+	if (argc <= 2) {
+		IConsolePrint(CC_HELP, "List and update authorized keys. Usage: 'authorized_key list [type]|add [type] [key]|remove [type] [key]'.");
+		IConsolePrint(CC_HELP, "  list: list all the authorized keys of the given type.");
+		IConsolePrint(CC_HELP, "  add: add the given key to the authorized keys of the given type.");
+		IConsolePrint(CC_HELP, "  remove: remove the given key from the authorized keys of the given type; use 'all' to remove all authorized keys.");
+		IConsolePrint(CC_HELP, "Instead of a key, use 'client:<id>' to add/remove the key of that given client.");
+
+		std::string buffer;
+		for (auto [name, _] : _console_cmd_authorized_keys) fmt::format_to(std::back_inserter(buffer), ", {}", name);
+		IConsolePrint(CC_HELP, "The supported types are: all{} and company:<id>.", buffer);
+		return true;
+	}
+
+	ConNetworkAuthorizedKeyAction action;
+	std::string_view action_string = argv[1];
+	if (StrEqualsIgnoreCase(action_string, "list")) {
+		action = CNAKA_LIST;
+	} else if (StrEqualsIgnoreCase(action_string, "add")) {
+		action = CNAKA_ADD;
+	} else if (StrEqualsIgnoreCase(action_string, "remove") || StrEqualsIgnoreCase(action_string, "delete")) {
+		action = CNAKA_REMOVE;
+	} else {
+		IConsolePrint(CC_WARNING, "No valid action was given.");
+		return false;
+	}
+
+	std::string authorized_key;
+	if (action != CNAKA_LIST) {
+		if (argc <= 3) {
+			IConsolePrint(CC_ERROR, "You must enter the key.");
+			return false;
+		}
+
+		authorized_key = argv[3];
+		if (StrStartsWithIgnoreCase(authorized_key, "client:")) {
+			std::string id_string(authorized_key.substr(7));
+			authorized_key = NetworkGetPublicKeyOfClient(static_cast<ClientID>(std::stoi(id_string)));
+			if (authorized_key.empty()) {
+				IConsolePrint(CC_ERROR, "You must enter a valid client id; see 'clients'.");
+				return false;
+			}
+		}
+
+		if (authorized_key.size() != NETWORK_PUBLIC_KEY_LENGTH - 1) {
+			IConsolePrint(CC_ERROR, "You must enter a valid authorized key.");
+			return false;
+		}
+	}
+
+	std::string_view type = argv[2];
+	if (StrEqualsIgnoreCase(type, "all")) {
+		for (auto [name, authorized_keys] : _console_cmd_authorized_keys) PerformNetworkAuthorizedKeyAction(name, authorized_keys, action, authorized_key);
+		for (Company *c : Company::Iterate()) PerformNetworkAuthorizedKeyAction(fmt::format("company:{}", c->index + 1), &c->allow_list, action, authorized_key, c->index);
+		return true;
+	}
+
+	if (StrStartsWithIgnoreCase(type, "company:")) {
+		std::string id_string(type.substr(8));
+		Company *c = Company::GetIfValid(std::stoi(id_string) - 1);
+		if (c == nullptr) {
+			IConsolePrint(CC_ERROR, "You must enter a valid company id; see 'companies'.");
+			return false;
+		}
+
+		PerformNetworkAuthorizedKeyAction(type, &c->allow_list, action, authorized_key, c->index);
+		return true;
+	}
+
+	for (auto [name, authorized_keys] : _console_cmd_authorized_keys) {
+		if (StrEqualsIgnoreCase(type, name)) continue;
+
+		PerformNetworkAuthorizedKeyAction(name, authorized_keys, action, authorized_key);
+		return true;
+	}
+
+	IConsolePrint(CC_WARNING, "No valid type was given.");
+	return false;
+}
+
 DEF_CONSOLE_CMD(ConCompanyPasswordHash)
 {
 	if (argc == 0) {
-		IConsoleHelp("Change the password hash of a company. Usage: 'company_pw_hash <company-no> \"<password_hash>\"");
-		IConsoleHelp("Use \"*\" to disable the password.");
+		IConsolePrint(CC_HELP, "Change the password hash of a company. Usage: 'company_pw_hash <company-no> \"<password_hash>\"");
+		IConsolePrint(CC_HELP, "Use \"*\" to disable the password.");
 		return true;
 	}
 
@@ -2172,7 +2349,7 @@ DEF_CONSOLE_CMD(ConCompanyPasswordHash)
 	const char *password = argv[2];
 
 	if (!Company::IsValidHumanID(company_id)) {
-		IConsoleError("You have to specify the ID of a valid human controlled company.");
+		IConsolePrint(CC_ERROR, "You have to specify the ID of a valid human controlled company.");
 		return false;
 	}
 
@@ -2181,9 +2358,9 @@ DEF_CONSOLE_CMD(ConCompanyPasswordHash)
 	NetworkServerSetCompanyPassword(company_id, password, true);
 
 	if (StrEmpty(password)) {
-		IConsolePrintF(CC_WARNING, "Company password hash cleared");
+		IConsolePrint(CC_WARNING, "Company password hash cleared");
 	} else {
-		IConsolePrintF(CC_WARNING, "Company password hash changed to: %s", password);
+		IConsolePrint(CC_WARNING, "Company password hash changed to: {}", password);
 	}
 
 	return true;
@@ -2192,7 +2369,7 @@ DEF_CONSOLE_CMD(ConCompanyPasswordHash)
 DEF_CONSOLE_CMD(ConCompanyPasswordHashes)
 {
 	if (argc == 0) {
-		IConsoleHelp("List the password hashes of all companies in the game. Usage 'company_pw_hashes'");
+		IConsolePrint(CC_HELP, "List the password hashes of all companies in the game. Usage 'company_pw_hashes'");
 		return true;
 	}
 
@@ -2201,7 +2378,7 @@ DEF_CONSOLE_CMD(ConCompanyPasswordHashes)
 		SetDParam(0, c->index);
 		std::string company_name = GetString(STR_COMPANY_NAME);
 
-		IConsolePrintF(CC_INFO, "#:%d(%s) Company Name: '%s'  Hash: '%s'",
+		IConsolePrint(CC_INFO, "#:{}({}) Company Name: '{}'  Hash: '{}'",
 			c->index + 1, GetStringPtr(STR_COLOUR_DARK_BLUE + _company_colours[c->index]), company_name.c_str(), _network_company_states[c->index].password.c_str());
 	}
 
@@ -2215,9 +2392,16 @@ DEF_CONSOLE_CMD(ConCompanyPasswordHashes)
 /** Resolve a string to a content type. */
 static ContentType StringToContentType(const char *str)
 {
-	static const char * const inv_lookup[] = { "", "base", "newgrf", "ai", "ailib", "scenario", "heightmap" };
-	for (uint i = 1 /* there is no type 0 */; i < lengthof(inv_lookup); i++) {
-		if (StrEqualsIgnoreCase(str, inv_lookup[i])) return (ContentType)i;
+	static const std::initializer_list<std::pair<std::string_view, ContentType>> content_types = {
+		{"base",      CONTENT_TYPE_BASE_GRAPHICS},
+		{"newgrf",    CONTENT_TYPE_NEWGRF},
+		{"ai",        CONTENT_TYPE_AI},
+		{"ailib",     CONTENT_TYPE_AI_LIBRARY},
+		{"scenario",  CONTENT_TYPE_SCENARIO},
+		{"heightmap", CONTENT_TYPE_HEIGHTMAP},
+	};
+	for (const auto &ct : content_types) {
+		if (StrEqualsIgnoreCase(str, ct.first)) return ct.second;
 	}
 	return CONTENT_TYPE_END;
 }
@@ -2226,17 +2410,17 @@ static ContentType StringToContentType(const char *str)
 struct ConsoleContentCallback : public ContentCallback {
 	void OnConnect(bool success) override
 	{
-		IConsolePrintF(CC_DEFAULT, "Content server connection %s", success ? "established" : "failed");
+		IConsolePrint(CC_DEFAULT, "Content server connection {}.", success ? "established" : "failed");
 	}
 
 	void OnDisconnect() override
 	{
-		IConsolePrintF(CC_DEFAULT, "Content server connection closed");
+		IConsolePrint(CC_DEFAULT, "Content server connection closed.");
 	}
 
 	void OnDownloadComplete(ContentID cid) override
 	{
-		IConsolePrintF(CC_DEFAULT, "Completed download of %d", cid);
+		IConsolePrint(CC_DEFAULT, "Completed download of {}.", cid);
 	}
 };
 
@@ -2251,9 +2435,7 @@ static void OutputContentState(const ContentInfo *const ci)
 	static const char * const states[] = { "Not selected", "Selected", "Dep Selected", "Installed", "Unknown" };
 	static const TextColour state_to_colour[] = { CC_COMMAND, CC_INFO, CC_INFO, CC_WHITE, CC_ERROR };
 
-	char buf[sizeof(ci->md5sum) * 2 + 1];
-	md5sumToString(buf, lastof(buf), ci->md5sum);
-	IConsolePrintF(state_to_colour[ci->state], "%d, %s, %s, %s, %08X, %s", ci->id, types[ci->type - 1], states[ci->state], ci->name.c_str(), ci->unique_id, buf);
+	IConsolePrint(state_to_colour[ci->state], "{}, {}, {}, {}, {:08X}, {}", ci->id, types[ci->type - 1], states[ci->state], ci->name, ci->unique_id, FormatArrayAsHex(ci->md5sum));
 }
 
 DEF_CONSOLE_CMD(ConContent)
@@ -2265,13 +2447,13 @@ DEF_CONSOLE_CMD(ConContent)
 	}
 
 	if (argc <= 1) {
-		IConsoleHelp("Query, select and download content. Usage: 'content update|upgrade|select [id]|unselect [all|id]|state [filter]|download'");
-		IConsoleHelp("  update: get a new list of downloadable content; must be run first");
-		IConsoleHelp("  upgrade: select all items that are upgrades");
-		IConsoleHelp("  select: select a specific item given by its id. If no parameter is given, all selected content will be listed");
-		IConsoleHelp("  unselect: unselect a specific item given by its id or 'all' to unselect all");
-		IConsoleHelp("  state: show the download/select state of all downloadable content. Optionally give a filter string");
-		IConsoleHelp("  download: download all content you've selected");
+		IConsolePrint(CC_HELP, "Query, select and download content. Usage: 'content update|upgrade|select [id]|unselect [all|id]|state [filter]|download'.");
+		IConsolePrint(CC_HELP, "  update: get a new list of downloadable content; must be run first.");
+		IConsolePrint(CC_HELP, "  upgrade: select all items that are upgrades.");
+		IConsolePrint(CC_HELP, "  select: select a specific item given by its id. If no parameter is given, all selected content will be listed.");
+		IConsolePrint(CC_HELP, "  unselect: unselect a specific item given by its id or 'all' to unselect all.");
+		IConsolePrint(CC_HELP, "  state: show the download/select state of all downloadable content. Optionally give a filter string.");
+		IConsolePrint(CC_HELP, "  download: download all content you've selected.");
 		return true;
 	}
 
@@ -2288,7 +2470,7 @@ DEF_CONSOLE_CMD(ConContent)
 	if (StrEqualsIgnoreCase(argv[1], "select")) {
 		if (argc <= 2) {
 			/* List selected content */
-			IConsolePrintF(CC_WHITE, "id, type, state, name");
+			IConsolePrint(CC_WHITE, "id, type, state, name");
 			for (ConstContentIterator iter = _network_content_client.Begin(); iter != _network_content_client.End(); iter++) {
 				if ((*iter)->state != ContentInfo::SELECTED && (*iter)->state != ContentInfo::AUTOSELECTED) continue;
 				OutputContentState(*iter);
@@ -2300,7 +2482,7 @@ DEF_CONSOLE_CMD(ConContent)
 			 * to download every available package on BaNaNaS. This is not in
 			 * the spirit of this service. Additionally, these few people were
 			 * good for 70% of the consumed bandwidth of BaNaNaS. */
-			IConsoleError("'select all' is no longer supported since 1.11");
+			IConsolePrint(CC_ERROR, "'select all' is no longer supported since 1.11.");
 		} else {
 			_network_content_client.Select((ContentID)atoi(argv[2]));
 		}
@@ -2309,7 +2491,7 @@ DEF_CONSOLE_CMD(ConContent)
 
 	if (StrEqualsIgnoreCase(argv[1], "unselect")) {
 		if (argc <= 2) {
-			IConsoleError("You must enter the id.");
+			IConsolePrint(CC_ERROR, "You must enter the id.");
 			return false;
 		}
 		if (StrEqualsIgnoreCase(argv[2], "all")) {
@@ -2321,7 +2503,7 @@ DEF_CONSOLE_CMD(ConContent)
 	}
 
 	if (StrEqualsIgnoreCase(argv[1], "state")) {
-		IConsolePrintF(CC_WHITE, "id, type, state, name");
+		IConsolePrint(CC_WHITE, "id, type, state, name");
 		for (ConstContentIterator iter = _network_content_client.Begin(); iter != _network_content_client.End(); iter++) {
 			if (argc > 2 && strcasestr((*iter)->name.c_str(), argv[2]) == nullptr) continue;
 			OutputContentState(*iter);
@@ -2333,7 +2515,7 @@ DEF_CONSOLE_CMD(ConContent)
 		uint files;
 		uint bytes;
 		_network_content_client.DownloadSelectedContent(files, bytes);
-		IConsolePrintF(CC_DEFAULT, "Downloading %d file(s) (%d bytes)", files, bytes);
+		IConsolePrint(CC_DEFAULT, "Downloading {} file(s) ({} bytes).", files, bytes);
 		return true;
 	}
 
@@ -2344,13 +2526,17 @@ DEF_CONSOLE_CMD(ConContent)
 DEF_CONSOLE_CMD(ConFont)
 {
 	if (argc == 0) {
-		IConsoleHelp("Manage the fonts configuration.");
-		IConsoleHelp("Usage 'font'.");
-		IConsoleHelp("  Print out the fonts configuration.");
-		IConsoleHelp("Usage 'font [medium|small|large|mono] [<name>] [<size>] [aa|noaa]'.");
-		IConsoleHelp("  Change the configuration for a font.");
-		IConsoleHelp("  Omitting an argument will keep the current value.");
-		IConsoleHelp("  Set <name> to \"\" for the sprite font (size and aa have no effect on sprite font).");
+		IConsolePrint(CC_HELP, "Manage the fonts configuration.");
+		IConsolePrint(CC_HELP, "Usage 'font'.");
+		IConsolePrint(CC_HELP, "  Print out the fonts configuration.");
+		IConsolePrint(CC_HELP, "  The \"Currently active\" configuration is the one actually in effect (after interface scaling and replacing unavailable fonts).");
+		IConsolePrint(CC_HELP, "  The \"Requested\" configuration is the one requested via console command or config file.");
+		IConsolePrint(CC_HELP, "Usage 'font [medium|small|large|mono] [<font name>] [<size>]'.");
+		IConsolePrint(CC_HELP, "  Change the configuration for a font.");
+		IConsolePrint(CC_HELP, "  Omitting an argument will keep the current value.");
+		IConsolePrint(CC_HELP, "  Set <font name> to \"\" for the default font. Note that <size> has no effect if the default font is in use, and fixed defaults are used instead.");
+		IConsolePrint(CC_HELP, "  If the sprite font is enabled in Game Options, it is used instead of the default font.");
+		IConsolePrint(CC_HELP, "  The <size> is automatically multiplied by the current interface scaling.");
 		return true;
 	}
 
@@ -2366,38 +2552,23 @@ DEF_CONSOLE_CMD(ConFont)
 		FontCacheSubSetting *setting = GetFontCacheSubSetting(argfs);
 		std::string font = setting->font;
 		uint size = setting->size;
-		bool aa = setting->aa;
+		uint v;
+		uint8_t arg_index = 2;
+		/* For <name> we want a string. */
 
-		byte arg_index = 2;
-		/* We may encounter "aa" or "noaa" but it must be the last argument. */
-		if (StrEqualsIgnoreCase(argv[arg_index], "aa") || StrEqualsIgnoreCase(argv[arg_index], "noaa")) {
-			aa = !StrStartsWithIgnoreCase(argv[arg_index++], "no");
-			if (argc > arg_index) return false;
-		} else {
-			/* For <name> we want a string. */
-			uint v;
-			if (!GetArgumentInteger(&v, argv[arg_index])) {
-				font = argv[arg_index++];
-			}
+		if (!GetArgumentInteger(&v, argv[arg_index])) {
+			font = argv[arg_index++];
 		}
 
 		if (argc > arg_index) {
 			/* For <size> we want a number. */
-			uint v;
 			if (GetArgumentInteger(&v, argv[arg_index])) {
 				size = v;
 				arg_index++;
 			}
 		}
 
-		if (argc > arg_index) {
-			/* Last argument must be "aa" or "noaa". */
-			if (!StrEqualsIgnoreCase(argv[arg_index], "aa") && !StrEqualsIgnoreCase(argv[arg_index], "noaa")) return false;
-			aa = !StrStartsWithIgnoreCase(argv[arg_index++], "no");
-			if (argc > arg_index) return false;
-		}
-
-		SetFont(argfs, font, size, aa);
+		SetFont(argfs, font, size);
 	}
 
 	for (FontSize fs = FS_BEGIN; fs < FS_END; fs++) {
@@ -2408,7 +2579,9 @@ DEF_CONSOLE_CMD(ConFont)
 			InitFontCache(fs == FS_MONO);
 			fc = FontCache::Get(fs);
 		}
-		IConsolePrintF(CC_DEFAULT, "%s: \"%s\" %d %s [\"%s\" %d %s]", FontSizeToName(fs), fc->GetFontName().c_str(), fc->GetFontSize(), GetFontAAState(fs) ? "aa" : "noaa", setting->font.c_str(), setting->size, setting->aa ? "aa" : "noaa");
+		IConsolePrint(CC_DEFAULT, "{} font:", FontSizeToName(fs));
+		IConsolePrint(CC_DEFAULT, "Currently active: \"{}\", size {}", fc->GetFontName(), fc->GetFontSize());
+		IConsolePrint(CC_DEFAULT, "Requested: \"{}\", size {}", setting->font, setting->size);
 	}
 
 	FontChanged();
@@ -2419,8 +2592,8 @@ DEF_CONSOLE_CMD(ConFont)
 DEF_CONSOLE_CMD(ConSetting)
 {
 	if (argc == 0) {
-		IConsoleHelp("Change setting for all clients. Usage: 'setting <name> [<value>]'");
-		IConsoleHelp("Omitting <value> will print out the current value of the setting.");
+		IConsolePrint(CC_HELP, "Change setting for all clients. Usage: 'setting <name> [<value>]'.");
+		IConsolePrint(CC_HELP, "Omitting <value> will print out the current value of the setting.");
 		return true;
 	}
 
@@ -2438,8 +2611,8 @@ DEF_CONSOLE_CMD(ConSetting)
 DEF_CONSOLE_CMD(ConSettingNewgame)
 {
 	if (argc == 0) {
-		IConsoleHelp("Change setting for the next game. Usage: 'setting_newgame <name> [<value>]'");
-		IConsoleHelp("Omitting <value> will print out the current value of the setting.");
+		IConsolePrint(CC_HELP, "Change setting for the next game. Usage: 'setting_newgame <name> [<value>]'.");
+		IConsolePrint(CC_HELP, "Omitting <value> will print out the current value of the setting.");
 		return true;
 	}
 
@@ -2457,7 +2630,7 @@ DEF_CONSOLE_CMD(ConSettingNewgame)
 DEF_CONSOLE_CMD(ConListSettings)
 {
 	if (argc == 0) {
-		IConsoleHelp("List settings. Usage: 'list_settings [<pre-filter>]'");
+		IConsolePrint(CC_HELP, "List settings. Usage: 'list_settings [<pre-filter>]'.");
 		return true;
 	}
 
@@ -2470,7 +2643,7 @@ DEF_CONSOLE_CMD(ConListSettings)
 DEF_CONSOLE_CMD(ConListSettingsDefaults)
 {
 	if (argc == 0) {
-		IConsoleHelp("List settings and also show default value. Usage: 'list_settings_def [<pre-filter>]'");
+		IConsolePrint(CC_HELP, "List settings and also show default value. Usage: 'list_settings_def [<pre-filter>]'");
 		return true;
 	}
 
@@ -2483,7 +2656,7 @@ DEF_CONSOLE_CMD(ConListSettingsDefaults)
 DEF_CONSOLE_CMD(ConGamelogPrint)
 {
 	if (argc == 0) {
-		IConsoleHelp("Print logged fundamental changes to the game since the start. Usage: 'gamelog'.");
+		IConsolePrint(CC_HELP, "Print logged fundamental changes to the game since the start. Usage: 'gamelog'.");
 		return true;
 	}
 
@@ -2494,7 +2667,7 @@ DEF_CONSOLE_CMD(ConGamelogPrint)
 DEF_CONSOLE_CMD(ConNewGRFReload)
 {
 	if (argc == 0) {
-		IConsoleHelp("Reloads all active NewGRFs from disk. Equivalent to reapplying NewGRFs via the settings, but without asking for confirmation. This might crash OpenTTD!");
+		IConsolePrint(CC_HELP, "Reloads all active NewGRFs from disk. Equivalent to reapplying NewGRFs via the settings, but without asking for confirmation. This might crash OpenTTD!");
 		return true;
 	}
 
@@ -2530,15 +2703,15 @@ DEF_CONSOLE_CMD(ConListDirs)
 	};
 
 	if (argc != 2) {
-		IConsoleHelp("List all search paths or default directories for various categories.");
-		IConsoleHelp("Usage: list_dirs <category>");
+		IConsolePrint(CC_HELP, "List all search paths or default directories for various categories.");
+		IConsolePrint(CC_HELP, "Usage: list_dirs <category>");
 		std::string cats = subdir_name_map[0].name;
 		bool first = true;
 		for (const SubdirNameMap &sdn : subdir_name_map) {
 			if (!first) cats = cats + ", " + sdn.name;
 			first = false;
 		}
-		IConsolePrintF(CC_WARNING, "Valid categories: %s", cats.c_str());
+		IConsolePrint(CC_HELP, "Valid categories: {}", cats);
 		return true;
 	}
 
@@ -2557,24 +2730,24 @@ DEF_CONSOLE_CMD(ConListDirs)
 			found |= exists;
 			/* Print */
 			if (!sdn.default_only || exists) {
-				IConsolePrintF(exists ? CC_DEFAULT : CC_INFO, "%s %s", path.c_str(), exists ? "[ok]" : "[not found]");
+				IConsolePrint(exists ? CC_DEFAULT : CC_INFO, "{} {}", path, exists ? "[ok]" : "[not found]");
 				if (sdn.default_only) break;
 			}
 		}
 		if (!found) {
-			IConsolePrintF(CC_ERROR, "No directories exist for category %s", argv[1]);
+			IConsolePrint(CC_ERROR, "No directories exist for category {}", argv[1]);
 		}
 		return true;
 	}
 
-	IConsolePrintF(CC_ERROR, "Invalid category name: %s", argv[1]);
+	IConsolePrint(CC_ERROR, "Invalid category name: {}", argv[1]);
 	return false;
 }
 
 DEF_CONSOLE_CMD(ConResetBlockedHeliports)
 {
 	if (argc == 0) {
-		IConsoleHelp("Resets heliports blocked by the improved breakdowns bug, for single-player use only.");
+		IConsolePrint(CC_HELP, "Resets heliports blocked by the improved breakdowns bug, for single-player use only.");
 		return true;
 	}
 
@@ -2595,18 +2768,18 @@ DEF_CONSOLE_CMD(ConResetBlockedHeliports)
 			st->airport.flags = 0;
 			count++;
 			SetDParam(0, st->index);
-			IConsolePrintF(CC_DEFAULT, "Unblocked: %s", GetString(STR_STATION_NAME).c_str());
+			IConsolePrint(CC_DEFAULT, "Unblocked: {}", GetString(STR_STATION_NAME));
 		}
 	}
 
-	IConsolePrintF(CC_DEFAULT, "Unblocked %u heliports", count);
+	IConsolePrint(CC_DEFAULT, "Unblocked {} heliports", count);
 	return true;
 }
 
 DEF_CONSOLE_CMD(ConMergeLinkgraphJobsAsap)
 {
 	if (argc == 0) {
-		IConsoleHelp("Merge linkgraph jobs asap, for single-player use only.");
+		IConsolePrint(CC_HELP, "Merge linkgraph jobs asap, for single-player use only.");
 		return true;
 	}
 
@@ -2619,7 +2792,7 @@ DEF_CONSOLE_CMD(ConMergeLinkgraphJobsAsap)
 DEF_CONSOLE_CMD(ConUnblockBayRoadStops)
 {
 	if (argc == 0) {
-		IConsoleHelp("Unblock bay road stops blocked by a bug, for single-player use only.");
+		IConsolePrint(CC_HELP, "Unblock bay road stops blocked by a bug, for single-player use only.");
 		return true;
 	}
 
@@ -2643,13 +2816,13 @@ DEF_CONSOLE_CMD(ConUnblockBayRoadStops)
 DEF_CONSOLE_CMD(ConDbgSpecial)
 {
 	if (argc == 0) {
-		IConsoleHelp("Debug special.");
+		IConsolePrint(CC_HELP, "Debug special.");
 		return true;
 	}
 
 	if (argc == 2) {
 		if (strcmp(argv[1], "error") == 0) {
-			error("User triggered");
+			FatalErrorI("User triggered");
 			return true;
 		}
 	}
@@ -2661,7 +2834,7 @@ DEF_CONSOLE_CMD(ConDbgSpecial)
 DEF_CONSOLE_CMD(ConDeleteVehicleID)
 {
 	if (argc == 0) {
-		IConsoleHelp("Delete vehicle ID, for emergency single-player use only.");
+		IConsolePrint(CC_HELP, "Delete vehicle ID, for emergency single-player use only.");
 		return true;
 	}
 
@@ -2680,7 +2853,7 @@ DEF_CONSOLE_CMD(ConDeleteVehicleID)
 DEF_CONSOLE_CMD(ConRunTileLoopTile)
 {
 	if (argc == 0 || argc > 3) {
-		IConsoleHelp("Run tile loop proc on tile.");
+		IConsolePrint(CC_HELP, "Run tile loop proc on tile.");
 		return true;
 	}
 
@@ -2689,7 +2862,7 @@ DEF_CONSOLE_CMD(ConRunTileLoopTile)
 		if (!GetArgumentInteger(&tile, argv[1])) return false;
 
 		if (tile >= MapSize()) {
-			IConsolePrint(CC_ERROR, "Tile does not exist");
+			IConsolePrint(CC_ERROR, "Tile does not exist.");
 			return true;
 		}
 		uint32_t count = 1;
@@ -2709,45 +2882,49 @@ DEF_CONSOLE_CMD(ConRunTileLoopTile)
 DEF_CONSOLE_CMD(ConGetFullDate)
 {
 	if (argc == 0) {
-		IConsoleHelp("Returns the current full date/tick information of the game. Usage: 'getfulldate'");
+		IConsolePrint(CC_HELP, "Returns the current full date/tick information of the game. Usage: 'getfulldate'");
 		return true;
 	}
 
-	IConsolePrintF(CC_DEFAULT, "Calendar Date: %04d-%02d-%02d (%d), fract: %i, sub_fract: %i", CalTime::CurYear().base(), CalTime::CurMonth() + 1, CalTime::CurDay(), CalTime::CurDate().base(), CalTime::CurDateFract(), CalTime::Detail::now.sub_date_fract);
-	IConsolePrintF(CC_DEFAULT, "Economy Date: %04d-%02d-%02d (%d), fract: %i, tick skip: %i", EconTime::CurYear().base(), EconTime::CurMonth() + 1, EconTime::CurDay(), EconTime::CurDate().base(), EconTime::CurDateFract(), TickSkipCounter());
-	IConsolePrintF(CC_DEFAULT, "Period display offset: %d", EconTime::Detail::period_display_offset.base());
-	IConsolePrintF(CC_DEFAULT, "Elapsed years: %d", EconTime::Detail::years_elapsed.base());
-	IConsolePrintF(CC_DEFAULT, "Tick counter: " OTTD_PRINTF64, _tick_counter);
-	IConsolePrintF(CC_DEFAULT, "Tick counter (scaled): " OTTD_PRINTF64, _scaled_tick_counter);
-	IConsolePrintF(CC_DEFAULT, "State ticks: " OTTD_PRINTF64 " (offset: " OTTD_PRINTF64 ")", _state_ticks.base(), DateDetail::_state_ticks_offset.base());
-	IConsolePrintF(CC_DEFAULT, "Effective day length: %d", DayLengthFactor());
+	IConsolePrint(CC_DEFAULT, "Calendar Date: {:04}-{:02}-{:02} ({}), fract: {}, sub_fract: {}", CalTime::CurYear(), CalTime::CurMonth() + 1, CalTime::CurDay(), CalTime::CurDate(), CalTime::CurDateFract(), CalTime::Detail::now.sub_date_fract);
+	IConsolePrint(CC_DEFAULT, "Economy Date: {:04}-{:02}-{:02} ({}), fract: {}, tick skip: {}", EconTime::CurYear(), EconTime::CurMonth() + 1, EconTime::CurDay(), EconTime::CurDate(), EconTime::CurDateFract(), TickSkipCounter());
+	IConsolePrint(CC_DEFAULT, "Period display offset: {}", EconTime::Detail::period_display_offset);
+	IConsolePrint(CC_DEFAULT, "Elapsed years: {}", EconTime::Detail::years_elapsed);
+	IConsolePrint(CC_DEFAULT, "Tick counter: {}", _tick_counter);
+	IConsolePrint(CC_DEFAULT, "Tick counter (scaled): {}", _scaled_tick_counter);
+	IConsolePrint(CC_DEFAULT, "State ticks: {} (offset: {})", _state_ticks, DateDetail::_state_ticks_offset);
+	IConsolePrint(CC_DEFAULT, "Effective economy speed reduction factor: {}", DayLengthFactor());
+	if (!CalTime::IsCalendarFrozen()) IConsolePrint(CC_DEFAULT, "Ticks per calendar day: {}", TicksPerCalendarDay());
+	if (_settings_time.time_in_minutes) {
+		Ticks remainder = _settings_time.GetTickMinutesRemainder(_state_ticks);
+		ClockFaceMinutes hhmm = _settings_time.ToTickMinutes(_state_ticks).ToClockFaceMinutes();
+		IConsolePrint(CC_DEFAULT, "Timetable time: {:02}:{:02} + {} ticks", hhmm.ClockHour(), hhmm.ClockMinute(), remainder);
+	}
 	return true;
 }
 
 DEF_CONSOLE_CMD(ConDumpCommandLog)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump log of recently executed commands.");
+		IConsolePrint(CC_HELP, "Dump log of recently executed commands.");
 		return true;
 	}
 
-	char buffer[2048];
-	DumpCommandLog(buffer, lastof(buffer), [&](char *current) -> char * {
-		PrintLineByLine(buffer);
-		return buffer;
-	});
+	format_buffer buffer;
+	DumpCommandLog(buffer);
+	PrintLineByLine(buffer);
 	return true;
 }
 
 DEF_CONSOLE_CMD(ConDumpSpecialEventsLog)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump log of special events.");
+		IConsolePrint(CC_HELP, "Dump log of special events.");
 		return true;
 	}
 
-	char buffer[32768];
-	DumpSpecialEventsLog(buffer, lastof(buffer));
+	format_buffer buffer;
+	DumpSpecialEventsLog(buffer);
 	PrintLineByLine(buffer);
 	return true;
 }
@@ -2755,12 +2932,12 @@ DEF_CONSOLE_CMD(ConDumpSpecialEventsLog)
 DEF_CONSOLE_CMD(ConDumpDesyncMsgLog)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump log of desync messages.");
+		IConsolePrint(CC_HELP, "Dump log of desync messages.");
 		return true;
 	}
 
-	char buffer[32768];
-	DumpDesyncMsgLog(buffer, lastof(buffer));
+	format_buffer buffer;
+	DumpDesyncMsgLog(buffer);
 	PrintLineByLine(buffer);
 	return true;
 }
@@ -2768,23 +2945,23 @@ DEF_CONSOLE_CMD(ConDumpDesyncMsgLog)
 DEF_CONSOLE_CMD(ConDumpInflation)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump inflation data.");
+		IConsolePrint(CC_HELP, "Dump inflation data.");
 		return true;
 	}
 
-	IConsolePrintF(CC_DEFAULT, "interest_rate: %u", _economy.interest_rate);
-	IConsolePrintF(CC_DEFAULT, "infl_amount: %u", _economy.infl_amount);
-	IConsolePrintF(CC_DEFAULT, "infl_amount_pr: %u", _economy.infl_amount_pr);
-	IConsolePrintF(CC_DEFAULT, "inflation_prices: %f", _economy.inflation_prices / 65536.0);
-	IConsolePrintF(CC_DEFAULT, "inflation_payment: %f", _economy.inflation_payment / 65536.0);
-	IConsolePrintF(CC_DEFAULT, "inflation ratio: %f", (double) _economy.inflation_prices / (double) _economy.inflation_payment);
+	IConsolePrint(CC_DEFAULT, "interest_rate: {}", _economy.interest_rate);
+	IConsolePrint(CC_DEFAULT, "infl_amount: {}", _economy.infl_amount);
+	IConsolePrint(CC_DEFAULT, "infl_amount_pr: {}", _economy.infl_amount_pr);
+	IConsolePrint(CC_DEFAULT, "inflation_prices: {}", _economy.inflation_prices / 65536.0);
+	IConsolePrint(CC_DEFAULT, "inflation_payment: {}", _economy.inflation_payment / 65536.0);
+	IConsolePrint(CC_DEFAULT, "inflation ratio: {}", (double) _economy.inflation_prices / (double) _economy.inflation_payment);
 	return true;
 }
 
 DEF_CONSOLE_CMD(ConDumpCpdpStats)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump cargo packet deferred payment stats.");
+		IConsolePrint(CC_HELP, "Dump cargo packet deferred payment stats.");
 		return true;
 	}
 
@@ -2796,13 +2973,13 @@ DEF_CONSOLE_CMD(ConDumpCpdpStats)
 DEF_CONSOLE_CMD(ConVehicleStats)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump vehicle stats.");
+		IConsolePrint(CC_HELP, "Dump vehicle stats.");
 		return true;
 	}
 
-	extern void DumpVehicleStats(char *buffer, const char *last);
-	char buffer[32768];
-	DumpVehicleStats(buffer, lastof(buffer));
+	extern void DumpVehicleStats(format_target &buffer);
+	format_buffer buffer;
+	DumpVehicleStats(buffer);
 	PrintLineByLine(buffer);
 	return true;
 }
@@ -2810,32 +2987,46 @@ DEF_CONSOLE_CMD(ConVehicleStats)
 DEF_CONSOLE_CMD(ConMapStats)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump map stats.");
+		IConsolePrint(CC_HELP, "Dump map stats.");
 		return true;
 	}
 
-	extern void DumpMapStats(char *b, const char *last);
-	char buffer[32768];
-	DumpMapStats(buffer, lastof(buffer));
+	extern void DumpMapStats(format_target &buffer);
+	format_buffer buffer;
+	DumpMapStats(buffer);
 	PrintLineByLine(buffer);
 
 	IConsolePrint(CC_DEFAULT, "");
-	IConsolePrintF(CC_DEFAULT, "towns: %u", (uint) Town::GetNumItems());
-	IConsolePrintF(CC_DEFAULT, "industries: %u", (uint) Industry::GetNumItems());
-	IConsolePrintF(CC_DEFAULT, "objects: %u", (uint) Object::GetNumItems());
+	IConsolePrint(CC_DEFAULT, "towns: {}", Town::GetNumItems());
+	IConsolePrint(CC_DEFAULT, "industries: {}", Industry::GetNumItems());
+	IConsolePrint(CC_DEFAULT, "objects: {}", Object::GetNumItems());
 	return true;
 }
 
 DEF_CONSOLE_CMD(ConStFlowStats)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump station flow stats.");
+		IConsolePrint(CC_HELP, "Dump station flow stats.");
 		return true;
 	}
 
-	extern void DumpStationFlowStats(char *b, const char *last);
-	char buffer[32768];
-	DumpStationFlowStats(buffer, lastof(buffer));
+	extern void DumpStationFlowStats(format_target &buffer);
+	format_buffer buffer;
+	DumpStationFlowStats(buffer);
+	PrintLineByLine(buffer);
+	return true;
+}
+
+DEF_CONSOLE_CMD(ConSlotsStats)
+{
+	if (argc == 0) {
+		IConsolePrint(CC_HELP, "Dump routing restrictions slots and counter stats.");
+		return true;
+	}
+
+	extern void DumpTraceRestrictSlotsStats(format_target &buffer);
+	format_buffer buffer;
+	DumpTraceRestrictSlotsStats(buffer);
 	PrintLineByLine(buffer);
 	return true;
 }
@@ -2843,22 +3034,23 @@ DEF_CONSOLE_CMD(ConStFlowStats)
 DEF_CONSOLE_CMD(ConDumpGameEvents)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump game events.");
+		IConsolePrint(CC_HELP, "Dump game events.");
 		return true;
 	}
 
-	char buffer[256];
-	DumpGameEventFlags(_game_events_since_load, buffer, lastof(buffer));
-	IConsolePrintF(CC_DEFAULT, "Since load: %s", buffer);
-	DumpGameEventFlags(_game_events_overall, buffer, lastof(buffer));
-	IConsolePrintF(CC_DEFAULT, "Overall: %s", buffer);
+	format_buffer buffer;
+	DumpGameEventFlags(_game_events_since_load, buffer);
+	IConsolePrint(CC_DEFAULT, "Since load: {}", buffer);
+	buffer.clear();
+	DumpGameEventFlags(_game_events_overall, buffer);
+	IConsolePrint(CC_DEFAULT, "Overall: {}", buffer);
 	return true;
 }
 
 DEF_CONSOLE_CMD(ConDumpLoadDebugLog)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump load debug log.");
+		IConsolePrint(CC_HELP, "Dump load debug log.");
 		return true;
 	}
 
@@ -2870,7 +3062,7 @@ DEF_CONSOLE_CMD(ConDumpLoadDebugLog)
 DEF_CONSOLE_CMD(ConDumpLoadDebugConfig)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump load debug config.");
+		IConsolePrint(CC_HELP, "Dump load debug config.");
 		return true;
 	}
 
@@ -2883,15 +3075,15 @@ DEF_CONSOLE_CMD(ConDumpLoadDebugConfig)
 DEF_CONSOLE_CMD(ConDumpLinkgraphJobs)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump link-graph jobs.");
+		IConsolePrint(CC_HELP, "Dump link-graph jobs.");
 		return true;
 	}
 
-	IConsolePrintF(CC_DEFAULT, PRINTF_SIZE " link graph jobs", LinkGraphJob::GetNumItems());
+	IConsolePrint(CC_DEFAULT, "{} link graph jobs", LinkGraphJob::GetNumItems());
 	for (const LinkGraphJob *lgj : LinkGraphJob::Iterate()) {
-		IConsolePrintF(CC_DEFAULT, "  Job: %5u, nodes: %u, cost: " OTTD_PRINTF64U ", started: %d, ends in: %d, duration: %d",
+		IConsolePrint(CC_DEFAULT, "  Job: {:5}, nodes: {}, cost: {}, started: {}, ends in: {}, duration: {}",
 				lgj->index, lgj->Graph().Size(), lgj->Graph().CalculateCostEstimate(),
-				(int)(lgj->StartTick() - _scaled_tick_counter), (int)(lgj->JoinTick() - _scaled_tick_counter), (int)(lgj->JoinTick() - lgj->StartTick()));
+				(int)(lgj->StartTick() - _scaled_tick_counter), (lgj->JoinTick() - _scaled_tick_counter), (lgj->JoinTick() - lgj->StartTick()));
 	 }
 	return true;
 }
@@ -2899,21 +3091,21 @@ DEF_CONSOLE_CMD(ConDumpLinkgraphJobs)
 DEF_CONSOLE_CMD(ConDumpRoadTypes)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump road/tram types.");
+		IConsolePrint(CC_HELP, "Dump road/tram types.");
 		return true;
 	}
 
-	IConsolePrintF(CC_DEFAULT, "  Flags:");
-	IConsolePrintF(CC_DEFAULT, "    c = catenary");
-	IConsolePrintF(CC_DEFAULT, "    l = no level crossings");
-	IConsolePrintF(CC_DEFAULT, "    X = no houses");
-	IConsolePrintF(CC_DEFAULT, "    h = hidden");
-	IConsolePrintF(CC_DEFAULT, "    T = buildable by towns");
-	IConsolePrintF(CC_DEFAULT, "  Extra flags:");
-	IConsolePrintF(CC_DEFAULT, "    s = not available to scripts (AI/GS)");
-	IConsolePrintF(CC_DEFAULT, "    t = not modifiable by towns");
-	IConsolePrintF(CC_DEFAULT, "    T = disallow tunnels");
-	IConsolePrintF(CC_DEFAULT, "    c = disallow collisions with trains for vehicles of this type");
+	IConsolePrint(CC_DEFAULT, "  Flags:");
+	IConsolePrint(CC_DEFAULT, "    c = catenary");
+	IConsolePrint(CC_DEFAULT, "    l = no level crossings");
+	IConsolePrint(CC_DEFAULT, "    X = no houses");
+	IConsolePrint(CC_DEFAULT, "    h = hidden");
+	IConsolePrint(CC_DEFAULT, "    T = buildable by towns");
+	IConsolePrint(CC_DEFAULT, "  Extra flags:");
+	IConsolePrint(CC_DEFAULT, "    s = not available to scripts (AI/GS)");
+	IConsolePrint(CC_DEFAULT, "    t = not modifiable by towns");
+	IConsolePrint(CC_DEFAULT, "    T = disallow tunnels");
+	IConsolePrint(CC_DEFAULT, "    c = disallow collisions with trains for vehicles of this type");
 
 	btree::btree_map<uint32_t, const GRFFile *> grfs;
 	for (RoadType rt = ROADTYPE_BEGIN; rt < ROADTYPE_END; rt++) {
@@ -2932,10 +3124,10 @@ DEF_CONSOLE_CMD(ConDumpRoadTypes)
 			grfid = grf->grfid;
 			grfs.insert(std::pair<uint32_t, const GRFFile *>(grfid, grf));
 		}
-		IConsolePrintF(CC_DEFAULT, "  %02u %s %c%c%c%c, Flags: %c%c%c%c%c, Extra Flags: %c%c%c%c, GRF: %08X, %s",
+		IConsolePrint(CC_DEFAULT, "  {:2} {} {}, Flags: {}{}{}{}{}, Extra Flags: {}{}{}{}, GRF: {:08X},{}",
 				(uint) rt,
 				RoadTypeIsTram(rt) ? "Tram" : "Road",
-				rti->label >> 24, rti->label >> 16, rti->label >> 8, rti->label,
+				NewGRFLabelDumper().Label(rti->label),
 				HasBit(rti->flags, ROTF_CATENARY)                   ? 'c' : '-',
 				HasBit(rti->flags, ROTF_NO_LEVEL_CROSSING)          ? 'l' : '-',
 				HasBit(rti->flags, ROTF_NO_HOUSES)                  ? 'X' : '-',
@@ -2950,7 +3142,7 @@ DEF_CONSOLE_CMD(ConDumpRoadTypes)
 		);
 	}
 	for (const auto &grf : grfs) {
-		IConsolePrintF(CC_DEFAULT, "  GRF: %08X = %s", BSWAP32(grf.first), grf.second->filename.c_str());
+		IConsolePrint(CC_DEFAULT, "  GRF: {:08X} = {}", BSWAP32(grf.first), grf.second->filename);
 	}
 	return true;
 }
@@ -2958,20 +3150,20 @@ DEF_CONSOLE_CMD(ConDumpRoadTypes)
 DEF_CONSOLE_CMD(ConDumpRailTypes)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump rail types.");
+		IConsolePrint(CC_HELP, "Dump rail types.");
 		return true;
 	}
 
-	IConsolePrintF(CC_DEFAULT, "  Flags:");
-	IConsolePrintF(CC_DEFAULT, "    c = catenary");
-	IConsolePrintF(CC_DEFAULT, "    l = no level crossings");
-	IConsolePrintF(CC_DEFAULT, "    h = hidden");
-	IConsolePrintF(CC_DEFAULT, "    s = no sprite combine");
-	IConsolePrintF(CC_DEFAULT, "    a = allow 90° turns");
-	IConsolePrintF(CC_DEFAULT, "    d = disallow 90° turns");
-	IConsolePrintF(CC_DEFAULT, "  Ctrl flags:");
-	IConsolePrintF(CC_DEFAULT, "    p = signal graphics callback enabled for programmable pre-signals");
-	IConsolePrintF(CC_DEFAULT, "    r = signal graphics callback restricted signal flag enabled");
+	IConsolePrint(CC_DEFAULT, "  Flags:");
+	IConsolePrint(CC_DEFAULT, "    c = catenary");
+	IConsolePrint(CC_DEFAULT, "    l = no level crossings");
+	IConsolePrint(CC_DEFAULT, "    h = hidden");
+	IConsolePrint(CC_DEFAULT, "    s = no sprite combine");
+	IConsolePrint(CC_DEFAULT, "    a = allow 90° turns");
+	IConsolePrint(CC_DEFAULT, "    d = disallow 90° turns");
+	IConsolePrint(CC_DEFAULT, "  Ctrl flags:");
+	IConsolePrint(CC_DEFAULT, "    p = signal graphics callback enabled for programmable pre-signals");
+	IConsolePrint(CC_DEFAULT, "    r = signal graphics callback restricted signal flag enabled");
 
 	btree::btree_map<uint32_t, const GRFFile *> grfs;
 	for (RailType rt = RAILTYPE_BEGIN; rt < RAILTYPE_END; rt++) {
@@ -2990,9 +3182,9 @@ DEF_CONSOLE_CMD(ConDumpRailTypes)
 			grfid = grf->grfid;
 			grfs.insert(std::pair<uint32_t, const GRFFile *>(grfid, grf));
 		}
-		IConsolePrintF(CC_DEFAULT, "  %02u %c%c%c%c, Flags: %c%c%c%c%c%c, Ctrl Flags: %c%c%c%c, GRF: %08X, %s",
+		IConsolePrint(CC_DEFAULT, "  {:2} {}, Flags: {}{}{}{}{}{}, Ctrl Flags: {}{}{}{}, GRF: {:08X}, {}",
 				(uint) rt,
-				rti->label >> 24, rti->label >> 16, rti->label >> 8, rti->label,
+				NewGRFLabelDumper().Label(rti->label),
 				HasBit(rti->flags, RTF_CATENARY)            ? 'c' : '-',
 				HasBit(rti->flags, RTF_NO_LEVEL_CROSSING)   ? 'l' : '-',
 				HasBit(rti->flags, RTF_HIDDEN)              ? 'h' : '-',
@@ -3008,7 +3200,7 @@ DEF_CONSOLE_CMD(ConDumpRailTypes)
 		);
 	}
 	for (const auto &grf : grfs) {
-		IConsolePrintF(CC_DEFAULT, "  GRF: %08X = %s", BSWAP32(grf.first), grf.second->filename.c_str());
+		IConsolePrint(CC_DEFAULT, "  GRF: {:08X} = {}", BSWAP32(grf.first), grf.second->filename);
 	}
 	return true;
 }
@@ -3016,24 +3208,24 @@ DEF_CONSOLE_CMD(ConDumpRailTypes)
 DEF_CONSOLE_CMD(ConDumpBridgeTypes)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump bridge types.");
+		IConsolePrint(CC_HELP, "Dump bridge types.");
 		return true;
 	}
 
-	IConsolePrintF(CC_DEFAULT, "  Ctrl flags:");
-	IConsolePrintF(CC_DEFAULT, "    c = custom pillar flags");
-	IConsolePrintF(CC_DEFAULT, "    i = invalid pillar flags");
-	IConsolePrintF(CC_DEFAULT, "    t = not available to towns");
-	IConsolePrintF(CC_DEFAULT, "    s = not available to scripts (AI/GS)");
+	IConsolePrint(CC_DEFAULT, "  Ctrl flags:");
+	IConsolePrint(CC_DEFAULT, "    c = custom pillar flags");
+	IConsolePrint(CC_DEFAULT, "    i = invalid pillar flags");
+	IConsolePrint(CC_DEFAULT, "    t = not available to towns");
+	IConsolePrint(CC_DEFAULT, "    s = not available to scripts (AI/GS)");
 
 	btree::btree_set<uint32_t> grfids;
 	for (BridgeType bt = 0; bt < MAX_BRIDGES; bt++) {
 		const BridgeSpec *spec = GetBridgeSpec(bt);
 		uint32_t grfid = GetStringGRFID(spec->material);
 		if (grfid != 0) grfids.insert(grfid);
-		IConsolePrintF(CC_DEFAULT, "  %02u Year: %7u, Min: %3u, Max: %5u, Flags: %02X, Ctrl Flags: %c%c%c%c, Pillars: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X, GRF: %08X, %s",
+		IConsolePrint(CC_DEFAULT, "  {:2} Year: {:7}, Min: {:3}, Max: {:5}, Flags: {:02X}, Ctrl Flags: {}{}{}{}, Pillars: {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X}, GRF: {:08X}, {}",
 				(uint) bt,
-				spec->avail_year.base(),
+				spec->avail_year,
 				spec->min_length,
 				spec->max_length,
 				spec->flags,
@@ -3060,7 +3252,7 @@ DEF_CONSOLE_CMD(ConDumpBridgeTypes)
 	for (uint32_t grfid : grfids) {
 		extern GRFFile *GetFileByGRFID(uint32_t grfid);
 		const GRFFile *grffile = GetFileByGRFID(grfid);
-		IConsolePrintF(CC_DEFAULT, "  GRF: %08X = %s", BSWAP32(grfid), grffile ? grffile->filename.c_str() : "????");
+		IConsolePrint(CC_DEFAULT, "  GRF: {:08X} = {}", BSWAP32(grfid), grffile ? (std::string_view)grffile->filename : "????");
 	}
 	return true;
 }
@@ -3068,22 +3260,35 @@ DEF_CONSOLE_CMD(ConDumpBridgeTypes)
 DEF_CONSOLE_CMD(ConDumpCargoTypes)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump cargo types.");
+		IConsolePrint(CC_HELP, "Dump cargo types.");
 		return true;
 	}
 
-	IConsolePrintF(CC_DEFAULT, "  Cargo classes:");
-	IConsolePrintF(CC_DEFAULT, "    p = passenger");
-	IConsolePrintF(CC_DEFAULT, "    m = mail");
-	IConsolePrintF(CC_DEFAULT, "    x = express");
-	IConsolePrintF(CC_DEFAULT, "    a = armoured");
-	IConsolePrintF(CC_DEFAULT, "    b = bulk");
-	IConsolePrintF(CC_DEFAULT, "    g = piece goods");
-	IConsolePrintF(CC_DEFAULT, "    l = liquid");
-	IConsolePrintF(CC_DEFAULT, "    r = refrigerated");
-	IConsolePrintF(CC_DEFAULT, "    h = hazardous");
-	IConsolePrintF(CC_DEFAULT, "    c = covered/sheltered");
-	IConsolePrintF(CC_DEFAULT, "    S = special");
+	IConsolePrint(CC_DEFAULT, "  Cargo classes:");
+	IConsolePrint(CC_DEFAULT, "    p = passenger");
+	IConsolePrint(CC_DEFAULT, "    m = mail");
+	IConsolePrint(CC_DEFAULT, "    x = express");
+	IConsolePrint(CC_DEFAULT, "    a = armoured");
+	IConsolePrint(CC_DEFAULT, "    b = bulk");
+	IConsolePrint(CC_DEFAULT, "    g = piece goods");
+	IConsolePrint(CC_DEFAULT, "    l = liquid");
+	IConsolePrint(CC_DEFAULT, "    r = refrigerated");
+	IConsolePrint(CC_DEFAULT, "    h = hazardous");
+	IConsolePrint(CC_DEFAULT, "    c = covered/sheltered");
+	IConsolePrint(CC_DEFAULT, "    o = oversized");
+	IConsolePrint(CC_DEFAULT, "    d = powderized");
+	IConsolePrint(CC_DEFAULT, "    n = not pourable");
+	IConsolePrint(CC_DEFAULT, "    e = potable");
+	IConsolePrint(CC_DEFAULT, "    i = non-potable");
+	IConsolePrint(CC_DEFAULT, "    S = special");
+	IConsolePrint(CC_DEFAULT, "  Town acceptance effect:");
+	IConsolePrint(CC_DEFAULT, "    P = passenger");
+	IConsolePrint(CC_DEFAULT, "    M = mail");
+	IConsolePrint(CC_DEFAULT, "    G = goods");
+	IConsolePrint(CC_DEFAULT, "    W = water");
+	IConsolePrint(CC_DEFAULT, "    F = food");
+
+	static const char tae_char[NUM_TAE] = { '-', 'P', 'M', 'G', 'W', 'F' };
 
 	btree::btree_map<uint32_t, const GRFFile *> grfs;
 	for (CargoID i = 0; i < NUM_CARGO; i++) {
@@ -3102,10 +3307,10 @@ DEF_CONSOLE_CMD(ConDumpCargoTypes)
 			grfid = grf->grfid;
 			grfs.insert(std::pair<uint32_t, const GRFFile *>(grfid, grf));
 		}
-		IConsolePrintF(CC_DEFAULT, "  %02u Bit: %2u, Label: %c%c%c%c, Callback mask: 0x%02X, Cargo class: %c%c%c%c%c%c%c%c%c%c%c, GRF: %08X, %s",
+		IConsolePrint(CC_DEFAULT, "  {:2} Bit: {:2}, Label: {}, Callback mask: 0x{:02X}, Cargo class: {}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}, Town: {}, GRF: {:08X}, {}",
 				(uint) i,
 				spec->bitnum,
-				spec->label.base() >> 24, spec->label.base() >> 16, spec->label.base() >> 8, spec->label.base(),
+				NewGRFLabelDumper().Label(spec->label.base()),
 				spec->callback_mask,
 				(spec->classes & CC_PASSENGERS)   != 0 ? 'p' : '-',
 				(spec->classes & CC_MAIL)         != 0 ? 'm' : '-',
@@ -3117,13 +3322,19 @@ DEF_CONSOLE_CMD(ConDumpCargoTypes)
 				(spec->classes & CC_REFRIGERATED) != 0 ? 'r' : '-',
 				(spec->classes & CC_HAZARDOUS)    != 0 ? 'h' : '-',
 				(spec->classes & CC_COVERED)      != 0 ? 'c' : '-',
+				(spec->classes & CC_OVERSIZED)    != 0 ? 'o' : '-',
+				(spec->classes & CC_POWDERIZED)   != 0 ? 'd' : '-',
+				(spec->classes & CC_NOT_POURABLE) != 0 ? 'n' : '-',
+				(spec->classes & CC_POTABLE)      != 0 ? 'e' : '-',
+				(spec->classes & CC_NON_POTABLE)  != 0 ? 'i' : '-',
 				(spec->classes & CC_SPECIAL)      != 0 ? 'S' : '-',
+				tae_char[spec->town_acceptance_effect - TAE_BEGIN],
 				BSWAP32(grfid),
 				GetStringPtr(spec->name)
 		);
 	}
 	for (const auto &grf : grfs) {
-		IConsolePrintF(CC_DEFAULT, "  GRF: %08X = %s", BSWAP32(grf.first), grf.second->filename.c_str());
+		IConsolePrint(CC_DEFAULT, "  GRF: {:08X} = {}", BSWAP32(grf.first), grf.second->filename);
 	}
 	return true;
 }
@@ -3131,13 +3342,13 @@ DEF_CONSOLE_CMD(ConDumpCargoTypes)
 DEF_CONSOLE_CMD(ConDumpVehicle)
 {
 	if (argc != 2) {
-		IConsoleHelp("Debug: Show vehicle information.  Usage: 'dump_vehicle <vehicle-id>'");
+		IConsolePrint(CC_HELP, "Debug: Show vehicle information.  Usage: 'dump_vehicle <vehicle-id>'");
 		return true;
 	}
 
 	const Vehicle *v = Vehicle::GetIfValid(atoi(argv[1]));
 	if (v != nullptr) {
-		IConsolePrint(CC_DEFAULT, scope_dumper().VehicleInfo(v));
+		IConsolePrint(CC_DEFAULT, "{}", VehicleInfoDumper(v));
 	} else {
 		IConsolePrint(CC_DEFAULT, "No such vehicle");
 	}
@@ -3156,24 +3367,24 @@ DEF_CONSOLE_CMD(ConDumpVehicle)
  */
 DEF_CONSOLE_CMD(ConDumpTile)
 {
-	char buffer[128];
-
 	switch (argc) {
 		case 0:
-			IConsoleHelp("Dump the map state of a given tile.");
-			IConsoleHelp("Usage: 'dump_tile <tile>' or 'dump_tile <x> <y>'");
-			IConsoleHelp("Numbers can be either decimal (34161) or hexadecimal (0x4a5B).");
+			IConsolePrint(CC_HELP, "Dump the map state of a given tile.");
+			IConsolePrint(CC_HELP, "Usage: 'dump_tile <tile>' or 'dump_tile <x> <y>'");
+			IConsolePrint(CC_HELP, "Numbers can be either decimal (34161) or hexadecimal (0x4a5B).");
 			return true;
 
 		case 2: {
 			uint32_t result;
 			if (GetArgumentInteger(&result, argv[1])) {
 				if (result >= MapSize()) {
-					IConsolePrint(CC_ERROR, "Tile does not exist");
+					IConsolePrint(CC_ERROR, "Tile does not exist.");
 					return true;
 				}
-				DumpTileInfo(buffer, lastof(buffer), (TileIndex)result);
-				IConsolePrintF(CC_DEFAULT, "  %s", buffer);
+				format_buffer buffer;
+				buffer.append("  ");
+				DumpTileInfo(buffer, (TileIndex)result);
+				IConsolePrint(CC_DEFAULT, buffer.to_string());
 				return true;
 			}
 			break;
@@ -3183,11 +3394,13 @@ DEF_CONSOLE_CMD(ConDumpTile)
 			uint32_t x, y;
 			if (GetArgumentInteger(&x, argv[1]) && GetArgumentInteger(&y, argv[2])) {
 				if (x >= MapSizeX() || y >= MapSizeY()) {
-					IConsolePrint(CC_ERROR, "Tile does not exist");
+					IConsolePrint(CC_ERROR, "Tile does not exist.");
 					return true;
 				}
-				DumpTileInfo(buffer, lastof(buffer), TileXY(x, y));
-				IConsolePrintF(CC_DEFAULT, "  %s", buffer);
+				format_buffer buffer;
+				buffer.append("  ");
+				DumpTileInfo(buffer, TileXY(x, y));
+				IConsolePrint(CC_DEFAULT, buffer.to_string());
 				return true;
 			}
 			break;
@@ -3200,29 +3413,28 @@ DEF_CONSOLE_CMD(ConDumpTile)
 DEF_CONSOLE_CMD(ConDumpGrfCargoTables)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump GRF cargo translation tables.");
+		IConsolePrint(CC_HELP, "Dump GRF cargo translation tables.");
 		return true;
 	}
 
 	const std::vector<GRFFile *> &files = GetAllGRFFiles();
 
-	char buffer[256];
+	format_buffer buffer;
 
 	for (const GRFFile *grf : files) {
 		if (grf->cargo_list.empty()) continue;
 
-		IConsolePrintF(CC_DEFAULT, "[%08X] %s: %u cargoes", BSWAP32(grf->grfid), grf->filename.c_str(), uint(grf->cargo_list.size()));
+		IConsolePrint(CC_DEFAULT, "[{:08X}] {}: {} cargoes", BSWAP32(grf->grfid), grf->filename, grf->cargo_list.size());
 
 		uint i = 0;
 		for (const CargoLabel &cl : grf->cargo_list) {
-			buffer[0] = 0;
-			char *b = buffer;
+			buffer.clear();
 			for (const CargoSpec *cs : CargoSpec::Iterate()) {
 				if (grf->cargo_map[cs->Index()] == i) {
-					b += seprintf(b, lastof(buffer), "%s%02u[%c%c%c%c]", (b == buffer) ? ": " : ", ", cs->Index(), GB(cs->label.base(), 24, 8), GB(cs->label.base(), 16, 8), GB(cs->label.base(), 8, 8), GB(cs->label.base(), 0, 8));
+					buffer.format("{}{:02}[{}]", buffer.size() == 0 ? ": " : ", ", cs->Index(), NewGRFLabelDumper().Label(cs->label.base()));
 				}
 			}
-			IConsolePrintF(CC_DEFAULT, "  %c%c%c%c%s", GB(cl.base(), 24, 8), GB(cl.base(), 16, 8), GB(cl.base(), 8, 8), GB(cl.base(), 0, 8), buffer);
+			IConsolePrint(CC_DEFAULT, "  {}{}", NewGRFLabelDumper().Label(cl.base()), buffer);
 			i++;
 		}
 	}
@@ -3233,20 +3445,21 @@ DEF_CONSOLE_CMD(ConDumpGrfCargoTables)
 DEF_CONSOLE_CMD(ConDumpSignalStyles)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump custom signal styles.");
+		IConsolePrint(CC_HELP, "Dump custom signal styles.");
 		return true;
 	}
 
-	IConsolePrintF(CC_DEFAULT, "  Flags:");
-	IConsolePrintF(CC_DEFAULT, "    n = no aspect increment");
-	IConsolePrintF(CC_DEFAULT, "    a = always reserve through");
-	IConsolePrintF(CC_DEFAULT, "    l = lookahead aspects set");
-	IConsolePrintF(CC_DEFAULT, "    o = opposite side");
-	IConsolePrintF(CC_DEFAULT, "    s = lookahead single signal");
-	IConsolePrintF(CC_DEFAULT, "    c = combined normal and shunt");
-	IConsolePrintF(CC_DEFAULT, "    r = realistic braking only");
-	IConsolePrintF(CC_DEFAULT, "    b = both sides");
-	IConsolePrintF(CC_DEFAULT, "  Extra aspects: %u", _extra_aspects);
+	IConsolePrint(CC_DEFAULT, "  Flags:");
+	IConsolePrint(CC_DEFAULT, "    n = no aspect increment");
+	IConsolePrint(CC_DEFAULT, "    a = always reserve through");
+	IConsolePrint(CC_DEFAULT, "    l = lookahead aspects set");
+	IConsolePrint(CC_DEFAULT, "    o = opposite side");
+	IConsolePrint(CC_DEFAULT, "    s = lookahead single signal");
+	IConsolePrint(CC_DEFAULT, "    c = combined normal and shunt");
+	IConsolePrint(CC_DEFAULT, "    r = realistic braking only");
+	IConsolePrint(CC_DEFAULT, "    b = both sides");
+	IConsolePrint(CC_DEFAULT, "  Extra aspects: {}", _extra_aspects);
+	IConsolePrint(CC_DEFAULT, "  Default style extra aspects: {}", _default_signal_style_lookahead_extra_aspects);
 
 	btree::btree_map<uint32_t, const GRFFile *> grfs;
 	for (uint8_t i = 0; i < _num_new_signal_styles; i++) {
@@ -3257,7 +3470,7 @@ DEF_CONSOLE_CMD(ConDumpSignalStyles)
 			grfid = style.grffile->grfid;
 			grfs.insert(std::pair<uint32_t, const GRFFile *>(grfid, style.grffile));
 		}
-		IConsolePrintF(CC_DEFAULT, "  %2u: GRF: %08X, Local: %2u, Extra aspects: %3u, Flags: %c%c%c%c%c%c%c%c, %s",
+		IConsolePrint(CC_DEFAULT, "  {:2}: GRF: {:08X}, Local: {:2}, Extra aspects: {:3}, Flags: {}{}{}{}{}{}{}{}, {}",
 				(uint) (i + 1),
 				BSWAP32(grfid),
 				style.grf_local_id,
@@ -3274,7 +3487,7 @@ DEF_CONSOLE_CMD(ConDumpSignalStyles)
 		);
 	}
 	for (const auto &grf : grfs) {
-		IConsolePrintF(CC_DEFAULT, "  GRF: %08X = %s", BSWAP32(grf.first), grf.second->filename.c_str());
+		IConsolePrint(CC_DEFAULT, "  GRF: {:08X} = {}", BSWAP32(grf.first), grf.second->filename);
 	}
 
 	return true;
@@ -3283,13 +3496,13 @@ DEF_CONSOLE_CMD(ConDumpSignalStyles)
 DEF_CONSOLE_CMD(ConSpriteCacheStats)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump sprite cache stats.");
+		IConsolePrint(CC_HELP, "Dump sprite cache stats.");
 		return true;
 	}
 
-	extern void DumpSpriteCacheStats(char *buffer, const char *last);
-	char buffer[8192];
-	DumpSpriteCacheStats(buffer, lastof(buffer));
+	extern void DumpSpriteCacheStats(format_target &buffer);
+	format_buffer buffer;
+	DumpSpriteCacheStats(buffer);
 	PrintLineByLine(buffer);
 	return true;
 }
@@ -3297,12 +3510,12 @@ DEF_CONSOLE_CMD(ConSpriteCacheStats)
 DEF_CONSOLE_CMD(ConDumpVersion)
 {
 	if (argc == 0) {
-		IConsoleHelp("Dump version info");
+		IConsolePrint(CC_HELP, "Dump version info");
 		return true;
 	}
 
-	char buffer[65536];
-	CrashLog::VersionInfoLog(buffer, lastof(buffer));
+	format_buffer buffer;
+	CrashLog::VersionInfoLog(buffer);
 	PrintLineByLine(buffer);
 	return true;
 }
@@ -3310,7 +3523,7 @@ DEF_CONSOLE_CMD(ConDumpVersion)
 DEF_CONSOLE_CMD(ConCheckCaches)
 {
 	if (argc == 0) {
-		IConsoleHelp("Debug: Check caches. Usage: 'check_caches [<broadcast>]'");
+		IConsolePrint(CC_HELP, "Debug: Check caches. Usage: 'check_caches [<broadcast>]'");
 		return true;
 	}
 
@@ -3320,8 +3533,8 @@ DEF_CONSOLE_CMD(ConCheckCaches)
 	if (broadcast) {
 		DoCommandP(0, 0, 0, CMD_DESYNC_CHECK);
 	} else {
-		auto logger = [&](const char *str) {
-			IConsolePrint(CC_WARNING, str);
+		auto logger = [&](std::string_view str) {
+			IConsolePrint(CC_WARNING, std::string{str});
 		};
 		CheckCaches(true, logger, CHECK_CACHE_ALL | CHECK_CACHE_EMIT_LOG);
 	}
@@ -3332,7 +3545,7 @@ DEF_CONSOLE_CMD(ConCheckCaches)
 DEF_CONSOLE_CMD(ConShowTownWindow)
 {
 	if (argc != 2) {
-		IConsoleHelp("Debug: Show town window.  Usage: 'show_town_window <town-id>'");
+		IConsolePrint(CC_HELP, "Debug: Show town window.  Usage: 'show_town_window <town-id>'");
 		return true;
 	}
 
@@ -3353,7 +3566,7 @@ DEF_CONSOLE_CMD(ConShowTownWindow)
 DEF_CONSOLE_CMD(ConShowStationWindow)
 {
 	if (argc != 2) {
-		IConsoleHelp("Debug: Show station window.  Usage: 'show_station_window <station-id>'");
+		IConsolePrint(CC_HELP, "Debug: Show station window.  Usage: 'show_station_window <station-id>'");
 		return true;
 	}
 
@@ -3375,7 +3588,7 @@ DEF_CONSOLE_CMD(ConShowStationWindow)
 DEF_CONSOLE_CMD(ConShowIndustryWindow)
 {
 	if (argc != 2) {
-		IConsoleHelp("Debug: Show industry window.  Usage: 'show_industry_window <industry-id>'");
+		IConsolePrint(CC_HELP, "Debug: Show industry window.  Usage: 'show_industry_window <industry-id>'");
 		return true;
 	}
 
@@ -3397,20 +3610,20 @@ DEF_CONSOLE_CMD(ConShowIndustryWindow)
 DEF_CONSOLE_CMD(ConViewportDebug)
 {
 	if (argc < 1 || argc > 2) {
-		IConsoleHelp("Debug: viewports flags.  Usage: 'viewport_debug [<flags>]'");
-		IConsoleHelp("   1: VDF_DIRTY_BLOCK_PER_DRAW");
-		IConsoleHelp("   2: VDF_DIRTY_WHOLE_VIEWPORT");
-		IConsoleHelp("   4: VDF_DIRTY_BLOCK_PER_SPLIT");
-		IConsoleHelp("   8: VDF_DISABLE_DRAW_SPLIT");
-		IConsoleHelp("  10: VDF_SHOW_NO_LANDSCAPE_MAP_DRAW");
-		IConsoleHelp("  20: VDF_DISABLE_LANDSCAPE_CACHE");
-		IConsoleHelp("  40: VDF_DISABLE_THREAD");
+		IConsolePrint(CC_HELP, "Debug: viewports flags.  Usage: 'viewport_debug [<flags>]'");
+		IConsolePrint(CC_HELP, "   1: VDF_DIRTY_BLOCK_PER_DRAW");
+		IConsolePrint(CC_HELP, "   2: VDF_DIRTY_WHOLE_VIEWPORT");
+		IConsolePrint(CC_HELP, "   4: VDF_DIRTY_BLOCK_PER_SPLIT");
+		IConsolePrint(CC_HELP, "   8: VDF_DISABLE_DRAW_SPLIT");
+		IConsolePrint(CC_HELP, "  10: VDF_SHOW_NO_LANDSCAPE_MAP_DRAW");
+		IConsolePrint(CC_HELP, "  20: VDF_DISABLE_LANDSCAPE_CACHE");
+		IConsolePrint(CC_HELP, "  40: VDF_DISABLE_THREAD");
 		return true;
 	}
 
 	extern uint32_t _viewport_debug_flags;
 	if (argc == 1) {
-		IConsolePrintF(CC_DEFAULT, "Viewport debug flags: %X", _viewport_debug_flags);
+		IConsolePrint(CC_DEFAULT, "Viewport debug flags: {:X}", _viewport_debug_flags);
 	} else {
 		_viewport_debug_flags = std::strtoul(argv[1], nullptr, 16);
 	}
@@ -3421,7 +3634,7 @@ DEF_CONSOLE_CMD(ConViewportDebug)
 DEF_CONSOLE_CMD(ConViewportMarkDirty)
 {
 	if (argc < 3 || argc > 5) {
-		IConsoleHelp("Debug: Mark main viewport dirty.  Usage: 'viewport_mark_dirty <x> <y> [<w> <h>]'");
+		IConsolePrint(CC_HELP, "Debug: Mark main viewport dirty.  Usage: 'viewport_mark_dirty <x> <y> [<w> <h>]'");
 		return true;
 	}
 
@@ -3432,7 +3645,7 @@ DEF_CONSOLE_CMD(ConViewportMarkDirty)
 	uint b = std::min<uint>(t + ((argc > 4) ? strtoul(argv[4], nullptr, 0) : 1), vp->dirty_blocks_per_column);
 	for (uint x = l; x < r; x++) {
 		for (uint y = t; y < b; y++) {
-			vp->dirty_blocks[(x * vp->dirty_blocks_per_column) + y] = true;
+			SetBit(vp->dirty_blocks[(x * vp->dirty_blocks_column_pitch) + (y / VP_BLOCK_BITS)], y % VP_BLOCK_BITS);
 		}
 	}
 	vp->is_dirty = true;
@@ -3444,7 +3657,7 @@ DEF_CONSOLE_CMD(ConViewportMarkDirty)
 DEF_CONSOLE_CMD(ConViewportMarkStationOverlayDirty)
 {
 	if (argc != 2) {
-		IConsoleHelp("Debug: Mark main viewport link graph overlay station links.  Usage: 'viewport_mark_dirty_st_overlay <station-id>'");
+		IConsolePrint(CC_HELP, "Debug: Mark main viewport link graph overlay station links.  Usage: 'viewport_mark_dirty_st_overlay <station-id>'");
 		return true;
 	}
 
@@ -3462,16 +3675,16 @@ DEF_CONSOLE_CMD(ConViewportMarkStationOverlayDirty)
 DEF_CONSOLE_CMD(ConGfxDebug)
 {
 	if (argc < 1 || argc > 2) {
-		IConsoleHelp("Debug: gfx flags.  Usage: 'gfx_debug [<flags>]'");
-		IConsoleHelp("  1: GDF_SHOW_WINDOW_DIRTY");
-		IConsoleHelp("  2: GDF_SHOW_WIDGET_DIRTY");
-		IConsoleHelp("  4: GDF_SHOW_RECT_DIRTY");
+		IConsolePrint(CC_HELP, "Debug: gfx flags.  Usage: 'gfx_debug [<flags>]'");
+		IConsolePrint(CC_HELP, "  1: GDF_SHOW_WINDOW_DIRTY");
+		IConsolePrint(CC_HELP, "  2: GDF_SHOW_WIDGET_DIRTY");
+		IConsolePrint(CC_HELP, "  4: GDF_SHOW_RECT_DIRTY");
 		return true;
 	}
 
 	extern uint32_t _gfx_debug_flags;
 	if (argc == 1) {
-		IConsolePrintF(CC_DEFAULT, "Gfx debug flags: %X", _gfx_debug_flags);
+		IConsolePrint(CC_DEFAULT, "Gfx debug flags: {:X}", _gfx_debug_flags);
 	} else {
 		_gfx_debug_flags = std::strtoul(argv[1], nullptr, 16);
 	}
@@ -3482,7 +3695,7 @@ DEF_CONSOLE_CMD(ConGfxDebug)
 DEF_CONSOLE_CMD(ConCSleep)
 {
 	if (argc != 2) {
-		IConsoleHelp("Debug: Sleep.  Usage: 'csleep <milliseconds>'");
+		IConsolePrint(CC_HELP, "Debug: Sleep.  Usage: 'csleep <milliseconds>'");
 		return true;
 	}
 
@@ -3494,7 +3707,7 @@ DEF_CONSOLE_CMD(ConCSleep)
 DEF_CONSOLE_CMD(ConRecalculateRoadCachedOneWayStates)
 {
 	if (argc == 0) {
-		IConsoleHelp("Debug: Recalculate road cached one way states");
+		IConsolePrint(CC_HELP, "Debug: Recalculate road cached one way states");
 		return true;
 	}
 
@@ -3507,16 +3720,16 @@ DEF_CONSOLE_CMD(ConRecalculateRoadCachedOneWayStates)
 DEF_CONSOLE_CMD(ConMiscDebug)
 {
 	if (argc < 1 || argc > 2) {
-		IConsoleHelp("Debug: misc flags.  Usage: 'misc_debug [<flags>]'");
-		IConsoleHelp("  1: MDF_OVERHEAT_BREAKDOWN_OPEN_WIN");
-		IConsoleHelp("  2: MDF_ZONING_DEBUG_MODES");
-		IConsoleHelp(" 10: MDF_NEWGRF_SG_SAVE_RAW");
-		IConsoleHelp(" 20: MDF_SPECIAL_CMDS");
+		IConsolePrint(CC_HELP, "Debug: misc flags.  Usage: 'misc_debug [<flags>]'");
+		IConsolePrint(CC_HELP, "  1: MDF_OVERHEAT_BREAKDOWN_OPEN_WIN");
+		IConsolePrint(CC_HELP, "  2: MDF_ZONING_DEBUG_MODES");
+		IConsolePrint(CC_HELP, " 10: MDF_NEWGRF_SG_SAVE_RAW");
+		IConsolePrint(CC_HELP, " 20: MDF_SPECIAL_CMDS");
 		return true;
 	}
 
 	if (argc == 1) {
-		IConsolePrintF(CC_DEFAULT, "Misc debug flags: %X", _misc_debug_flags);
+		IConsolePrint(CC_DEFAULT, "Misc debug flags: {:X}", _misc_debug_flags);
 	} else {
 		_misc_debug_flags = std::strtoul(argv[1], nullptr, 16);
 	}
@@ -3527,20 +3740,20 @@ DEF_CONSOLE_CMD(ConMiscDebug)
 DEF_CONSOLE_CMD(ConSetNewGRFOptimiserFlags)
 {
 	if (argc < 1 || argc > 2) {
-		IConsoleHelp("Debug: misc set_newgrf_optimiser_flags.  Usage: 'set_newgrf_optimiser_flags [<flags>]'");
+		IConsolePrint(CC_HELP, "Debug: misc set_newgrf_optimiser_flags.  Usage: 'set_newgrf_optimiser_flags [<flags>]'");
 		return true;
 	}
 
 	if (argc == 1) {
-		IConsolePrintF(CC_DEFAULT, "NewGRF optimiser flags: %X", _settings_game.debug.newgrf_optimiser_flags);
+		IConsolePrint(CC_DEFAULT, "NewGRF optimiser flags: {:X}", _settings_game.debug.newgrf_optimiser_flags);
 	} else {
 		if (_game_mode == GM_MENU || (_networking && !_network_server)) {
-			IConsoleError("This command is only available in-game and in the editor, and not as a network client.");
+			IConsolePrint(CC_ERROR, "This command is only available in-game and in the editor, and not as a network client.");
 			return true;
 		}
 		extern uint NetworkClientCount();
 		if (_networking && NetworkClientCount() > 1) {
-			IConsoleError("This command is not available when network clients are connected.");
+			IConsolePrint(CC_ERROR, "This command is not available when network clients are connected.");
 			return true;
 		}
 
@@ -3560,7 +3773,7 @@ DEF_CONSOLE_CMD(ConSetNewGRFOptimiserFlags)
 DEF_CONSOLE_CMD(ConDoDisaster)
 {
 	if (argc == 0) {
-		IConsoleHelp("Debug: Do disaster");
+		IConsolePrint(CC_HELP, "Debug: Do disaster");
 		return true;
 	}
 
@@ -3573,18 +3786,18 @@ DEF_CONSOLE_CMD(ConDoDisaster)
 DEF_CONSOLE_CMD(ConBankruptCompany)
 {
 	if (argc != 2) {
-		IConsoleHelp("Debug: Mark company as bankrupt.  Usage: 'bankrupt_company <company-id>'");
+		IConsolePrint(CC_HELP, "Debug: Mark company as bankrupt.  Usage: 'bankrupt_company <company-id>'");
 		return true;
 	}
 
 	if (_game_mode != GM_NORMAL) {
-		IConsoleWarning("Companies can only be managed in a game.");
+		IConsolePrint(CC_ERROR, "Companies can only be managed in a game.");
 		return true;
 	}
 
 	CompanyID company_id = (CompanyID)(atoi(argv[1]) - 1);
 	if (!Company::IsValidID(company_id)) {
-		IConsolePrintF(CC_DEFAULT, "Unknown company. Company range is between 1 and %d.", MAX_COMPANIES);
+		IConsolePrint(CC_DEFAULT, "Unknown company. Company range is between 1 and {}.", MAX_COMPANIES);
 		return true;
 	}
 
@@ -3601,23 +3814,23 @@ DEF_CONSOLE_CMD(ConBankruptCompany)
 DEF_CONSOLE_CMD(ConDeleteCompany)
 {
 	if (argc != 2) {
-		IConsoleHelp("Debug: Delete company.  Usage: 'delete_company <company-id>'");
+		IConsolePrint(CC_HELP, "Debug: Delete company.  Usage: 'delete_company <company-id>'");
 		return true;
 	}
 
 	if (_game_mode != GM_NORMAL) {
-		IConsoleWarning("Companies can only be managed in a game.");
+		IConsolePrint(CC_ERROR, "Companies can only be managed in a game.");
 		return true;
 	}
 
 	CompanyID company_id = (CompanyID)(atoi(argv[1]) - 1);
 	if (!Company::IsValidID(company_id)) {
-		IConsolePrintF(CC_DEFAULT, "Unknown company. Company range is between 1 and %d.", MAX_COMPANIES);
+		IConsolePrint(CC_DEFAULT, "Unknown company. Company range is between 1 and {}.", MAX_COMPANIES);
 		return true;
 	}
 
 	if (company_id == _local_company) {
-		IConsoleWarning("Cannot delete current company.");
+		IConsolePrint(CC_ERROR, "Cannot delete current company.");
 		return true;
 	}
 
@@ -3630,19 +3843,19 @@ DEF_CONSOLE_CMD(ConDeleteCompany)
 DEF_CONSOLE_CMD(ConNewGRFProfile)
 {
 	if (argc == 0) {
-		IConsoleHelp("Collect performance data about NewGRF sprite requests and callbacks. Sub-commands can be abbreviated.");
-		IConsoleHelp("Usage: newgrf_profile [list]");
-		IConsoleHelp("  List all NewGRFs that can be profiled, and their status.");
-		IConsoleHelp("Usage: newgrf_profile select <grf-num>...");
-		IConsoleHelp("  Select one or more GRFs for profiling.");
-		IConsoleHelp("Usage: newgrf_profile unselect <grf-num>...");
-		IConsoleHelp("  Unselect one or more GRFs from profiling. Use the keyword \"all\" instead of a GRF number to unselect all. Removing an active profiler aborts data collection.");
-		IConsoleHelp("Usage: 'newgrf_profile start [<num-ticks>]':");
-		IConsoleHelp("  Begin profiling all selected GRFs. If a number of ticks is provided, profiling stops after that many game ticks. There are 74 ticks in a calendar day.");
-		IConsoleHelp("Usage: newgrf_profile stop");
-		IConsoleHelp("  End profiling and write the collected data to CSV files.");
-		IConsoleHelp("Usage: newgrf_profile abort");
-		IConsoleHelp("  End profiling and discard all collected data.");
+		IConsolePrint(CC_HELP, "Collect performance data about NewGRF sprite requests and callbacks. Sub-commands can be abbreviated.");
+		IConsolePrint(CC_HELP, "Usage: 'newgrf_profile [list]':");
+		IConsolePrint(CC_HELP, "  List all NewGRFs that can be profiled, and their status.");
+		IConsolePrint(CC_HELP, "Usage: 'newgrf_profile select <grf-num>...':");
+		IConsolePrint(CC_HELP, "  Select one or more GRFs for profiling.");
+		IConsolePrint(CC_HELP, "Usage: 'newgrf_profile unselect <grf-num>...':");
+		IConsolePrint(CC_HELP, "  Unselect one or more GRFs from profiling. Use the keyword \"all\" instead of a GRF number to unselect all. Removing an active profiler aborts data collection.");
+		IConsolePrint(CC_HELP, "Usage: 'newgrf_profile start [<num-ticks>]':");
+		IConsolePrint(CC_HELP, "  Begin profiling all selected GRFs. If a number of ticks is provided, profiling stops after that many game ticks. There are 74 ticks in a calendar day.");
+		IConsolePrint(CC_HELP, "Usage: 'newgrf_profile stop':");
+		IConsolePrint(CC_HELP, "  End profiling and write the collected data to CSV files.");
+		IConsolePrint(CC_HELP, "Usage: 'newgrf_profile abort':");
+		IConsolePrint(CC_HELP, "  End profiling and discard all collected data.");
 		return true;
 	}
 
@@ -3653,12 +3866,12 @@ DEF_CONSOLE_CMD(ConNewGRFProfile)
 		IConsolePrint(CC_INFO, "Loaded GRF files:");
 		int i = 1;
 		for (GRFFile *grf : files) {
-			auto profiler = std::find_if(_newgrf_profilers.begin(), _newgrf_profilers.end(), [&](NewGRFProfiler &pr) { return pr.grffile == grf; });
+			auto profiler = std::ranges::find(_newgrf_profilers, grf, &NewGRFProfiler::grffile);
 			bool selected = profiler != _newgrf_profilers.end();
 			bool active = selected && profiler->active;
 			TextColour tc = active ? TC_LIGHT_BLUE : selected ? TC_GREEN : CC_INFO;
 			const char *statustext = active ? " (active)" : selected ? " (selected)" : "";
-			IConsolePrintF(tc, "%d: [%08X] %s%s", i, BSWAP32(grf->grfid), grf->filename.c_str(), statustext);
+			IConsolePrint(tc, "{}: [{:08X}] {}{}", i, BSWAP32(grf->grfid), grf->filename, statustext);
 			i++;
 		}
 		return true;
@@ -3669,12 +3882,12 @@ DEF_CONSOLE_CMD(ConNewGRFProfile)
 		for (size_t argnum = 2; argnum < argc; ++argnum) {
 			int grfnum = atoi(argv[argnum]);
 			if (grfnum < 1 || grfnum > (int)files.size()) { // safe cast, files.size() should not be larger than a few hundred in the most extreme cases
-				IConsolePrintF(CC_WARNING, "GRF number %d out of range, not added.", grfnum);
+				IConsolePrint(CC_WARNING, "GRF number {} out of range, not added.", grfnum);
 				continue;
 			}
 			GRFFile *grf = files[grfnum - 1];
 			if (std::any_of(_newgrf_profilers.begin(), _newgrf_profilers.end(), [&](NewGRFProfiler &pr) { return pr.grffile == grf; })) {
-				IConsolePrintF(CC_WARNING, "GRF number %d [%08X] is already selected for profiling.", grfnum, BSWAP32(grf->grfid));
+				IConsolePrint(CC_WARNING, "GRF number {} [{:08X}] is already selected for profiling.", grfnum, BSWAP32(grf->grfid));
 				continue;
 			}
 			_newgrf_profilers.emplace_back(grf);
@@ -3691,12 +3904,11 @@ DEF_CONSOLE_CMD(ConNewGRFProfile)
 			}
 			int grfnum = atoi(argv[argnum]);
 			if (grfnum < 1 || grfnum > (int)files.size()) {
-				IConsolePrintF(CC_WARNING, "GRF number %d out of range, not removing.", grfnum);
+				IConsolePrint(CC_WARNING, "GRF number {} out of range, not removing.", grfnum);
 				continue;
 			}
 			GRFFile *grf = files[grfnum - 1];
-			auto pos = std::find_if(_newgrf_profilers.begin(), _newgrf_profilers.end(), [&](NewGRFProfiler &pr) { return pr.grffile == grf; });
-			if (pos != _newgrf_profilers.end()) _newgrf_profilers.erase(pos);
+			_newgrf_profilers.erase(std::ranges::find(_newgrf_profilers, grf, &NewGRFProfiler::grffile));
 		}
 		return true;
 	}
@@ -3711,22 +3923,21 @@ DEF_CONSOLE_CMD(ConNewGRFProfile)
 				started++;
 
 				if (!grfids.empty()) grfids += ", ";
-				char grfidstr[12]{ 0 };
-				seprintf(grfidstr, lastof(grfidstr), "[%08X]", BSWAP32(pr.grffile->grfid));
-				grfids += grfidstr;
+				fmt::format_to(std::back_inserter(grfids), "[{:08X}]", BSWAP32(pr.grffile->grfid));
 			}
 		}
 		if (started > 0) {
-			IConsolePrintF(CC_DEBUG, "Started profiling for GRFID%s %s", (started > 1) ? "s" : "", grfids.c_str());
+			IConsolePrint(CC_DEBUG, "Started profiling for GRFID{} {}.", (started > 1) ? "s" : "", grfids);
+
 			if (argc >= 3) {
 				uint64_t ticks = std::max(atoi(argv[2]), 1);
 				NewGRFProfiler::StartTimer(ticks);
-				IConsolePrintF(CC_DEBUG, "Profiling will automatically stop after %u ticks.", (uint)ticks);
+				IConsolePrint(CC_DEBUG, "Profiling will automatically stop after {} ticks.", ticks);
 			}
 		} else if (_newgrf_profilers.empty()) {
-			IConsolePrintF(CC_WARNING, "No GRFs selected for profiling, did not start.");
+			IConsolePrint(CC_ERROR, "No GRFs selected for profiling, did not start.");
 		} else {
-			IConsolePrintF(CC_WARNING, "Did not start profiling for any GRFs, all selected GRFs are already profiling.");
+			IConsolePrint(CC_ERROR, "Did not start profiling for any GRFs, all selected GRFs are already profiling.");
 		}
 		return true;
 	}
@@ -3752,7 +3963,7 @@ DEF_CONSOLE_CMD(ConNewGRFProfile)
 DEF_CONSOLE_CMD(ConRoadTypeFlagCtl)
 {
 	if (argc != 3) {
-		IConsoleHelp("Debug: Road/tram type flag control.");
+		IConsolePrint(CC_HELP, "Debug: Road/tram type flag control.");
 		return true;
 	}
 
@@ -3774,7 +3985,7 @@ DEF_CONSOLE_CMD(ConRoadTypeFlagCtl)
 DEF_CONSOLE_CMD(ConRailTypeMapColourCtl)
 {
 	if (argc != 3) {
-		IConsoleHelp("Debug: Rail type map colour control.");
+		IConsolePrint(CC_HELP, "Debug: Rail type map colour control.");
 		return true;
 	}
 
@@ -3793,7 +4004,7 @@ DEF_CONSOLE_CMD(ConRailTypeMapColourCtl)
 DEF_CONSOLE_CMD(ConSwitchBaseset)
 {
 	if (argc != 2) {
-		IConsoleHelp("Debug: Try to switch baseset and reload NewGRFs. Usage: 'switch_baseset <baseset-name>'");
+		IConsolePrint(CC_HELP, "Debug: Try to switch baseset and reload NewGRFs. Usage: 'switch_baseset <baseset-name>'");
 		return true;
 	}
 
@@ -3807,14 +4018,14 @@ DEF_CONSOLE_CMD(ConSwitchBaseset)
 		}
 	}
 
-	IConsolePrintF(CC_WARNING, "No such baseset: %s.", argv[1]);
+	IConsolePrint(CC_WARNING, "No such baseset: {}.", argv[1]);
 	return 1;
 }
 
-static bool ConConditionalCommon(byte argc, char *argv[], int value, const char *value_name, const char *name)
+static bool ConConditionalCommon(uint8_t argc, char *argv[], int value, const char *value_name, const char *name)
 {
 	if (argc < 4) {
-		IConsolePrintF(CC_WARNING, "- Execute command if %s is within the specified range. Usage: '%s <minimum> <maximum> <command...>'", value_name, name);
+		IConsolePrint(CC_WARNING, "- Execute command if {} is within the specified range. Usage: '{} <minimum> <maximum> <command...>'", value_name, name);
 		return true;
 	}
 
@@ -3875,7 +4086,7 @@ static void IConsoleDebugLibRegister()
 DEF_CONSOLE_CMD(ConFramerate)
 {
 	if (argc == 0) {
-		IConsoleHelp("Show frame rate and game speed information");
+		IConsolePrint(CC_HELP, "Show frame rate and game speed information.");
 		return true;
 	}
 
@@ -3886,12 +4097,12 @@ DEF_CONSOLE_CMD(ConFramerate)
 DEF_CONSOLE_CMD(ConFramerateWindow)
 {
 	if (argc == 0) {
-		IConsoleHelp("Open the frame rate window");
+		IConsolePrint(CC_HELP, "Open the frame rate window.");
 		return true;
 	}
 
 	if (_network_dedicated) {
-		IConsoleError("Can not open frame rate window on a dedicated server");
+		IConsolePrint(CC_ERROR, "Can not open frame rate window on a dedicated server.");
 		return false;
 	}
 
@@ -3902,7 +4113,7 @@ DEF_CONSOLE_CMD(ConFramerateWindow)
 DEF_CONSOLE_CMD(ConFindNonRealisticBrakingSignal)
 {
 	if (argc == 0) {
-		IConsoleHelp("Find the next signal tile which prevents enabling of realistic braking");
+		IConsolePrint(CC_HELP, "Find the next signal tile which prevents enabling of realistic braking");
 		return true;
 	}
 
@@ -3928,12 +4139,30 @@ DEF_CONSOLE_CMD(ConFindNonRealisticBrakingSignal)
 	return true;
 }
 
+DEF_CONSOLE_CMD(ConFindMissingObject)
+{
+	if (argc == 0) {
+		IConsolePrint(CC_HELP, "Find the next object tile where the spec is missing");
+		return true;
+	}
+
+	extern TileIndex FindMissingObjectTile();
+	TileIndex t = FindMissingObjectTile();
+	if (t != INVALID_TILE) {
+		ScrollMainWindowToTile(t);
+		SetRedErrorSquare(t);
+	}
+
+	return true;
+}
+
+
 DEF_CONSOLE_CMD(ConDumpInfo)
 {
 	if (argc != 2) {
-		IConsoleHelp("Dump debugging information.");
-		IConsoleHelp("Usage: dump_info roadtypes|railtypes|cargotypes");
-		IConsoleHelp("  Show information about road/tram types, rail types or cargo types.");
+		IConsolePrint(CC_HELP, "Dump debugging information.");
+		IConsolePrint(CC_HELP, "Usage: 'dump_info roadtypes|railtypes|cargotypes'.");
+		IConsolePrint(CC_HELP, "  Show information about road/tram types, rail types or cargo types.");
 		return true;
 	}
 
@@ -4015,6 +4244,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("echo",                    ConEcho);
 	IConsole::CmdRegister("echoc",                   ConEchoC);
 	IConsole::CmdRegister("exec",                    ConExec);
+	IConsole::CmdRegister("schedule",                ConSchedule);
 	IConsole::CmdRegister("exit",                    ConExit);
 	IConsole::CmdRegister("part",                    ConPart);
 	IConsole::CmdRegister("help",                    ConHelp);
@@ -4113,6 +4343,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("reset_company",           ConResetCompany,     ConHookServerOnly);
 	IConsole::AliasRegister("clean_company",         "reset_company %A");
 	IConsole::CmdRegister("offer_company_sale",      ConOfferCompanySale, ConHookServerOrNoNetwork);
+	IConsole::CmdRegister("merge_companies",         ConMergeCompanies,   ConHookServerOrNoNetwork);
 	IConsole::CmdRegister("client_name",             ConClientNickChange, ConHookServerOnly);
 	IConsole::CmdRegister("kick",                    ConKick,             ConHookServerOnly);
 	IConsole::CmdRegister("ban",                     ConBan,              ConHookServerOnly);
@@ -4122,6 +4353,9 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("pause",                   ConPauseGame,        ConHookServerOrNoNetwork);
 	IConsole::CmdRegister("unpause",                 ConUnpauseGame,      ConHookServerOrNoNetwork);
 	IConsole::CmdRegister("step",                    ConStepGame,         ConHookNoNetwork);
+
+	IConsole::CmdRegister("authorized_key",          ConNetworkAuthorizedKey, ConHookServerOnly);
+	IConsole::AliasRegister("ak", "authorized_key %+");
 
 	IConsole::CmdRegister("company_pw",              ConCompanyPassword,  ConHookNeedNetwork);
 	IConsole::AliasRegister("company_password",      "company_pw %+");
@@ -4168,6 +4402,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("fps_wnd",                 ConFramerateWindow);
 
 	IConsole::CmdRegister("find_non_realistic_braking_signal", ConFindNonRealisticBrakingSignal);
+	IConsole::CmdRegister("find_missing_object",     ConFindMissingObject);
 	IConsole::CmdRegister("create_town", ConCreateTown);
 
 	IConsole::CmdRegister("getfulldate",             ConGetFullDate,      nullptr, true);
@@ -4179,6 +4414,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("dump_veh_stats",          ConVehicleStats,     nullptr, true);
 	IConsole::CmdRegister("dump_map_stats",          ConMapStats,         nullptr, true);
 	IConsole::CmdRegister("dump_st_flow_stats",      ConStFlowStats,      nullptr, true);
+	IConsole::CmdRegister("dump_slot_stats",         ConSlotsStats,       nullptr, true);
 	IConsole::CmdRegister("dump_game_events",        ConDumpGameEvents,   nullptr, true);
 	IConsole::CmdRegister("dump_load_debug_log",     ConDumpLoadDebugLog, nullptr, true);
 	IConsole::CmdRegister("dump_load_debug_config",  ConDumpLoadDebugConfig, nullptr, true);

@@ -20,7 +20,6 @@
 #include "../debug.h"
 #include "../driver.h"
 #include "../mixer.h"
-#include "../core/endian_type.hpp"
 #include "cocoa_s.h"
 
 #define Rect        OTTDRect
@@ -58,9 +57,9 @@ const char *SoundDriver_Cocoa::Start(const StringList &parm)
 	requestedDesc.mBitsPerChannel = 16;
 	requestedDesc.mFormatFlags |= kLinearPCMFormatFlagIsSignedInteger;
 
-#if TTD_ENDIAN == TTD_BIG_ENDIAN
-	requestedDesc.mFormatFlags |= kLinearPCMFormatFlagIsBigEndian;
-#endif /* TTD_ENDIAN == TTD_BIG_ENDIAN */
+	if constexpr (std::endian::native == std::endian::big) {
+		requestedDesc.mFormatFlags |= kLinearPCMFormatFlagIsBigEndian;
+	}
 
 	requestedDesc.mFramesPerPacket = 1;
 	requestedDesc.mBytesPerFrame = requestedDesc.mBitsPerChannel * requestedDesc.mChannelsPerFrame / 8;
@@ -118,7 +117,7 @@ void SoundDriver_Cocoa::Stop()
 
 	/* stop processing the audio unit */
 	if (AudioOutputUnitStop(_outputAudioUnit) != noErr) {
-		DEBUG(driver, 0, "cocoa_s: Core_CloseAudio: AudioOutputUnitStop failed");
+		Debug(driver, 0, "cocoa_s: Core_CloseAudio: AudioOutputUnitStop failed");
 		return;
 	}
 
@@ -126,12 +125,12 @@ void SoundDriver_Cocoa::Stop()
 	callback.inputProc = 0;
 	callback.inputProcRefCon = 0;
 	if (AudioUnitSetProperty(_outputAudioUnit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &callback, sizeof(callback)) != noErr) {
-		DEBUG(driver, 0, "cocoa_s: Core_CloseAudio: AudioUnitSetProperty (kAudioUnitProperty_SetRenderCallback) failed");
+		Debug(driver, 0, "cocoa_s: Core_CloseAudio: AudioUnitSetProperty (kAudioUnitProperty_SetRenderCallback) failed");
 		return;
 	}
 
 	if (AudioComponentInstanceDispose(_outputAudioUnit) != noErr) {
-		DEBUG(driver, 0, "cocoa_s: Core_CloseAudio: AudioComponentInstanceDispose failed");
+		Debug(driver, 0, "cocoa_s: Core_CloseAudio: AudioComponentInstanceDispose failed");
 		return;
 	}
 }

@@ -33,7 +33,7 @@ struct RoadTypeScopeResolver : public ScopeResolver {
 	}
 
 	uint32_t GetRandomBits() const override;
-	uint32_t GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra *extra) const override;
+	uint32_t GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra &extra) const override;
 };
 
 /** Resolver object for road types. */
@@ -58,5 +58,9 @@ SpriteID GetCustomRoadSprite(const RoadTypeInfo *rti, TileIndex tile, RoadTypeSp
 
 RoadType GetRoadTypeTranslation(RoadTramType rtt, uint8_t tracktype, const GRFFile *grffile);
 uint8_t GetReverseRoadTypeTranslation(RoadType roadtype, const GRFFile *grffile);
+
+void ConvertRoadTypes();
+void SetCurrentRoadTypeLabelList();
+void ClearRoadTypeLabelList();
 
 #endif /* NEWGRF_ROADTYPE_H */

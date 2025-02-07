@@ -22,8 +22,6 @@ STR_TRANSPARENT_LOADING_TOOLTIP                                 :{BLACK}Baskulig
 
 # Programmable Pre-Signals
 
-#House construction window (for SE only)
-
 #Town select window (for SE only)
 
 STR_MAPGEN_SNOW_LINE_HEIGHT                                     :{BLACK}Neĝlinia alteco:
@@ -48,8 +46,8 @@ STR_VEHICLE_STATUS_CANNOT_REACH_DEPOT_SERVICE_VEL_END           :{LTBLUE}Ne pova
 
 STR_ORDERS_GO_TO_TOOLTIP_EXTRA                                  :{BLACK}Enigi novan ordonon antaŭ la elektita ordono, aŭ aldoni fine de la listo. Kun Ctrl, vagonarordonoj estos 'plenŝargi ia kargo', vojpunkt-ordonoj estos 'ne-halti' kaj depotordono estos 'servado'. Kun 'Komunordonoj'-butono aŭ Ctrl-klaku, ĉi tiu veturilo akiros komunajn ordonojn kun eklekta veturilo. Klaku veturilon por kopii ordonojn de tiu veturilo. Doni ia depotordono maleblas aŭtomatan servadon de ĉi tiu veturilo
 
-STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :A:
-STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :F:
+STR_TIMETABLE_ARRIVAL_ABBREVIATION                              :A:{SPACE}{SPACE}
+STR_TIMETABLE_DEPARTURE_ABBREVIATION                            :F:{SPACE}{SPACE}
 
 # Cargo type orders Window
 
@@ -82,3 +80,17 @@ STR_ERROR_CAN_T_SELL_25_SHARE_IN                                :{WHITE}Ne povas
 STR_ERROR_PROTECTED                                             :{WHITE}Ĉi tiu kompanio ne sufiĉe aĝas por jam komerci dividaĵojn...
 
 STR_CONFIG_SETTING_CYCLE_SIGNAL_PBS                             :Nur vojrezervaj semaforoj
+
+STR_WARNING_PASSWORD_SECURITY                                   :{YELLOW}Atentu: La serviladministrantoj eventuale povas legi ajnan tekston entajpitan ĉi tie.
+STR_NETWORK_NEED_COMPANY_PASSWORD_CAPTION                       :{WHITE}Kompanio estas protektata. Enigu pasvorton
+
+# Network set password
+STR_COMPANY_PASSWORD_CANCEL                                     :{BLACK}Ne konservu la pasvorton.
+STR_COMPANY_PASSWORD_OK                                         :{BLACK}Donu la novan pasvorton al la kompanio.
+STR_COMPANY_PASSWORD_CAPTION                                    :{WHITE}Kompania pasvorto
+STR_COMPANY_PASSWORD_MAKE_DEFAULT                               :{BLACK}Fari defaŭltan kompanipasvorton.
+STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}Uzu ĉi tiun kompanipasvorton kiel defaŭlto por novaj kompanioj.
+
+STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}Pasvorto
+STR_COMPANY_VIEW_PASSWORD_TOOLTIP                               :{BLACK}Pasvorte protektu vian kompanion por eviti ke eksteruloj aliĝu
+STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}Agordu kompanian pasvorton

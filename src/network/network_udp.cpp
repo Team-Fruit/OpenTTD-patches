@@ -60,9 +60,9 @@ struct UDPSocket {
 static UDPSocket _udp_client("Client"); ///< udp client socket
 static UDPSocket _udp_server("Server"); ///< udp server socket
 
-static Packet PrepareUdpClientFindServerPacket()
+static Packet PrepareUdpClientFindServerPacket(NetworkUDPSocketHandler *socket)
 {
-	Packet p(PACKET_UDP_CLIENT_FIND_SERVER);
+	Packet p(socket, PACKET_UDP_CLIENT_FIND_SERVER);
 	p.Send_uint32(FIND_SERVER_EXTENDED_TOKEN);
 	p.Send_uint16(0); // flags
 	p.Send_uint16(0); // version
@@ -92,10 +92,10 @@ void ServerNetworkUDPSocketHandler::Receive_CLIENT_FIND_SERVER(Packet &p, Networ
 		return;
 	}
 
-	Packet packet(PACKET_UDP_SERVER_RESPONSE);
+	Packet packet(this, PACKET_UDP_SERVER_RESPONSE);
 	this->SendPacket(packet, client_addr);
 
-	DEBUG(net, 7, "Queried from %s", client_addr.GetHostname());
+	Debug(net, 7, "Queried from {}", client_addr.GetHostname());
 }
 
 void ServerNetworkUDPSocketHandler::Reply_CLIENT_FIND_SERVER_extended(Packet &p, NetworkAddress &client_addr)
@@ -103,10 +103,10 @@ void ServerNetworkUDPSocketHandler::Reply_CLIENT_FIND_SERVER_extended(Packet &p,
 	[[maybe_unused]] uint16_t flags = p.Recv_uint16();
 	uint16_t version = p.Recv_uint16();
 
-	Packet packet(PACKET_UDP_EX_SERVER_RESPONSE);
+	Packet packet(this, PACKET_UDP_EX_SERVER_RESPONSE);
 	this->SendPacket(packet, client_addr);
 
-	DEBUG(net, 7, "Queried (extended: %u) from %s", version, client_addr.GetHostname());
+	Debug(net, 7, "Queried (extended: {}) from {}", version, client_addr.GetHostname());
 }
 
 ///*** Communication with servers (we are client) ***/
@@ -122,14 +122,14 @@ public:
 
 void ClientNetworkUDPSocketHandler::Receive_SERVER_RESPONSE(Packet &, NetworkAddress &client_addr)
 {
-	DEBUG(net, 3, "Server response from %s", NetworkAddressDumper().GetAddressAsString(client_addr));
+	Debug(net, 3, "Server response from {}", FormatNetworkAddress(client_addr));
 
 	NetworkAddServer(client_addr.GetAddressAsString(false), false, true);
 }
 
 void ClientNetworkUDPSocketHandler::Receive_EX_SERVER_RESPONSE(Packet &, NetworkAddress &client_addr)
 {
-	DEBUG(net, 3, "Extended server response from %s", NetworkAddressDumper().GetAddressAsString(client_addr));
+	Debug(net, 3, "Extended server response from {}", FormatNetworkAddress(client_addr));
 
 	NetworkAddServer(client_addr.GetAddressAsString(false), false, true); // TODO, mark as extended
 }
@@ -138,9 +138,9 @@ void ClientNetworkUDPSocketHandler::Receive_EX_SERVER_RESPONSE(Packet &, Network
 static void NetworkUDPBroadCast(NetworkUDPSocketHandler *socket)
 {
 	for (NetworkAddress &addr : _broadcast_list) {
-		DEBUG(net, 5, "Broadcasting to %s", addr.GetHostname());
+		Debug(net, 5, "Broadcasting to {}", addr.GetHostname());
 
-		Packet p = PrepareUdpClientFindServerPacket();
+		Packet p = PrepareUdpClientFindServerPacket(socket);
 		socket->SendPacket(p, addr, true, true);
 	}
 }
@@ -151,7 +151,7 @@ void NetworkUDPSearchGame()
 	/* We are still searching.. */
 	if (_network_udp_broadcast > 0) return;
 
-	DEBUG(net, 3, "Searching server");
+	Debug(net, 3, "Searching server");
 
 	NetworkUDPBroadCast(_udp_client.socket);
 	_network_udp_broadcast = 300; // Stay searching for 300 ticks
@@ -163,7 +163,7 @@ void NetworkUDPInitialize()
 	/* If not closed, then do it. */
 	if (_udp_server.socket != nullptr) NetworkUDPClose();
 
-	DEBUG(net, 3, "Initializing UDP listeners");
+	Debug(net, 3, "Initializing UDP listeners");
 	assert(_udp_client.socket == nullptr && _udp_server.socket == nullptr);
 
 	_udp_client.socket = new ClientNetworkUDPSocketHandler();
@@ -190,7 +190,7 @@ void NetworkUDPClose()
 
 	_network_udp_server = false;
 	_network_udp_broadcast = 0;
-	DEBUG(net, 5, "Closed UDP listeners");
+	Debug(net, 5, "Closed UDP listeners");
 }
 
 /** Receive the UDP packets. */

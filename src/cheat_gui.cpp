@@ -28,6 +28,7 @@
 #include "newgrf.h"
 #include "error.h"
 #include "network/network.h"
+#include "order_backup.h"
 #include "order_base.h"
 #include "vehicle_base.h"
 #include "currency.h"
@@ -72,6 +73,7 @@ static int32_t ClickChangeCompanyCheat(int32_t p1, int32_t p2)
 {
 	while ((uint)p1 < Company::GetPoolSize()) {
 		if (Company::IsValidID((CompanyID)p1)) {
+			OrderBackup::Reset();
 			SetLocalCompany((CompanyID)p1);
 			return _local_company;
 		}
@@ -105,22 +107,22 @@ extern void EnginesMonthlyLoop();
 static int32_t ClickChangeDateCheat(int32_t p1, int32_t p2)
 {
 	/* Don't allow changing to an invalid year, or the current year. */
-	p1 = Clamp(p1, CalTime::MIN_YEAR.base(), CalTime::MAX_YEAR.base());
-	if (p1 == CalTime::CurYear()) return CalTime::CurYear().base();
+	const CalTime::Year year = CalTime::DeserialiseYearClamped(p1);
+	if (year == CalTime::CurYear()) return year.base();
 
-	CalTime::Date new_date = CalTime::ConvertYMDToDate(p1, CalTime::CurMonth(), CalTime::CurDay());
+	CalTime::Date new_date = CalTime::ConvertYMDToDate(year, CalTime::CurMonth(), CalTime::CurDay());
 
 	/* Change the date. */
 	CalTime::Detail::SetDate(new_date, CalTime::CurDateFract());
 
 	if (!EconTime::UsingWallclockUnits()) {
-		EconTime::Date new_econ_date = new_date.base();
+		EconTime::Date new_econ_date{new_date.base()};
 		EconTime::DateFract new_econ_date_fract = CalTime::CurDateFract();
 
 		/* Shift cached dates. */
 		LinkGraphSchedule::instance.ShiftDates(new_econ_date - EconTime::CurDate());
 		ShiftVehicleDates(new_econ_date - EconTime::CurDate());
-		EconTime::Detail::period_display_offset -= (p1 - EconTime::CurYear().base());
+		EconTime::Detail::period_display_offset -= YearDelta{year.base() - EconTime::CurYear().base()};
 
 		EconTime::Detail::SetDate(new_econ_date, new_econ_date_fract);
 		UpdateOrderUIOnDateChange();
@@ -130,6 +132,7 @@ static int32_t ClickChangeDateCheat(int32_t p1, int32_t p2)
 	InvalidateWindowClassesData(WC_BUILD_STATION, 0);
 	InvalidateWindowClassesData(WC_BUS_STATION, 0);
 	InvalidateWindowClassesData(WC_BUILD_OBJECT, 0);
+	InvalidateWindowClassesData(WC_FINANCES, 0);
 	ResetSignalVariant();
 	MarkWholeScreenDirty();
 	return CalTime::CurYear().base();
@@ -244,7 +247,7 @@ struct CheatWindow : Window {
 	Dimension box;      ///< Dimension of box sprite
 	Dimension icon;     ///< Dimension of company icon sprite
 
-	CheatWindow(WindowDesc *desc) : Window(desc)
+	CheatWindow(WindowDesc &desc) : Window(desc)
 	{
 		this->InitNested();
 	}
@@ -330,45 +333,44 @@ struct CheatWindow : Window {
 		}
 	}
 
-	void UpdateWidgetSize(WidgetID widget, Dimension *size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension *fill, [[maybe_unused]] Dimension *resize) override
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
 	{
 		if (widget != WID_C_PANEL) return;
 
 		uint width = 0;
 		uint lines = 0;
-		for (int i = 0; i != lengthof(_cheats_ui); i++) {
-			const CheatEntry *ce = &_cheats_ui[i];
-			if (!IsCheatAllowed(ce->mode)) continue;
+		for (const CheatEntry &ce : _cheats_ui) {
+			if (!IsCheatAllowed(ce.mode)) continue;
 			lines++;
-			switch (ce->type) {
+			switch (ce.type) {
 				case SLF_ALLOW_CONTROL:
 					/* Change inflation factors */
 					break;
 
 				case SLE_BOOL:
 					SetDParam(0, STR_CONFIG_SETTING_ON);
-					width = std::max(width, GetStringBoundingBox(ce->str).width);
+					width = std::max(width, GetStringBoundingBox(ce.str).width);
 					SetDParam(0, STR_CONFIG_SETTING_OFF);
-					width = std::max(width, GetStringBoundingBox(ce->str).width);
+					width = std::max(width, GetStringBoundingBox(ce.str).width);
 					break;
 
 				default:
-					switch (ce->str) {
+					switch (ce.str) {
 						/* Display date for change date cheat */
 						case STR_CHEAT_CHANGE_DATE:
 							SetDParam(0, CalTime::ConvertYMDToDate(CalTime::MAX_YEAR, 11, 31));
-							width = std::max(width, GetStringBoundingBox(ce->str).width);
+							width = std::max(width, GetStringBoundingBox(ce.str).width);
 							break;
 
 						/* Draw coloured flag for change company cheat */
 						case STR_CHEAT_CHANGE_COMPANY:
 							SetDParamMaxValue(0, MAX_COMPANIES);
-							width = std::max(width, GetStringBoundingBox(ce->str).width + WidgetDimensions::scaled.hsep_wide * 4);
+							width = std::max(width, GetStringBoundingBox(ce.str).width + WidgetDimensions::scaled.hsep_wide * 4);
 							break;
 
 						default:
 							SetDParam(0, INT64_MAX);
-							width = std::max(width, GetStringBoundingBox(ce->str).width);
+							width = std::max(width, GetStringBoundingBox(ce.str).width);
 							break;
 					}
 					break;
@@ -379,8 +381,8 @@ struct CheatWindow : Window {
 		this->line_height = std::max<uint>(this->line_height, SETTING_BUTTON_HEIGHT);
 		this->line_height = std::max<uint>(this->line_height, GetCharacterHeight(FS_NORMAL)) + WidgetDimensions::scaled.framerect.Vertical();
 
-		size->width = width + WidgetDimensions::scaled.hsep_wide * 4 + this->box.width + SETTING_BUTTON_WIDTH /* stuff on the left */ + WidgetDimensions::scaled.hsep_wide * 2 /* extra spacing on right */;
-		size->height = WidgetDimensions::scaled.framerect.Vertical() + this->line_height * lines;
+		size.width = width + WidgetDimensions::scaled.hsep_wide * 4 + this->box.width + SETTING_BUTTON_WIDTH /* stuff on the left */ + WidgetDimensions::scaled.hsep_wide * 2 /* extra spacing on right */;
+		size.height = WidgetDimensions::scaled.framerect.Vertical() + this->line_height * lines;
 	}
 
 	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
@@ -491,29 +493,29 @@ struct CheatWindow : Window {
 		this->SetDirty();
 	}
 
-	void OnQueryTextFinished(char *str) override
+	void OnQueryTextFinished(std::optional<std::string> str) override
 	{
 		/* Was 'cancel' pressed or nothing entered? */
-		if (str == nullptr || StrEmpty(str)) return;
+		if (!str.has_value() || str->empty()) return;
 
 		const CheatEntry *ce = &_cheats_ui[clicked_widget];
 
 		if (ce->type == SLF_ALLOW_CONTROL) {
 			char tmp_buffer[32];
-			strecpy(tmp_buffer, str, lastof(tmp_buffer));
+			strecpy(tmp_buffer, str->c_str(), lastof(tmp_buffer));
 			str_replace_wchar(tmp_buffer, lastof(tmp_buffer), GetDecimalSeparatorChar(), '.');
 			DoCommandP(0, (uint32_t)clicked_widget, (uint32_t)Clamp<uint64_t>(atof(tmp_buffer) * 65536.0, 1 << 16, MAX_INFLATION), CMD_CHEAT_SETTING);
 			return;
 		}
 		if (ce->mode == CNM_MONEY) {
 			if (!_networking) *ce->been_used = true;
-			DoCommandPEx(0, 0, 0, (std::strtoll(str, nullptr, 10) / _currency->rate), IsNetworkSettingsAdmin() ? CMD_MONEY_CHEAT_ADMIN : CMD_MONEY_CHEAT);
+			DoCommandPEx(0, 0, 0, (std::strtoll(str->c_str(), nullptr, 10) / GetCurrency().rate), IsNetworkSettingsAdmin() ? CMD_MONEY_CHEAT_ADMIN : CMD_MONEY_CHEAT);
 			return;
 		}
 
 		if (_networking) return;
 		int oldvalue = (int32_t)ReadValue(ce->variable, ce->type);
-		int value = atoi(str);
+		int value = atoi(str->c_str());
 		*ce->been_used = true;
 		value = ce->proc(value, value - oldvalue);
 
@@ -527,7 +529,7 @@ static WindowDesc _cheats_desc(__FILE__, __LINE__,
 	WDP_AUTO, "cheats", 0, 0,
 	WC_CHEATS, WC_NONE,
 	0,
-	std::begin(_nested_cheat_widgets), std::end(_nested_cheat_widgets)
+	_nested_cheat_widgets
 );
 
 bool CheatWindowMayBeShown()
@@ -540,6 +542,6 @@ void ShowCheatWindow()
 {
 	CloseWindowById(WC_CHEATS, 0);
 	if (CheatWindowMayBeShown()) {
-		new CheatWindow(&_cheats_desc);
+		new CheatWindow(_cheats_desc);
 	}
 }

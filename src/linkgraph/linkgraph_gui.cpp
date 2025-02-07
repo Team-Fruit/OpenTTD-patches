@@ -18,6 +18,7 @@
 #include "../smallmap_gui.h"
 #include "../zoom_func.h"
 #include "../landscape.h"
+#include "../strings_func.h"
 #include "../core/geometry_func.hpp"
 #include "../widgets/link_graph_legend_widget.h"
 
@@ -578,19 +579,21 @@ bool LinkGraphOverlay::ShowTooltip(Point pt, TooltipCloseCondition close_cond)
 				pt.y - 2 <= std::max(pta.y, ptb.y) &&
 				check_distance()) {
 
-			std::string buf;
-			StringBuilder builder(buf);
-			buf[0] = 0;
+			format_buffer buf;
 
 			auto add_travel_time = [&](uint32_t time) {
 				if (time > 0) {
 					if (_settings_time.time_in_minutes) {
 						SetDParam(0, STR_TIMETABLE_MINUTES);
 						SetDParam(1, time / _settings_time.ticks_per_minute);
-						GetString(builder, STR_LINKGRAPH_STATS_TOOLTIP_TIME_EXTENSION_GENERAL);
+						AppendStringInPlace(buf, STR_LINKGRAPH_STATS_TOOLTIP_TIME_EXTENSION_GENERAL);
+					} else if (EconTime::UsingWallclockUnits() && DayLengthFactor() > 1) {
+						SetDParam(0, STR_UNITS_SECONDS);
+						SetDParam(1, time / (DAY_TICKS / 2));
+						AppendStringInPlace(buf, STR_LINKGRAPH_STATS_TOOLTIP_TIME_EXTENSION_GENERAL);
 					} else {
 						SetDParam(0, time / (DAY_TICKS * DayLengthFactor()));
-						GetString(builder, STR_LINKGRAPH_STATS_TOOLTIP_TIME_EXTENSION);
+						AppendStringInPlace(buf, STR_LINKGRAPH_STATS_TOOLTIP_TIME_EXTENSION);
 					}
 				}
 			};
@@ -599,15 +602,15 @@ bool LinkGraphOverlay::ShowTooltip(Point pt, TooltipCloseCondition close_cond)
 				if (info_link.usage < info_link.planned) {
 					SetDParam(0, info_link.cargo);
 					SetDParam(1, info_link.usage);
-					GetString(builder, STR_LINKGRAPH_STATS_TOOLTIP_USAGE);
+					AppendStringInPlace(buf, STR_LINKGRAPH_STATS_TOOLTIP_USAGE);
 				} else if (info_link.planned < info_link.usage) {
 					SetDParam(0, info_link.cargo);
 					SetDParam(1, info_link.planned);
-					GetString(builder, STR_LINKGRAPH_STATS_TOOLTIP_PLANNED);
+					AppendStringInPlace(buf, STR_LINKGRAPH_STATS_TOOLTIP_PLANNED);
 				}
 				SetDParam(0, info_link.cargo);
 				SetDParam(1, info_link.capacity);
-				GetString(builder, STR_LINKGRAPH_STATS_TOOLTIP_CAPACITY);
+				AppendStringInPlace(buf, STR_LINKGRAPH_STATS_TOOLTIP_CAPACITY);
 				add_travel_time(info_link.time);
 			};
 
@@ -621,11 +624,11 @@ bool LinkGraphOverlay::ShowTooltip(Point pt, TooltipCloseCondition close_cond)
 				if (j->from_id == i->to_id && j->to_id == i->from_id) {
 					back_time = j->prop.time;
 					if (j->prop.Usage() > 0 || (_ctrl_pressed && j->prop.capacity > 0)) {
-						if (_ctrl_pressed) builder += '\n';
+						if (_ctrl_pressed) buf.push_back('\n');
 						SetDParam(0, j->prop.cargo);
 						SetDParam(1, j->prop.Usage());
 						SetDParam(2, j->prop.Usage() * 100 / (j->prop.capacity + 1));
-						GetString(builder, STR_LINKGRAPH_STATS_TOOLTIP_RETURN_EXTENSION);
+						AppendStringInPlace(buf, STR_LINKGRAPH_STATS_TOOLTIP_RETURN_EXTENSION);
 						if (_ctrl_pressed) {
 							add_extra_info(j->prop);
 						}
@@ -640,14 +643,12 @@ bool LinkGraphOverlay::ShowTooltip(Point pt, TooltipCloseCondition close_cond)
 
 			if (_ctrl_pressed) {
 				/* Add distance information */
-				builder += "\n\n";
+				buf.append("\n\n");
 				TileIndex t0 = Station::Get(i->from_id)->xy;
 				TileIndex t1 = Station::Get(i->to_id)->xy;
-				uint dx = Delta(TileX(t0), TileX(t1));
-				uint dy = Delta(TileY(t0), TileY(t1));
 				SetDParam(0, DistanceManhattan(t0, t1));
-				SetDParam(1, IntSqrt64(((uint64_t)dx * (uint64_t)dx) + ((uint64_t)dy * (uint64_t)dy))); // Avoid overflow in DistanceSquare
-				GetString(builder, STR_LINKGRAPH_STATS_TOOLTIP_DISTANCE);
+				SetDParam(1, IntSqrt64(DistanceSquare64(t0, t1))); // Avoid overflow in DistanceSquare
+				AppendStringInPlace(buf, STR_LINKGRAPH_STATS_TOOLTIP_DISTANCE);
 			}
 
 			SetDParam(0, link.cargo);
@@ -655,8 +656,14 @@ bool LinkGraphOverlay::ShowTooltip(Point pt, TooltipCloseCondition close_cond)
 			SetDParam(2, i->from_id);
 			SetDParam(3, i->to_id);
 			SetDParam(4, link.Usage() * 100 / (link.capacity + 1));
-			SetDParamStr(5, std::move(buf));
-			GuiShowTooltips(this->window, EconTime::UsingWallclockUnits() ? STR_LINKGRAPH_STATS_TOOLTIP_MINUTE : STR_LINKGRAPH_STATS_TOOLTIP_MONTH, close_cond);
+			SetDParamStr(5, buf);
+			StringID msg;
+			if (EconTime::UsingWallclockUnits()) {
+				msg = ReplaceWallclockMinutesUnit() ? STR_LINKGRAPH_STATS_TOOLTIP_PRODUCTION_INTERVAL : STR_LINKGRAPH_STATS_TOOLTIP_MINUTE;
+			} else {
+				msg = STR_LINKGRAPH_STATS_TOOLTIP_MONTH;
+			}
+			GuiShowTooltips(this->window, msg, close_cond);
 			return true;
 		}
 	}
@@ -791,7 +798,7 @@ static WindowDesc _linkgraph_legend_desc(__FILE__, __LINE__,
 	WDP_AUTO, "toolbar_linkgraph", 0, 0,
 	WC_LINKGRAPH_LEGEND, WC_NONE,
 	0,
-	std::begin(_nested_linkgraph_legend_widgets), std::end(_nested_linkgraph_legend_widgets)
+	_nested_linkgraph_legend_widgets
 );
 
 /**
@@ -799,10 +806,10 @@ static WindowDesc _linkgraph_legend_desc(__FILE__, __LINE__,
  */
 void ShowLinkGraphLegend()
 {
-	AllocateWindowDescFront<LinkGraphLegendWindow>(&_linkgraph_legend_desc, 0);
+	AllocateWindowDescFront<LinkGraphLegendWindow>(_linkgraph_legend_desc, 0);
 }
 
-LinkGraphLegendWindow::LinkGraphLegendWindow(WindowDesc *desc, int window_number) : Window(desc)
+LinkGraphLegendWindow::LinkGraphLegendWindow(WindowDesc &desc, int window_number) : Window(desc)
 {
 	this->num_cargo = _sorted_cargo_specs.size();
 
@@ -830,7 +837,7 @@ void LinkGraphLegendWindow::SetOverlay(LinkGraphOverlay *overlay)
 	}
 }
 
-void LinkGraphLegendWindow::UpdateWidgetSize(WidgetID widget, Dimension *size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension *fill, [[maybe_unused]] Dimension *resize)
+void LinkGraphLegendWindow::UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize)
 {
 	if (IsInsideMM(widget, WID_LGL_SATURATION_FIRST, WID_LGL_SATURATION_LAST + 1)) {
 		StringID str = STR_NULL;
@@ -845,7 +852,7 @@ void LinkGraphLegendWindow::UpdateWidgetSize(WidgetID widget, Dimension *size, [
 			Dimension dim = GetStringBoundingBox(str, FS_SMALL);
 			dim.width += padding.width;
 			dim.height += padding.height;
-			*size = maxdim(*size, dim);
+			size = maxdim(size, dim);
 		}
 	}
 	if (IsInsideMM(widget, WID_LGL_CARGO_FIRST, WID_LGL_CARGO_LAST + 1)) {
@@ -853,7 +860,7 @@ void LinkGraphLegendWindow::UpdateWidgetSize(WidgetID widget, Dimension *size, [
 		Dimension dim = GetStringBoundingBox(cargo->abbrev, FS_SMALL);
 		dim.width += padding.width;
 		dim.height += padding.height;
-		*size = maxdim(*size, dim);
+		size = maxdim(size, dim);
 	}
 }
 

@@ -38,7 +38,7 @@ struct RailTypeScopeResolver : public ScopeResolver {
 	}
 
 	uint32_t GetRandomBits() const override;
-	uint32_t GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra *extra) const override;
+	uint32_t GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra &extra) const override;
 };
 
 /** Resolver object for rail types. */
@@ -71,5 +71,9 @@ CustomSignalSpriteResult GetCustomSignalSprite(const RailTypeInfo *rti, TileInde
 
 RailType GetRailTypeTranslation(uint8_t railtype, const GRFFile *grffile);
 uint8_t GetReverseRailTypeTranslation(RailType railtype, const GRFFile *grffile);
+
+void ConvertRailTypes();
+void SetCurrentRailTypeLabelList();
+void ClearRailTypeLabelList();
 
 #endif /* NEWGRF_RAILTYPE_H */

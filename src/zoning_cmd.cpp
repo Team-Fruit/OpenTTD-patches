@@ -67,7 +67,7 @@ bool IsAreaWithinAcceptanceZoneOfStation(TileArea area, Owner owner, StationFaci
 {
 	StationFinder morestations(area);
 
-	for (const Station *st : *morestations.GetStations()) {
+	for (const Station *st : morestations.GetStations()) {
 		if (st->owner != owner || !(st->facilities & facility_mask)) continue;
 		Rect rect = st->GetCatchmentRect();
 		return TileArea(TileXY(rect.left, rect.top), TileXY(rect.right, rect.bottom)).Intersects(area);
@@ -168,7 +168,7 @@ SpriteID TileZoneCheckStationCatchmentEvaluation(TileIndex tile, Owner owner, bo
 
 	StationFinder stations(TileArea(tile, 1, 1));
 
-	for (const Station *st : *stations.GetStations()) {
+	for (const Station *st : stations.GetStations()) {
 		if (st->owner == owner) {
 			if (!open_window_only || FindWindowById(WC_STATION_VIEW, st->index) != nullptr) {
 				return SPR_ZONING_INNER_HIGHLIGHT_LIGHT_BLUE;
@@ -214,7 +214,7 @@ SpriteID TileZoneCheckUnservedBuildingsEvaluation(TileIndex tile, Owner owner)
 
 	StationFinder stations(TileArea(tile, 1, 1));
 
-	for (const Station *st : *stations.GetStations()) {
+	for (const Station *st : stations.GetStations()) {
 		if (st->owner == owner) {
 			return ZONING_INVALID_SPRITE_ID;
 		}
@@ -242,13 +242,13 @@ SpriteID TileZoneCheckUnservedIndustriesEvaluation(TileIndex tile, Owner owner)
 				if (st->facilities & (~(FACIL_BUS_STOP | FACIL_TRUCK_STOP)) || st->facilities == (FACIL_BUS_STOP | FACIL_TRUCK_STOP)) {
 					return ZONING_INVALID_SPRITE_ID;
 				} else if (st->facilities & (FACIL_BUS_STOP | FACIL_TRUCK_STOP)) {
-					for (uint i = 0; i < std::size(ind->produced_cargo); i++) {
-						if (ind->produced_cargo[i] != INVALID_CARGO && st->facilities & (IsCargoInClass(ind->produced_cargo[i], CC_PASSENGERS) ? FACIL_BUS_STOP : FACIL_TRUCK_STOP)) {
+					for (const auto &p : ind->Produced()) {
+						if (p.cargo != INVALID_CARGO && st->facilities & (IsCargoInClass(p.cargo, CC_PASSENGERS) ? FACIL_BUS_STOP : FACIL_TRUCK_STOP)) {
 							return ZONING_INVALID_SPRITE_ID;
 						}
 					}
-					for (uint i = 0; i < std::size(ind->accepts_cargo); i++) {
-						if (ind->accepts_cargo[i] != INVALID_CARGO && st->facilities & (IsCargoInClass(ind->accepts_cargo[i], CC_PASSENGERS) ? FACIL_BUS_STOP : FACIL_TRUCK_STOP)) {
+					for (const auto &a : ind->Accepted()) {
+						if (a.cargo != INVALID_CARGO && st->facilities & (IsCargoInClass(a.cargo, CC_PASSENGERS) ? FACIL_BUS_STOP : FACIL_TRUCK_STOP)) {
 							return ZONING_INVALID_SPRITE_ID;
 						}
 					}
@@ -321,6 +321,8 @@ inline SpriteID TileZoneCheckOneWayRoadEvaluation(TileIndex tile)
 			if (IsTileType(tile, MP_STATION)) {
 				return SPR_ZONING_INNER_HIGHLIGHT_GREEN;
 			} else if (IsNormalRoadTile(tile) && GetDisallowedRoadDirections(tile) != DRD_NONE) {
+				return SPR_ZONING_INNER_HIGHLIGHT_LIGHT_BLUE;
+			} else if (IsRoadBridgeTile(tile) && GetBridgeDisallowedRoadDirections(tile) != DRD_NONE) {
 				return SPR_ZONING_INNER_HIGHLIGHT_LIGHT_BLUE;
 			} else {
 				return SPR_ZONING_INNER_HIGHLIGHT_PURPLE;

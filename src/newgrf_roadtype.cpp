@@ -14,6 +14,8 @@
 #include "date_func.h"
 #include "depot_base.h"
 #include "town.h"
+#include "tunnelbridge_map.h"
+#include "newgrf_dump.h"
 
 #include "safeguards.h"
 
@@ -23,7 +25,7 @@
 	return GB(tmp, 0, 2);
 }
 
-/* virtual */ uint32_t RoadTypeScopeResolver::GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra *extra) const
+/* virtual */ uint32_t RoadTypeScopeResolver::GetVariable(uint16_t variable, uint32_t parameter, GetVariableExtra &extra) const
 {
 	if (this->tile == INVALID_TILE) {
 		switch (variable) {
@@ -53,9 +55,9 @@
 		}
 	}
 
-	DEBUG(grf, 1, "Unhandled road type tile variable 0x%X", variable);
+	Debug(grf, 1, "Unhandled road type tile variable 0x{:X}", variable);
 
-	extra->available = false;
+	extra.available = false;
 	return UINT_MAX;
 }
 
@@ -168,9 +170,73 @@ uint8_t GetReverseRoadTypeTranslation(RoadType roadtype, const GRFFile *grffile)
 	return 0xFF;
 }
 
+std::vector<LabelObject<RoadTypeLabel>> _roadtype_list;
+
+/**
+ * Test if any saved road type labels are different to the currently loaded
+ * road types. Road types stored in the map will be converted if necessary.
+ */
+void ConvertRoadTypes()
+{
+	std::vector<RoadType> roadtype_conversion_map;
+	bool needs_conversion = false;
+	for (auto it = std::begin(_roadtype_list); it != std::end(_roadtype_list); ++it) {
+		RoadType rt = GetRoadTypeByLabel(it->label);
+		if (rt == INVALID_ROADTYPE || GetRoadTramType(rt) != it->subtype) {
+			rt = it->subtype ? ROADTYPE_TRAM : ROADTYPE_ROAD;
+		}
+
+		roadtype_conversion_map.push_back(rt);
+
+		/* Conversion is needed if the road type is in a different position than the list. */
+		if (it->label != 0 && rt != std::distance(std::begin(_roadtype_list), it)) needs_conversion = true;
+	}
+	if (!needs_conversion) return;
+
+	for (TileIndex t = 0; t < MapSize(); t++) {
+		switch (GetTileType(t)) {
+			case MP_ROAD:
+				if (RoadType rt = GetRoadTypeRoad(t); rt != INVALID_ROADTYPE) SetRoadTypeRoad(t, roadtype_conversion_map[rt]);
+				if (RoadType rt = GetRoadTypeTram(t); rt != INVALID_ROADTYPE) SetRoadTypeTram(t, roadtype_conversion_map[rt]);
+				break;
+
+			case MP_STATION:
+				if (IsStationRoadStop(t) || IsRoadWaypoint(t)) {
+					if (RoadType rt = GetRoadTypeRoad(t); rt != INVALID_ROADTYPE) SetRoadTypeRoad(t, roadtype_conversion_map[rt]);
+					if (RoadType rt = GetRoadTypeTram(t); rt != INVALID_ROADTYPE) SetRoadTypeTram(t, roadtype_conversion_map[rt]);
+				}
+				break;
+
+			case MP_TUNNELBRIDGE:
+				if (GetTunnelBridgeTransportType(t) == TRANSPORT_ROAD) {
+					if (RoadType rt = GetRoadTypeRoad(t); rt != INVALID_ROADTYPE) SetRoadTypeRoad(t, roadtype_conversion_map[rt]);
+					if (RoadType rt = GetRoadTypeTram(t); rt != INVALID_ROADTYPE) SetRoadTypeTram(t, roadtype_conversion_map[rt]);
+				}
+				break;
+
+			default:
+				break;
+		}
+	}
+}
+
+/** Populate road type label list with current values. */
+void SetCurrentRoadTypeLabelList()
+{
+	_roadtype_list.clear();
+	for (RoadType rt = ROADTYPE_BEGIN; rt != ROADTYPE_END; rt++) {
+		_roadtype_list.push_back({GetRoadTypeInfo(rt)->label, GetRoadTramType(rt)});
+	}
+}
+
+void ClearRoadTypeLabelList()
+{
+	_roadtype_list.clear();
+}
+
 void DumpRoadTypeSpriteGroup(RoadType rt, SpriteGroupDumper &dumper)
 {
-	char buffer[64];
+	format_buffer buffer;
 	const RoadTypeInfo *rti = GetRoadTypeInfo(rt);
 
 	static const char *sprite_group_names[] =  {
@@ -191,10 +257,10 @@ void DumpRoadTypeSpriteGroup(RoadType rt, SpriteGroupDumper &dumper)
 
 	for (RoadTypeSpriteGroup rtsg = (RoadTypeSpriteGroup)0; rtsg < ROTSG_END; rtsg = (RoadTypeSpriteGroup)(rtsg + 1)) {
 		if (rti->group[rtsg] != nullptr) {
-			char *b = buffer;
-			b += seprintf(b, lastof(buffer), "%s: %s", RoadTypeIsTram(rt) ? "Tram" : "Road", sprite_group_names[rtsg]);
+			buffer.clear();
+			buffer.format("{}: {}", RoadTypeIsTram(rt) ? "Tram" : "Road", sprite_group_names[rtsg]);
 			if (rti->grffile[rtsg] != nullptr) {
-				b += seprintf(b, lastof(buffer), ", GRF: %08X", BSWAP32(rti->grffile[rtsg]->grfid));
+				buffer.format(", GRF: {:08X}", BSWAP32(rti->grffile[rtsg]->grfid));
 			}
 			dumper.Print(buffer);
 			dumper.DumpSpriteGroup(rti->group[rtsg], 0);

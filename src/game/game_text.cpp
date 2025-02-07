@@ -21,41 +21,25 @@
 #include "table/strings.h"
 #include "table/strgen_tables.h"
 
-#include <stdarg.h>
 #include <memory>
 
 #include "../safeguards.h"
 
-void CDECL strgen_warning(const char *s, ...)
+void CDECL StrgenWarningI(const std::string &msg)
 {
-	char buf[1024];
-	va_list va;
-	va_start(va, s);
-	vseprintf(buf, lastof(buf), s, va);
-	va_end(va);
-	DEBUG(script, 0, "%s:%d: warning: %s", _file, _cur_line, buf);
+	Debug(script, 0, "{}:{}: warning: {}", _file, _cur_line, msg);
 	_warnings++;
 }
 
-void CDECL strgen_error(const char *s, ...)
+void CDECL StrgenErrorI(const std::string &msg)
 {
-	char buf[1024];
-	va_list va;
-	va_start(va, s);
-	vseprintf(buf, lastof(buf), s, va);
-	va_end(va);
-	DEBUG(script, 0, "%s:%d: error: %s", _file, _cur_line, buf);
+	Debug(script, 0, "{}:{}: error: {}", _file, _cur_line, msg);
 	_errors++;
 }
 
-[[noreturn]] void CDECL strgen_fatal(const char *s, ...)
+void CDECL StrgenFatalI(const std::string &msg)
 {
-	char buf[1024];
-	va_list va;
-	va_start(va, s);
-	vseprintf(buf, lastof(buf), s, va);
-	va_end(va);
-	DEBUG(script, 0, "%s:%d: FATAL: %s", _file, _cur_line, buf);
+	Debug(script, 0, "{}:{}: FATAL: {}", _file, _cur_line, msg);
 	throw std::exception();
 }
 
@@ -67,10 +51,8 @@ void CDECL strgen_error(const char *s, ...)
 LanguageStrings ReadRawLanguageStrings(const std::string &file)
 {
 	size_t to_read;
-	FILE *fh = FioFOpenFile(file, "rb", GAME_DIR, &to_read);
-	if (fh == nullptr) return LanguageStrings();
-
-	FileCloser fhClose(fh);
+	auto fh = FioFOpenFile(file, "rb", GAME_DIR, &to_read);
+	if (!fh.has_value()) return LanguageStrings();
 
 	auto pos = file.rfind(PATHSEPCHAR);
 	if (pos == std::string::npos) return LanguageStrings();
@@ -82,7 +64,7 @@ LanguageStrings ReadRawLanguageStrings(const std::string &file)
 	LanguageStrings ret(langname.substr(0, langname.find('.')));
 
 	char buffer[2048];
-	while (to_read != 0 && fgets(buffer, sizeof(buffer), fh) != nullptr) {
+	while (to_read != 0 && fgets(buffer, sizeof(buffer), *fh) != nullptr) {
 		size_t len = strlen(buffer);
 
 		/* Remove trailing spaces/newlines from the string. */
@@ -158,7 +140,7 @@ struct TranslationWriter : LanguageWriter {
 		/* We don't write the length. */
 	}
 
-	void Write(const byte *buffer, size_t length) override
+	void Write(const uint8_t *buffer, size_t length) override
 	{
 		this->strings.emplace_back((const char *)buffer, length);
 	}
@@ -202,7 +184,7 @@ public:
 	/**
 	 * Scan.
 	 */
-	void Scan(const char *directory)
+	void Scan(const std::string &directory)
 	{
 		this->FileScanner::Scan(".txt", directory, false);
 	}
@@ -263,7 +245,7 @@ GameStrings *LoadTranslations()
 			}
 		} else {
 			/* Scan filesystem */
-			scanner.Scan(ldir.c_str());
+			scanner.Scan(ldir);
 		}
 
 		gs->Compile();
@@ -341,7 +323,7 @@ GameStrings *_current_data = nullptr;
  */
 const char *GetGameStringPtr(uint id)
 {
-	if (id >= _current_data->cur_language->lines.size()) return GetStringPtr(STR_UNDEFINED);
+	if (_current_data == nullptr || _current_data->cur_language == nullptr || id >= _current_data->cur_language->lines.size()) return GetStringPtr(STR_UNDEFINED);
 	return _current_data->cur_language->lines[id].c_str();
 }
 

@@ -16,12 +16,19 @@
 #include "vehicle_base.h"
 #include "vehiclelist.h"
 #include "window_gui.h"
-#include "widgets/dropdown_type.h"
+#include "dropdown_type.h"
 #include "cargo_type.h"
+#include <bit>
 #include <iterator>
 #include <numeric>
 
 typedef GUIList<const Vehicle*, std::nullptr_t, CargoID> GUIVehicleList;
+
+inline uint32_t GetVehicleTimetableTypeSortKey(const Vehicle *v)
+{
+	uint32_t result = v->vehicle_flags & GetBitMaskBN<uint32_t>(VF_TIMETABLE_SEPARATION, VF_AUTOMATE_TIMETABLE, VF_AUTOFILL_TIMETABLE, VF_SCHEDULED_DISPATCH);
+	return std::rotr(result, VF_AUTOMATE_TIMETABLE); // Move automate bit to LSB (least important for sorting)
+}
 
 struct GUIVehicleGroup {
 	VehicleList::const_iterator vehicles_begin;    ///< Pointer to beginning element of this vehicle group.
@@ -62,12 +69,24 @@ struct GUIVehicleGroup {
 		});
 		return oldest->economy_age;
 	}
+
+	uint8_t GetOrderOccupancyAverage() const
+	{
+		if (this->NumVehicles() < 1) return 0;
+		return this->vehicles_begin[0]->GetOrderOccupancyAverage();
+	}
+
+	uint32_t GetTimetableTypeSortKey() const
+	{
+		if (this->NumVehicles() < 1) return 0;
+		return GetVehicleTimetableTypeSortKey(this->vehicles_begin[0]);
+	}
 };
 
 typedef GUIList<GUIVehicleGroup, std::nullptr_t, CargoID> GUIVehicleGroupList;
 
 struct BaseVehicleListWindow : public Window {
-	enum GroupBy : byte {
+	enum GroupBy : uint8_t {
 		GB_NONE,
 		GB_SHARED_ORDERS,
 
@@ -82,7 +101,7 @@ public:
 	CompanyID own_company;                    ///< Company ID used for own_vehicles
 	GUIVehicleGroupList vehgroups;            ///< List of (groups of) vehicles.  This stores iterators of `vehicles`, and should be rebuilt if `vehicles` is structurally changed.
 	Listing *sorting;                         ///< Pointer to the vehicle type related sorting.
-	byte unitnumber_digits;                   ///< The number of digits of the highest unit number.
+	uint8_t unitnumber_digits;                ///< The number of digits of the highest unit number.
 	Scrollbar *vscroll;
 	VehicleListIdentifier vli;                  ///< Identifier of the vehicle list we want to currently show.
 	VehicleID vehicle_sel;                      ///< Selected vehicle
@@ -113,13 +132,15 @@ public:
 	static const StringID vehicle_depot_name[];
 	static const StringID vehicle_depot_sell_name[];
 
-	static const StringID vehicle_group_by_names[];
-	static const StringID vehicle_group_none_sorter_names[];
-	static const StringID vehicle_group_shared_orders_sorter_names[];
-	static VehicleGroupSortFunction * const vehicle_group_none_sorter_funcs[];
-	static VehicleGroupSortFunction * const vehicle_group_shared_orders_sorter_funcs[];
+	static const std::initializer_list<const StringID> vehicle_group_by_names;
+	static const std::initializer_list<const StringID> vehicle_group_none_sorter_names_calendar;
+	static const std::initializer_list<const StringID> vehicle_group_none_sorter_names_wallclock;
+	static const std::initializer_list<const StringID> vehicle_group_shared_orders_sorter_names_calendar;
+	static const std::initializer_list<const StringID> vehicle_group_shared_orders_sorter_names_wallclock;
+	static const std::initializer_list<VehicleGroupSortFunction * const> vehicle_group_none_sorter_funcs;
+	static const std::initializer_list<VehicleGroupSortFunction * const> vehicle_group_shared_orders_sorter_funcs;
 
-	BaseVehicleListWindow(WindowDesc *desc, WindowNumber wno);
+	BaseVehicleListWindow(WindowDesc &desc, WindowNumber wno);
 
 	void OnInit() override;
 
@@ -131,7 +152,7 @@ public:
 	void SortVehicleList();
 	void CountOwnVehicles();
 	void BuildVehicleList();
-	void SetCargoFilter(byte index);
+	void SetCargoFilter(uint8_t index);
 	void SetCargoFilterArray();
 	void FilterVehicleList();
 	StringID GetCargoFilterLabel(CargoID cid) const;
@@ -141,19 +162,19 @@ public:
 			StringID change_order_str = 0, bool show_create_group = false, bool consider_top_level = false);
 	bool ShouldShowActionDropdownList() const;
 
-	const StringID *GetVehicleSorterNames()
+	std::span<const StringID> GetVehicleSorterNames()
 	{
 		switch (this->grouping) {
 			case GB_NONE:
-				return vehicle_group_none_sorter_names;
+				return EconTime::UsingWallclockUnits() ? vehicle_group_none_sorter_names_wallclock : vehicle_group_none_sorter_names_calendar;
 			case GB_SHARED_ORDERS:
-				return vehicle_group_shared_orders_sorter_names;
+				return EconTime::UsingWallclockUnits() ? vehicle_group_shared_orders_sorter_names_wallclock : vehicle_group_shared_orders_sorter_names_calendar;
 			default:
 				NOT_REACHED();
 		}
 	}
 
-	VehicleGroupSortFunction * const *GetVehicleSorterFuncs()
+	std::span<VehicleGroupSortFunction * const> GetVehicleSorterFuncs()
 	{
 		switch (this->grouping) {
 			case GB_NONE:
@@ -167,6 +188,22 @@ public:
 
 	uint GetSorterDisableMask(VehicleType type) const;
 };
+
+struct CargoIconOverlay {
+	int left;
+	int right;
+	CargoID cargo_type;
+	uint cargo_cap;
+
+	constexpr CargoIconOverlay(int left, int right, CargoID cargo_type, uint cargo_cap)
+		: left(left), right(right), cargo_type(cargo_type), cargo_cap(cargo_cap)
+	{ }
+};
+
+bool ShowCargoIconOverlay();
+void AddCargoIconOverlay(std::vector<CargoIconOverlay> &overlays, int x, int width, const Vehicle *v);
+void DrawCargoIconOverlay(int x, int y, CargoID cid);
+void DrawCargoIconOverlays(std::span<const CargoIconOverlay> overlays, int y);
 
 uint GetVehicleListHeight(VehicleType type, uint divisor = 1);
 

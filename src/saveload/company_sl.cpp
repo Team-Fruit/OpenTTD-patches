@@ -231,6 +231,22 @@ public:
 	void LoadCheck(CompanyProperties *c) const override { this->Load(c); }
 };
 
+class SlAllowListData : public VectorSaveLoadHandler<SlAllowListData, CompanyProperties, std::string> {
+public:
+	struct KeyWrapper {
+		std::string key;
+	};
+
+	inline static const SaveLoad description[] = {
+		SLE_SSTR(KeyWrapper, key, SLE_STR),
+	};
+	inline const static SaveLoadCompatTable compat_description = {};
+
+	std::vector<std::string> &GetVector(CompanyProperties *cprops) const override { return cprops->allow_list; }
+
+	void LoadCheck(CompanyProperties *cprops) const override { this->Load(cprops); }
+};
+
 /* Save/load of companies */
 static const SaveLoad _company_desc[] = {
 	    SLE_VAR(CompanyProperties, name_2,          SLE_UINT32),
@@ -240,6 +256,9 @@ static const SaveLoad _company_desc[] = {
 	    SLE_VAR(CompanyProperties, president_name_1, SLE_STRINGID),
 	    SLE_VAR(CompanyProperties, president_name_2, SLE_UINT32),
 	SLE_CONDSSTR(CompanyProperties, president_name,  SLE_STR | SLF_ALLOW_CONTROL, SLV_84, SL_MAX_VERSION),
+
+	SLE_CONDVECTOR(CompanyProperties, allow_list, SLE_STR, SLV_COMPANY_ALLOW_LIST, SLV_COMPANY_ALLOW_LIST_V2),
+	SLEG_CONDSTRUCTLIST("allow_list", SlAllowListData, SLV_COMPANY_ALLOW_LIST_V2, SL_MAX_VERSION),
 
 	    SLE_VAR(CompanyProperties, face,            SLE_UINT32),
 
@@ -260,7 +279,9 @@ static const SaveLoad _company_desc[] = {
 	SLE_CONDVAR(CompanyProperties, last_build_coordinate, SLE_FILE_U16 | SLE_VAR_U32,  SL_MIN_VERSION,  SLV_6),
 	SLE_CONDVAR(CompanyProperties, last_build_coordinate, SLE_UINT32,                  SLV_6, SL_MAX_VERSION),
 	SLE_CONDVAR(CompanyProperties, inaugurated_year,      SLE_FILE_U8  | SLE_VAR_I32,  SL_MIN_VERSION, SLV_31),
-	SLE_CONDVAR(CompanyProperties, inaugurated_year,      SLE_INT32,                  SLV_31, SL_MAX_VERSION),
+	SLE_CONDVAR(CompanyProperties, inaugurated_year,      SLE_INT32,                   SLV_31, SLV_COMPANY_INAUGURATED_PERIOD_V2),
+	SLE_CONDVARNAME(CompanyProperties, inaugurated_year, "inaugurated_year_calendar", SLE_INT32, SLV_COMPANY_INAUGURATED_PERIOD_V2, SL_MAX_VERSION),
+	SLE_CONDVARNAME(CompanyProperties, display_inaugurated_period, "inaugurated_year", SLE_INT32, SLV_COMPANY_INAUGURATED_PERIOD_V2, SL_MAX_VERSION),
 
 	    SLE_ARR(CompanyProperties, share_owners,          SLE_UINT8, 4),
 

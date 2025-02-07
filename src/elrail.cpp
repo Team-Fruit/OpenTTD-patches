@@ -88,7 +88,7 @@ struct DualTrackBits {
  * @param override pointer to PCP override, can be nullptr
  * @return trackbits of tile if it is electrified
  */
-static DualTrackBits GetRailTrackBitsUniversal(TileIndex t, byte *override)
+static DualTrackBits GetRailTrackBitsUniversal(TileIndex t, uint8_t *override)
 {
 	DualTrackBits out;
 	out.primary = TRACK_BIT_NONE;
@@ -326,10 +326,10 @@ static void DrawRailCatenaryRailway(const TileInfo *ti)
 	}
 
 	TLG tlg = GetTLG(ti->tile);
-	byte PCPstatus = 0;
-	byte OverridePCP = 0;
-	byte PPPpreferred[DIAGDIR_END];
-	byte PPPallowed[DIAGDIR_END];
+	uint8_t PCPstatus = 0;
+	uint8_t OverridePCP = 0;
+	uint8_t PPPpreferred[DIAGDIR_END];
+	uint8_t PPPallowed[DIAGDIR_END];
 
 	/* Find which rail bits are present, and select the override points.
 	 * We don't draw a pylon:
@@ -499,7 +499,7 @@ static void DrawRailCatenaryRailway(const TileInfo *ti)
 		if (PPPallowed[i] != 0 && HasBit(PCPstatus, i) && !HasBit(OverridePCP, i) &&
 				(!IsRailStationTile(ti->tile) || CanStationTileHavePylons(ti->tile))) {
 			for (Direction k = DIR_BEGIN; k < DIR_END; k++) {
-				byte temp = PPPorder[i][GetTLG(ti->tile)][k];
+				uint8_t temp = PPPorder[i][GetTLG(ti->tile)][k];
 
 				if (HasBit(PPPallowed[i], temp)) {
 					uint x  = ti->x + x_pcp_offsets[i] + x_ppp_offsets[temp];
@@ -579,7 +579,7 @@ static void DrawRailCatenaryRailway(const TileInfo *ti)
 	/* Drawing of pylons is finished, now draw the wires */
 	for (Track t : SetTrackBitIterator(wireconfig[TS_HOME])) {
 		SpriteID wire_base = get_wire_sprite(t, (t == halftile_track));
-		byte PCPconfig = HasBit(PCPstatus, PCPpositions[t][0]) +
+		uint8_t PCPconfig = HasBit(PCPstatus, PCPpositions[t][0]) +
 			(HasBit(PCPstatus, PCPpositions[t][1]) << 1);
 
 		const SortableSpriteStruct *sss;
@@ -703,7 +703,11 @@ void DrawRailCatenary(const TileInfo *ti)
 void SettingsDisableElrail(int32_t new_value)
 {
 	bool disable = (new_value != 0);
+	UpdateDisableElrailSettingState(disable, true);
+}
 
+void UpdateDisableElrailSettingState(bool disable, bool update_vehicles)
+{
 	/* pick appropriate railtype for elrail engines depending on setting */
 	const RailType new_railtype = disable ? RAILTYPE_RAIL : RAILTYPE_ELECTRIC;
 
@@ -731,10 +735,12 @@ void SettingsDisableElrail(int32_t new_value)
 	}
 
 	/* Fix the total power and acceleration for trains */
-	for (Train *t : Train::IterateFrontOnly()) {
-		/* power and acceleration is cached only for front engines */
-		if (t->IsFrontEngine()) {
-			t->ConsistChanged(CCF_TRACK);
+	if (update_vehicles) {
+		for (Train *t : Train::IterateFrontOnly()) {
+			/* power and acceleration is cached only for front engines */
+			if (t->IsFrontEngine()) {
+				t->ConsistChanged(CCF_TRACK);
+			}
 		}
 	}
 

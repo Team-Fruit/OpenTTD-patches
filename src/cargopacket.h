@@ -35,7 +35,7 @@ struct GoodsEntry; // forward-declare for Stage() and RerouteStalePackets()
 
 template <class Tinst, class Tcont> class CargoList;
 class StationCargoList; // forward-declare, so we can use it in VehicleCargoList.
-extern SaveLoadTable GetCargoPacketDesc();
+extern NamedSaveLoadTable GetCargoPacketDesc();
 
 namespace upstream_sl {
 	extern upstream_sl::SaveLoadTable GetCargoPacketDesc();
@@ -79,7 +79,7 @@ private:
 	friend class VehicleCargoList;
 	friend class StationCargoList;
 	/** We want this to be saved, right? */
-	friend SaveLoadTable GetCargoPacketDesc();
+	friend NamedSaveLoadTable GetCargoPacketDesc();
 	friend upstream_sl::SaveLoadTable upstream_sl::GetCargoPacketDesc();
 	friend void Load_CPDP();
 public:
@@ -403,6 +403,7 @@ protected:
 		return total;
 	}
 
+	void AssertCountConsistencyError() const;
 public:
 
 	/**
@@ -410,18 +411,14 @@ public:
 	 */
 	inline void AssertCountConsistency() const
 	{
-		assert_msg(this->action_counts[MTA_KEEP] +
+#ifdef WITH_ASSERT
+		if (unlikely(this->action_counts[MTA_KEEP] +
 				this->action_counts[MTA_DELIVER] +
 				this->action_counts[MTA_TRANSFER] +
-				this->action_counts[MTA_LOAD] == this->count,
-				"%u + %u + %u + %u != %u, (%u in %u packets)",
-				this->action_counts[MTA_KEEP],
-				this->action_counts[MTA_DELIVER],
-				this->action_counts[MTA_TRANSFER],
-				this->action_counts[MTA_LOAD],
-				this->count,
-				this->RecalculateCargoTotal(),
-				(uint) this->packets.size());
+				this->action_counts[MTA_LOAD] != this->count)) {
+			this->AssertCountConsistencyError();
+		}
+#endif
 	}
 
 protected:
@@ -441,7 +438,7 @@ public:
 	/** The super class ought to know what it's doing. */
 	friend class CargoList<VehicleCargoList, CargoPacketList>;
 	/** The vehicles have a cargo list (and we want that saved). */
-	friend SaveLoadTable GetVehicleDescription(VehicleType vt);
+	friend NamedSaveLoadTable GetVehicleDescription(VehicleType vt);
 
 	friend class CargoShift;
 	friend class CargoTransfer;
@@ -522,7 +519,7 @@ public:
 
 	void InvalidateCache();
 
-	bool Stage(bool accepted, StationID current_station, StationIDStack next_station, uint8_t order_flags, const GoodsEntry *ge, CargoPayment *payment, TileIndex current_tile);
+	bool Stage(bool accepted, StationID current_station, StationIDStack next_station, uint8_t order_flags, const GoodsEntry *ge, CargoID cargo, CargoPayment *payment, TileIndex current_tile);
 
 	/**
 	 * Marks all cargo in the vehicle as to be kept. This is mostly useful for
@@ -542,7 +539,7 @@ public:
 	template<MoveToAction Tfrom, MoveToAction Tto>
 	uint Reassign(uint max_move);
 	uint Return(uint max_move, StationCargoList *dest, StationID next_station, TileIndex current_tile);
-	uint Unload(uint max_move, StationCargoList *dest, CargoPayment *payment, TileIndex current_tile);
+	uint Unload(uint max_move, StationCargoList *dest, CargoID cargo, CargoPayment *payment, TileIndex current_tile);
 	uint Shift(uint max_move, VehicleCargoList *dest);
 	uint Truncate(uint max_move = UINT_MAX);
 	uint Reroute(uint max_move, VehicleCargoList *dest, StationID avoid, StationID avoid2, const GoodsEntry *ge);
@@ -582,7 +579,7 @@ public:
 	/** The super class ought to know what it's doing. */
 	friend class CargoList<StationCargoList, StationCargoPacketMap>;
 	/** The stations, via GoodsEntry, have a CargoList. */
-	friend SaveLoadTable GetGoodsDesc();
+	friend NamedSaveLoadTable GetGoodsDesc();
 	friend upstream_sl::SlStationGoods;
 
 	friend class CargoLoad;

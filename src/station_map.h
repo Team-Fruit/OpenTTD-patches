@@ -17,7 +17,7 @@
 #include "rail.h"
 #include "road.h"
 
-typedef byte StationGfx; ///< Index of station graphics. @see _station_display_datas
+typedef uint8_t StationGfx; ///< Index of station graphics. @see _station_display_datas
 
 /**
  * Get StationID from a tile
@@ -359,20 +359,27 @@ inline StationGfx GetAirportGfx(TileIndex t)
 }
 
 /**
- * Gets the direction the road stop entrance points towards.
+ * Gets the direction the bay road stop entrance points towards.
  * @param t the tile of the road stop
- * @pre IsAnyRoadStopTile(t)
+ * @pre IsBayRoadStopTile(t)
  * @return the direction of the entrance
  */
-inline DiagDirection GetRoadStopDir(TileIndex t)
+inline DiagDirection GetBayRoadStopDir(TileIndex t)
 {
-	StationGfx gfx = GetStationGfx(t);
-	dbg_assert_tile(IsAnyRoadStopTile(t), t);
-	if (gfx < GFX_TRUCK_BUS_DRIVETHROUGH_OFFSET) {
-		return (DiagDirection)(gfx);
-	} else {
-		return (DiagDirection)(gfx - GFX_TRUCK_BUS_DRIVETHROUGH_OFFSET);
-	}
+	dbg_assert_tile(IsBayRoadStopTile(t), t);
+	return static_cast<DiagDirection>(GetStationGfx(t));
+}
+
+/**
+ * Gets the axis of the drive through stop.
+ * @param t the tile of the road stop
+ * @pre IsDriveThroughStopTile(t)
+ * @return the axis the drive through is in
+ */
+inline Axis GetDriveThroughStopAxis(TileIndex t)
+{
+	dbg_assert_tile(IsDriveThroughStopTile(t), t);
+	return static_cast<Axis>(GetStationGfx(t) - GFX_TRUCK_BUS_DRIVETHROUGH_OFFSET);
 }
 
 /**
@@ -459,7 +466,7 @@ inline bool IsStationTileBlocked(TileIndex t)
 inline void SetStationTileBlocked(TileIndex t, bool b)
 {
 	assert(HasStationRail(t));
-	SB(_me[t].m6, 0, 1, b ? 1 : 0);
+	AssignBit(_me[t].m6, 0, b);
 }
 
 /**
@@ -483,7 +490,7 @@ inline bool CanStationTileHaveWires(TileIndex t)
 inline void SetStationTileHaveWires(TileIndex t, bool b)
 {
 	assert(HasStationRail(t));
-	SB(_me[t].m6, 1, 1, b ? 1 : 0);
+	AssignBit(_me[t].m6, 1, b);
 }
 
 /**
@@ -507,7 +514,7 @@ inline bool CanStationTileHavePylons(TileIndex t)
 inline void SetStationTileHavePylons(TileIndex t, bool b)
 {
 	assert(HasStationRail(t));
-	SB(_me[t].m6, 7, 1, b ? 1 : 0);
+	AssignBit(_me[t].m6, 7, b);
 }
 
 /**
@@ -587,7 +594,7 @@ inline bool HasStationReservation(TileIndex t)
 inline void SetRailStationReservation(TileIndex t, bool b)
 {
 	dbg_assert_tile(HasStationRail(t), t);
-	SB(_me[t].m6, 2, 1, b ? 1 : 0);
+	AssignBit(_me[t].m6, 2, b);
 }
 
 /**
@@ -643,7 +650,7 @@ inline bool IsCustomStationSpecIndex(TileIndex t)
  * @param specindex The new spec.
  * @pre HasStationTileRail(t)
  */
-inline void SetCustomStationSpecIndex(TileIndex t, byte specindex)
+inline void SetCustomStationSpecIndex(TileIndex t, uint8_t specindex)
 {
 	dbg_assert_tile(HasStationTileRail(t), t);
 	_m[t].m4 = specindex;
@@ -679,7 +686,7 @@ inline bool IsCustomRoadStopSpecIndex(TileIndex t)
  * @param specindex The new spec.
  * @pre IsAnyRoadStopTile(t)
  */
-inline void SetCustomRoadStopSpecIndex(TileIndex t, byte specindex)
+inline void SetCustomRoadStopSpecIndex(TileIndex t, uint8_t specindex)
 {
 	dbg_assert_tile(IsAnyRoadStopTile(t), t);
 	SB(_me[t].m8, 0, 6, specindex);
@@ -703,7 +710,7 @@ inline uint GetCustomRoadStopSpecIndex(TileIndex t)
  * @param random_bits The random bits.
  * @pre IsTileType(t, MP_STATION)
  */
-inline void SetStationTileRandomBits(TileIndex t, byte random_bits)
+inline void SetStationTileRandomBits(TileIndex t, uint8_t random_bits)
 {
 	dbg_assert_tile(IsTileType(t, MP_STATION), t);
 	SB(_m[t].m3, 4, 4, random_bits);
@@ -715,7 +722,7 @@ inline void SetStationTileRandomBits(TileIndex t, byte random_bits)
  * @pre IsTileType(t, MP_STATION)
  * @return The random bits for this station tile.
  */
-inline byte GetStationTileRandomBits(TileIndex t)
+inline uint8_t GetStationTileRandomBits(TileIndex t)
 {
 	dbg_assert_tile(IsTileType(t, MP_STATION), t);
 	return GB(_m[t].m3, 4, 4);
@@ -730,7 +737,7 @@ inline byte GetStationTileRandomBits(TileIndex t)
  * @param section the StationGfx to be used for this tile
  * @param wc The water class of the station
  */
-inline void MakeStation(TileIndex t, Owner o, StationID sid, StationType st, byte section, WaterClass wc = WATER_CLASS_INVALID)
+inline void MakeStation(TileIndex t, Owner o, StationID sid, StationType st, uint8_t section, WaterClass wc = WATER_CLASS_INVALID)
 {
 	SetTileType(t, MP_STATION);
 	SetTileOwner(t, o);
@@ -755,7 +762,7 @@ inline void MakeStation(TileIndex t, Owner o, StationID sid, StationType st, byt
  * @param section the StationGfx to be used for this tile
  * @param rt the railtype of this tile
  */
-inline void MakeRailStation(TileIndex t, Owner o, StationID sid, Axis a, byte section, RailType rt)
+inline void MakeRailStation(TileIndex t, Owner o, StationID sid, Axis a, uint8_t section, RailType rt)
 {
 	MakeStation(t, o, sid, STATION_RAIL, section + a);
 	SetRailType(t, rt);
@@ -771,7 +778,7 @@ inline void MakeRailStation(TileIndex t, Owner o, StationID sid, Axis a, byte se
  * @param section the StationGfx to be used for this tile
  * @param rt the railtype of this tile
  */
-inline void MakeRailWaypoint(TileIndex t, Owner o, StationID sid, Axis a, byte section, RailType rt)
+inline void MakeRailWaypoint(TileIndex t, Owner o, StationID sid, Axis a, uint8_t section, RailType rt)
 {
 	MakeStation(t, o, sid, STATION_WAYPOINT, section + a);
 	SetRailType(t, rt);
@@ -824,7 +831,7 @@ inline void MakeDriveThroughRoadStop(TileIndex t, Owner station, Owner road, Own
  * @param section the StationGfx to be used for this tile
  * @param wc the type of water on this tile
  */
-inline void MakeAirport(TileIndex t, Owner o, StationID sid, byte section, WaterClass wc)
+inline void MakeAirport(TileIndex t, Owner o, StationID sid, uint8_t section, WaterClass wc)
 {
 	MakeStation(t, o, sid, STATION_AIRPORT, section, wc);
 }
