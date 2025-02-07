@@ -2,6 +2,10 @@
 
 * * *
 
+### v0.64.1+1 (2025-02-08)
+* Patch feeder payments system
+* Update base jgrpp to 4312e8ee89a27dbb500145b8ae93798e60cde0c9
+*
 ### v0.58.3+1 (2024-04-20)
 * Update Japanese translation
 * Update base jgrpp to 6056a002229e337a2d84918cc4445a524ade8595
