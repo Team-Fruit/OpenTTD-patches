@@ -723,8 +723,8 @@ bool VehicleCargoList::Stage(bool accepted, StationID current_station, StationID
 				transfer_deliver.push_front(cp);
 				/* Add feeder share here to allow reusing field for next station. */
 				share = payment->PayTransfer(cargo, cp, cp->count, current_tile);
-				cp->AddFeederShare(share);
-				this->feeder_share += share;
+				// cp->AddFeederShare(share);
+				// this->feeder_share += share;
 				cp->next_hop = cargo_next;
 				break;
 			default:

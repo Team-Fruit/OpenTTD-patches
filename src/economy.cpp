@@ -1480,11 +1480,11 @@ void CargoPayment::PayFinalDelivery(CargoID cargo, CargoPacket *cp, uint count, 
 	/* Handle end of route payment */
 	Money profit = DeliverGoods(count, cargo, this->current_station, cp->GetDistance(current_tile), cp->GetPeriodsInTransit(), this->owner, cp->GetSourceType(), cp->GetSourceID());
 
-	profit -= cp->GetFeederShare(count);
+	// profit -= cp->GetFeederShare(count);
 
 	/* For Infrastructure patch. Handling transfers between other companies */
 	this->route_profit += profit;
-	cp->PayDeferredPayments();
+	// cp->PayDeferredPayments();
 
 	/* The vehicle's profit is whatever route profit there is minus feeder shares. */
 	this->visual_profit += profit;
@@ -1508,10 +1508,12 @@ Money CargoPayment::PayTransfer(CargoID cargo, CargoPacket *cp, uint count, Tile
 			cp->GetPeriodsInTransit(),
 			cargo);
 
-	profit = profit * _settings_game.economy.feeder_payment_share / 100;
+	// profit = profit * _settings_game.economy.feeder_payment_share / 100;
 
 	/* For Infrastructure patch. Handling transfers between other companies */
 	cp->RegisterDeferredCargoPayment(this->front->owner, this->front->type, profit);
+
+	this->route_profit += profit;
 
 	this->visual_transfer += profit; // accumulate transfer profits for whole vehicle
 	return profit; // account for the (virtual) profit already made for the cargo packet

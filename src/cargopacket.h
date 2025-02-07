@@ -123,6 +123,7 @@ public:
 	{
 		if (this->source_xy == INVALID_TILE) {
 			this->source_xy = tile;
+			this->periods_in_transit = 0;
 		}
 
 #ifdef WITH_FULL_ASSERTS
