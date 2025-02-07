@@ -950,9 +950,7 @@ STR_GAME_OPTIONS_TAB_GENERAL_TOOLTIP                            :{BLACK}一般�
 STR_GAME_OPTIONS_TAB_GRAPHICS                                   :グラフィック
 STR_GAME_OPTIONS_TAB_GRAPHICS_TOOLTIP                           :{BLACK}グラフィック設定を開きます
 STR_GAME_OPTIONS_TAB_SOUND                                      :サウンド
-STR_GAME_OPTIONS_TAB_SOUND_TT                                   :{BLACK}サウンドと音楽の設定を開きます
 STR_GAME_OPTIONS_TAB_SOCIAL                                     :ソーシャル
-STR_GAME_OPTIONS_TAB_SOCIAL_TT                                  :{BLACK}ソーシャル連携の設定を開きます
 
 STR_GAME_OPTIONS_VOLUME                                         :音量
 STR_GAME_OPTIONS_SFX_VOLUME                                     :効果音
@@ -2132,8 +2130,6 @@ STR_CONFIG_SETTING_NETWORK                                      :ネットワー
 STR_CONFIG_SETTING_REVERSE_AT_SIGNALS                           :信号待ちでの折返し: {STRING}
 STR_CONFIG_SETTING_REVERSE_AT_SIGNALS_HELPTEXT                  :列車が信号で長く待たされた場合、進路を反転することを許可します
 ###length 2
-STR_CONFIG_SETTING_PATHFINDER_NPF                               :NPF
-STR_CONFIG_SETTING_PATHFINDER_YAPF                              :YAPF {BLUE}(おすすめ)
 
 STR_CONFIG_SETTING_QUERY_CAPTION                                :{WHITE}設定を変更します
 
@@ -3276,15 +3272,9 @@ STR_MAPGEN_NUMBER_OF_INDUSTRIES                                 :{BLACK}産業�
 STR_MAPGEN_NUMBER_OF_INDUSTRIES_TOOLTIP                         :{BLACK}産業の密度を選択するかカスタム数値を設定します
 STR_MAPGEN_HEIGHTMAP_HEIGHT                                     :{BLACK}最高峰:
 STR_MAPGEN_HEIGHTMAP_HEIGHT_TOOLTIP                             :{BLACK}ゲームが生成を試行する最高峰を海抜高度で設定します
-STR_MAPGEN_HEIGHTMAP_HEIGHT_UP                                  :{BLACK}マップの最高峰の値を1増やします
-STR_MAPGEN_HEIGHTMAP_HEIGHT_DOWN                                :{BLACK}マップの最高峰の値を1減らします
 STR_MAPGEN_SNOW_COVERAGE                                        :{BLACK}降雪量:
-STR_MAPGEN_SNOW_COVERAGE_UP                                     :{BLACK}積雪量を10％増やします
-STR_MAPGEN_SNOW_COVERAGE_DOWN                                   :{BLACK}積雪量を10％減らします
 STR_MAPGEN_SNOW_COVERAGE_TEXT                                   :{BLACK}{NUM}％
 STR_MAPGEN_DESERT_COVERAGE                                      :{BLACK}砂漠の範囲:
-STR_MAPGEN_DESERT_COVERAGE_UP                                   :{BLACK}砂漠の範囲を10％増やします
-STR_MAPGEN_DESERT_COVERAGE_DOWN                                 :{BLACK}砂漠の範囲を10％減らします
 STR_MAPGEN_DESERT_COVERAGE_TEXT                                 :{BLACK}{NUM}％
 STR_MAPGEN_TERRAIN_TYPE                                         :{BLACK}地形種類:
 STR_MAPGEN_SEA_LEVEL                                            :{BLACK}潮位:
@@ -3357,8 +3347,6 @@ STR_SE_MAPGEN_FLAT_WORLD_TOOLTIP                                :{BLACK}全域�
 STR_SE_MAPGEN_RANDOM_LAND                                       :{WHITE}ランダムマップ
 STR_SE_MAPGEN_FLAT_WORLD_HEIGHT                                 :{BLACK}平地マップの高度:
 STR_SE_MAPGEN_FLAT_WORLD_HEIGHT_TOOLTIP                         :{BLACK}平地の海抜高度を設定します
-STR_SE_MAPGEN_FLAT_WORLD_HEIGHT_DOWN                            :{BLACK}平地高度を下げる
-STR_SE_MAPGEN_FLAT_WORLD_HEIGHT_UP                              :{BLACK}平地高度を上げる
 
 STR_SE_MAPGEN_FLAT_WORLD_HEIGHT_QUERY_CAPT                      :{WHITE}平地高度を変更
 
@@ -3728,7 +3716,6 @@ STR_STATION_LIST_CAPTION                                        :{WHITE}{COMPANY
 STR_STATION_LIST_STATION                                        :{YELLOW}{STATION} {STATION_FEATURES}
 STR_STATION_LIST_WAYPOINT                                       :{YELLOW}{WAYPOINT}
 STR_STATION_LIST_NONE                                           :{YELLOW}- なし -
-STR_STATION_LIST_SELECT_ALL_FACILITIES                          :{BLACK}全停留施設を選択
 STR_STATION_LIST_CARGO_FILTER_ALL_AND_NO_RATING                 :すべての貨物と評価なし
 STR_STATION_LIST_CARGO_FILTER_MULTIPLE                          :複数の貨物タイプ
 STR_STATION_LIST_CARGO_FILTER_NO_CARGO_TYPES                    :貨物タイプなし
@@ -3928,7 +3915,6 @@ STR_INDUSTRY_DIRECTORY_ITEM_PROD1                               :{ORANGE}{INDUST
 STR_INDUSTRY_DIRECTORY_ITEM_PROD2                               :{ORANGE}{INDUSTRY} {STRING}, {STRING}
 STR_INDUSTRY_DIRECTORY_ITEM_PROD3                               :{ORANGE}{INDUSTRY} {STRING}, {STRING}, {STRING}
 STR_INDUSTRY_DIRECTORY_ITEM_PRODMORE                            :{ORANGE}{INDUSTRY} {STRING}, {STRING}, {STRING} そして以後 {NUM} つ続く...
-STR_INDUSTRY_DIRECTORY_LIST_CAPTION                             :{BLACK}産業の名前です - 名前をクリックするとこの産業拠点の場所にメイン画面を移動します。Ctrl+クリックでこの産業拠点の場所を新たなビューポートに表示します
 STR_INDUSTRY_DIRECTORY_ACCEPTED_CARGO_FILTER                    :{BLACK}受け取った貨物: {SILVER}{STRING}
 STR_INDUSTRY_DIRECTORY_PRODUCED_CARGO_FILTER                    :{BLACK}生産された貨物：{SILVER} {STRING}
 STR_INDUSTRY_DIRECTORY_FILTER_ALL_TYPES                         :すべての貨物タイプ
