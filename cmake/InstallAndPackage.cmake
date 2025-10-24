@@ -58,6 +58,8 @@ install(FILES
         DESTINATION ${DOCS_DESTINATION_DIR}
         COMPONENT docs)
 
+cmake_path(SET DOCS_DOCS_DESTINATION_DIR NORMALIZE ${DOCS_DESTINATION_DIR}/docs)
+
 install(FILES
                 ${CMAKE_SOURCE_DIR}/docs/admin_network.md
                 ${CMAKE_SOURCE_DIR}/docs/debugging_desyncs.md
@@ -73,7 +75,7 @@ install(FILES
                 ${CMAKE_SOURCE_DIR}/docs/obg_format.txt
                 ${CMAKE_SOURCE_DIR}/docs/obm_format.txt
                 ${CMAKE_SOURCE_DIR}/docs/obs_format.txt
-        DESTINATION ${DOCS_DESTINATION_DIR}/docs
+        DESTINATION ${DOCS_DOCS_DESTINATION_DIR}
         COMPONENT docs)
 
 # A Linux manual only makes sense when using FHS. Otherwise it is a very odd
