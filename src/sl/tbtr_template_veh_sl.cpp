@@ -31,7 +31,7 @@ NamedSaveLoadTable GetTemplateVehicleDesc() {
 		NSL("subtype",                 SLE_VAR(TemplateVehicle, subtype, SLE_UINT8)),
 		NSL("railtype",                SLE_VAR(TemplateVehicle, railtype, SLE_UINT8)),
 
-		NSL("",                        SLE_VAR(TemplateVehicle, index, SLE_UINT32)),
+		NSL("",                        SLE_VAR(TemplateVehicle, index, SLE_VAR_U16 | SLE_FILE_U32)),
 
 		NSL("real_consist_length",     SLE_VAR(TemplateVehicle, real_consist_length, SLE_UINT16)),
 
@@ -71,7 +71,7 @@ static void Load_TMPLS()
 
 	int index;
 	while ((index = SlIterateArray()) != -1) {
-		TemplateVehicle *tv = new (index) TemplateVehicle();
+		TemplateVehicle *tv = new (TemplateID(index)) TemplateVehicle();
 		SlObjectLoadFiltered(tv, slt);
 	}
 }
@@ -135,7 +135,7 @@ void AfterLoadTemplateVehiclesUpdateProperties()
 		if (tv->Prev() == nullptr) {
 			Backup<CompanyID> cur_company(_current_company, tv->owner, FILE_LINE);
 			StringID err;
-			Train* t = VirtualTrainFromTemplateVehicle(tv, err, 0);
+			Train* t = VirtualTrainFromTemplateVehicle(tv, err, (ClientID)0);
 			if (t != nullptr) {
 				uint32_t full_cargo_weight = 0;
 				for (Train *u = t; u != nullptr; u = u->Next()) {

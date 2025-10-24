@@ -14,11 +14,12 @@
 #include "company_base.h"
 #include "newgrf_config.h"
 #include "network/core/tcp_content_type.h"
+#include "order_type.h"
 #include <vector>
 
 
 /** Special values for save-load window for the data parameter of #InvalidateWindowData. */
-enum SaveLoadInvalidateWindowData {
+enum SaveLoadInvalidateWindowData : uint8_t {
 	SLIWD_RESCAN_FILES,          ///< Rescan all files (when changed directory, ...)
 	SLIWD_SELECTION_CHANGES,     ///< File selection has changed (user click, ...)
 	SLIWD_FILTER_CHANGES,        ///< The filename filter has changed (via the editbox)
@@ -40,7 +41,7 @@ public:
 	const FiosItem *FindItem(const std::string_view file);
 };
 
-enum SortingBits {
+enum SortingBits : uint8_t {
 	SORT_ASCENDING  = 0,
 	SORT_DESCENDING = 1,
 	SORT_BY_DATE    = 0,
@@ -51,27 +52,39 @@ DECLARE_ENUM_AS_BIT_SET(SortingBits)
 /* Variables to display file lists */
 extern SortingBits _savegame_sort_order;
 
-void ShowSaveLoadDialog(AbstractFileType abstract_filetype, SaveLoadOperation fop);
+struct FiosOrderListInfo {
+	const Vehicle * const veh;
+	const VehicleOrderID order_insert_index;
+	const bool reverse;
+
+	FiosOrderListInfo(const Vehicle *veh, VehicleOrderID order_insert_index = INVALID_VEH_ORDER_ID, bool reverse = false)
+			: veh(veh), order_insert_index(order_insert_index), reverse(reverse) {}
+};
+
+void ShowSaveLoadDialog(AbstractFileType abstract_filetype, SaveLoadOperation fop, std::optional<FiosOrderListInfo> order_list_info = std::nullopt);
 
 void FiosGetSavegameList(SaveLoadOperation fop, bool show_dirs, FileList &file_list);
 void FiosGetScenarioList(SaveLoadOperation fop, bool show_dirs, FileList &file_list);
 void FiosGetHeightmapList(SaveLoadOperation fop, bool show_dirs, FileList &file_list);
+void FiosGetOrderlistList(SaveLoadOperation fop, bool show_dirs, FileList &file_list);
 void FiosGetTownDataList(SaveLoadOperation fop, bool show_dirs, FileList &file_list);
 
 bool FiosBrowseTo(const FiosItem *item);
 
 std::string FiosGetCurrentPath();
 std::optional<uint64_t> FiosGetDiskFreeSpace(const std::string &path);
-bool FiosDelete(const char *name);
+bool FiosDelete(const char *name, AbstractFileType file_type);
 std::string FiosMakeHeightmapName(const char *name);
 std::string FiosMakeSavegameName(const char *name);
+std::string FiosMakeOrderListName(const char *name);
 
 FiosType FiosGetSavegameListCallback(SaveLoadOperation fop, const std::string &file, const char *ext, char *title, const char *last);
 FiosType FiosGetScenarioListCallback(SaveLoadOperation fop, const std::string &file, const char *ext, char *title, const char *last);
 FiosType FiosGetHeightmapListCallback(SaveLoadOperation fop, const std::string &file, const char *ext, char *title, const char *last);
+FiosType FiosGetOrderlistListCallback(SaveLoadOperation fop, const std::string &file, const char *ext, char *title, const char *last);
 
 void ScanScenarios();
-const char *FindScenario(const ContentInfo *ci, bool md5sum);
+const char *FindScenario(const ContentInfo &ci, bool md5sum);
 
 /**
  * A savegame name automatically numbered.
@@ -79,15 +92,15 @@ const char *FindScenario(const ContentInfo *ci, bool md5sum);
 struct FiosNumberedSaveName {
 	FiosNumberedSaveName(std::string_view prefix);
 	std::string Filename();
-	std::string FilenameUsingMaxSaves(int max_saves);
+	std::string FilenameUsingMaxSaves(uint max_saves);
 	void FilenameUsingNumber(struct format_target &buffer, int num, const char *suffix) const;
 	std::string Extension();
-	int GetLastNumber() const { return this->number; }
+	uint GetLastNumber() const { return this->number; }
 	std::string_view GetSavePath() const { return this->save_path; }
 private:
 	std::string prefix;
 	std::string save_path;
-	int number;
+	uint number;
 };
 
 #endif /* FIOS_H */

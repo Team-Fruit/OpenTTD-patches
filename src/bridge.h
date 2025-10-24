@@ -18,7 +18,7 @@
  * which is used to determine the proper sprite table to use
  * while drawing a given bridge part.
  */
-enum BridgePieces {
+enum BridgePieces : uint8_t {
 	BRIDGE_PIECE_NORTH = 0,
 	BRIDGE_PIECE_SOUTH,
 	BRIDGE_PIECE_INNER_NORTH,
@@ -29,7 +29,7 @@ enum BridgePieces {
 	NUM_BRIDGE_PIECES,
 };
 
-DECLARE_POSTFIX_INCREMENT(BridgePieces)
+DECLARE_INCREMENT_DECREMENT_OPERATORS(BridgePieces)
 
 static const uint MAX_BRIDGES = 16; ///< Maximal number of available bridge specs.
 constexpr uint SPRITES_PER_BRIDGE_PIECE = 32; ///< Number of sprites there are per bridge piece.
@@ -37,7 +37,7 @@ constexpr uint SPRITES_PER_BRIDGE_PIECE = 32; ///< Number of sprites there are p
 typedef uint BridgeType; ///< Bridge spec number.
 
 /**
- * Actions that can be performed when the vehicle enters the depot.
+ * Bridge piece present pillar flags.
  */
 enum BridgePiecePillarFlags {
 	BPPF_CORNER_W        = 1 << 0,
@@ -72,7 +72,7 @@ struct BridgeSpec {
 	PaletteID pal;               ///< the palette which is used in the GUI
 	StringID material;           ///< the string that contains the bridge description
 	StringID transport_name[2];  ///< description of the bridge, when built for road or rail
-	PalSpriteID **sprite_table;  ///< table of sprites for drawing the bridge
+	std::vector<std::vector<PalSpriteID>> sprite_table; ///< table of sprites for drawing the bridge
 	uint8_t flags;               ///< bit 0 set: disable drawing of far pillars.
 	uint8_t ctrl_flags;          ///< control flags
 	uint8_t pillar_flags[12];    ///< bridge pillar flags: 6 x pairs of x and y flags
@@ -96,7 +96,7 @@ inline const BridgeSpec *GetBridgeSpec(BridgeType i)
 
 void DrawBridgeMiddle(const TileInfo *ti);
 
-CommandCost CheckBridgeAvailability(BridgeType bridge_type, uint bridge_len, DoCommandFlag flags = DC_NONE);
+CommandCost CheckBridgeAvailability(BridgeType bridge_type, uint bridge_len, DoCommandFlags flags = {});
 bool MayTownBuildBridgeType(BridgeType bridge_type);
 int CalcBridgeLenCostFactor(int x);
 BridgePiecePillarFlags GetBridgeTilePillarFlags(TileIndex tile, TileIndex northern_bridge_end, TileIndex southern_bridge_end, BridgeType bridge_type, TransportType bridge_transport_type);

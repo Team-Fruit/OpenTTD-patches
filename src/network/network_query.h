@@ -13,8 +13,8 @@
 #include "network_internal.h"
 #include <vector>
 
-/** Class for handling the client side of quering a game server. */
-class QueryNetworkGameSocketHandler : public ZeroedMemoryAllocator, public NetworkGameSocketHandler {
+/** Class for handling the client side of querying a game server. */
+class QueryNetworkGameSocketHandler : public NetworkGameSocketHandler {
 private:
 	static std::vector<std::unique_ptr<QueryNetworkGameSocketHandler>> queries; ///< Pending queries.
 	std::string connection_string; ///< Address we are connected to.
@@ -34,18 +34,18 @@ protected:
 
 public:
 	/**
-	 * Create a new socket for the client side of quering game server.
+	 * Create a new socket for the client side of querying game server.
 	 * @param s The socket to connect with.
 	 * @param connection_string The connection string of the server.
 	 */
-	QueryNetworkGameSocketHandler(SOCKET s, const std::string &connection_string) : NetworkGameSocketHandler(s), connection_string(connection_string) {}
+	QueryNetworkGameSocketHandler(SOCKET s, std::string_view connection_string) : NetworkGameSocketHandler(s), connection_string(connection_string) {}
 
 	/**
 	 * Start to query a server based on an open socket.
 	 * @param s The socket to connect with.
 	 * @param connection_string The connection string of the server.
 	 */
-	static void QueryServer(SOCKET s, const std::string &connection_string)
+	static void QueryServer(SOCKET s, std::string_view connection_string)
 	{
 		auto query = std::make_unique<QueryNetworkGameSocketHandler>(s, connection_string);
 		query->SendGameInfo();

@@ -8,6 +8,7 @@
 /** @file order_sl.cpp Code handling saving and loading of orders */
 
 #include "../stdafx.h"
+#include "../core/alloc_func.hpp"
 #include "../order_backup.h"
 #include "../settings_type.h"
 #include "../network/network.h"
@@ -101,7 +102,7 @@ void Order::ConvertFromOldSavegame()
  */
 static Order UnpackVersion4Order(uint16_t packed)
 {
-	return Order(((uint64_t) GB(packed, 8, 8)) << 24 | ((uint64_t) GB(packed, 4, 4)) << 8 | ((uint64_t) GB(packed, 0, 4)));
+	return Order(GB(packed, 0, 4), GB(packed, 4, 4), GB(packed, 8, 8));
 }
 
 /**
@@ -111,7 +112,7 @@ static Order UnpackVersion4Order(uint16_t packed)
  */
 static Order UnpackVersion5Order(uint32_t packed)
 {
-	return Order(((uint64_t) GB(packed, 16, 16)) << 24 | ((uint64_t) GB(packed, 8, 8)) << 8 | ((uint64_t) GB(packed, 0, 8)));
+	return Order(GB(packed, 0, 8), GB(packed, 8, 8), GB(packed, 16, 16));
 }
 
 /**
@@ -212,8 +213,8 @@ static void Load_ORDR()
 
 			SlArray(orders, len, SLE_UINT16);
 
-			for (size_t i = 0; i < len; ++i) {
-				OrderPoolItem *o = new (i) OrderPoolItem();
+			for (uint32_t i = 0; i < (uint32_t)len; ++i) {
+				OrderPoolItem *o = new (OrderID(i)) OrderPoolItem();
 				o->order.AssignOrder(UnpackVersion4Order(orders[i]));
 			}
 
@@ -224,8 +225,8 @@ static void Load_ORDR()
 
 			SlArray(orders, len, SLE_UINT32);
 
-			for (size_t i = 0; i < len; ++i) {
-				OrderPoolItem *o = new (i) OrderPoolItem();
+			for (uint32_t i = 0; i < (uint32_t)len; ++i) {
+				OrderPoolItem *o = new (OrderID(i)) OrderPoolItem();
 				o->order.AssignOrder(UnpackVersion5Order(orders[i]));
 			}
 
@@ -234,7 +235,7 @@ static void Load_ORDR()
 
 		/* Update all the next pointer */
 		for (OrderPoolItem *o : OrderPoolItem::Iterate()) {
-			size_t order_index = o->index;
+			uint32_t order_index = o->index.base();
 			/* Delete invalid orders */
 			if (o->order.IsType(OT_NOTHING)) {
 				delete o;
@@ -242,7 +243,7 @@ static void Load_ORDR()
 			}
 			/* The orders were built like this:
 			 * While the order is valid, set the previous will get its next pointer set */
-			OrderPoolItem *prev = OrderPoolItem::GetIfValid(order_index - 1);
+			OrderPoolItem *prev = OrderPoolItem::GetIfValid(OrderID(order_index - 1));
 			if (prev != nullptr) prev->next = o;
 		}
 	} else {
@@ -250,7 +251,7 @@ static void Load_ORDR()
 
 		int index;
 		while ((index = SlIterateArray()) != -1) {
-			OrderPoolItem *item = new (index) OrderPoolItem();
+			OrderPoolItem *item = new (OrderID(index)) OrderPoolItem();
 			SlObjectLoadFiltered(&item->order, slt);
 			item->next_ref = _order_item_ref;
 		}
@@ -297,6 +298,7 @@ NamedSaveLoadTable GetDispatchSlotDescription()
 	static const NamedSaveLoad _dispatch_slot_info_desc[] = {
 		NSL("offset",        SLE_VAR(DispatchSlot, offset,                                       SLE_UINT32)),
 		NSL("flags",         SLE_VAR(DispatchSlot, flags,                                        SLE_UINT16)),
+		NSLT("route_id",     SLE_VAR(DispatchSlot, route_id,                                     SLE_UINT8)),
 	};
 
 	return _dispatch_slot_info_desc;
@@ -515,6 +517,8 @@ NamedSaveLoadTable GetOrderListDescription()
 		NSL("",            SLEG_CONDVAR_X(_jokerpp_separation_mode,                           SLE_UINT32, SL_MIN_VERSION, SL_MAX_VERSION, SlXvFeatureTest(XSLFTO_AND, XSLFI_JOKERPP))),
 		NSL("",            SLE_CONDNULL_X(21,                                                             SL_MIN_VERSION, SL_MAX_VERSION, SlXvFeatureTest(XSLFTO_AND, XSLFI_JOKERPP))),
 
+		NSLT("route_overlay_colour", SLE_VAR(OrderList, route_overlay_colour, SLE_UINT8)),
+
 		NSLT_STRUCTLIST<OrderListDispatchScheduleStructHandler>("dispatch_schedule"),
 		NSLT_STRUCTLIST<OrderListOrderVectorStructHandler>("order_vector"),
 	};
@@ -585,7 +589,7 @@ static void Load_ORDL()
 	int index;
 	while ((index = SlIterateArray()) != -1) {
 		/* set num_orders to 0 so it's a valid OrderList */
-		OrderList *list = new (index) OrderList();
+		OrderList *list = new (OrderListID(index)) OrderList();
 		SlObjectLoadFiltered(list, slt);
 		if (SlXvIsFeaturePresent(XSLFI_JOKERPP)) {
 			if (_jokerpp_separation_mode == 0) {
@@ -644,7 +648,7 @@ void Load_BKOR()
 		int index;
 		while ((index = SlIterateArray()) != -1) {
 			/* set num_orders to 0 so it's a valid OrderList */
-			OrderBackup *ob = new (index) OrderBackup();
+			OrderBackup *ob = new (OrderBackupID(index)) OrderBackup();
 			SlObjectLoadFiltered(ob, slt);
 		}
 		return;
@@ -656,7 +660,7 @@ void Load_BKOR()
 	int index;
 	while ((index = SlIterateArray()) != -1) {
 		/* set num_orders to 0 so it's a valid OrderList */
-		OrderBackup *ob = new (index) OrderBackup();
+		OrderBackup *ob = new (OrderBackupID(index)) OrderBackup();
 		SlObjectLoadFiltered(ob, slt);
 		if (SlXvIsFeaturePresent(XSLFI_SCHEDULED_DISPATCH, 3)) {
 			uint count = SlReadUint32();

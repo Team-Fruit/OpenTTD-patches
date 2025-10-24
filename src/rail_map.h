@@ -21,7 +21,7 @@
 
 
 /** Different types of Rail-related tiles */
-enum RailTileType {
+enum RailTileType : uint8_t {
 	RAIL_TILE_NORMAL   = 0, ///< Normal rail tile without signals
 	RAIL_TILE_SIGNALS  = 1, ///< Normal rail tile with signals
 	RAIL_TILE_DEPOT    = 3, ///< Depot (one entrance)
@@ -239,7 +239,6 @@ inline TrackBits GetRailReservationTrackBits(TileIndex t)
 inline void SetTrackReservation(TileIndex t, TrackBits b)
 {
 	dbg_assert_tile(IsPlainRailTile(t), t);
-	dbg_assert(b != INVALID_TRACK_BIT);
 	dbg_assert(!TracksOverlap(b));
 	Track track = RemoveFirstTrack(&b);
 	SB(_m[t].m2, 8, 3, track == INVALID_TRACK ? 0 : track + 1);
@@ -637,7 +636,7 @@ inline RailType GetRailTypeByTrackBit(TileIndex t, TrackBits track) { return Gen
 inline RailType GetRailTypeByEntryDir(TileIndex t, DiagDirection enterdir) { return GenericGetRailTypeByEntryDir(t, enterdir, false); }
 
 /** The ground 'under' the rail */
-enum RailGroundType {
+enum RailGroundType : uint8_t {
 	RAIL_GROUND_BARREN       =  0, ///< Nothing (dirt)
 	RAIL_GROUND_GRASS        =  1, ///< Grassy
 	RAIL_GROUND_FENCE_NW     =  2, ///< Grass with a fence at the NW edge
@@ -692,7 +691,7 @@ inline void MakeRailDepot(TileIndex t, Owner o, DepotID did, DiagDirection d, Ra
 	SetTileType(t, MP_RAILWAY);
 	SetTileOwner(t, o);
 	SetDockingTile(t, false);
-	_m[t].m2 = did;
+	_m[t].m2 = did.base();
 	_m[t].m3 = 0;
 	_m[t].m4 = 0;
 	_m[t].m5 = RAIL_TILE_DEPOT << 6 | d;

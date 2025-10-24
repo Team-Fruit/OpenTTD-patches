@@ -157,8 +157,6 @@ STR_SCENEDIT_FILE_MENU_QUIT                                     :निकास
 
 
 # Settings menu
-###length 16
-STR_SETTINGS_MENU_CONFIG_SETTINGS_TREE                          :समायोजन
 STR_SETTINGS_MENU_WAYPOINTS_DISPLAYED                           :पथ-संकेतों के नाम दिखायें
 STR_SETTINGS_MENU_TRANSPARENT_SIGNS                             :पारदर्शी संकेत
 
@@ -292,7 +290,6 @@ STR_STATUSBAR_PAUSED_LINK_GRAPH                                 :{ORANGE}* * ठ
 
 # News message history
 
-STR_NEWS_CUSTOM_ITEM                                            :{BIG_FONT}{BLACK}{STRING}
 
 STR_NEWS_FIRST_CARGO_TRAM_ARRIVAL                               :{BIG_FONT}{BLACK}नागरिक हर्षित हैं . . .{}पहली माल ट्रैम {STATION} पर पहुँची है!
 
@@ -330,7 +327,7 @@ STR_EXTRA_VIEW_MOVE_MAIN_TO_VIEW_TOOLTIP                        :{BLACK}इस �
 
 
 
-###length 44
+###length 45
 STR_GAME_OPTIONS_CURRENCY_FIM                                   :फिनलैंड मार्का
 STR_GAME_OPTIONS_CURRENCY_ISK                                   :आइसलैंडिक क्रोना
 STR_GAME_OPTIONS_CURRENCY_HKD                                   :हाँग काँग डॉलर
@@ -437,6 +434,7 @@ STR_CONFIG_SETTING_TRAIN_REVERSING_HELPTEXT                     :यदि स�
 STR_CONFIG_SETTING_MAP_HEIGHT_LIMIT_HELPTEXT                    :मानचित्र के भूभाग की अधिकतम ऊंचाई निर्धारित करें। "(स्वतः)" चुनने पर भूभाग जनन के बाद एक उपयुक्त संख्या चुन ली जायेगी।
 STR_CONFIG_SETTING_MAP_HEIGHT_LIMIT_VALUE                       :{NUM}
 ###setting-zero-is-special
+
 
 
 
@@ -655,6 +653,8 @@ STR_CONFIG_SETTING_COLOURED_NEWS_YEAR                           :रंगीन
 STR_CONFIG_SETTING_ENDING_YEAR_VALUE                            :{NUM}
 ###setting-zero-is-special
 
+###length 2
+
 ###length 3
 
 
@@ -670,6 +670,8 @@ STR_CONFIG_SETTING_ENDING_YEAR_VALUE                            :{NUM}
 STR_CONFIG_SETTING_NOISE_LEVEL                                  :शोर स्तर के आधार पर हवाईअड्डे पर स्थान सीमित करें: {STRING}
 
 STR_CONFIG_SETTING_TOWN_FOUNDING                                :खेल में कस्बों की स्थापना: {STRING}
+###length 3
+
 ###length 3
 
 STR_CONFIG_SETTING_TOWN_CARGOGENMODE                            :नगर में माल उत्पादन: {STRING}
@@ -761,7 +763,6 @@ STR_LIVERY_ELECTRIC                                             :इलेक्
 # Face selection window
 
 STR_FACE_LOAD_DONE                                              :{WHITE}ओपनटीटीडी प्रारूप पत्र से आपका प्रिय चेहरा भर लिया गया है
-STR_FACE_COLLAR_TOOLTIP                                         :{BLACK}कॉलर बदलें
 
 # Matches ServerGameType
 ###length 3
@@ -875,6 +876,7 @@ STR_TOOLBAR_DISABLED_NO_VEHICLE_AVAILABLE                       :{BLACK}अक�
 
 
 
+
 STR_STATION_CLASS_DFLT                                          :मानक स्टेशन
 STR_STATION_CLASS_WAYP                                          :पथ-संकेत
 
@@ -925,6 +927,7 @@ STR_OBJECT_CLASS_LTHS                                           :प्रका
 
 STR_FOUND_TOWN_INITIAL_SIZE_SMALL_BUTTON                        :{BLACK}लघु
 STR_FOUND_TOWN_CITY                                             :{BLACK}शहर
+
 
 
 # Fund new industry window
@@ -1163,7 +1166,6 @@ STR_INDUSTRY_DIRECTORY_ITEM_PROD3                               :{ORANGE}{INDUST
 STR_INDUSTRY_VIEW_CAPTION                                       :{WHITE}{INDUSTRY}
 
 
-STR_INDUSTRY_VIEW_ACCEPT_CARGO                                  :{YELLOW}{STRING}{BLACK}{3:STRING}
 
 
 # Vehicle lists
@@ -1203,6 +1205,7 @@ STR_PURCHASE_INFO_SPEED                                         :{BLACK}रफ�
 STR_PURCHASE_INFO_WEIGHT_CWEIGHT                                :{BLACK}भार : {GOLD}{WEIGHT_SHORT} ({WEIGHT_SHORT})
 
 ###length 3
+STR_CARGO_TYPE_FILTER_FREIGHT                                   :परिवहन
 
 ###length VEHICLE_TYPES
 
@@ -1374,18 +1377,16 @@ STR_ORDER_CONDITIONAL_VALUE_TOOLTIP                             :{BLACK}वा�
 # String parts to build the order string
 
 
-STR_ORDER_NEAREST_DEPOT                                         :निकटतम
 ###length 3
 STR_ORDER_TRAIN_DEPOT                                           :ट्रेन डिपो
 ###next-name-looks-similar
 
-STR_ORDER_GO_TO_NEAREST_DEPOT_FORMAT                            :{STRING} {STRING} {STRING}
 STR_ORDER_GO_TO_DEPOT_FORMAT                                    :{STRING} {DEPOT}
 
 
 
-STR_ORDER_GO_TO_STATION                                         :{STRING} {STATION} {STRING}
-STR_ORDER_GO_TO_STATION_CAN_T_USE_STATION                       :{PUSH_COLOUR}{RED}(स्टेशन का उपयोग नहीं कर सकते){POP_COLOUR} {STRING} {STATION} {STRING}
+STR_ORDER_GO_TO_STATION                                         :{STRING} {STATION}
+STR_ORDER_GO_TO_STATION_CAN_T_USE_STATION                       :{PUSH_COLOUR}{RED}(स्टेशन का उपयोग नहीं कर सकते){POP_COLOUR} {STRING} {STATION}
 
 
 STR_ORDER_NO_LOAD                                               :(कोई लोडिंग नहीं)
@@ -1399,7 +1400,6 @@ STR_ORDER_NO_LOAD                                               :(कोई ल�
 
 # Time table window
 STR_TIMETABLE_ORDER_VIEW                                        :{BLACK}आदेश
-
 
 
 
@@ -1573,6 +1573,10 @@ STR_ERROR_CAN_T_RENAME_AIRCRAFT_TYPE                            :{WHITE}वि�
 ###length VEHICLE_TYPES
 STR_ERROR_CAN_T_SELL_TRAIN                                      :{WHITE}रेल वाहन नहीं बेच सकते...
 
+###length VEHICLE_TYPES
+
+###length VEHICLE_TYPES
+
 
 
 
@@ -1691,18 +1695,7 @@ STR_UNKNOWN_STATION                                             :अज्ञा
 
 # Viewport strings
 STR_VIEWPORT_TOWN_POP                                           :{WHITE}{TOWN} ({COMMA})
-STR_VIEWPORT_TOWN                                               :{WHITE}{TOWN}
-STR_VIEWPORT_TOWN_TINY_BLACK                                    :{TINY_FONT}{BLACK}{TOWN}
-STR_VIEWPORT_TOWN_TINY_WHITE                                    :{TINY_FONT}{WHITE}{TOWN}
-
-STR_VIEWPORT_SIGN_SMALL_BLACK                                   :{TINY_FONT}{BLACK}{SIGN}
-STR_VIEWPORT_SIGN_SMALL_WHITE                                   :{TINY_FONT}{WHITE}{SIGN}
-
 STR_VIEWPORT_STATION                                            :{STATION} {STATION_FEATURES}
-STR_VIEWPORT_STATION_TINY                                       :{TINY_FONT}{STATION}
-
-STR_VIEWPORT_WAYPOINT                                           :{WAYPOINT}
-STR_VIEWPORT_WAYPOINT_TINY                                      :{TINY_FONT}{WAYPOINT}
 
 # Simple strings to get specific types of data
 STR_COMPANY_NAME                                                :{COMPANY}
@@ -1746,4 +1739,5 @@ STR_BUS                                                         :{BLACK}{BUS}
 STR_LORRY                                                       :{BLACK}{LORRY}
 STR_PLANE                                                       :{BLACK}{PLANE}
 STR_SHIP                                                        :{BLACK}{SHIP}
+
 

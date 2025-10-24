@@ -14,6 +14,7 @@
 #include "../../sl/saveload.h"
 #include "../../thread.h"
 #include "../../screenshot.h"
+#include "../../screenshot_type.h"
 #include "../../debug.h"
 #include "../../video/video_driver.hpp"
 #include "../../scope.h"
@@ -45,7 +46,7 @@
 #define MAX_STACK_FRAMES 64
 
 #if !defined(WITHOUT_DBG_LLDB)
-static bool ExecReadStdoutThroughFile(const char *file, char *const *args, format_target &buffer)
+static bool ExecReadStdoutThroughFile(const char *file, char *const *args, format_target_ctrl &buffer)
 {
 	int null_fd = open("/dev/null", O_RDWR);
 	if (null_fd == -1) return false;
@@ -171,7 +172,7 @@ class CrashLogOSX final : public CrashLog {
 		this->crash_file = -1;
 	}
 
-	void LogOSVersion(format_target &buffer) const override
+	void LogOSVersion(format_target_ctrl &buffer) const override
 	{
 		int ver_maj, ver_min, ver_bug;
 		GetMacOSVersion(&ver_maj, &ver_min, &ver_bug);
@@ -192,7 +193,7 @@ class CrashLogOSX final : public CrashLog {
 		);
 	}
 
-	void LogError(format_target &buffer, const char *message) const override
+	void LogError(format_target_ctrl &buffer, const char *message) const override
 	{
 		buffer.format(
 				"Crash reason:\n"
@@ -221,7 +222,7 @@ class CrashLogOSX final : public CrashLog {
 		);
 	}
 
-	void LogStacktrace(format_target &buffer) const override
+	void LogStacktrace(format_target_ctrl &buffer) const override
 	{
 		buffer.append("\nStacktrace:\n");
 
@@ -246,7 +247,7 @@ class CrashLogOSX final : public CrashLog {
 	 * and there is some potentially useful information in the output from LogStacktrace
 	 * which is not in lldb's output.
 	 */
-	void LogLldbInfo(format_target &buffer) const
+	void LogLldbInfo(format_target_ctrl &buffer) const
 	{
 
 #if !defined(WITHOUT_DBG_LLDB)
@@ -292,7 +293,7 @@ class CrashLogOSX final : public CrashLog {
 	/**
 	 * Log LLDB information if available
 	 */
-	void LogDebugExtra(format_target &buffer) const override
+	void LogDebugExtra(format_target_ctrl &buffer) const override
 	{
 		this->LogLldbInfo(buffer);
 	}
@@ -300,7 +301,7 @@ class CrashLogOSX final : public CrashLog {
 	/**
 	 * Log registers if available
 	 */
-	void LogRegisters(format_target &buffer) const override
+	void LogRegisters(format_target_ctrl &buffer) const override
 	{
 #ifdef WITH_UCONTEXT
 		ucontext_t *ucontext = static_cast<ucontext_t *>(context);
@@ -394,6 +395,12 @@ public:
 			buf.finalise();
 		}
 
+		bool have_game_lock = true;
+		if (!VideoDriver::EmergencyAcquireGameLock(20, 2)) {
+			this->WriteToStdout("Failed to acquire gamelock before filling crash log\n\n");
+			have_game_lock = false;
+		}
+
 		this->WriteToStdout("Writing crash log to disk...\n");
 		this->PrepareLogFileName(this->crashlog_filename, lastof(this->crashlog_filename), name_buffer);
 		bool bret = this->OpenLogFile(this->crashlog_filename);
@@ -407,7 +414,7 @@ public:
 		}
 		this->crash_buffer_write = buffer;
 
-		char *end = this->FillCrashLog(buffer, last);
+		char *end = this->FillCrashLog(buffer, last, have_game_lock);
 		this->CloseCrashLogFile(end);
 		this->WriteToStdout("Crash log generated.\n\n");
 
@@ -420,7 +427,7 @@ public:
 		}
 
 		this->WriteToStdout("Writing crash screenshot...\n");
-		SetScreenshotAuxiliaryText("Crash Log", buffer);
+		ScreenshotAuxiliaryText::Set("Crash Log", buffer);
 		if (!this->WriteScreenshot(this->screenshot_filename, lastof(this->screenshot_filename), name_buffer)) {
 			this->screenshot_filename[0] = '\0';
 			ret = false;
@@ -523,7 +530,7 @@ void CDECL HandleCrash(int signum, siginfo_t *si, void *context)
 }
 
 
-/* static */ void CrashLog::VersionInfoLog(format_target &buffer)
+/* static */ void CrashLog::VersionInfoLog(format_target_ctrl &buffer)
 {
 	CrashLogOSX log(CrashLogOSX::DesyncTag{});
 	log.FillVersionInfoLog(buffer);

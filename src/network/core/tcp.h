@@ -14,7 +14,7 @@
 
 #include "address.h"
 #include "packet.h"
-#include "../../core/ring_buffer.hpp"
+#include "../../3rdparty/cpp-ring-buffer/ring_buffer.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -24,7 +24,7 @@
 #include <thread>
 
 /** The states of sending the packets. */
-enum SendPacketsState {
+enum SendPacketsState : uint8_t {
 	SPS_CLOSED,      ///< The connection got closed.
 	SPS_NONE_SENT,   ///< The buffer is still full, so no (parts of) packets could be sent.
 	SPS_PARTLY_SENT, ///< The packets are partly sent; there are more packets to be sent in the queue.
@@ -34,12 +34,12 @@ enum SendPacketsState {
 /** Base socket handler for all TCP sockets */
 class NetworkTCPSocketHandler : public NetworkSocketHandler {
 private:
-	ring_buffer<std::unique_ptr<Packet>> packet_queue; ///< Packets that are awaiting delivery
-	std::unique_ptr<Packet> packet_recv;               ///< Partially received packet
+	jgr::ring_buffer<std::unique_ptr<Packet>> packet_queue{}; ///< Packets that are awaiting delivery
+	std::unique_ptr<Packet> packet_recv = nullptr;            ///< Partially received packet
 
 public:
-	SOCKET sock;              ///< The socket currently connected to
-	bool writable;            ///< Can we write to this socket?
+	SOCKET sock = INVALID_SOCKET; ///< The socket currently connected to
+	bool writable = false; ///< Can we write to this socket?
 
 	/**
 	 * Whether this socket is currently bound to a socket.
@@ -67,7 +67,11 @@ public:
 	 */
 	bool HasSendQueue() { return !this->packet_queue.empty(); }
 
-	NetworkTCPSocketHandler(SOCKET s = INVALID_SOCKET);
+	/**
+	 * Construct a socket handler for a TCP connection.
+	 * @param s The just opened TCP connection.
+	 */
+	NetworkTCPSocketHandler(SOCKET s = INVALID_SOCKET) : sock(s) {}
 	~NetworkTCPSocketHandler();
 };
 
@@ -83,7 +87,7 @@ private:
 	 * game-thread, and not at another random time where we might not have the
 	 * lock on the game-state.
 	 */
-	enum class Status {
+	enum class Status : uint8_t {
 		Init,       ///< TCPConnecter is created but resolving hasn't started.
 		Resolving,  ///< The hostname is being resolved (threaded).
 		Failure,    ///< Resolving failed.
@@ -123,7 +127,7 @@ private:
 
 public:
 	TCPConnecter() {};
-	TCPConnecter(const std::string &connection_string, uint16_t default_port, const NetworkAddress &bind_address = {}, int family = AF_UNSPEC);
+	TCPConnecter(std::string_view connection_string, uint16_t default_port, const NetworkAddress &bind_address = {}, int family = AF_UNSPEC);
 	virtual ~TCPConnecter();
 
 	/**
@@ -164,7 +168,7 @@ private:
 public:
 	ServerAddress server_address; ///< Address we are connecting to.
 
-	TCPServerConnecter(const std::string &connection_string, uint16_t default_port);
+	TCPServerConnecter(std::string_view connection_string, uint16_t default_port);
 
 	void SetConnected(SOCKET sock);
 	void SetFailure();

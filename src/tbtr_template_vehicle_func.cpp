@@ -19,11 +19,14 @@
 #include "debug.h"
 #include "depot_base.h"
 #include "gfx_func.h"
+#include "group_cmd.h"
+#include "order_cmd.h"
 #include "newgrf.h"
 #include "spritecache.h"
 #include "strings_func.h"
 #include "table/sprites.h"
 #include "table/strings.h"
+#include "tbtr_template_vehicle_cmd.h"
 #include "tbtr_template_vehicle_func.h"
 #include "tbtr_template_vehicle.h"
 #include "train.h"
@@ -155,16 +158,16 @@ TemplateVehicle *TemplateVehicleFromVirtualTrain(Train *virt)
 	return tmp->First();
 }
 
-CommandCost CmdSellRailWagon(DoCommandFlag flags, Vehicle *t, uint16_t data, uint32_t user);
+CommandCost CmdSellRailWagon(DoCommandFlags flags, Vehicle *t, bool sell_chain, bool backup_order, ClientID user);
 
 Train *DeleteVirtualTrain(Train *chain, Train *to_del)
 {
 	if (chain != to_del) {
-		CmdSellRailWagon(DC_EXEC, to_del, 0, 0);
+		CmdSellRailWagon(DoCommandFlag::Execute, to_del, false, false, INVALID_CLIENT_ID);
 		return chain;
 	} else {
 		chain = chain->GetNextUnit();
-		CmdSellRailWagon(DC_EXEC, to_del, 0, 0);
+		CmdSellRailWagon(DoCommandFlag::Execute, to_del, false, false, INVALID_CLIENT_ID);
 		return chain;
 	}
 }
@@ -235,11 +238,9 @@ static bool IsTrainUsableAsTemplateReplacementSource(const Train *t)
 
 void TemplateDepotVehicles::Init(TileIndex tile)
 {
-	FindVehicleOnPos(tile, VEH_TRAIN, this, [](Vehicle *v, void *data) -> Vehicle * {
-		TemplateDepotVehicles *self = static_cast<TemplateDepotVehicles *>(data);
-		self->vehicles.insert(v->index);
-		return v;
-	});
+	for (const Train *v : VehiclesOnTile<VEH_TRAIN>(tile)) {
+		this->vehicles.insert(v->index);
+	}
 }
 
 void TemplateDepotVehicles::RemoveVehicle(VehicleID id)
@@ -268,9 +269,9 @@ Train *TemplateDepotVehicles::ContainsEngine(EngineID eid, Train *not_in)
 
 void NeutralizeStatus(Train *t)
 {
-	DoCommand(t->tile, DEFAULT_GROUP, t->index, DC_EXEC, CMD_ADD_VEHICLE_GROUP);
-	DoCommand(0, t->index | CO_UNSHARE << 30, 0, DC_EXEC, CMD_CLONE_ORDER);
-	DoCommand(0, t->index, 0, DC_EXEC, CMD_RENAME_VEHICLE, nullptr);
+	Command<CMD_ADD_VEHICLE_GROUP>::Do(DoCommandFlag::Execute, DEFAULT_GROUP, t->index, false);
+	Command<CMD_CLONE_ORDER>::Do(DoCommandFlag::Execute, CO_SHARE, t->index, VehicleID::Invalid());
+	Command<CMD_RENAME_VEHICLE>::Do(DoCommandFlag::Execute, t->index, {});
 }
 
 TBTRDiffFlags TrainTemplateDifference(const Train *t, const TemplateVehicle *tv)
@@ -302,7 +303,7 @@ void BreakUpRemainders(Train *t)
 		if (HasBit(t->subtype, GVSF_ENGINE)) {
 			Train *move = t;
 			t = t->Next();
-			DoCommand(move->tile, move->index | (1 << 22), INVALID_VEHICLE, DC_EXEC, CMD_MOVE_RAIL_VEHICLE);
+			Command<CMD_MOVE_RAIL_VEHICLE>::Do(DoCommandFlag::Execute, move->index, VehicleID::Invalid(), MoveRailVehicleFlags::NewHead);
 			NeutralizeStatus(move);
 		} else {
 			t = t->Next();
@@ -324,15 +325,13 @@ uint CountTrainsNeedingTemplateReplacement(GroupID g_id, const TemplateVehicle *
 }
 
 /* Refit each vehicle in t as is in tv, assume t and tv contain the same types of vehicles */
-CommandCost CmdRefitTrainFromTemplate(Train *t, const TemplateVehicle *tv, DoCommandFlag flags)
+CommandCost CmdRefitTrainFromTemplate(Train *t, const TemplateVehicle *tv, DoCommandFlags flags)
 {
 	CommandCost cost(t->GetExpenseType(false));
 
 	while (t != nullptr && tv != nullptr) {
 		/* Refit t as tv */
-		uint32_t cb = GetCmdRefitVeh(t);
-
-		cost.AddCost(DoCommand(t->tile, t->index, tv->cargo_type | tv->cargo_subtype << 8 | (1 << 16) | (1 << 31), flags, cb));
+		cost.AddCost(Command<CMD_REFIT_VEHICLE>::Do(flags, t->index, tv->cargo_type, tv->cargo_subtype, false, false, 1));
 
 		t = t->GetNextUnit();
 		tv = tv->GetNextUnit();
@@ -341,23 +340,20 @@ CommandCost CmdRefitTrainFromTemplate(Train *t, const TemplateVehicle *tv, DoCom
 }
 
 /* Set unit direction of each vehicle in t as is in tv, assume t and tv contain the same types of vehicles */
-CommandCost CmdSetTrainUnitDirectionFromTemplate(Train *t, const TemplateVehicle *tv, DoCommandFlag flags)
+void CmdSetTrainUnitDirectionFromTemplate(Train *t, const TemplateVehicle *tv, DoCommandFlags flags)
 {
-	CommandCost cost(t->GetExpenseType(false));
-
 	while (t != nullptr && tv != nullptr) {
 		/* Refit t as tv */
 		if (HasBit(t->flags, VRF_REVERSE_DIRECTION) != HasBit(tv->ctrl_flags, TVCF_REVERSED)) {
-			cost.AddCost(DoCommand(t->tile, t->index, true, flags, CMD_REVERSE_TRAIN_DIRECTION | CMD_MSG(STR_ERROR_CAN_T_REVERSE_DIRECTION_RAIL_VEHICLE)));
+			Command<CMD_REVERSE_TRAIN_DIRECTION>::Do(flags, t->index, true);
 		}
 
 		t = t->GetNextUnit();
 		tv = tv->GetNextUnit();
 	}
-	return cost;
 }
 
-/** using cmdtemplatereplacevehicle as test-function (i.e. with flag DC_NONE) is not a good idea as that function relies on
+/** Using CmdTemplateReplaceVehicle as a test function (i.e. without DoCommandFlag::Execute) is not a good idea as that function relies on
  *  actually moving vehicles around to work properly.
  *  We do this worst-cast test instead.
  */
@@ -366,7 +362,7 @@ CommandCost TestBuyAllTemplateVehiclesInChain(const TemplateVehicle *tv, TileInd
 	CommandCost cost(EXPENSES_NEW_VEHICLES);
 
 	for (; tv != nullptr; tv = tv->GetNextUnit()) {
-		cost.AddCost(DoCommand(tile, tv->engine_type, 0, DC_NONE, CMD_BUILD_VEHICLE));
+		cost.AddCost(Command<CMD_BUILD_VEHICLE>::Do({}, tile, tv->engine_type, false, INVALID_CARGO, INVALID_CLIENT_ID));
 	}
 
 	return cost;
@@ -384,7 +380,7 @@ void TransferCargoForTrain(Train *old_veh, Train *new_head)
 {
 	assert(new_head->IsPrimaryVehicle() || new_head->IsFreeWagon());
 
-	const CargoID cargo_type = old_veh->cargo_type;
+	const CargoType cargo_type = old_veh->cargo_type;
 	const uint8_t cargo_subtype = old_veh->cargo_subtype;
 
 	/* How much cargo has to be moved (if possible) */
@@ -416,7 +412,7 @@ void UpdateAllTemplateVehicleImages()
 		if (tv->Prev() == nullptr) {
 			Backup<CompanyID> cur_company(_current_company, tv->owner, FILE_LINE);
 			StringID err;
-			Train *t = VirtualTrainFromTemplateVehicle(tv, err, 0);
+			Train *t = VirtualTrainFromTemplateVehicle(tv, err, (ClientID)0);
 			if (t != nullptr) {
 				int tv_len = 0;
 				for (TemplateVehicle *u = tv; u != nullptr; u = u->Next()) {

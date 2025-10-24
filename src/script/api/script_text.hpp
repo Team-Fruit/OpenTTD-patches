@@ -11,6 +11,7 @@
 #define SCRIPT_TEXT_HPP
 
 #include "script_object.hpp"
+#include "../../strings_type.h"
 
 #include <array>
 #include <variant>
@@ -26,7 +27,7 @@ public:
 	 * @return A string.
 	 * @api -all
 	 */
-	virtual std::string GetEncodedText() = 0;
+	virtual EncodedString GetEncodedText() = 0;
 
 	/**
 	 * Convert a #ScriptText into a decoded normal string.
@@ -44,7 +45,7 @@ class RawText : public Text {
 public:
 	RawText(const std::string &text) : text(text) {}
 
-	std::string GetEncodedText() override { return this->text; }
+	EncodedString GetEncodedText() override;
 private:
 	const std::string text;
 };
@@ -125,34 +126,31 @@ public:
 	/**
 	 * @api -all
 	 */
-	std::string GetEncodedText() override;
+	EncodedString GetEncodedText() override;
 
 private:
 	using ScriptTextRef = ScriptObjectRef<ScriptText>;
-	using StringIDList = std::vector<StringID>;
 	using ScriptTextList = std::vector<ScriptText *>;
 	using Param = std::variant<SQInteger, std::string, ScriptTextRef>;
 
 	struct ParamCheck {
-		StringID owner;
+		StringIndexInTab owner;
 		int idx;
 		Param *param;
 		bool used = false;
-		const char *cmd = nullptr;
+		std::string_view cmd;
 
-		ParamCheck(StringID owner, int idx, Param *param) : owner(owner), idx(idx), param(param) {}
+		ParamCheck(StringIndexInTab owner, int idx, Param *param) : owner(owner), idx(idx), param(param) {}
 
-		void Encode(std::back_insert_iterator<std::string> &output, const char *cmd);
+		void Encode(struct format_target &output, std::string_view cmd);
 	};
 
 	using ParamList = std::vector<ParamCheck>;
 	using ParamSpan = std::span<ParamCheck>;
 
-	StringID string;
+	StringIndexInTab string;
 	std::array<Param, SCRIPT_TEXT_MAX_PARAMETERS> param = {};
 	int paramc = 0;
-
-	void _TextParamError(std::string msg);
 
 	/**
 	 * Internal function to recursively fill a list of parameters.
@@ -171,9 +169,7 @@ private:
 	 * @param args The parameters to be consumed.
 	 * @param first Whether it's the first call in the recursion.
 	 */
-	void _GetEncodedText(std::back_insert_iterator<std::string> &output, int &param_count, ParamSpan args, bool first);
-
-	void _GetEncodedTextTraditional(std::back_insert_iterator<std::string> &output, int &param_count, StringIDList &seen_ids);
+	void _GetEncodedText(struct format_target &output, int &param_count, ParamSpan args, bool first);
 
 	/**
 	 * Set a parameter, where the value is the first item on the stack.

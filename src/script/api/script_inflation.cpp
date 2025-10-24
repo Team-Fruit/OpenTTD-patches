@@ -13,6 +13,7 @@
 #include "../../economy_func.h"
 #include "../../cheat_type.h"
 #include "../../command_type.h"
+#include "../../settings_cmd.h"
 
 #include "../../safeguards.h"
 
@@ -28,14 +29,16 @@
 
 /* static */ bool ScriptInflation::SetPriceFactor(int64_t factor)
 {
+	EnforceDeityMode(false);
 	EnforcePrecondition(false, factor >= 1 << 16 && factor <= (int64_t)MAX_INFLATION);
 	if ((uint64_t)factor == _economy.inflation_prices) return true;
-	return ScriptObject::DoCommand(0, CHT_INFLATION_COST, (uint32_t)factor, CMD_CHEAT_SETTING);
+	return ScriptObject::Command<CMD_CHEAT_SETTING>::Do(CHT_INFLATION_COST, (uint32_t)factor);
 }
 
 /* static */ bool ScriptInflation::SetPaymentFactor(int64_t factor)
 {
+	EnforceDeityMode(false);
 	EnforcePrecondition(false, factor >= 1 << 16 && factor <= (int64_t)MAX_INFLATION);
 	if ((uint64_t)factor == _economy.inflation_payment) return true;
-	return ScriptObject::DoCommand(0, CHT_INFLATION_INCOME, (uint32_t)factor, CMD_CHEAT_SETTING);
+	return ScriptObject::Command<CMD_CHEAT_SETTING>::Do(CHT_INFLATION_INCOME, (uint32_t)factor);
 }

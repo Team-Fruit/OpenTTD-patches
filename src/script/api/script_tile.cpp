@@ -17,6 +17,9 @@
 #include "../../tree_map.h"
 #include "../../town.h"
 #include "../../landscape.h"
+#include "../../landscape_cmd.h"
+#include "../../terraform_cmd.h"
+#include "../../tree_cmd.h"
 
 #include "../../safeguards.h"
 
@@ -127,14 +130,14 @@
 {
 	if (!::IsValidTile(tile)) return false;
 
-	return (::IsTileType(tile, MP_CLEAR) && ::GetRawClearGround(tile) == ::CLEAR_ROCKS);
+	return (::IsTileType(tile, MP_CLEAR) && ::GetClearGround(tile) == ::CLEAR_ROCKS);
 }
 
 /* static */ bool ScriptTile::IsRoughTile(TileIndex tile)
 {
 	if (!::IsValidTile(tile)) return false;
 
-	return (::IsTileType(tile, MP_CLEAR) && ::GetRawClearGround(tile) == ::CLEAR_ROUGH);
+	return (::IsTileType(tile, MP_CLEAR) && ::GetClearGround(tile) == ::CLEAR_ROUGH);
 }
 
 /* static */ bool ScriptTile::IsSnowTile(TileIndex tile)
@@ -206,7 +209,7 @@
 	if (::IsTileType(tile, MP_HOUSE)) return ScriptCompany::COMPANY_INVALID;
 	if (::IsTileType(tile, MP_INDUSTRY)) return ScriptCompany::COMPANY_INVALID;
 
-	return ScriptCompany::ResolveCompanyID((ScriptCompany::CompanyID)(uint8_t)::GetTileOwner(tile));
+	return ScriptCompany::ResolveCompanyID(ScriptCompany::ToScriptCompanyID(::GetTileOwner(tile)));
 }
 
 /* static */ bool ScriptTile::HasTransportType(TileIndex tile, TransportType transport_type)
@@ -221,7 +224,7 @@
 	}
 }
 
-/* static */ SQInteger ScriptTile::GetCargoAcceptance(TileIndex tile, CargoID cargo_type, SQInteger width, SQInteger height, SQInteger radius)
+/* static */ SQInteger ScriptTile::GetCargoAcceptance(TileIndex tile, CargoType cargo_type, SQInteger width, SQInteger height, SQInteger radius)
 {
 	if (!::IsValidTile(tile) || width <= 0 || height <= 0 || radius < 0 || !ScriptCargo::IsValidCargo(cargo_type)) return -1;
 
@@ -229,7 +232,7 @@
 	return acceptance[cargo_type];
 }
 
-/* static */ SQInteger ScriptTile::GetCargoProduction(TileIndex tile, CargoID cargo_type, SQInteger width, SQInteger height, SQInteger radius)
+/* static */ SQInteger ScriptTile::GetCargoProduction(TileIndex tile, CargoType cargo_type, SQInteger width, SQInteger height, SQInteger radius)
 {
 	if (!::IsValidTile(tile) || width <= 0 || height <= 0 || radius < 0 || !ScriptCargo::IsValidCargo(cargo_type)) return -1;
 
@@ -252,7 +255,7 @@
 	EnforceCompanyModeValid(false);
 	EnforcePrecondition(false, tile < ScriptMap::GetMapSize());
 
-	return ScriptObject::DoCommand(tile, slope, 1, CMD_TERRAFORM_LAND);
+	return ScriptObject::Command<CMD_TERRAFORM_LAND>::Do(tile, (::Slope)slope, true);
 }
 
 /* static */ bool ScriptTile::LowerTile(TileIndex tile, Slope slope)
@@ -260,7 +263,7 @@
 	EnforceCompanyModeValid(false);
 	EnforcePrecondition(false, tile < ScriptMap::GetMapSize());
 
-	return ScriptObject::DoCommand(tile, slope, 0, CMD_TERRAFORM_LAND);
+	return ScriptObject::Command<CMD_TERRAFORM_LAND>::Do(tile, (::Slope)slope, false);
 }
 
 /* static */ bool ScriptTile::LevelTiles(TileIndex start_tile, TileIndex end_tile)
@@ -269,7 +272,7 @@
 	EnforcePrecondition(false, start_tile < ScriptMap::GetMapSize());
 	EnforcePrecondition(false, end_tile < ScriptMap::GetMapSize());
 
-	return ScriptObject::DoCommand(end_tile, start_tile, LM_LEVEL << 1, CMD_LEVEL_LAND);
+	return ScriptObject::Command<CMD_LEVEL_LAND>::Do(end_tile, start_tile, false, LM_LEVEL);
 }
 
 /* static */ bool ScriptTile::DemolishTile(TileIndex tile)
@@ -277,7 +280,7 @@
 	EnforceDeityOrCompanyModeValid(false);
 	EnforcePrecondition(false, ::IsValidTile(tile));
 
-	return ScriptObject::DoCommand(tile, 0, 0, CMD_LANDSCAPE_CLEAR);
+	return ScriptObject::Command<CMD_LANDSCAPE_CLEAR>::Do(tile);
 }
 
 /* static */ bool ScriptTile::PlantTree(TileIndex tile)
@@ -285,7 +288,7 @@
 	EnforceCompanyModeValid(false);
 	EnforcePrecondition(false, ::IsValidTile(tile));
 
-	return ScriptObject::DoCommand(tile, TREE_INVALID, tile, CMD_PLANT_TREE);
+	return ScriptObject::Command<CMD_PLANT_TREE>::Do(tile, tile, {}, 1, false);
 }
 
 /* static */ bool ScriptTile::PlantTreeRectangle(TileIndex tile, SQInteger width, SQInteger height)
@@ -297,7 +300,7 @@
 	TileIndex end_tile = TileAddWrap(tile, width - 1, height - 1);
 	EnforcePrecondition(false, ::IsValidTile(end_tile));
 
-	return ScriptObject::DoCommand(tile, TREE_INVALID, end_tile, CMD_PLANT_TREE);
+	return ScriptObject::Command<CMD_PLANT_TREE>::Do(tile, end_tile, {}, 1, false);
 }
 
 /* static */ bool ScriptTile::IsWithinTownInfluence(TileIndex tile, TownID town_id)
@@ -307,20 +310,20 @@
 
 /* static */ TownID ScriptTile::GetTownAuthority(TileIndex tile)
 {
-	if (!::IsValidTile(tile)) return INVALID_TOWN;
+	if (!::IsValidTile(tile)) return TownID::Invalid();
 
 	Town *town = ::ClosestTownFromTile(tile, _settings_game.economy.dist_local_authority);
-	if (town == nullptr) return INVALID_TOWN;
+	if (town == nullptr) return TownID::Invalid();
 
 	return town->index;
 }
 
 /* static */ TownID ScriptTile::GetClosestTown(TileIndex tile)
 {
-	if (!::IsValidTile(tile)) return INVALID_TOWN;
+	if (!::IsValidTile(tile)) return TownID::Invalid();
 
 	Town *town = ::ClosestTownFromTile(tile, UINT_MAX);
-	if (town == nullptr) return INVALID_TOWN;
+	if (town == nullptr) return TownID::Invalid();
 
 	return town->index;
 }

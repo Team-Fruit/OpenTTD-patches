@@ -9,6 +9,7 @@
 
 #include "../../stdafx.h"
 #include "script_gamesettings.hpp"
+#include "../../settings_cmd.h"
 #include "../../settings_internal.h"
 #include "../../settings_type.h"
 #include "../../command_type.h"
@@ -40,8 +41,8 @@ struct CargoScalingProxy {
 		CargoScalingMode mode = this->is_industry ? _settings_game.economy.industry_cargo_scale_mode : _settings_game.economy.town_cargo_scale_mode;
 		if (mode == CSM_DAYLENGTH) {
 			/* Asynchronous free command, don't bother halting the script or saving the result */
-			::DoCommandPScript(0, 0, (uint32_t)CSM_NORMAL, 0, CMD_CHANGE_SETTING, nullptr,
-					this->is_industry ? "economy.industry_cargo_scale_mode" : "economy.town_cargo_scale_mode", false, false, true, nullptr);
+			auto payload = ChangeSettingCmdData::Make(this->is_industry ? "economy.industry_cargo_scale_mode" : "economy.town_cargo_scale_mode", (uint32_t)CSM_NORMAL);
+			::DoCommandPScript(CMD_CHANGE_SETTING, TileIndex{}, std::move(payload), CommandCallback::None, 0, DCIF_NONE, false, true);
 		}
 
 		return ScriptGameSettings::SetValue(this->is_industry ? "economy.industry_cargo_scale" : "economy.town_cargo_scale", ScaleQuantity(100, (int)value));
@@ -91,11 +92,11 @@ struct CargoScalingProxy {
 	const SettingDesc *sd = GetSettingFromName(setting);
 	if (sd == nullptr || !sd->IsIntSetting()) return false;
 
-	if ((sd->flags & SF_NO_NETWORK_SYNC) != 0) return false;
+	if ((sd->flags.Test(SettingFlag::NoNetworkSync))) return false;
 
 	value = Clamp<SQInteger>(value, INT32_MIN, INT32_MAX);
 
-	return ScriptObject::DoCommand(0, 0, value, CMD_CHANGE_SETTING, sd->name);
+	return ScriptObject::Command<CMD_CHANGE_SETTING>::Do(sd->name, value);
 }
 
 /* static */ bool ScriptGameSettings::IsDisabledVehicleType(ScriptVehicle::VehicleType vehicle_type)

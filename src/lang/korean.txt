@@ -286,7 +286,7 @@ STR_TOOLTIP_CLOSE_WINDOW                                        :{BLACK}창을 �
 STR_TOOLTIP_WINDOW_TITLE_DRAG_THIS                              :{BLACK}창 제목 - 창을 움직이려면 여기를 드래그하세요.
 STR_TOOLTIP_SHADE                                               :{BLACK}창 접기 - 창을 접어 제목만 보여줍니다.
 STR_TOOLTIP_DEBUG                                               :{BLACK}NewGRF 디버그 정보를 보여주기
-STR_TOOLTIP_DEFSIZE                                             :{BLACK}창의 크기를 기본 크기로 되돌립니다. 현재 창 크기를 기본값으로 설정하시려면 CTRL+클릭하십시오.
+STR_TOOLTIP_DEFSIZE                                             :{BLACK}창의 크기를 기본 크기로 되돌립니다. 현재 창 크기를 기본값으로 설정하시려면 CTRL+클릭하세요. 초기값으로 되돌리려면 두 번 CTRL+클릭하세요
 STR_TOOLTIP_STICKY                                              :{BLACK}이 창을 '모든 창 닫기' 단축키로 닫을 수 없게 고정합니다. CTRL+클릭하면 그 상태를 기본으로 설정합니다.
 STR_TOOLTIP_RESIZE                                              :{BLACK}이 창의 크기를 조절하려면 여기를 클릭하고 드래그하세요
 STR_TOOLTIP_TOGGLE_LARGE_SMALL_WINDOW                           :{BLACK}창 크기를 대형/소형으로 전환합니다.
@@ -441,12 +441,10 @@ STR_SCENEDIT_FILE_MENU_SEPARATOR                                :
 STR_SCENEDIT_FILE_MENU_QUIT                                     :게임 종료
 
 STR_SCENEDIT_TOWN_MENU_BUILD_TOWN                               :도시 생성
-STR_SCENEDIT_TOWN_MENU_PACE_HOUSE                               :건물 건설
+STR_SCENEDIT_TOWN_MENU_PACE_HOUSE                               :건물 생성
 
 # Settings menu
-###length 16
 STR_SETTINGS_MENU_GAME_OPTIONS                                  :게임 기본 설정
-STR_SETTINGS_MENU_CONFIG_SETTINGS_TREE                          :설정
 STR_SETTINGS_MENU_AI_SETTINGS                                   :인공지능 설정
 STR_SETTINGS_MENU_GAMESCRIPT_SETTINGS                           :게임 스크립트 설정
 STR_SETTINGS_MENU_NEWGRF_SETTINGS                               :NewGRF 설정
@@ -454,6 +452,12 @@ STR_SETTINGS_MENU_SANDBOX_OPTIONS                               :치트
 STR_SETTINGS_MENU_TRANSPARENCY_OPTIONS                          :투명 설정
 STR_SETTINGS_MENU_TOWN_NAMES_DISPLAYED                          :도시 이름을 표시함
 STR_SETTINGS_MENU_STATION_NAMES_DISPLAYED                       :역 이름을 표시함
+STR_SETTINGS_MENU_STATION_NAMES_TRAIN                           :기차역
+STR_SETTINGS_MENU_STATION_NAMES_LORRY                           :트럭 적하장
+STR_SETTINGS_MENU_STATION_NAMES_BUS                             :버스 정류장
+STR_SETTINGS_MENU_STATION_NAMES_SHIP                            :항구
+STR_SETTINGS_MENU_STATION_NAMES_PLANE                           :공항
+STR_SETTINGS_MENU_STATION_NAMES_GHOST                           :제거된 역
 STR_SETTINGS_MENU_WAYPOINTS_DISPLAYED                           :경유지의 이름을 표시함
 STR_SETTINGS_MENU_SIGNS_DISPLAYED                               :팻말을 표시함
 STR_SETTINGS_MENU_SHOW_COMPETITOR_SIGNS                         :경쟁사의 팻말과 역 이름을 표시
@@ -837,7 +841,6 @@ STR_MESSAGE_HISTORY_TOOLTIP                                     :{BLACK}최근 �
 STR_MESSAGE_NEWS_FORMAT                                         :{STRING}  -  {STRING}
 
 STR_NEWS_MESSAGE_CAPTION                                        :{WHITE}메시지
-STR_NEWS_CUSTOM_ITEM                                            :{BIG_FONT}{BLACK}{STRING}
 
 STR_NEWS_FIRST_TRAIN_ARRIVAL                                    :{BIG_FONT}{BLACK}시민들이 기뻐합니다 . . .{}{STATION}에 처음으로 열차가 도착했습니다!
 STR_NEWS_FIRST_BUS_ARRIVAL                                      :{BIG_FONT}{BLACK}시민들이 기뻐합니다 . . .{}{STATION}에 처음으로 버스가 도착했습니다!
@@ -932,7 +935,7 @@ STR_NEWS_STATION_NOW_ACCEPTS_CARGO_LIST                         :{WHITE}{STATION
 
 STR_NEWS_OFFER_OF_SUBSIDY_EXPIRED                               :{BIG_FONT}{BLACK}보조금 지급 종료:{}{}{1:STRING}에서 {2:STRING}까지의 {0:STRING} 수송은{}더 이상 보조금을 지급하지 않습니다.
 STR_NEWS_SUBSIDY_WITHDRAWN_SERVICE                              :{BIG_FONT}{BLACK}보조금 지급 만료:{}{}{1:STRING}에서 {2:STRING}까지의{}{0:STRING} 수송 보조금은 더 이상 지급되지 않습니다.
-STR_NEWS_SERVICE_SUBSIDY_OFFERED                                :{BIG_FONT}{BLACK}보조금 지급 안내{}{}처음으로 {1:STRING}에서 {2:STRING}까지{}{0:STRING}{G 0 "을" "를"} 수송하는 회사는{}지역 당국으로부터 {3:UNITS_YEARS_OR_MINUTES} 동안 보조금을 받게 될 것입니다!
+STR_NEWS_SERVICE_SUBSIDY_OFFERED                                :{BIG_FONT}{BLACK}보조금 지급 안내{}{}{1:STRING}에서 {2:STRING}까지{}처음 {0:STRING}{G 0 "을" "를"} 수송하는 회사는{}지역 당국으로부터 {3:UNITS_YEARS_OR_MINUTES} 동안 보조금을 받게 될 것입니다!
 ###length 4
 STR_NEWS_SERVICE_SUBSIDY_AWARDED_HALF                           :{BIG_FONT}{BLACK}{0:STRING}에게 보조금 지급!{}{}{2:STRING}에서 {3:STRING}까지 {1:STRING}{G 1 "을" "를"} 수송에 대해 {4:UNITS_YEARS_OR_MINUTES} 동안 50%의 추가 보조금이 주어집니다!
 STR_NEWS_SERVICE_SUBSIDY_AWARDED_DOUBLE                         :{BIG_FONT}{BLACK}{0:STRING}에게 보조금 지급!{}{}{2:STRING}에서 {3:STRING}까지 {1:STRING}{G 1 "을" "를"} 수송에 대해 {4:UNITS_YEARS_OR_MINUTES} 동안 2배의 추가 보조금이 주어집니다!
@@ -975,7 +978,7 @@ STR_GAME_OPTIONS_CURRENCY_UNITS_DROPDOWN_TOOLTIP                :{BLACK}화폐 �
 
 STR_GAME_OPTIONS_CURRENCY_CODE                                  :{STRING} ({STRING})
 
-###length 44
+###length 45
 STR_GAME_OPTIONS_CURRENCY_GBP                                   :영국 파운드
 STR_GAME_OPTIONS_CURRENCY_USD                                   :미국 달러
 STR_GAME_OPTIONS_CURRENCY_EUR                                   :유로
@@ -1020,6 +1023,7 @@ STR_GAME_OPTIONS_CURRENCY_IDR                                   :인도네시아
 STR_GAME_OPTIONS_CURRENCY_MYR                                   :말레이시아 링깃
 STR_GAME_OPTIONS_CURRENCY_LVL                                   :라트비아 라츠
 STR_GAME_OPTIONS_CURRENCY_PTE                                   :포르투갈 이스쿠두
+STR_GAME_OPTIONS_CURRENCY_UAH                                   :우크라이나 흐리우냐
 
 STR_GAME_OPTIONS_AUTOSAVE_FRAME                                 :{BLACK}자동 저장
 STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_TOOLTIP                      :{BLACK}게임 자동 저장 간격을 선택
@@ -1076,7 +1080,6 @@ STR_GAME_OPTIONS_PARTICIPATE_SURVEY_LINK_TOOLTIP                :{BLACK}자동 �
 STR_GAME_OPTIONS_PARTICIPATE_SURVEY_PREVIEW                     :{BLACK}설문조사 결과 미리보기
 STR_GAME_OPTIONS_PARTICIPATE_SURVEY_PREVIEW_TOOLTIP             :{BLACK}현재 진행 중인 게임의 설문조사 결과를 보여줍니다
 
-STR_GAME_OPTIONS_GRAPHICS                                       :{BLACK}그래픽
 
 STR_GAME_OPTIONS_REFRESH_RATE                                   :{BLACK}화면 주사율
 STR_GAME_OPTIONS_REFRESH_RATE_TOOLTIP                           :{BLACK}사용할 화면 주사율을 선택하세요
@@ -1213,10 +1216,9 @@ STR_CITY_APPROVAL_TOLERANT                                      :신경 씀
 STR_CITY_APPROVAL_HOSTILE                                       :싫어함
 STR_CITY_APPROVAL_PERMISSIVE                                    :신경 안 씀 (회사 행동에 영향 없음)
 
-STR_WARNING_NO_SUITABLE_AI                                      :{WHITE}사용할 수 있는 인공지능이 없습니다...{}'온라인 콘텐츠' 시스템을 통해 인공지능을 다운로드받을 수 있습니다.
+STR_WARNING_NO_SUITABLE_AI                                      :{WHITE}사용할 수 있는 인공지능이 없습니다...{}{}'온라인 콘텐츠' 시스템을 통해 인공지능을 다운로드받을 수 있습니다.
 
 # Settings tree window
-STR_CONFIG_SETTING_TREE_CAPTION                                 :{WHITE}설정
 STR_CONFIG_SETTING_FILTER_TITLE                                 :{BLACK}검색:
 STR_CONFIG_SETTING_EXPAND_ALL                                   :{BLACK}모두 펼치기
 STR_CONFIG_SETTING_COLLAPSE_ALL                                 :{BLACK}모두 접기
@@ -1342,6 +1344,7 @@ STR_CONFIG_SETTING_CATCHMENT_HELPTEXT                           :역과 공항�
 STR_CONFIG_SETTING_SERVE_NEUTRAL_INDUSTRIES                     :역이 붙어 있는 산업시설의 화물을 회사의 역이 취급 가능: {STRING}
 STR_CONFIG_SETTING_SERVE_NEUTRAL_INDUSTRIES_HELPTEXT            :이 설정을 켜면, (유전과 같이) 역이 붙어 있는 산업시설이 근처에 지은 회사 소유의 역에서도 화물을 취급할 수 있습니다. 이 설정을 끄면, 반드시 산업시설에 붙어 있는 역에서만 화물을 취급할 수 있습니다. 인근에 있는 모든 회사 소유의 역은 화물을 취급할 수 없게 되며, 산업시설에 붙어 있는 역도 그 산업시설 이외의 화물을 취급할 수 없게 됩니다.
 
+
 STR_CONFIG_SETTING_EXTRADYNAMITE                                :도시 소유의 도로, 다리 등의 제거 허용: {STRING}
 STR_CONFIG_SETTING_EXTRADYNAMITE_HELPTEXT                       :도시 소유의 기반시설이나 건물을 제거할 수 있게 합니다.
 
@@ -1366,7 +1369,7 @@ STR_CONFIG_SETTING_ROAD_VEHICLE_SLOPE_STEEPNESS                 :경사도 설�
 STR_CONFIG_SETTING_ROAD_VEHICLE_SLOPE_STEEPNESS_HELPTEXT        :자동차/전차에 적용시킬 경사도를 설정합니다. 값이 높을수록 차량이 언덕을 오를 때 더 힘이 듭니다.
 
 STR_CONFIG_SETTING_FORBID_90_DEG                                :열차의 90도 회전을 금지함: {STRING}
-STR_CONFIG_SETTING_FORBID_90_DEG_HELPTEXT                       :─ 모양의 수평 선로와 │ 모양의 수직 선로가 바로 이어져 만날 때 90도 회전이 발생합니다. 이 설정을 켜면, 열차가 칸 가장자리를 통과할 때 90도로 회전할 수 있도록 허용합니다. 이 설정은 선박의 회전 반경에도 적용됩니다
+STR_CONFIG_SETTING_FORBID_90_DEG_HELPTEXT                       :─ 모양의 수평 선로와 │ 모양의 수직 선로가 바로 이어져 만날 때 90도 회전이 발생합니다. 이 설정을 켜면, 열차가 칸 가장자리를 통과할 때 90도로 회전할 수 없도록 금지합니다
 
 STR_CONFIG_SETTING_DISTANT_JOIN_STATIONS                        :역이 같은 방향으로 붙어있지 않아도 같은 이름의 역 짓기 허용: {STRING}
 STR_CONFIG_SETTING_DISTANT_JOIN_STATIONS_HELPTEXT               :이미 존재하는 역을 직접 건드리지 않고도 역의 일부분을 새로 추가/확장하는 것을 허용합니다. 인접한 칸에 기존과 다른 새로운 역을 놓을 때에는 CTRL+클릭해야 합니다
@@ -1925,7 +1928,10 @@ STR_CONFIG_SETTING_ENDING_YEAR_VALUE                            :{NUM}
 STR_CONFIG_SETTING_ENDING_YEAR_ZERO                             :안 함
 
 STR_CONFIG_SETTING_ECONOMY_TYPE                                 :경제 변화: {STRING}
-STR_CONFIG_SETTING_ECONOMY_TYPE_HELPTEXT                        :부드러운 경제에서는 생산량이 소량으로 자주 변하게 됩니다. 멈춘 경제에서는 생산량이 변하지 않고 산업시설의 폐쇄를 막습니다. 이 설정은 NewGRF로 추가한 산업시설에는 적용되지 않을 수 있습니다
+###length 2
+STR_CONFIG_SETTING_ECONOMY_TYPE_HELPTEXT                        :부드러운 경제에서는 생산량이 소량으로 자주 변하게 됩니다. 멈춘 경제에서는 생산량이 변하지 않고 산업시설의 폐쇄를 막습니다. 이 설정은 NewGRF로 추가한 산업시설에는 적용되지 않을 수 있습니다.{}{}경제가 일시정지되어 있는 경우, 1개월당 산업시설 생산량은 (1개월과 정확히 같지 않지는 않은) 특정 고정 간격마다 계산되기 때문에 다르게 표시되어 보일 수 있습니다
+STR_CONFIG_SETTING_ECONOMY_TYPE_HELPTEXT_PERIOD                 :부드러운 경제에서는 생산량이 소량으로 자주 변하게 됩니다. 멈춘 경제에서는 생산량이 변하지 않고 산업시설의 폐쇄를 막습니다. 이 설정은 NewGRF로 추가한 산업시설에는 적용되지 않을 수 있습니다.{}{}경제가 일시정지되어 있는 경우, 분당 산업시설 생산량은 (1분과 정확히 같지 않지는 않은) 특정 고정 간격마다 계산되기 때문에 다르게 표시되어 보일 수 있습니다
+
 ###length 3
 STR_CONFIG_SETTING_ECONOMY_TYPE_ORIGINAL                        :기본
 STR_CONFIG_SETTING_ECONOMY_TYPE_SMOOTH                          :부드러움
@@ -1978,6 +1984,13 @@ STR_CONFIG_SETTING_TOWN_FOUNDING_HELPTEXT                       :플레이어가
 STR_CONFIG_SETTING_TOWN_FOUNDING_FORBIDDEN                      :금지
 STR_CONFIG_SETTING_TOWN_FOUNDING_ALLOWED                        :허용
 STR_CONFIG_SETTING_TOWN_FOUNDING_ALLOWED_CUSTOM_LAYOUT          :허용, 도로 모양 선택 가능
+
+STR_CONFIG_SETTING_HOUSE_PLACER                                 :개별 도시 건물 배치: {STRING}
+STR_CONFIG_SETTING_HOUSE_PLACER_HELPTEXT                        :이 설정을 켜면, 플레이어가 도시 건물을 수동으로 세울 수 있게 됩니다
+###length 3
+STR_CONFIG_SETTING_HOUSE_PLACER_FORBIDDEN                       :금지
+STR_CONFIG_SETTING_HOUSE_PLACER_ALLOWED                         :허용
+STR_CONFIG_SETTING_HOUSE_PLACER_FULLY_CONSTRUCTED               :허용, 건설 완료 상태로 지어짐
 
 STR_CONFIG_SETTING_TOWN_CARGOGENMODE                            :도시 화물 생성: {STRING}
 STR_CONFIG_SETTING_TOWN_CARGOGENMODE_HELPTEXT                   :도시의 전반적인 인구에 따라, 도시가 얼마나 많은 화물을 생산하는 지를 설정합니다.{}제곱 성장: 도시의 규모가 2배 커지면 승객을 4배 더 생산합니다.{}선형 성장: 도시의 규모가 2배 커지면 승객을 2배 더 생산합니다
@@ -2084,7 +2097,7 @@ STR_CONFIG_SETTING_LOCALISATION_UNITS_VELOCITY_GAMEUNITS_SECS   :게임 단위 (
 STR_CONFIG_SETTING_LOCALISATION_UNITS_VELOCITY_KNOTS            :노트
 
 STR_CONFIG_SETTING_LOCALISATION_UNITS_POWER                     :차량의 힘 단위: {STRING}
-STR_CONFIG_SETTING_LOCALISATION_UNITS_POWER_HELPTEXT            :출력할 차량의 힘 단위를 선택합니다.
+STR_CONFIG_SETTING_LOCALISATION_UNITS_POWER_HELPTEXT            :출력할 차량의 힘 단위를 선택합니다
 ###length 3
 STR_CONFIG_SETTING_LOCALISATION_UNITS_POWER_IMPERIAL            :야드파운드법 (마력)
 STR_CONFIG_SETTING_LOCALISATION_UNITS_POWER_METRIC              :미터법 (마력)
@@ -2098,21 +2111,21 @@ STR_CONFIG_SETTING_LOCALISATION_UNITS_WEIGHT_METRIC             :미터법 (톤)
 STR_CONFIG_SETTING_LOCALISATION_UNITS_WEIGHT_SI                 :국제표준규격 (kg)
 
 STR_CONFIG_SETTING_LOCALISATION_UNITS_VOLUME                    :부피 단위: {STRING}
-STR_CONFIG_SETTING_LOCALISATION_UNITS_VOLUME_HELPTEXT           :부피를 표시할 때 선택한 단위를 사용하여 나타냅니다.
+STR_CONFIG_SETTING_LOCALISATION_UNITS_VOLUME_HELPTEXT           :부피를 표시할 때 선택한 단위를 사용하여 나타냅니다
 ###length 3
 STR_CONFIG_SETTING_LOCALISATION_UNITS_VOLUME_IMPERIAL           :야드파운드법 (갤런)
 STR_CONFIG_SETTING_LOCALISATION_UNITS_VOLUME_METRIC             :미터법 (리터)
 STR_CONFIG_SETTING_LOCALISATION_UNITS_VOLUME_SI                 :국제표준규격 (m³)
 
 STR_CONFIG_SETTING_LOCALISATION_UNITS_FORCE                     :견인 효과 단위: {STRING}
-STR_CONFIG_SETTING_LOCALISATION_UNITS_FORCE_HELPTEXT            :견인 효과(견인력)를 표시할 때 선택한 단위를 사용하여 나타냅니다.
+STR_CONFIG_SETTING_LOCALISATION_UNITS_FORCE_HELPTEXT            :견인 효과(견인력)를 표시할 때 선택한 단위를 사용하여 나타냅니다
 ###length 3
 STR_CONFIG_SETTING_LOCALISATION_UNITS_FORCE_IMPERIAL            :야드파운드법 (파운드중)
 STR_CONFIG_SETTING_LOCALISATION_UNITS_FORCE_METRIC              :미터법 (kgf)
 STR_CONFIG_SETTING_LOCALISATION_UNITS_FORCE_SI                  :국제표준규격 (kN)
 
 STR_CONFIG_SETTING_LOCALISATION_UNITS_HEIGHT                    :높이 단위: {STRING}
-STR_CONFIG_SETTING_LOCALISATION_UNITS_HEIGHT_HELPTEXT           :높이를 표시할 때 선택한 단위를 사용하여 나타냅니다.
+STR_CONFIG_SETTING_LOCALISATION_UNITS_HEIGHT_HELPTEXT           :높이를 표시할 때 선택한 단위를 사용하여 나타냅니다
 ###length 3
 STR_CONFIG_SETTING_LOCALISATION_UNITS_HEIGHT_IMPERIAL           :야드파운드법 (ft)
 STR_CONFIG_SETTING_LOCALISATION_UNITS_HEIGHT_METRIC             :미터법 (m)
@@ -2189,9 +2202,8 @@ STR_INTRO_MULTIPLAYER                                           :{BLACK}멀티 �
 STR_INTRO_GAME_OPTIONS                                          :{BLACK}게임 설정
 STR_INTRO_HIGHSCORE                                             :{BLACK}고득점 순위표
 STR_INTRO_HELP                                                  :{BLACK}도움말 & 매뉴얼
-STR_INTRO_CONFIG_SETTINGS_TREE                                  :{BLACK}설정
 STR_INTRO_NEWGRF_SETTINGS                                       :{BLACK}NewGRF 설정
-STR_INTRO_ONLINE_CONTENT                                        :{BLACK}온라인 콘텐츠 다운로드
+STR_INTRO_ONLINE_CONTENT                                        :{BLACK}온라인 콘텐츠
 STR_INTRO_AI_SETTINGS                                           :{BLACK}인공지능 설정
 STR_INTRO_GAMESCRIPT_SETTINGS                                   :{BLACK}게임 스크립트 설정
 STR_INTRO_QUIT                                                  :{BLACK}종료
@@ -2211,7 +2223,6 @@ STR_INTRO_TOOLTIP_TOYLAND_LANDSCAPE                             :{BLACK}장난�
 STR_INTRO_TOOLTIP_GAME_OPTIONS                                  :{BLACK}게임 기본 설정 창을 엽니다
 STR_INTRO_TOOLTIP_HIGHSCORE                                     :{BLACK}고득점 순위표를 엽니다
 STR_INTRO_TOOLTIP_HELP                                          :{BLACK}각종 문서와 온라인 링크를 확인합니다
-STR_INTRO_TOOLTIP_CONFIG_SETTINGS_TREE                          :{BLACK}설정 창을 엽니다
 STR_INTRO_TOOLTIP_NEWGRF_SETTINGS                               :{BLACK}NewGRF 설정 창을 엽니다
 STR_INTRO_TOOLTIP_ONLINE_CONTENT                                :{BLACK}새로 나왔거나 업데이트된 콘텐츠를 체크하여 다운로드합니다
 STR_INTRO_TOOLTIP_AI_SETTINGS                                   :{BLACK}인공지능 설정 창을 엽니다
@@ -2240,6 +2251,7 @@ STR_HELP_WINDOW_README                                          :{BLACK}Readme
 STR_HELP_WINDOW_CHANGELOG                                       :{BLACK}변경기록
 STR_HELP_WINDOW_KNOWN_BUGS                                      :{BLACK}알려진 버그
 STR_HELP_WINDOW_LICENSE                                         :{BLACK}라이선스
+STR_HELP_WINDOW_FONTS                                           :{BLACK}글씨체
 STR_HELP_WINDOW_MAIN_WEBSITE                                    :{BLACK}OpenTTD
 STR_HELP_WINDOW_MANUAL_WIKI                                     :{BLACK}매뉴얼 / 위키
 STR_HELP_WINDOW_BUGTRACKER                                      :{BLACK}버그 신고
@@ -2308,12 +2320,7 @@ STR_LIVERY_FREIGHT_TRAM                                         :{G=f}화물 전
 STR_FACE_CAPTION                                                :{WHITE}얼굴 선택
 STR_FACE_CANCEL_TOOLTIP                                         :{BLACK}새 얼굴 선택을 취소합니다.
 STR_FACE_OK_TOOLTIP                                             :{BLACK}이 얼굴을 선택합니다.
-STR_FACE_RANDOM                                                 :{BLACK}무작위화
 
-STR_FACE_MALE_BUTTON                                            :{BLACK}남성
-STR_FACE_MALE_TOOLTIP                                           :{BLACK}남성 얼굴 선택
-STR_FACE_FEMALE_BUTTON                                          :{BLACK}여성
-STR_FACE_FEMALE_TOOLTIP                                         :{BLACK}여성 얼굴 선택
 STR_FACE_NEW_FACE_BUTTON                                        :{BLACK}새 얼굴
 STR_FACE_NEW_FACE_TOOLTIP                                       :{BLACK}얼굴을 만듭니다.
 STR_FACE_ADVANCED                                               :{BLACK}고급
@@ -2323,44 +2330,31 @@ STR_FACE_SIMPLE_TOOLTIP                                         :{BLACK}간편 �
 STR_FACE_LOAD                                                   :{BLACK}불러오기
 STR_FACE_LOAD_TOOLTIP                                           :{BLACK}즐겨찾는 얼굴 불러오기
 STR_FACE_LOAD_DONE                                              :{WHITE}당신이 즐겨찾는 얼굴을 OpenTTD 설정 파일로부터 불러왔습니다.
-STR_FACE_FACECODE                                               :{BLACK}플레이어 얼굴 번호
-STR_FACE_FACECODE_TOOLTIP                                       :{BLACK}플레이어 얼굴 번호 보기/설정
-STR_FACE_FACECODE_CAPTION                                       :{WHITE}플레이어 얼굴 번호 보기/설정
-STR_FACE_FACECODE_SET                                           :{WHITE}새 얼굴 번호 코드가 설정되었습니다.
-STR_FACE_FACECODE_ERR                                           :{WHITE}플레이어 얼굴 번호를 설정할 수 없습니다 - 0에서 4,294,967,295 사이의 값을 입력하십시오!
+STR_FACE_FACECODE                                               :{BLACK}플레이어 얼굴 코드
+STR_FACE_FACECODE_TOOLTIP                                       :{BLACK}플레이어 얼굴 코드 보기/설정
+STR_FACE_FACECODE_CAPTION                                       :{WHITE}플레이어 얼굴 코드 보기/설정
+STR_FACE_FACECODE_SET                                           :{WHITE}새 회사 소유주 얼굴이 설정되었습니다
+STR_FACE_FACECODE_ERR                                           :{WHITE}플레이어 얼굴 코드를 설정할 수 없습니다 - 올바른 값을 입력해야 합니다
 STR_FACE_SAVE                                                   :{BLACK}저장
 STR_FACE_SAVE_TOOLTIP                                           :{BLACK}즐겨찾는 얼굴로 저장
 STR_FACE_SAVE_DONE                                              :{WHITE}이 얼굴이 OpenTTD 설정 파일에 즐겨찾는 얼굴로 저장될 것입니다.
-STR_FACE_EUROPEAN                                               :{BLACK}유럽인
-STR_FACE_EUROPEAN_TOOLTIP                                       :{BLACK}유럽인 얼굴 선택
-STR_FACE_AFRICAN                                                :{BLACK}흑인
-STR_FACE_AFRICAN_TOOLTIP                                        :{BLACK}흑인 얼굴 선택
+STR_FACE_SETTING_TOGGLE                                         :{STRING} {ORANGE}{STRING}
+STR_FACE_SETTING_NUMERIC                                        :{STRING} {ORANGE}{NUM} / {NUM}
 STR_FACE_YES                                                    :예
 STR_FACE_NO                                                     :아니요
-STR_FACE_MOUSTACHE_EARRING_TOOLTIP                              :{BLACK}콧수염이나 귀걸이 착용
+STR_FACE_STYLE                                                  :종류:
 STR_FACE_HAIR                                                   :머리:
-STR_FACE_HAIR_TOOLTIP                                           :{BLACK}머리 변경
 STR_FACE_EYEBROWS                                               :눈썹:
-STR_FACE_EYEBROWS_TOOLTIP                                       :{BLACK}눈썹 변경
 STR_FACE_EYECOLOUR                                              :눈동자 색:
-STR_FACE_EYECOLOUR_TOOLTIP                                      :{BLACK}눈동자색 변경
 STR_FACE_GLASSES                                                :안경:
-STR_FACE_GLASSES_TOOLTIP                                        :{BLACK}안경 착용
-STR_FACE_GLASSES_TOOLTIP_2                                      :{BLACK}안경 변경
 STR_FACE_NOSE                                                   :코:
-STR_FACE_NOSE_TOOLTIP                                           :{BLACK}코 변경
 STR_FACE_LIPS                                                   :입술:
 STR_FACE_MOUSTACHE                                              :콧수염:
-STR_FACE_LIPS_MOUSTACHE_TOOLTIP                                 :{BLACK}입술/콧수염 변경
 STR_FACE_CHIN                                                   :턱:
-STR_FACE_CHIN_TOOLTIP                                           :{BLACK}턱 변경
 STR_FACE_JACKET                                                 :자켓:
-STR_FACE_JACKET_TOOLTIP                                         :{BLACK}자켓 변경
 STR_FACE_COLLAR                                                 :옷깃:
-STR_FACE_COLLAR_TOOLTIP                                         :{BLACK}옷깃 변경
 STR_FACE_TIE                                                    :넥타이:
 STR_FACE_EARRING                                                :귀걸이:
-STR_FACE_TIE_EARRING_TOOLTIP                                    :{BLACK}넥타이/귀걸이 변경
 
 # Matches ServerGameType
 ###length 3
@@ -2519,7 +2513,7 @@ STR_NETWORK_CLIENT_LIST_ADMIN_COMPANY_RESET                     :삭제
 STR_NETWORK_CLIENT_LIST_ASK_CAPTION                             :{WHITE}관리자 기능
 STR_NETWORK_CLIENT_LIST_ASK_CLIENT_KICK                         :{YELLOW}'{STRING}' 플레이어를 정말로 추방하시겠습니까?
 STR_NETWORK_CLIENT_LIST_ASK_CLIENT_BAN                          :{YELLOW}'{STRING}' 플레이어를 정말로 차단하시겠습니까?
-STR_NETWORK_CLIENT_LIST_ASK_COMPANY_RESET                       :{YELLOW}'{COMPANY}' 회사를 정말로 삭제하시겠습니까?
+STR_NETWORK_CLIENT_LIST_ASK_COMPANY_RESET                       :{YELLOW}정말 '{COMPANY}' 회사를 삭제하시겠습니까?
 
 STR_NETWORK_ASK_RELAY_CAPTION                                   :{WHITE}중계를 이용할까요?
 STR_NETWORK_ASK_RELAY_TEXT                                      :{YELLOW}'{0:STRING}' 서버와 연결하는 데 실패했습니다.{} '{1:STRING}'{G 1 "을" "를"} 통해 연결을 중계하시겠습니까?
@@ -2551,7 +2545,7 @@ STR_NETWORK_CHAT_TO_COMPANY                                     :[팀] {STRING}�
 STR_NETWORK_CHAT_CLIENT                                         :[귓속말] {STRING}: {WHITE}{STRING}
 STR_NETWORK_CHAT_TO_CLIENT                                      :[귓속말] {STRING}에게: {WHITE}{STRING}
 STR_NETWORK_CHAT_ALL                                            :[모두] {STRING}: {WHITE}{STRING}
-STR_NETWORK_CHAT_EXTERNAL                                       :[{3:STRING}] {0:STRING}: {WHITE}{1:STRING}
+STR_NETWORK_CHAT_EXTERNAL                                       :[{STRING}] {STRING}: {WHITE}{STRING}
 STR_NETWORK_CHAT_OSKTITLE                                       :{BLACK}채팅 메시지를 입력하세요
 
 # Network messages
@@ -2609,7 +2603,7 @@ STR_NETWORK_ERROR_CLIENT_TIMEOUT_JOIN                           :지도 생성 /
 STR_NETWORK_ERROR_CLIENT_INVALID_CLIENT_NAME                    :유효하지 않은 클라이언트 이름
 
 # Network related errors
-STR_NETWORK_SERVER_MESSAGE                                      :*** {1:STRING}
+STR_NETWORK_SERVER_MESSAGE                                      :*** {STRING}
 
 ###length 12
 STR_NETWORK_SERVER_MESSAGE_GAME_PAUSED                          :게임이 일시 정지되었습니다. ({STRING})
@@ -2627,15 +2621,15 @@ STR_NETWORK_SERVER_MESSAGE_GAME_REASON_LINK_GRAPH               :연결 상태�
 
 STR_NETWORK_MESSAGE_CLIENT_LEAVING                              :게임 종료
 STR_NETWORK_MESSAGE_CLIENT_JOINED                               :*** {STRING} 님이 입장하셨습니다
-STR_NETWORK_MESSAGE_CLIENT_JOINED_ID                            :*** {0:STRING} 님이 입장하셨습니다 ({2:NUM}번 접속자)
-STR_NETWORK_MESSAGE_CLIENT_COMPANY_JOIN                         :*** {0:STRING} 님이 {2:NUM}번 회사에 참여하셨습니다
+STR_NETWORK_MESSAGE_CLIENT_JOINED_ID                            :*** {STRING} 님이 입장하셨습니다 ({NUM}번 접속자)
+STR_NETWORK_MESSAGE_CLIENT_COMPANY_JOIN                         :*** {STRING} 님이 {STRING} 회사에 참여하셨습니다
 STR_NETWORK_MESSAGE_CLIENT_COMPANY_SPECTATE                     :*** {STRING} 님이 관전을 시작하셨습니다
-STR_NETWORK_MESSAGE_CLIENT_COMPANY_NEW                          :*** {0:STRING} 님이 새로운 회사({2:NUM}번)를 창설하셨습니다
-STR_NETWORK_MESSAGE_CLIENT_LEFT                                 :*** {0:STRING} 님이 퇴장하셨습니다 (사유: {2:STRING})
+STR_NETWORK_MESSAGE_CLIENT_COMPANY_NEW                          :*** {STRING} 님이 새로운 회사({NUM}번)를 창설하셨습니다
+STR_NETWORK_MESSAGE_CLIENT_LEFT                                 :*** {STRING} 님이 퇴장하셨습니다 (사유: {STRING})
 STR_NETWORK_MESSAGE_NAME_CHANGE                                 :*** {STRING} 님이 이름을 {STRING}(으)로 바꾸었습니다
-STR_NETWORK_MESSAGE_GIVE_MONEY                                  :*** {0:STRING} 님이 {1:STRING}에게 {2:CURRENCY_LONG}만큼의 돈을 보내셨습니다
+STR_NETWORK_MESSAGE_GIVE_MONEY                                  :*** {0:STRING} 님이 {2:STRING}에게 {1:CURRENCY_LONG}만큼의 돈을 보내셨습니다
 STR_NETWORK_MESSAGE_SERVER_SHUTDOWN                             :{WHITE}서버가 게임을 종료하였습니다
-STR_NETWORK_MESSAGE_SERVER_REBOOT                               :{WHITE}서버가 재시작되고 있습니다...{}기다려주세요...
+STR_NETWORK_MESSAGE_SERVER_REBOOT                               :{WHITE}서버가 재시작되고 있습니다...{}{}기다려주세요...
 STR_NETWORK_MESSAGE_KICKED                                      :*** {STRING} - 서버에서 강제로 추방되었습니다. 사유: ({STRING})
 
 STR_NETWORK_ERROR_COORDINATOR_REGISTRATION_FAILED               :{WHITE}서버 등록 실패
@@ -2644,7 +2638,7 @@ STR_NETWORK_ERROR_COORDINATOR_ISOLATED                          :{WHITE}서버�
 STR_NETWORK_ERROR_COORDINATOR_ISOLATED_DETAIL                   :{WHITE}다른 플레이어가 이 서버에 들어올 수 없게 될 것입니다
 
 # Content downloading window
-STR_CONTENT_TITLE                                               :{WHITE}콘텐츠 다운로드
+STR_CONTENT_TITLE                                               :{WHITE}온라인 콘텐츠
 STR_CONTENT_TYPE_CAPTION                                        :{BLACK}종류
 STR_CONTENT_TYPE_CAPTION_TOOLTIP                                :{BLACK}콘텐츠의 종류입니다
 STR_CONTENT_NAME_CAPTION                                        :{BLACK}이름
@@ -2843,12 +2837,18 @@ STR_HOUSE_PICKER_YEARS_FROM                                     :{BLACK}연도: 
 STR_HOUSE_PICKER_YEARS_UNTIL                                    :{BLACK}연도: {ORANGE}{NUM}년까지
 STR_HOUSE_PICKER_SIZE                                           :{BLACK}크기: {ORANGE}{NUM}x{NUM}칸
 STR_HOUSE_PICKER_CARGO_ACCEPTED                                 :{BLACK}받는 화물: {ORANGE}
+STR_HOUSE_PICKER_CARGO_PRODUCED                                 :{BLACK}생산 화물량: {ORANGE}{CARGO_LIST}
 
 STR_HOUSE_PICKER_CLASS_ZONE1                                    :가장자리
 STR_HOUSE_PICKER_CLASS_ZONE2                                    :교외
 STR_HOUSE_PICKER_CLASS_ZONE3                                    :바깥쪽 시내
 STR_HOUSE_PICKER_CLASS_ZONE4                                    :안쪽 시내
 STR_HOUSE_PICKER_CLASS_ZONE5                                    :도시 중심
+
+STR_HOUSE_PICKER_PROTECT_TITLE                                  :업그레이드 방지
+STR_HOUSE_PICKER_PROTECT_TOOLTIP                                :이 건물이 도시가 성장함에 따라 교체되는 것을 막을지 여부를 선택합니다
+STR_HOUSE_PICKER_PROTECT_OFF                                    :끄기
+STR_HOUSE_PICKER_PROTECT_ON                                     :켜기
 
 STR_STATION_CLASS_DFLT                                          :기본
 STR_STATION_CLASS_DFLT_STATION                                  :기본 역
@@ -2882,7 +2882,7 @@ STR_SELECT_ROAD_BRIDGE_CAPTION                                  :{WHITE}다리 �
 STR_SELECT_BRIDGE_SELECTION_TOOLTIP                             :{BLACK}다리 건설 - 원하는 다리 종류를 선택하세요
 STR_SELECT_BRIDGE_INFO_NAME                                     :{GOLD}{STRING}
 STR_SELECT_BRIDGE_INFO_NAME_MAX_SPEED                           :{GOLD}{STRING},{} {VELOCITY}
-STR_SELECT_BRIDGE_INFO_NAME_COST                                :{GOLD}{0:STRING},{} {WHITE}{2:CURRENCY_LONG}
+STR_SELECT_BRIDGE_INFO_NAME_COST                                :{GOLD}{STRING},{} {WHITE}{CURRENCY_LONG}
 STR_SELECT_BRIDGE_INFO_NAME_MAX_SPEED_COST                      :{GOLD}{STRING},{} {VELOCITY} {WHITE}{CURRENCY_LONG}
 STR_BRIDGE_NAME_SUSPENSION_STEEL                                :강철 현수교
 STR_BRIDGE_NAME_GIRDER_STEEL                                    :강철 거더교
@@ -2941,7 +2941,7 @@ STR_STATION_BUILD_CARGO_TRAM_ORIENTATION_TOOLTIP                :{BLACK}화물 �
 # Waterways toolbar (last two for SE only)
 STR_WATERWAYS_TOOLBAR_CAPTION                                   :{WHITE}수로 건설
 STR_WATERWAYS_TOOLBAR_CAPTION_SE                                :{WHITE}항만
-STR_WATERWAYS_TOOLBAR_BUILD_CANALS_TOOLTIP                      :{BLACK}운하를 만듭니다. SHIFT 키를 누른 채로 사용하면 예상 비용을 볼 수 있습니다
+STR_WATERWAYS_TOOLBAR_BUILD_CANALS_TOOLTIP                      :{BLACK}운하를 만듭니다. CTRL+클릭+드래그하면 대각선 방향의 영역을 선택할 수 있습니다. SHIFT 키를 누른 채로 사용하면 예상 비용을 볼 수 있습니다
 STR_WATERWAYS_TOOLBAR_BUILD_LOCKS_TOOLTIP                       :{BLACK}갑문을 만듭니다. SHIFT 키를 누른 채로 사용하면 예상 비용을 볼 수 있습니다
 STR_WATERWAYS_TOOLBAR_BUILD_DEPOT_TOOLTIP                       :{BLACK}선박 구입과 점검을 위한 정박소를 만듭니다. SHIFT 키를 누른 채로 사용하면 예상 비용을 볼 수 있습니다
 STR_WATERWAYS_TOOLBAR_BUILD_DOCK_TOOLTIP                        :{BLACK}항구를 만듭니다. CTRL+클릭하면 같은 이름의 항구을 서로 떨어진 곳에 지을 수 있습니다. SHIFT 키를 누른 채로 사용하면 예상 비용을 볼 수 있습니다
@@ -3055,6 +3055,12 @@ STR_FOUND_TOWN_INITIAL_SIZE_TOOLTIP                             :{BLACK}도시 �
 STR_FOUND_TOWN_CITY                                             :{BLACK}대도시로 만듦
 STR_FOUND_TOWN_CITY_TOOLTIP                                     :{BLACK}대도시는 도시보다 빠르게 성장합니다.{}도시를 만들었을 때, 위 설정에 따라 더욱 커집니다
 
+STR_FOUND_TOWN_EXPAND_MODE                                      :{YELLOW}도시 확장:
+STR_FOUND_TOWN_EXPAND_BUILDINGS                                 :건물
+STR_FOUND_TOWN_EXPAND_BUILDINGS_TOOLTIP                         :도시의 건물을 확장합니다
+STR_FOUND_TOWN_EXPAND_ROADS                                     :도로
+STR_FOUND_TOWN_EXPAND_ROADS_TOOLTIP                             :도시의 도로를 확장합니다
+
 STR_FOUND_TOWN_ROAD_LAYOUT                                      :{YELLOW}도시 도로 설계:
 STR_FOUND_TOWN_SELECT_LAYOUT_TOOLTIP                            :{BLACK}이 도시에 사용할 도로 설계를 선택합니다
 STR_FOUND_TOWN_SELECT_LAYOUT_ORIGINAL                           :{BLACK}오리지널
@@ -3126,6 +3132,8 @@ STR_LANG_AREA_INFORMATION_TRAM_TYPE                             :{BLACK}전차 �
 STR_LANG_AREA_INFORMATION_RAIL_SPEED_LIMIT                      :{BLACK}선로 제한 속력: {LTBLUE}{VELOCITY}
 STR_LANG_AREA_INFORMATION_ROAD_SPEED_LIMIT                      :{BLACK}도로 제한 속력: {LTBLUE}{VELOCITY}
 STR_LANG_AREA_INFORMATION_TRAM_SPEED_LIMIT                      :{BLACK}전차 제한 속력: {LTBLUE}{VELOCITY}
+STR_LAND_AREA_INFORMATION_TOWN_CAN_UPGRADE                      :{BLACK}도시 발전 가능 여부: {LTBLUE}예
+STR_LAND_AREA_INFORMATION_TOWN_CANNOT_UPGRADE                   :{BLACK}도시 발전 가능 여부: {LTBLUE}아니요
 
 # Description of land area of different tiles
 STR_LAI_CLEAR_DESCRIPTION_ROCKS                                 :암석
@@ -3133,8 +3141,10 @@ STR_LAI_CLEAR_DESCRIPTION_ROUGH_LAND                            :거친 땅
 STR_LAI_CLEAR_DESCRIPTION_BARE_LAND                             :맨 땅
 STR_LAI_CLEAR_DESCRIPTION_GRASS                                 :초원
 STR_LAI_CLEAR_DESCRIPTION_FIELDS                                :들판
-STR_LAI_CLEAR_DESCRIPTION_SNOW_COVERED_LAND                     :눈덮인 땅
 STR_LAI_CLEAR_DESCRIPTION_DESERT                                :사막
+STR_LAI_CLEAR_DESCRIPTION_SNOWY_ROCKS                           :눈 덮인 암석
+STR_LAI_CLEAR_DESCRIPTION_SNOWY_ROUGH_LAND                      :눈 덮인 거친 땅
+STR_LAI_CLEAR_DESCRIPTION_SNOWY_GRASS                           :눈 덮인 초원
 
 STR_LAI_RAIL_DESCRIPTION_TRACK                                  :철도 선로
 STR_LAI_RAIL_DESCRIPTION_TRACK_WITH_NORMAL_SIGNALS              :일반 신호기가 설치된 철도 선로
@@ -3308,7 +3318,7 @@ STR_SAVELOAD_DETAIL_COMPANY_INDEX                               :{SILVER}{COMMA}
 STR_SAVELOAD_DETAIL_GRFSTATUS                                   :{SILVER}NewGRF: {WHITE}{STRING}
 STR_SAVELOAD_FILTER_TITLE                                       :{BLACK}검색:
 STR_SAVELOAD_OVERWRITE_TITLE                                    :{WHITE}파일 덮어쓰기
-STR_SAVELOAD_OVERWRITE_WARNING                                  :{YELLOW}정말로 이미 존재하는 파일에 덮어씌우시겠습니까?
+STR_SAVELOAD_OVERWRITE_WARNING                                  :{YELLOW}정말 이미 존재하는 파일에 덮어씌우시겠습니까?
 STR_SAVELOAD_DIRECTORY                                          :{STRING} (폴더)
 STR_SAVELOAD_PARENT_DIRECTORY                                   :{STRING} (상위 폴더)
 
@@ -3606,17 +3616,17 @@ STR_NEWGRF_LIST_COMPATIBLE                                      :{YELLOW}호환�
 STR_NEWGRF_LIST_MISSING                                         :{RED}파일 없음
 
 # NewGRF 'it's broken' warnings
-STR_NEWGRF_BROKEN                                               :{WHITE}'{0:STRING}' NewGRF가 적용되는 과정에서 비동기화나 충돌이 일어날 수 있습니다
-STR_NEWGRF_BROKEN_POWERED_WAGON                                 :{WHITE}차고지 안에 있지 않은 '{1:ENGINE}' 동력 차량의 상태가 바뀌었습니다
-STR_NEWGRF_BROKEN_VEHICLE_LENGTH                                :{WHITE}'{1:ENGINE}'{G 1 "이" "가"} 차고지 안에 있지 않으면 차량 길이가 바뀝니다
-STR_NEWGRF_BROKEN_CAPACITY                                      :{WHITE}차량이 기지 안에 있지 않거나 개조가 불가능한 상태에서 '{1:ENGINE}'의 수송량이 변경되었습니다
+STR_NEWGRF_BROKEN                                               :{WHITE}'{PUSH_COLOUR}{0:STRING}{POP_COLOUR}' NewGRF가 적용되는 과정에서 비동기화나 충돌이 일어날 수 있습니다
+STR_NEWGRF_BROKEN_POWERED_WAGON                                 :{WHITE}차고지 안에 있지 않은 '{PUSH_COLOUR}{1:ENGINE}{POP_COLOUR}' 동력 차량의 상태가 바뀌었습니다
+STR_NEWGRF_BROKEN_VEHICLE_LENGTH                                :{WHITE}'{PUSH_COLOUR}{1:ENGINE}{POP_COLOUR}'{G 1 "이" "가"} 차고지 안에 있지 않으면 차량 길이가 바뀝니다
+STR_NEWGRF_BROKEN_CAPACITY                                      :{WHITE}차량이 기지 안에 있지 않거나 개조가 불가능한 상태에서 '{PUSH_COLOUR}{1:ENGINE}{POP_COLOUR}'의 수송량이 변경되었습니다
 STR_BROKEN_VEHICLE_LENGTH                                       :{WHITE}'{1:COMPANY}'에 속한 열차 '{0:VEHICLE}'의 길이가 잘못된 값을 가지고 있습니다. NewGRF에 의한 문제로 보입니다. 게임이 비동기화 또는 충돌을 일으킬 수 있습니다
 
-STR_NEWGRF_BUGGY                                                :{WHITE}NewGRF '{STRING}'에서 잘못된 정보를 제공하고 있습니다
-STR_NEWGRF_BUGGY_ARTICULATED_CARGO                              :{WHITE}{1:ENGINE}(을)를 만들기 이전과 이후의 화물/개조 정보가 현재의 구매 목록과 다릅니다. 이 경우 자동 교체시 열차 개조에 실패할 수도 있습니다
-STR_NEWGRF_BUGGY_ENDLESS_PRODUCTION_CALLBACK                    :{WHITE}'{1:STRING}' 때문에 결과물 콜백 과정에서 무한 루프가 발생하고 있습니다
+STR_NEWGRF_BUGGY                                                :{WHITE}NewGRF '{PUSH_COLOUR}{0:STRING}{POP_COLOUR}'에서 잘못된 정보를 제공하고 있습니다
+STR_NEWGRF_BUGGY_ARTICULATED_CARGO                              :{WHITE}{PUSH_COLOUR}{1:ENGINE}{POP_COLOUR}(을)를 만들기 이전과 이후의 화물/개조 정보가 현재의 구매 목록과 다릅니다. 이 경우 자동 교체시 열차 개조에 실패할 수도 있습니다
+STR_NEWGRF_BUGGY_ENDLESS_PRODUCTION_CALLBACK                    :{WHITE}'{PUSH_COLOUR}{1:STRING}{POP_COLOUR}' 때문에 결과물 콜백 과정에서 무한 루프가 발생하고 있습니다
 STR_NEWGRF_BUGGY_UNKNOWN_CALLBACK_RESULT                        :{WHITE}콜백 함수({1:HEX})가 알 수 없거나 잘못된 결과 값({2:HEX})을 반환했습니다
-STR_NEWGRF_BUGGY_INVALID_CARGO_PRODUCTION_CALLBACK              :{WHITE}'{1:STRING}' - 생산 콜백 함수의 {2:HEX}에서 잘못된 화물 종류를 반환했습니다
+STR_NEWGRF_BUGGY_INVALID_CARGO_PRODUCTION_CALLBACK              :{WHITE}'{PUSH_COLOUR}{1:STRING}{POP_COLOUR}' - 생산 콜백 함수의 {2:HEX}에서 잘못된 화물 종류를 반환했습니다
 
 # 'User removed essential NewGRFs'-placeholders for stuff without specs
 STR_NEWGRF_INVALID_CARGO                                        :<알 수 없는 화물>
@@ -3632,7 +3642,6 @@ STR_INVALID_VEHICLE                                             :<알 수 없는
 STR_NEWGRF_SCAN_CAPTION                                         :{WHITE}NewGRF 검색 중
 STR_NEWGRF_SCAN_MESSAGE                                         :{BLACK}NewGRF을 검색하는 중입니다. 파일 개수에 따라 시간이 조금 걸릴 수 있습니다...
 STR_NEWGRF_SCAN_STATUS                                          :{BLACK}약 {1:NUM}개의 NewGRF 중에서 {0:NUM}개의 NewGRF을 찾았습니다
-STR_NEWGRF_SCAN_ARCHIVES                                        :자료 검색 중
 
 # Sign list window
 STR_SIGN_LIST_CAPTION                                           :{WHITE}팻말 목록 - 팻말 {COMMA}개
@@ -3678,6 +3687,10 @@ STR_TOWN_VIEW_RENAME_TOOLTIP                                    :{BLACK}이 도�
 
 STR_TOWN_VIEW_EXPAND_BUTTON                                     :{BLACK}확장
 STR_TOWN_VIEW_EXPAND_TOOLTIP                                    :{BLACK}도시의 크기를 키웁니다.
+STR_TOWN_VIEW_EXPAND_BUILDINGS_BUTTON                           :{BLACK}건물 확장
+STR_TOWN_VIEW_EXPAND_BUILDINGS_TOOLTIP                          :{BLACK}도시의 건물을 확장합니다
+STR_TOWN_VIEW_EXPAND_ROADS_BUTTON                               :{BLACK}도로 확장
+STR_TOWN_VIEW_EXPAND_ROADS_TOOLTIP                              :{BLACK}도시의 도로를 확장합니다
 STR_TOWN_VIEW_DELETE_BUTTON                                     :{BLACK}삭제
 STR_TOWN_VIEW_DELETE_TOOLTIP                                    :{BLACK}이 도시를 완전히 삭제
 
@@ -4013,8 +4026,10 @@ STR_INDUSTRY_VIEW_PRODUCES_N_CARGO                              :{BLACK}생산 �
 STR_INDUSTRY_VIEW_CARGO_LIST_EXTENSION                          :, {STRING}{STRING}
 
 STR_INDUSTRY_VIEW_REQUIRES                                      :{BLACK}받는 화물:
-STR_INDUSTRY_VIEW_ACCEPT_CARGO                                  :{YELLOW}{0:STRING}{BLACK}{3:STRING}
-STR_INDUSTRY_VIEW_ACCEPT_CARGO_AMOUNT                           :{YELLOW}{STRING}{BLACK}: {CARGO_SHORT} 대기 중{STRING}
+STR_INDUSTRY_VIEW_ACCEPT_CARGO_SUFFIX                           :{YELLOW}{0:STRING}{BLACK}{3:STRING}
+STR_INDUSTRY_VIEW_ACCEPT_CARGO_AMOUNT_SUFFIX                    :{YELLOW}{0:STRING}{BLACK}: {1:CARGO_SHORT} {3:STRING} 대기 중
+STR_INDUSTRY_VIEW_ACCEPT_CARGO_NOSUFFIX                         :{YELLOW}{0:STRING}
+STR_INDUSTRY_VIEW_ACCEPT_CARGO_AMOUNT_NOSUFFIX                  :{YELLOW}{0:STRING}{BLACK}: {1:CARGO_SHORT} 대기 중
 
 STR_CONFIG_GAME_PRODUCTION                                      :{WHITE}생산량 변경 (8의 배수, 최대 2040)
 STR_CONFIG_GAME_PRODUCTION_LEVEL                                :{WHITE}생산 등급 변경 (퍼센트, 800%까지)
@@ -4082,7 +4097,7 @@ STR_GROUP_LIVERY_TOOLTIP                                        :{BLACK}선택�
 STR_GROUP_REPLACE_PROTECTION_TOOLTIP                            :{BLACK}클릭하면 전체 자동 교체로부터 이 그룹을 보호합니다. CTRL+클릭하면 하위 그룹도 보호합니다
 
 STR_QUERY_GROUP_DELETE_CAPTION                                  :{WHITE}그룹 삭제
-STR_GROUP_DELETE_QUERY_TEXT                                     :{WHITE}이 그룹과 하위 그룹을 정말 삭제하시겠습니까?
+STR_GROUP_DELETE_QUERY_TEXT                                     :{WHITE}정말 이 그룹과 하위 그룹을 삭제하시겠습니까?
 
 STR_GROUP_ADD_SHARED_VEHICLE                                    :경로를 공유 중인 차량 추가
 STR_GROUP_REMOVE_ALL_VEHICLES                                   :모든 차량 제거
@@ -4132,7 +4147,7 @@ STR_PURCHASE_INFO_COST_SPEED                                    :{BLACK}가격: 
 STR_PURCHASE_INFO_COST_REFIT_SPEED                              :{BLACK}가격: {GOLD}{CURRENCY_LONG}{BLACK} (개조 비용: {GOLD}{CURRENCY_LONG}{BLACK}) 속력: {GOLD}{VELOCITY}
 STR_PURCHASE_INFO_AIRCRAFT_CAPACITY                             :{BLACK}수송량: {GOLD}{CARGO_LONG}, {CARGO_LONG}
 STR_PURCHASE_INFO_PWAGPOWER_PWAGWEIGHT                          :{BLACK}전원 화물차: {GOLD}+{POWER}{BLACK} 중량: {GOLD}+{WEIGHT_SHORT}
-STR_PURCHASE_INFO_REFITTABLE_TO                                 :{BLACK}개조가능 화물: {GOLD}{STRING}
+STR_PURCHASE_INFO_REFITTABLE_TO                                 :{BLACK}개조 가능한 화물: {GOLD}{STRING}
 STR_PURCHASE_INFO_ALL_TYPES                                     :모든 화물
 STR_PURCHASE_INFO_NONE                                          :없음
 STR_PURCHASE_INFO_ENGINES_ONLY                                  :기관차만
@@ -4313,8 +4328,6 @@ STR_ENGINE_PREVIEW_TRAM_VEHICLE                                 :{G=f}전차
 STR_ENGINE_PREVIEW_AIRCRAFT                                     :{G=f}항공기
 STR_ENGINE_PREVIEW_SHIP                                         :{G=m}선박
 
-STR_ENGINE_PREVIEW_TEXT3                                        :{BLACK}{STRING}{}{5:STRING}{}{STRING}
-STR_ENGINE_PREVIEW_TEXT4                                        :{BLACK}{STRING}{}{STRING}{}{STRING}{}{STRING}
 STR_ENGINE_PREVIEW_COST_WEIGHT                                  :가격: {CURRENCY_LONG}  무게: {WEIGHT_SHORT}
 STR_ENGINE_PREVIEW_COST_MAX_SPEED                               :가격: {CURRENCY_LONG}  최대 속력: {VELOCITY}
 STR_ENGINE_PREVIEW_SPEED_POWER                                  :속력: {VELOCITY}  힘: {POWER}
@@ -4483,8 +4496,8 @@ STR_VEHICLE_INFO_RELIABILITY_BREAKDOWNS                         :{BLACK}신뢰�
 
 STR_VEHICLE_INFO_BUILT_VALUE                                    :{LTBLUE}{ENGINE} {BLACK}생산: {LTBLUE}{NUM}{BLACK} 가격: {LTBLUE}{CURRENCY_LONG}
 STR_VEHICLE_INFO_NO_CAPACITY                                    :{BLACK}수송량: {LTBLUE}없음{STRING}
-STR_VEHICLE_INFO_CAPACITY                                       :{BLACK}수송량: {LTBLUE}{0:CARGO_LONG}{3:STRING}
-STR_VEHICLE_INFO_CAPACITY_MULT                                  :{BLACK}수송량: {LTBLUE}{0:CARGO_LONG}{3:STRING} (x{4:NUM})
+STR_VEHICLE_INFO_CAPACITY                                       :{BLACK}수송량: {LTBLUE}{CARGO_LONG}{STRING}
+STR_VEHICLE_INFO_CAPACITY_MULT                                  :{BLACK}수송량: {LTBLUE}{CARGO_LONG}{STRING} (x{NUM})
 STR_VEHICLE_INFO_CAPACITY_CAPACITY                              :{BLACK}수송량: {LTBLUE}{CARGO_LONG}, {CARGO_LONG}{STRING}
 
 STR_VEHICLE_INFO_FEEDER_CARGO_VALUE                             :{BLACK}환승 수익: {LTBLUE}{CURRENCY_LONG}
@@ -4570,7 +4583,6 @@ STR_ORDERS_TIMETABLE_VIEW_TOOLTIP                               :{BLACK}시간�
 
 STR_ORDERS_LIST_TOOLTIP                                         :{BLACK}이 열차의 경로 - 선택하려면 클릭하세요. CTRL+클릭하시면 그 역이 있는 장소로 이동합니다
 STR_ORDER_INDEX                                                 :{COMMA}:{NBSP}
-STR_ORDER_TEXT                                                  :{STRING} {STRING} {STRING} {STRING}
 
 STR_ORDERS_END_OF_ORDERS                                        :- - 경로의 끝 - -
 STR_ORDERS_END_OF_SHARED_ORDERS                                 :- - 공유된 경로의 끝 - -
@@ -4669,63 +4681,62 @@ STR_ORDER_GO_NON_STOP_TO_WAYPOINT                               :직행 경유 {
 STR_ORDER_SERVICE_AT                                            :완행 점검
 STR_ORDER_SERVICE_NON_STOP_AT                                   :직행 점검
 
-STR_ORDER_NEAREST_DEPOT                                         :가까운
-STR_ORDER_NEAREST_HANGAR                                        :가까운 격납고
 ###length 3
 STR_ORDER_TRAIN_DEPOT                                           :차량기지
 STR_ORDER_ROAD_VEHICLE_DEPOT                                    :차고지
 STR_ORDER_SHIP_DEPOT                                            :정박소
 ###next-name-looks-similar
 
-STR_ORDER_GO_TO_NEAREST_DEPOT_FORMAT                            :{STRING} {STRING} {STRING}
+STR_ORDER_GO_TO_NEAREST_HANGAR_FORMAT                           :{STRING} 가장 가까운 격납고
+STR_ORDER_GO_TO_NEAREST_DEPOT_FORMAT                            :{STRING} 가장 가까운 {STRING}
 STR_ORDER_GO_TO_DEPOT_FORMAT                                    :{STRING} {DEPOT}
 
-STR_ORDER_REFIT_ORDER                                           :({STRING}{G 0 "으" ""}로 개조)
-STR_ORDER_REFIT_STOP_ORDER                                      :({STRING}에서 수리 후 멈춤)
-STR_ORDER_STOP_ORDER                                            :(멈춤)
+STR_ORDER_REFIT_ORDER                                           :{SPACE}({STRING}{G 0 "으" ""}로 개조)
+STR_ORDER_REFIT_STOP_ORDER                                      :{SPACE}({STRING}에서 개조 후 멈춤)
+STR_ORDER_STOP_ORDER                                            :{SPACE}(멈춤)
 
-STR_ORDER_WAIT_TO_UNBUNCH                                       :(배차 간격 유지 대기)
+STR_ORDER_WAIT_TO_UNBUNCH                                       :{SPACE}(배차 간격 유지 대기)
 
-STR_ORDER_GO_TO_STATION                                         :{STRING} {STATION} {STRING}
-STR_ORDER_GO_TO_STATION_CAN_T_USE_STATION                       :{PUSH_COLOUR}{RED}(이 역을 이용할 수 없음){POP_COLOUR} {STRING} {STATION} {STRING}
+STR_ORDER_GO_TO_STATION                                         :{STRING} {STATION}
+STR_ORDER_GO_TO_STATION_CAN_T_USE_STATION                       :{PUSH_COLOUR}{RED}(이 역을 이용할 수 없음){POP_COLOUR} {STRING} {STATION}
 
-STR_ORDER_IMPLICIT                                              :(자동)
+STR_ORDER_IMPLICIT                                              :{SPACE}(자동)
 
-STR_ORDER_FULL_LOAD                                             :(모든 화물을 가득 싣기)
-STR_ORDER_FULL_LOAD_ANY                                         :(아무 화물이나 가득 싣기)
-STR_ORDER_NO_LOAD                                               :(싣지 않기)
-STR_ORDER_UNLOAD                                                :(화물 하차 후 적재)
-STR_ORDER_UNLOAD_FULL_LOAD                                      :(화물 하차 후 모든 화물을 가득 싣기)
-STR_ORDER_UNLOAD_FULL_LOAD_ANY                                  :(화물 하차 후 아무 화물이나 가득 싣기)
-STR_ORDER_UNLOAD_NO_LOAD                                        :(화물 하차 후 빈 차로 출발)
-STR_ORDER_TRANSFER                                              :(환승 후 화물 적재)
-STR_ORDER_TRANSFER_FULL_LOAD                                    :(환승 후 모든 화물을 가득 싣기)
-STR_ORDER_TRANSFER_FULL_LOAD_ANY                                :(환승 후 아무 화물이나 가득 싣기)
-STR_ORDER_TRANSFER_NO_LOAD                                      :(환승 후 빈 차로 출발)
-STR_ORDER_NO_UNLOAD                                             :(내리지 않고 화물 적재)
-STR_ORDER_NO_UNLOAD_FULL_LOAD                                   :(내리지 않고 모든 화물을 가득 싣기)
-STR_ORDER_NO_UNLOAD_FULL_LOAD_ANY                               :(내리지 않고 아무 화물이나 가득 싣기)
-STR_ORDER_NO_UNLOAD_NO_LOAD                                     :(적재와 하차 없음)
+STR_ORDER_FULL_LOAD                                             :{SPACE}(모든 화물을 가득 싣기)
+STR_ORDER_FULL_LOAD_ANY                                         :{SPACE}(아무 화물이나 가득 싣기)
+STR_ORDER_NO_LOAD                                               :{SPACE}(싣지 않기)
+STR_ORDER_UNLOAD                                                :{SPACE}(화물 하차 후 적재)
+STR_ORDER_UNLOAD_FULL_LOAD                                      :{SPACE}(화물 하차 후 모든 화물을 가득 싣기)
+STR_ORDER_UNLOAD_FULL_LOAD_ANY                                  :{SPACE}(화물 하차 후 아무 화물이나 가득 싣기)
+STR_ORDER_UNLOAD_NO_LOAD                                        :{SPACE}(화물 하차 후 빈 차로 출발)
+STR_ORDER_TRANSFER                                              :{SPACE}(환승 후 화물 적재)
+STR_ORDER_TRANSFER_FULL_LOAD                                    :{SPACE}(환승 후 모든 화물을 가득 싣기)
+STR_ORDER_TRANSFER_FULL_LOAD_ANY                                :{SPACE}(환승 후 아무 화물이나 가득 싣기)
+STR_ORDER_TRANSFER_NO_LOAD                                      :{SPACE}(환승 후 빈 차로 출발)
+STR_ORDER_NO_UNLOAD                                             :{SPACE}(내리지 않고 화물 적재)
+STR_ORDER_NO_UNLOAD_FULL_LOAD                                   :{SPACE}(내리지 않고 모든 화물을 가득 싣기)
+STR_ORDER_NO_UNLOAD_FULL_LOAD_ANY                               :{SPACE}(내리지 않고 아무 화물이나 가득 싣기)
+STR_ORDER_NO_UNLOAD_NO_LOAD                                     :{SPACE}(적재 및 하차 없음)
 
-STR_ORDER_AUTO_REFIT                                            :({STRING}{G 0 "으" ""}로 개조)
-STR_ORDER_FULL_LOAD_REFIT                                       :({STRING}{G 0 "으" ""}로 개조하며 모든 화물을 가득 싣기)
-STR_ORDER_FULL_LOAD_ANY_REFIT                                   :({STRING}{G 0 "으" ""}로 개조하며 아무 화물이나 가득 싣기)
-STR_ORDER_UNLOAD_REFIT                                          :({STRING}{G 0 "으" ""}로 개조하며 화물 하차 후 적재)
-STR_ORDER_UNLOAD_FULL_LOAD_REFIT                                :({STRING}{G 0 "으" ""}로 개조하며 화물 하차 후 모든 화물을 가득 싣기)
-STR_ORDER_UNLOAD_FULL_LOAD_ANY_REFIT                            :({STRING}{G 0 "으" ""}로 개조하며 화물 하차 후 아무 화물이나 가득 싣기)
-STR_ORDER_TRANSFER_REFIT                                        :({STRING}{G 0 "으" ""}로 개조하며 환승 후 화물 적재)
-STR_ORDER_TRANSFER_FULL_LOAD_REFIT                              :({STRING}{G 0 "으" ""}로 개조하며 환승 후 모든 화물을 가득 싣기)
-STR_ORDER_TRANSFER_FULL_LOAD_ANY_REFIT                          :({STRING}{G 0 "으" ""}로 개조하며 환승 후 아무 화물이나 가득 싣기)
-STR_ORDER_NO_UNLOAD_REFIT                                       :({STRING}{G 0 "으" ""}로 개조하며 화물을 내리지 않고 적재)
-STR_ORDER_NO_UNLOAD_FULL_LOAD_REFIT                             :({STRING}{G 0 "으" ""}로 개조하며 화물을 내리지 않고 모든 화물을 가득 싣기)
-STR_ORDER_NO_UNLOAD_FULL_LOAD_ANY_REFIT                         :({STRING}{G 0 "으" ""}로 개조하며 화물을 내리지 않고 아무 화물이나 가득 싣기)
+STR_ORDER_AUTO_REFIT                                            :{SPACE}({STRING}{G 0 "으" ""}로 개조)
+STR_ORDER_FULL_LOAD_REFIT                                       :{SPACE}({STRING}{G 0 "으" ""}로 개조하며 모든 화물을 가득 싣기)
+STR_ORDER_FULL_LOAD_ANY_REFIT                                   :{SPACE}({STRING}{G 0 "으" ""}로 개조하며 아무 화물이나 가득 싣기)
+STR_ORDER_UNLOAD_REFIT                                          :{SPACE}({STRING}{G 0 "으" ""}로 개조하며 화물 하차 후 적재)
+STR_ORDER_UNLOAD_FULL_LOAD_REFIT                                :{SPACE}({STRING}{G 0 "으" ""}로 개조하며 화물 하차 후 모든 화물을 가득 싣기)
+STR_ORDER_UNLOAD_FULL_LOAD_ANY_REFIT                            :{SPACE}({STRING}{G 0 "으" ""}로 개조하며 화물 하차 후 아무 화물이나 가득 싣기)
+STR_ORDER_TRANSFER_REFIT                                        :{SPACE}({STRING}{G 0 "으" ""}로 개조하며 환승 후 화물 적재)
+STR_ORDER_TRANSFER_FULL_LOAD_REFIT                              :{SPACE}({STRING}{G 0 "으" ""}로 개조하며 환승 후 모든 화물을 가득 싣기)
+STR_ORDER_TRANSFER_FULL_LOAD_ANY_REFIT                          :{SPACE}({STRING}{G 0 "으" ""}로 개조하며 환승 후 아무 화물이나 가득 싣기)
+STR_ORDER_NO_UNLOAD_REFIT                                       :{SPACE}({STRING}{G 0 "으" ""}로 개조하며 화물을 내리지 않고 적재)
+STR_ORDER_NO_UNLOAD_FULL_LOAD_REFIT                             :{SPACE}({STRING}{G 0 "으" ""}로 개조하며 화물을 내리지 않고 모든 화물을 가득 싣기)
+STR_ORDER_NO_UNLOAD_FULL_LOAD_ANY_REFIT                         :{SPACE}({STRING}{G 0 "으" ""}로 개조하며 화물을 내리지 않고 아무 화물이나 가득 싣기)
 
 STR_ORDER_AUTO_REFIT_ANY                                        :이용 가능한 화물
 
 ###length 3
-STR_ORDER_STOP_LOCATION_NEAR_END                                :[가까운쪽]
-STR_ORDER_STOP_LOCATION_MIDDLE                                  :[중간]
-STR_ORDER_STOP_LOCATION_FAR_END                                 :[먼쪽]
+STR_ORDER_STOP_LOCATION_NEAR_END                                :{SPACE}[가까운쪽]
+STR_ORDER_STOP_LOCATION_MIDDLE                                  :{SPACE}[중간]
+STR_ORDER_STOP_LOCATION_FAR_END                                 :{SPACE}[먼쪽]
 
 STR_ORDER_OUT_OF_RANGE                                          :{RED} (다음 목적지가 제한 항속거리보다 멀리 있습니다)
 
@@ -4745,15 +4756,15 @@ STR_TIMETABLE_TOOLTIP                                           :{BLACK}시간�
 STR_TIMETABLE_NO_TRAVEL                                         :운행정보 없음
 STR_TIMETABLE_NOT_TIMETABLEABLE                                 :이동 (자동; 다음 경로에 의해 시간표 작성)
 STR_TIMETABLE_TRAVEL_NOT_TIMETABLED                             :운행 (시간표가 작성되지 않음)
-STR_TIMETABLE_TRAVEL_NOT_TIMETABLED_SPEED                       :최대 {2:VELOCITY}의 속력으로 운행 (시간표 작성 안 됨)
+STR_TIMETABLE_TRAVEL_NOT_TIMETABLED_SPEED                       :최대 {VELOCITY}의 속력으로 운행 (시간표 작성 안 됨)
 STR_TIMETABLE_TRAVEL_FOR                                        :{STRING}에 걸쳐 운행
 STR_TIMETABLE_TRAVEL_FOR_SPEED                                  :{0:STRING} 동안 최대 {1:VELOCITY}의 속력으로 운행
 STR_TIMETABLE_TRAVEL_FOR_ESTIMATED                              :운행 ({STRING} 동안, 시간표 작성 안 됨)
 STR_TIMETABLE_TRAVEL_FOR_SPEED_ESTIMATED                        :최대 {1:VELOCITY}의 속력으로 운행 ({0:STRING} 동안, 시간표 작성 안 됨)
-STR_TIMETABLE_STAY_FOR_ESTIMATED                                :({STRING} 동안 정차, 시간표 작성 안 됨)
-STR_TIMETABLE_AND_TRAVEL_FOR_ESTIMATED                          :({STRING} 동안 운행, 시간표 작성 안 됨)
-STR_TIMETABLE_STAY_FOR                                          :& {STRING} 동안 정차
-STR_TIMETABLE_AND_TRAVEL_FOR                                    :& 다음 목적지({STRING})로 이동
+STR_TIMETABLE_STAY_FOR_ESTIMATED                                :{SPACE}({STRING} 동안 정차, 시간표 작성 안 됨)
+STR_TIMETABLE_AND_TRAVEL_FOR_ESTIMATED                          :{SPACE}({STRING} 동안 운행, 시간표 작성 안 됨)
+STR_TIMETABLE_STAY_FOR                                          :{SPACE}& {STRING} 동안 정차
+STR_TIMETABLE_AND_TRAVEL_FOR                                    :{SPACE}& 다음 목적지({STRING})로 이동
 
 STR_TIMETABLE_APPROX_TIME                                       :{BLACK}이 시간표는 완주하는데 대략 {0:STRING}{G 0 "이" "가"} 걸립니다
 STR_TIMETABLE_TOTAL_TIME                                        :{BLACK}이 시간표는 완주하는데 {0:STRING}{G 0 "이" "가"} 걸립니다
@@ -4768,17 +4779,18 @@ STR_TIMETABLE_STATUS_START_IN_SECONDS                           :{BLACK}이 시�
 
 STR_TIMETABLE_START                                             :{BLACK}시간표 시작
 STR_TIMETABLE_START_TOOLTIP                                     :{BLACK}이 시간표가 언제 시작할지 선택합니다. CTRL+클릭하면, 만약 모든 경로에 시간표가 작성되어 있는 경우 이 경로를 공유하고 있는 모든 차량을 차량의 상대적인 순서에 따라 동일하게 배치시킵니다
-
 STR_TIMETABLE_START_SECONDS_QUERY                               :시간표를 이 시간(초) 뒤에 시작
 
 STR_TIMETABLE_CHANGE_TIME                                       :{BLACK}시간값 변경
 STR_TIMETABLE_WAIT_TIME_TOOLTIP                                 :{BLACK}선택한 경로에서 소요되는 시간 값을 변경합니다. CTRL+클릭하면 모든 경로에 그 시간 값을 설정합니다
+STR_TIMETABLE_CHANGE_TIME_QUERY                                 :시간 변경
 
 STR_TIMETABLE_CLEAR_TIME                                        :{BLACK}시간값 초기화
 STR_TIMETABLE_CLEAR_TIME_TOOLTIP                                :{BLACK}선택한 경로에서 소요되는 시간 값을 초기화합니다. CTRL+클릭하면 모든 경로의 시간을 초기화합니다
 
 STR_TIMETABLE_CHANGE_SPEED                                      :{BLACK}속력 제한
 STR_TIMETABLE_CHANGE_SPEED_TOOLTIP                              :{BLACK}선택한 경로의 최대 운행 속력을 제한합니다. CTRL+클릭하면 모든 경로에 그 속력 값을 설정합니다
+STR_TIMETABLE_CHANGE_SPEED_QUERY                                :속력 제한 변경
 
 STR_TIMETABLE_CLEAR_SPEED                                       :{BLACK}속력 제한값 초기화
 STR_TIMETABLE_CLEAR_SPEED_TOOLTIP                               :{BLACK}선택한 경로의 최대 운행 속력 제한값을 초기화합니다. CTRL+클릭하면 모든 경로의 속력을 초기화합니다
@@ -4883,9 +4895,8 @@ STR_SCREENSHOT_HEIGHTMAP_SCREENSHOT                             :{BLACK}높이�
 STR_SCREENSHOT_MINIMAP_SCREENSHOT                               :{BLACK}미니맵 스크린 샷
 
 # Script Parameters
-STR_AI_SETTINGS_CAPTION                                         :{WHITE}{STRING} 매개 변수
-STR_AI_SETTINGS_CAPTION_AI                                      :인공지능
-STR_AI_SETTINGS_CAPTION_GAMESCRIPT                              :게임 스크립트
+STR_AI_SETTINGS_CAPTION_AI                                      :{WHITE}인공지능 매개 변수
+STR_AI_SETTINGS_CAPTION_GAMESCRIPT                              :{WHITE}게임 스크립트 매개 변수
 STR_AI_SETTINGS_CLOSE                                           :{BLACK}닫기
 STR_AI_SETTINGS_RESET                                           :{BLACK}초기화
 STR_AI_SETTINGS_SETTING                                         :{STRING}: {ORANGE}{STRING}
@@ -4946,7 +4957,7 @@ STR_GAME_SAVELOAD_NOT_AVAILABLE                                 :<사용 불가�
 STR_WARNING_LOADGAME_REMOVED_TRAMS                              :{WHITE}전차를 지원하지 않는 버전으로 게임이 저장되었습니다. 모든 전차는 제거되었습니다.
 
 # Map generation messages
-STR_ERROR_COULD_NOT_CREATE_TOWN                                 :{WHITE}지도 생성이 중지되었습니다...{}... 도시를 건설할 적절한 곳이 존재하지 않습니다
+STR_ERROR_COULD_NOT_CREATE_TOWN                                 :{WHITE}지도 생성이 중단되었습니다...{}{}... 도시를 건설할 만한 적절한 곳이 존재하지 않습니다
 STR_ERROR_NO_TOWN_IN_SCENARIO                                   :{WHITE}... 시나리오에 도시가 없습니다
 
 STR_ERROR_PNGMAP                                                :{WHITE}PNG 파일에서 지형을 불러올 수 없습니다...
@@ -4975,7 +4986,7 @@ STR_ERROR_SCREENSHOT_FAILED                                     :{WHITE}스크�
 
 # Error message titles
 STR_ERROR_MESSAGE_CAPTION                                       :{YELLOW}알림
-STR_ERROR_MESSAGE_CAPTION_OTHER_COMPANY                         :{YELLOW}{STRING} 회사가 보낸 메시지
+STR_ERROR_MESSAGE_CAPTION_OTHER_COMPANY                         :{YELLOW}{COMPANY} 회사가 보낸 메시지
 
 # Generic construction errors
 STR_ERROR_OFF_EDGE_OF_MAP                                       :{WHITE}지도 가장자리에서 너무 멉니다
@@ -4985,6 +4996,7 @@ STR_ERROR_FLAT_LAND_REQUIRED                                    :{WHITE}평지�
 STR_ERROR_LAND_SLOPED_IN_WRONG_DIRECTION                        :{WHITE}잘못된 방향으로 땅이 기울어졌습니다
 STR_ERROR_CAN_T_DO_THIS                                         :{WHITE}그렇게 할 수 없습니다...
 STR_ERROR_BUILDING_MUST_BE_DEMOLISHED                           :{WHITE}건물을 먼저 제거해야 합니다
+STR_ERROR_BUILDING_IS_PROTECTED                                 :{WHITE}... 건물이 보호되어 있습니다
 STR_ERROR_CAN_T_CLEAR_THIS_AREA                                 :{WHITE}이 지역을 파괴할 수 없습니다...
 STR_ERROR_SITE_UNSUITABLE                                       :{WHITE}... 알맞지 않은 장소입니다
 STR_ERROR_ALREADY_BUILT                                         :{WHITE}... 이미 지어져있습니다
@@ -4994,7 +5006,7 @@ STR_ERROR_TERRAFORM_LIMIT_REACHED                               :{WHITE}... 지�
 STR_ERROR_CLEARING_LIMIT_REACHED                                :{WHITE}... 칸 제거 제한에 다다랐습니다
 STR_ERROR_TREE_PLANT_LIMIT_REACHED                              :{WHITE}... 나무 심기 제한에 다다랐습니다
 STR_ERROR_NAME_MUST_BE_UNIQUE                                   :{WHITE}이름은 유일해야 합니다
-STR_ERROR_GENERIC_OBJECT_IN_THE_WAY                             :{WHITE}중간에 {1:STRING}{G 1 "이" "가"} 있습니다
+STR_ERROR_GENERIC_OBJECT_IN_THE_WAY                             :{WHITE}중간에 {0:STRING}{G 0 "이" "가"} 있습니다
 STR_ERROR_NOT_ALLOWED_WHILE_PAUSED                              :{WHITE}일시 정지 중에는 할 수 없습니다
 
 # Local authority errors
@@ -5037,7 +5049,7 @@ STR_ERROR_TOO_CLOSE_TO_ANOTHER_TOWN                             :{WHITE}... 다�
 STR_ERROR_TOO_MANY_TOWNS                                        :{WHITE}... 도시가 너무 많습니다
 STR_ERROR_NO_SPACE_FOR_TOWN                                     :{WHITE}... 지도에 더 이상 공간이 없습니다
 STR_ERROR_ROAD_WORKS_IN_PROGRESS                                :{WHITE}도로 작업이 진행 중입니다
-STR_ERROR_TOWN_CAN_T_DELETE                                     :{WHITE}이 도시를 삭제할 수 없습니다...{}도시나 도시 소유의 땅에 역, 정류장, 항구, 공항 또는 차량기지, 차고지, 정박소 등이 존재하면 도시를 삭제할 수 없습니다.
+STR_ERROR_TOWN_CAN_T_DELETE                                     :{WHITE}이 도시를 삭제할 수 없습니다...{}{}도시나 도시 소유의 땅에 역, 정류장, 항구, 공항 또는 차량기지, 차고지, 정박소 등이 존재하면 도시를 삭제할 수 없습니다.
 STR_ERROR_STATUE_NO_SUITABLE_PLACE                              :{WHITE}... 이 도시의 중심에 동상을 세우기 적합한 장소가 없습니다
 STR_ERROR_CAN_T_BUILD_HOUSE                                     :{WHITE}건물을 지을 수 없습니다...
 
@@ -5095,7 +5107,7 @@ STR_ERROR_DRIVE_THROUGH_JUNCTION                                :{WHITE}... 통�
 STR_ERROR_CAN_T_REMOVE_PART_OF_STATION                          :{WHITE}역의 일부를 제거할 수 없습니다...
 STR_ERROR_MUST_REMOVE_RAILWAY_STATION_FIRST                     :{WHITE}철도역을 먼저 제거하세요
 STR_ERROR_CAN_T_REMOVE_BUS_STATION                              :{WHITE}버스 정류장을 제거할 수 없습니다...
-STR_ERROR_CAN_T_REMOVE_TRUCK_STATION                            :{WHITE}트럭 터미널을 제거할 수 없습니다...
+STR_ERROR_CAN_T_REMOVE_TRUCK_STATION                            :{WHITE}트럭 적하장을 제거할 수 없습니다...
 STR_ERROR_CAN_T_REMOVE_PASSENGER_TRAM_STATION                   :{WHITE}여객 전차역을 제거할 수 없습니다...
 STR_ERROR_CAN_T_REMOVE_CARGO_TRAM_STATION                       :{WHITE}화물 전차역을 제거할 수 없습니다...
 STR_ERROR_MUST_REMOVE_ROAD_STOP_FIRST                           :{WHITE}정류장을 먼저 제거하세요
@@ -5142,7 +5154,7 @@ STR_ERROR_TRAINS_CAN_ONLY_BE_ALTERED_INSIDE_A_DEPOT             :{WHITE}차량�
 STR_ERROR_TRAIN_TOO_LONG                                        :{WHITE}열차가 너무 깁니다!
 STR_ERROR_CAN_T_REVERSE_DIRECTION_RAIL_VEHICLE                  :{WHITE}차량을 뒤집을 수 없습니다...
 STR_ERROR_CAN_T_REVERSE_DIRECTION_RAIL_VEHICLE_MULTIPLE_UNITS   :{WHITE}여러 대가 연결된 차량은 뒤집을 수 없습니다...
-STR_ERROR_INCOMPATIBLE_RAIL_TYPES                               :알맞지 않은 철도 타입입니다
+STR_ERROR_INCOMPATIBLE_RAIL_TYPES                               :알맞지 않은 철도 종류입니다
 
 STR_ERROR_CAN_T_MOVE_VEHICLE                                    :{WHITE}차량을 옮길 수 없습니다...
 STR_ERROR_REAR_ENGINE_FOLLOW_FRONT                              :{WHITE}뒷쪽 기관차는 앞쪽 기관차와 항상 붙어있어야 합니다
@@ -5309,6 +5321,18 @@ STR_ERROR_CAN_T_SELL_TRAIN                                      :{WHITE}열차�
 STR_ERROR_CAN_T_SELL_ROAD_VEHICLE                               :{WHITE}차량을 팔 수 없습니다...
 STR_ERROR_CAN_T_SELL_SHIP                                       :{WHITE}선박을 팔 수 없습니다...
 STR_ERROR_CAN_T_SELL_AIRCRAFT                                   :{WHITE}항공기를 팔 수 없습니다...
+
+###length VEHICLE_TYPES
+STR_ERROR_CAN_T_SELL_ALL_TRAIN                                  :{WHITE}열차 차량을 모두 팔 수 없습니다...
+STR_ERROR_CAN_T_SELL_ALL_ROAD_VEHICLE                           :{WHITE}차량을 모두 팔 수 없습니다...
+STR_ERROR_CAN_T_SELL_ALL_SHIP                                   :{WHITE}선박을 모두 팔 수 없습니다...
+STR_ERROR_CAN_T_SELL_ALL_AIRCRAFT                               :{WHITE}항공기를 모두 팔 수 없습니다...
+
+###length VEHICLE_TYPES
+STR_ERROR_CAN_T_AUTOREPLACE_TRAIN                               :{WHITE}열차 차량을 자동 교체할 수 없습니다...
+STR_ERROR_CAN_T_AUTOREPLACE_ROAD_VEHICLE                        :{WHITE}차량을 자동 교체할 수 없습니다...
+STR_ERROR_CAN_T_AUTOREPLACE_SHIP                                :{WHITE}선박을 자동 교체할 수 없습니다...
+STR_ERROR_CAN_T_AUTOREPLACE_AIRCRAFT                            :{WHITE}항공기를 자동 교체할 수 없습니다...
 
 STR_ERROR_TOO_MANY_VEHICLES_IN_GAME                             :{WHITE}게임에 차량이 너무 많습니다!
 STR_ERROR_CAN_T_CHANGE_SERVICING                                :{WHITE}점검 간격 설정을 바꿀 수 없습니다...
@@ -5828,19 +5852,8 @@ STR_SAVEGAME_NAME_DEFAULT                                       :{COMPANY}의 �
 STR_SAVEGAME_NAME_SPECTATOR                                     :관전자의 게임, {1:STRING}
 
 # Viewport strings
-STR_VIEWPORT_TOWN_POP                                           :{WHITE}{TOWN} ({COMMA})
-STR_VIEWPORT_TOWN                                               :{WHITE}{TOWN}
-STR_VIEWPORT_TOWN_TINY_BLACK                                    :{TINY_FONT}{BLACK}{TOWN}
-STR_VIEWPORT_TOWN_TINY_WHITE                                    :{TINY_FONT}{WHITE}{TOWN}
-
-STR_VIEWPORT_SIGN_SMALL_BLACK                                   :{TINY_FONT}{BLACK}{SIGN}
-STR_VIEWPORT_SIGN_SMALL_WHITE                                   :{TINY_FONT}{WHITE}{SIGN}
-
+STR_VIEWPORT_TOWN_POP                                           :{TOWN} ({COMMA})
 STR_VIEWPORT_STATION                                            :{STATION} {STATION_FEATURES}
-STR_VIEWPORT_STATION_TINY                                       :{TINY_FONT}{STATION}
-
-STR_VIEWPORT_WAYPOINT                                           :{WAYPOINT}
-STR_VIEWPORT_WAYPOINT_TINY                                      :{TINY_FONT}{WAYPOINT}
 
 # Simple strings to get specific types of data
 STR_COMPANY_NAME                                                :{COMPANY}
@@ -5877,8 +5890,6 @@ STR_JUST_DATE_LONG                                              :{DATE_LONG}
 STR_JUST_DATE_ISO                                               :{DATE_ISO}
 STR_JUST_STRING                                                 :{STRING}
 STR_JUST_STRING1                                                :{STRING}
-STR_JUST_STRING2                                                :{STRING}
-STR_JUST_STRING4                                                :{STRING}
 STR_JUST_STRING_STRING                                          :{STRING}{STRING}
 STR_JUST_RAW_STRING                                             :{STRING}
 STR_JUST_BIG_RAW_STRING                                         :{BIG_FONT}{STRING}
@@ -5902,3 +5913,5 @@ STR_PLANE                                                       :{G=f}{BLACK}{PL
 STR_SHIP                                                        :{G=f}{BLACK}{SHIP}
 
 STR_TOOLBAR_RAILTYPE_VELOCITY                                   :{STRING} ({VELOCITY})
+
+STR_BADGE_NAME_LIST                                             :{STRING}: {GOLD}{STRING}

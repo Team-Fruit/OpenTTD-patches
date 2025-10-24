@@ -13,18 +13,19 @@
 #include "network_internal.h"
 #include "core/tcp_listen.h"
 #include "core/tcp_admin.h"
+#include "../core/pool_type.hpp"
 
-extern AdminIndex _redirect_console_to_admin;
+extern AdminID _redirect_console_to_admin;
 
 class ServerNetworkAdminSocketHandler;
 /** Pool with all admin connections. */
-typedef Pool<ServerNetworkAdminSocketHandler, AdminIndex, 2, MAX_ADMINS, PT_NADMIN> NetworkAdminSocketPool;
+using NetworkAdminSocketPool = Pool<ServerNetworkAdminSocketHandler, AdminID, 2, PoolType::NetworkAdmin>;
 extern NetworkAdminSocketPool _networkadminsocket_pool;
 
 /** Class for handling the server side of the game connection. */
 class ServerNetworkAdminSocketHandler : public NetworkAdminSocketPool::PoolItem<&_networkadminsocket_pool>, public NetworkAdminSocketHandler, public TCPListenHandler<ServerNetworkAdminSocketHandler, ADMIN_PACKET_SERVER_FULL, ADMIN_PACKET_SERVER_BANNED> {
 private:
-	std::unique_ptr<NetworkAuthenticationServerHandler> authentication_handler; ///< The handler for the authentication.
+	std::unique_ptr<NetworkAuthenticationServerHandler> authentication_handler = nullptr; ///< The handler for the authentication.
 protected:
 	NetworkRecvStatus Receive_ADMIN_JOIN(Packet &p) override;
 	NetworkRecvStatus Receive_ADMIN_QUIT(Packet &p) override;
@@ -43,9 +44,9 @@ protected:
 	NetworkRecvStatus SendAuthRequest();
 	NetworkRecvStatus SendEnableEncryption();
 public:
-	AdminUpdateFrequency update_frequency[ADMIN_UPDATE_END]; ///< Admin requested update intervals.
-	std::chrono::steady_clock::time_point connect_time;      ///< Time of connection.
-	NetworkAddress address;                                  ///< Address of the admin.
+	std::array<AdminUpdateFrequencies, ADMIN_UPDATE_END> update_frequency{}; ///< Admin requested update intervals.
+	std::chrono::steady_clock::time_point connect_time{}; ///< Time of connection.
+	NetworkAddress address{}; ///< Address of the admin.
 
 	ServerNetworkAdminSocketHandler(SOCKET s);
 	~ServerNetworkAdminSocketHandler();
@@ -68,7 +69,7 @@ public:
 	NetworkRecvStatus SendCompanyEconomy();
 	NetworkRecvStatus SendCompanyStats();
 
-	NetworkRecvStatus SendChat(NetworkAction action, DestType desttype, ClientID client_id, const std::string &msg, NetworkTextMessageData data);
+	NetworkRecvStatus SendChat(NetworkAction action, DestType desttype, ClientID client_id, std::string_view msg, NetworkTextMessageData data);
 	NetworkRecvStatus SendRcon(uint16_t colour, const std::string_view command);
 	NetworkRecvStatus SendConsole(const std::string_view origin, const std::string_view command);
 	NetworkRecvStatus SendGameScript(const std::string_view json);
@@ -113,9 +114,9 @@ void NetworkAdminCompanyNew(const Company *company);
 void NetworkAdminCompanyUpdate(const Company *company);
 void NetworkAdminCompanyRemove(CompanyID company_id, AdminCompanyRemoveReason bcrr);
 
-void NetworkAdminChat(NetworkAction action, DestType desttype, ClientID client_id, const std::string &msg, NetworkTextMessageData data = NetworkTextMessageData(), bool from_admin = false);
+void NetworkAdminChat(NetworkAction action, DestType desttype, ClientID client_id, std::string_view msg, NetworkTextMessageData data = NetworkTextMessageData(), bool from_admin = false);
 void NetworkAdminUpdate(AdminUpdateFrequency freq);
-void NetworkServerSendAdminRcon(AdminIndex admin_index, TextColour colour_code, const std::string_view string);
+void NetworkServerSendAdminRcon(AdminID admin_index, TextColour colour_code, const std::string_view string);
 void NetworkAdminConsole(const std::string_view origin, const std::string_view string);
 void NetworkAdminGameScript(const std::string_view json);
 void NetworkAdminCmdLogging(const NetworkClientSocket *owner, const CommandPacket &cp);

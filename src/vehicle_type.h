@@ -11,9 +11,11 @@
 #define VEHICLE_TYPE_H
 
 #include "core/enum_type.hpp"
+#include "core/pool_type.hpp"
 
 /** The type all our vehicle IDs have. */
-typedef uint32_t VehicleID;
+struct VehicleIDTag : public PoolIDTraits<uint32_t, 0xFF000, 0xFFFFF> {};
+using VehicleID = PoolID<VehicleIDTag>;
 
 static const int GROUND_ACCELERATION = 9800; ///< Acceleration due to gravity, 9.8 m/s^2
 
@@ -34,9 +36,7 @@ enum VehicleType : uint8_t {
 	VEH_END,
 	VEH_INVALID = 0xFF,           ///< Non-existing type of vehicle.
 };
-DECLARE_POSTFIX_INCREMENT(VehicleType)
-/** Helper information for extract tool. */
-template <> struct EnumPropsT<VehicleType> : MakeEnumPropsT<VehicleType, uint8_t, VEH_TRAIN, VEH_END, VEH_INVALID, 3> {};
+DECLARE_INCREMENT_DECREMENT_OPERATORS(VehicleType)
 DECLARE_ENUM_AS_ADDABLE(VehicleType)
 
 using VehicleTypeMask = uint8_t;
@@ -51,24 +51,19 @@ struct EffectVehicle;
 struct DisasterVehicle;
 
 /** Base vehicle class. */
-struct BaseVehicle
-{
-	VehicleType type; ///< Type of vehicle
+struct BaseVehicle {
+	VehicleType type = VEH_INVALID; ///< Type of vehicle
 };
 
-static const VehicleID INVALID_VEHICLE = 0xFFFFF; ///< Constant representing a non-existing vehicle.
-
-/** Flags to add to p1 for goto depot commands. */
-enum DepotCommand {
-	DEPOT_SELL          = (1U << 25), ///< Go to depot and sell order
-	DEPOT_CANCEL        = (1U << 26), ///< Cancel depot/service order
-	DEPOT_SPECIFIC      = (1U << 27), ///< Send vehicle to specific depot
-	DEPOT_SERVICE       = (1U << 28), ///< The vehicle will leave the depot right after arrival (service only)
-	DEPOT_MASS_SEND     = (1U << 29), ///< Tells that it's a mass send to depot command (type in VLW flag)
-	DEPOT_DONT_CANCEL   = (1U << 30), ///< Don't cancel current goto depot command if any
-	DEPOT_LOCATE_HANGAR = (1U << 31), ///< Find another airport if the target one lacks a hangar
-	DEPOT_COMMAND_MASK  = 0x7FU << 25,
+/** Flags for goto depot commands. */
+enum class DepotCommandFlag : uint8_t {
+	Service,     ///< The vehicle will leave the depot right after arrival (service only)
+	Cancel,      ///< Cancel depot/service order
+	DontCancel,  ///< Don't cancel current goto depot command if any
+	Specific,    ///< Send vehicle to specific depot
+	Sell,        ///< Go to depot and sell order
 };
+using DepotCommandFlags = EnumBitSet<DepotCommandFlag, uint8_t>;
 
 static const uint MAX_LENGTH_VEHICLE_NAME_CHARS = 128; ///< The maximum length of a vehicle name in characters including '\0'
 
@@ -94,7 +89,7 @@ enum BreakdownType {
 };
 
 /** Vehicle acceleration models. */
-enum AccelerationModel {
+enum AccelerationModel : uint8_t {
 	AM_ORIGINAL,
 	AM_REALISTIC,
 };
@@ -112,7 +107,7 @@ enum TrainRealisticBrakingAspectLimitedMode {
 };
 
 /** Visualisation contexts of vehicles and engines. */
-enum EngineImageType {
+enum EngineImageType : uint8_t {
 	EIT_ON_MAP     = 0x00,  ///< Vehicle drawn in viewport.
 	EIT_IN_DEPOT   = 0x10,  ///< Vehicle drawn in depot.
 	EIT_IN_DETAILS = 0x11,  ///< Vehicle drawn in vehicle details, refit window, ...
@@ -120,6 +115,16 @@ enum EngineImageType {
 	EIT_PURCHASE   = 0x20,  ///< Vehicle drawn in purchase list, autoreplace gui, ...
 	EIT_PREVIEW    = 0x21,  ///< Vehicle drawn in preview window, news, ...
 };
+
+/** Randomisation triggers for vehicles */
+enum class VehicleRandomTrigger : uint8_t {
+	NewCargo, ///< Affected vehicle only: Vehicle is loaded with cargo, after it was empty.
+	Depot, ///< Front vehicle only: Consist arrived in depot.
+	Empty, ///< Front vehicle only: Entire consist is empty.
+	AnyNewCargo, ///< All vehicles in consist: Any vehicle in the consist received new cargo.
+	Callback32, ///< All vehicles in consist: 32 day callback requested rerandomisation
+};
+using VehicleRandomTriggers = EnumBitSet<VehicleRandomTrigger, uint8_t>;
 
 static const uint32_t VEHICLE_NAME_NO_GROUP = 0x80000000; ///< String constant to not include the vehicle's group name, if using the long name format
 

@@ -10,6 +10,7 @@
 #ifndef GUI_H
 #define GUI_H
 
+#include "strings_type.h"
 #include "vehicle_type.h"
 #include "economy_type.h"
 #include "industry_type.h"
@@ -25,7 +26,6 @@ void InitializeGUI();
 
 /* settings_gui.cpp */
 void ShowGameOptions();
-void ShowGameSettings();
 
 /* train_gui.cpp */
 void ShowOrdersWindow(const Vehicle *v);
@@ -64,10 +64,10 @@ void ShowSubsidiesList();
 
 /* goal_gui.cpp */
 void ShowGoalsList(CompanyID company);
-void ShowGoalQuestion(uint16_t id, uint8_t type, uint32_t button_mask, const std::string &question);
+void ShowGoalQuestion(uint16_t id, uint8_t type, uint32_t button_mask, const EncodedString &question);
 
 /* story_gui.cpp */
-void ShowStoryBook(CompanyID company, uint16_t page_id = INVALID_STORY_PAGE, bool centered = false);
+void ShowStoryBook(CompanyID company, StoryPageID page_id = StoryPageID::Invalid(), bool centered = false);
 
 /* viewport_gui.cpp */
 void ShowExtraViewportWindow(TileIndex tile = INVALID_TILE);

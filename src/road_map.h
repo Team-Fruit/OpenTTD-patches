@@ -18,7 +18,7 @@
 
 
 /** The different types of road tiles. */
-enum RoadTileType {
+enum RoadTileType : uint8_t {
 	ROAD_TILE_NORMAL,   ///< Normal road
 	ROAD_TILE_CROSSING, ///< Level crossing
 	ROAD_TILE_DEPOT,    ///< Depot (one entrance)
@@ -35,8 +35,9 @@ inline bool MayHaveRoad(TileIndex t)
 		case MP_ROAD:
 			return true;
 
-		case MP_STATION:
-			return true;
+		case MP_STATION: {
+			return GB(_me[t].m6, 3, 4) == 2 || GB(_me[t].m6, 3, 4) == 3 || GB(_me[t].m6, 3, 4) == 8; // IsAnyRoadStop
+		}
 
 		case MP_TUNNELBRIDGE:
 			return GB(_m[t].m5, 2, 2) == 1;
@@ -205,10 +206,10 @@ inline RoadType GetRoadType(TileIndex t, RoadTramType rtt)
  */
 inline RoadTypes GetPresentRoadTypes(TileIndex t)
 {
-	RoadTypes result = ROADTYPES_NONE;
+	RoadTypes result{};
 	if (MayHaveRoad(t)) {
-		if (GetRoadTypeRoad(t) != INVALID_ROADTYPE) SetBit(result, GetRoadTypeRoad(t));
-		if (GetRoadTypeTram(t) != INVALID_ROADTYPE) SetBit(result, GetRoadTypeTram(t));
+		if (GetRoadTypeRoad(t) != INVALID_ROADTYPE) result.Set(GetRoadTypeRoad(t));
+		if (GetRoadTypeTram(t) != INVALID_ROADTYPE) result.Set(GetRoadTypeTram(t));
 	}
 	return result;
 }
@@ -258,7 +259,7 @@ inline bool HasTileRoadType(TileIndex t, RoadTramType rtt)
 inline bool HasTileAnyRoadType(TileIndex t, RoadTypes rts)
 {
 	if (!MayHaveRoad(t)) return false;
-	return (GetPresentRoadTypes(t) & rts);
+	return GetPresentRoadTypes(t).Any(rts);
 }
 
 /**
@@ -287,9 +288,9 @@ inline Owner GetRoadOwner(TileIndex t, RoadTramType rtt)
 inline void SetRoadOwner(TileIndex t, RoadTramType rtt, Owner o)
 {
 	if (rtt == RTT_ROAD) {
-		SB(IsNormalRoadTile(t) ? _m[t].m1 : _me[t].m7, 0, 5, o);
+		SB(IsNormalRoadTile(t) ? _m[t].m1 : _me[t].m7, 0, 5, o.base());
 	} else {
-		SB(_m[t].m3, 4, 4, o == OWNER_NONE ? OWNER_TOWN : o);
+		SB(_m[t].m3, 4, 4, (o == OWNER_NONE ? OWNER_TOWN : o).base());
 	}
 }
 
@@ -318,17 +319,16 @@ inline bool HasTownOwnedRoad(TileIndex t)
 	return HasTileRoadType(t, RTT_ROAD) && IsRoadOwner(t, RTT_ROAD, OWNER_TOWN);
 }
 
-/** Which directions are disallowed ? */
-enum DisallowedRoadDirections : uint8_t {
-	DRD_NONE,       ///< None of the directions are disallowed
-	DRD_SOUTHBOUND, ///< All southbound traffic is disallowed (Trackdir 8-13 is allowed)
-	DRD_NORTHBOUND, ///< All northbound traffic is disallowed (Trackdir 0-5 is allowed)
-	DRD_BOTH,       ///< All directions are disallowed
-	DRD_END,        ///< Sentinel
-};
-DECLARE_ENUM_AS_BIT_SET(DisallowedRoadDirections)
-/** Helper information for extract tool. */
-template <> struct EnumPropsT<DisallowedRoadDirections> : MakeEnumPropsT<DisallowedRoadDirections, uint8_t, DRD_NONE, DRD_END, DRD_END, 2> {};
+/**
+ * Checks if a DisallowedRoadDirections is valid.
+ *
+ * @param wc The value to check
+ * @return true if the given value is a valid DisallowedRoadDirections.
+ */
+inline bool IsValidDisallowedRoadDirections(DisallowedRoadDirections drt)
+{
+	return drt < DRD_END;
+}
 
 /**
  * Gets the disallowed directions
@@ -525,25 +525,21 @@ inline void SetCrossingOccupiedByRoadVehicle(TileIndex t, bool occupied)
 	AssignBit(_m[t].m5, 1, occupied);
 }
 
-/** Check if a road tile has snow/desert. */
-#define IsOnDesert IsOnSnow
 /**
  * Check if a road tile has snow/desert.
  * @param t The tile to query.
  * @return True if the tile has snow/desert.
  */
-inline bool IsOnSnow(TileIndex t)
+inline bool IsOnSnowOrDesert(TileIndex t)
 {
 	return HasBit(_me[t].m7, 5);
 }
 
-/** Toggle the snow/desert state of a road tile. */
-#define ToggleDesert ToggleSnow
 /**
  * Toggle the snow/desert state of a road tile.
  * @param t The tile to change.
  */
-inline void ToggleSnow(TileIndex t)
+inline void ToggleSnowOrDesert(TileIndex t)
 {
 	ToggleBit(_me[t].m7, 5);
 }
@@ -555,7 +551,7 @@ enum Roadside {
 	ROADSIDE_GRASS            = 1, ///< Road on grass
 	ROADSIDE_PAVED            = 2, ///< Road with paved sidewalks
 	ROADSIDE_STREET_LIGHTS    = 3, ///< Road with street lights on paved sidewalks
-	// 4 is unused for historical reasons
+	/* 4 is unused for historical reasons */
 	ROADSIDE_TREES            = 5, ///< Road with trees on paved sidewalks
 	ROADSIDE_GRASS_ROAD_WORKS = 6, ///< Road on grass with road works
 	ROADSIDE_PAVED_ROAD_WORKS = 7, ///< Road with sidewalks and road works
@@ -712,7 +708,7 @@ inline void MakeRoadNormal(TileIndex t, RoadBits bits, RoadType road_rt, RoadTyp
 {
 	SetTileType(t, MP_ROAD);
 	SetTileOwner(t, road);
-	_m[t].m2 = town;
+	_m[t].m2 = town.base();
 	_m[t].m3 = (tram_rt != INVALID_ROADTYPE ? bits : 0);
 	_m[t].m5 = (road_rt != INVALID_ROADTYPE ? bits : 0) | ROAD_TILE_NORMAL << 6;
 	SB(_me[t].m6, 2, 4, 0);
@@ -733,16 +729,16 @@ inline void MakeRoadNormal(TileIndex t, RoadBits bits, RoadType road_rt, RoadTyp
  * @param tram_rt The tram roadtype to set for the tile.
  * @param town    Town ID if the road is a town-owned road.
  */
-inline void MakeRoadCrossing(TileIndex t, Owner road, Owner tram, Owner rail, Axis roaddir, RailType rat, RoadType road_rt, RoadType tram_rt, uint town)
+inline void MakeRoadCrossing(TileIndex t, Owner road, Owner tram, Owner rail, Axis roaddir, RailType rat, RoadType road_rt, RoadType tram_rt, TownID town)
 {
 	SetTileType(t, MP_ROAD);
 	SetTileOwner(t, rail);
-	_m[t].m2 = town;
+	_m[t].m2 = town.base();
 	_m[t].m3 = 0;
 	_m[t].m4 = INVALID_ROADTYPE;
 	_m[t].m5 = ROAD_TILE_CROSSING << 6 | roaddir;
 	SB(_me[t].m6, 2, 4, 0);
-	_me[t].m7 = road;
+	_me[t].m7 = road.base();
 	_me[t].m8 = INVALID_ROADTYPE << 6 | rat;
 	SetRoadTypes(t, road_rt, tram_rt);
 	SetRoadOwner(t, RTT_TRAM, tram);
@@ -760,12 +756,12 @@ inline void MakeRoadDepot(TileIndex t, Owner owner, DepotID did, DiagDirection d
 {
 	SetTileType(t, MP_ROAD);
 	SetTileOwner(t, owner);
-	_m[t].m2 = did;
+	_m[t].m2 = did.base();
 	_m[t].m3 = 0;
 	_m[t].m4 = INVALID_ROADTYPE;
 	_m[t].m5 = ROAD_TILE_DEPOT << 6 | dir;
 	SB(_me[t].m6, 2, 4, 0);
-	_me[t].m7 = owner;
+	_me[t].m7 = owner.base();
 	_me[t].m8 = INVALID_ROADTYPE << 6;
 	SetRoadType(t, GetRoadTramType(rt), rt);
 	SetRoadOwner(t, RTT_TRAM, owner);

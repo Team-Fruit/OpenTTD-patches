@@ -134,7 +134,7 @@ inline bool IsSignalSpritePBS(SignalType type)
 SignalType NextSignalType(SignalType cur, SignalCycleGroups which_signals);
 
 /** State of the signal segment */
-enum SigSegState {
+enum SigSegState : uint8_t {
 	SIGSEG_FREE,    ///< Free and has no pre-signal exits or at least one green exit
 	SIGSEG_FULL,    ///< Occupied by a train
 	SIGSEG_PBS,     ///< Segment is a PBS segment
@@ -153,7 +153,7 @@ void CheckRemoveSignalsFromTile(TileIndex tile);
 void CheckRemoveSignal(TileIndex tile, Track track);
 
 /** Adds a signal dependency
- *  The signal identified by @p dep will be marked as dependend upon
+ *  The signal identified by @p dep will be marked as dependent upon
  *  the signal identified by @p on
  */
 void AddSignalDependency(SignalReference on, SignalReference dep);

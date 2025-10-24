@@ -17,6 +17,7 @@
 #include "date_type.h"
 #include "core/enum_type.hpp"
 #include "newgrf.h"
+#include "newgrf_badge_type.h"
 #include "economy_func.h"
 
 #include <array>
@@ -35,43 +36,24 @@ DECLARE_ENUM_AS_BIT_SET(RoadTramTypes)
 
 static const RoadTramType _roadtramtypes[] = { RTT_ROAD, RTT_TRAM };
 
-/** Roadtype flag bit numbers. Starts with RO instead of R because R is used for rails */
-enum RoadTypeFlag {
-	ROTF_CATENARY = 0,                                     ///< Bit number for adding catenary
-	ROTF_NO_LEVEL_CROSSING,                                ///< Bit number for disabling level crossing
-	ROTF_NO_HOUSES,                                        ///< Bit number for setting this roadtype as not house friendly
-	ROTF_HIDDEN,                                           ///< Bit number for hidden from construction.
-	ROTF_TOWN_BUILD,                                       ///< Bit number for allowing towns to build this roadtype.
+/** Roadtype flag bit numbers. */
+enum class RoadTypeFlag : uint8_t {
+	Catenary        = 0, ///< Bit number for adding catenary
+	NoLevelCrossing = 1, ///< Bit number for disabling level crossing
+	NoHouses        = 2, ///< Bit number for setting this roadtype as not house friendly
+	Hidden          = 3, ///< Bit number for hidden from construction.
+	TownBuild       = 4, ///< Bit number for allowing towns to build this roadtype.
 };
-
-/** Roadtype flags. Starts with RO instead of R because R is used for rails */
-enum RoadTypeFlags : uint8_t {
-	ROTFB_NONE = 0,                                        ///< All flags cleared.
-	ROTFB_CATENARY          = 1 << ROTF_CATENARY,          ///< Value for drawing a catenary.
-	ROTFB_NO_LEVEL_CROSSING = 1 << ROTF_NO_LEVEL_CROSSING, ///< Value for disabling a level crossing.
-	ROTFB_NO_HOUSES         = 1 << ROTF_NO_HOUSES,         ///< Value for for setting this roadtype as not house friendly.
-	ROTFB_HIDDEN            = 1 << ROTF_HIDDEN,            ///< Value for hidden from construction.
-	ROTFB_TOWN_BUILD        = 1 << ROTF_TOWN_BUILD,        ///< Value for allowing towns to build this roadtype.
-};
-DECLARE_ENUM_AS_BIT_SET(RoadTypeFlags)
+using RoadTypeFlags = EnumBitSet<RoadTypeFlag, uint8_t>;
 
 /** Roadtype extra flags. */
-enum RoadTypeExtraFlag {
-	RXTF_NOT_AVAILABLE_AI_GS = 0,                                ///< Bit number for unavailable for AI/GS
-	RXTF_NO_TOWN_MODIFICATION,                                   ///< Bit number for no town modification
-	RXTF_NO_TUNNELS,                                             ///< Bit number for no tunnels
-	RXTF_NO_TRAIN_COLLISION,                                     ///< Bit number for no train collision
+enum class RoadTypeExtraFlag : uint8_t {
+	NotAvailableAiGs   = 0, ///< Bit number for unavailable for AI/GS
+	NoTownModification = 1, ///< Bit number for no town modification
+	NoTunnels          = 2, ///< Bit number for no tunnels
+	NoTrainCollision   = 3, ///< Bit number for no train collision
 };
-
-/** Roadtype extra flags. */
-enum RoadTypeExtraFlags : uint8_t {
-	RXTFB_NONE = 0,                                              ///< All flags cleared.
-	RXTFB_NOT_AVAILABLE_AI_GS   = 1 << RXTF_NOT_AVAILABLE_AI_GS,
-	RXTFB_NO_TOWN_MODIFICATION  = 1 << RXTF_NO_TOWN_MODIFICATION,
-	RXTFB_NO_TUNNELS            = 1 << RXTF_NO_TUNNELS,
-	RXTFB_NO_TRAIN_COLLISION    = 1 << RXTF_NO_TRAIN_COLLISION,
-};
-DECLARE_ENUM_AS_BIT_SET(RoadTypeExtraFlags)
+using RoadTypeExtraFlags = EnumBitSet<RoadTypeExtraFlag, uint8_t>;
 
 enum RoadTypeCollisionMode : uint8_t {
 	RTCM_NORMAL = 0,
@@ -84,7 +66,7 @@ enum RoadTypeCollisionMode : uint8_t {
 struct SpriteGroup;
 
 /** Sprite groups for a roadtype. */
-enum RoadTypeSpriteGroup {
+enum RoadTypeSpriteGroup : uint8_t {
 	ROTSG_CURSORS,        ///< Optional: Cursor and toolbar icon images
 	ROTSG_OVERLAY,        ///< Optional: Images for overlaying track
 	ROTSG_GROUND,         ///< Required: Main group of ground images
@@ -229,22 +211,34 @@ public:
 	 */
 	const SpriteGroup *group[ROTSG_END];
 
+	std::vector<BadgeID> badges;
+
 	inline bool UsesOverlay() const
 	{
 		return this->group[ROTSG_GROUND] != nullptr;
 	}
 };
 
-extern RoadTypes _roadtypes_type;
+/**
+ * Get the mask for road types of the given RoadTramType.
+ * @param rtt RoadTramType.
+ * @return Mask of road types for RoadTramType.
+ */
+inline RoadTypes GetMaskForRoadTramType(RoadTramType rtt)
+{
+	extern RoadTypes _roadtypes_road;
+	extern RoadTypes _roadtypes_tram;
+	return rtt == RTT_ROAD ? _roadtypes_road : _roadtypes_tram;
+}
 
 inline bool RoadTypeIsRoad(RoadType roadtype)
 {
-	return !HasBit(_roadtypes_type, roadtype);
+	return GetMaskForRoadTramType(RTT_ROAD).Test(roadtype);
 }
 
 inline bool RoadTypeIsTram(RoadType roadtype)
 {
-	return HasBit(_roadtypes_type, roadtype);
+	return GetMaskForRoadTramType(RTT_TRAM).Test(roadtype);
 }
 
 inline RoadTramType GetRoadTramType(RoadType roadtype)
@@ -270,6 +264,19 @@ inline const RoadTypeInfo *GetRoadTypeInfo(RoadType roadtype)
 }
 
 /**
+ * Returns the railtype for a Railtype information.
+ * @param rti Pointer to static RailTypeInfo
+ * @return Railtype in static railtype definitions
+ */
+inline RoadType GetRoadTypeInfoIndex(const RoadTypeInfo *rti)
+{
+	extern RoadTypeInfo _roadtypes[ROADTYPE_END];
+	size_t index = rti - _roadtypes;
+	assert(index < ROADTYPE_END && rti == _roadtypes + index);
+	return static_cast<RoadType>(index);
+}
+
+/**
  * Checks if an engine of the given RoadType got power on a tile with a given
  * RoadType. This would normally just be an equality check, but for electrified
  * roads (which also support non-electric vehicles).
@@ -279,7 +286,7 @@ inline const RoadTypeInfo *GetRoadTypeInfo(RoadType roadtype)
  */
 inline bool HasPowerOnRoad(RoadType enginetype, RoadType tiletype)
 {
-	return HasBit(GetRoadTypeInfo(enginetype)->powered_roadtypes, tiletype);
+	return GetRoadTypeInfo(enginetype)->powered_roadtypes.Test(tiletype);
 }
 
 /**
@@ -333,7 +340,7 @@ inline Money RoadConvertCost(RoadType from, RoadType to)
 inline bool RoadNoLevelCrossing(RoadType roadtype)
 {
 	assert(roadtype < ROADTYPE_END);
-	return HasBit(GetRoadTypeInfo(roadtype)->flags, ROTF_NO_LEVEL_CROSSING);
+	return GetRoadTypeInfo(roadtype)->flags.Test(RoadTypeFlag::NoLevelCrossing);
 }
 
 /**
@@ -344,7 +351,7 @@ inline bool RoadNoLevelCrossing(RoadType roadtype)
 inline bool RoadNoTunnels(RoadType roadtype)
 {
 	assert(roadtype < ROADTYPE_END);
-	return HasBit(GetRoadTypeInfo(roadtype)->extra_flags, RXTF_NO_TUNNELS);
+	return GetRoadTypeInfo(roadtype)->extra_flags.Test(RoadTypeExtraFlag::NoTunnels);
 }
 
 RoadType GetRoadTypeByLabel(RoadTypeLabel label, bool allow_alternate_labels = true);

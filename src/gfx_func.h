@@ -58,8 +58,6 @@ extern bool _shift_pressed;  ///< Is Shift pressed?
 extern bool _invert_ctrl;
 extern bool _invert_shift;
 extern uint16_t _game_speed;
-extern uint8_t _milliseconds_per_tick;
-extern float _ticks_per_second;
 
 extern bool _left_button_down;
 extern bool _left_button_clicked;
@@ -83,7 +81,6 @@ void HandleShiftChanged();
 void HandleMouseEvents();
 void UpdateWindows();
 void ChangeGameSpeed(bool enable_fast_forward);
-void SetupTickRate();
 
 void DrawMouseCursor();
 void ScreenSizeChanged();
@@ -107,6 +104,7 @@ struct SpritePointerHolder;
 void DrawSpriteViewport(const SpritePointerHolder &sprite_store, const DrawPixelInfo *dpi, SpriteID img, PaletteID pal, int x, int y, const SubSprite *sub = nullptr);
 void PrepareDrawSpriteViewportSpriteStore(SpritePointerHolder &sprite_store, const DrawPixelInfo *dpi, SpriteID img, PaletteID pal);
 void DrawSprite(SpriteID img, PaletteID pal, int x, int y, const SubSprite *sub = nullptr, ZoomLevel zoom = ZOOM_LVL_GUI);
+void DrawSpriteCustomRemap(SpriteID img, std::span<uint8_t, 256> pal, int x, int y, const SubSprite *sub = nullptr, ZoomLevel zoom = ZOOM_LVL_GUI);
 void DrawSpriteIgnorePadding(SpriteID img, PaletteID pal, const Rect &r, StringAlignment align); /* widget.cpp */
 std::unique_ptr<uint32_t[]> DrawSpriteToRgbaBuffer(SpriteID spriteId, ZoomLevel zoom = ZOOM_LVL_GUI);
 
@@ -119,7 +117,7 @@ void DrawCharCentered(char32_t c, const Rect &r, TextColour colour);
 
 void GfxFillRect(class Blitter *blitter, const DrawPixelInfo *dpi, int left, int top, int right, int bottom, int colour, FillRectMode mode = FILLRECT_OPAQUE);
 void GfxFillRect(int left, int top, int right, int bottom, int colour, FillRectMode mode = FILLRECT_OPAQUE);
-void GfxFillPolygon(const std::vector<Point> &shape, int colour, FillRectMode mode = FILLRECT_OPAQUE, GfxFillRectModeFunctor *fill_functor = nullptr);
+void GfxFillPolygon(std::span<const Point> shape, int colour, FillRectMode mode = FILLRECT_OPAQUE, GfxFillRectModeFunctor *fill_functor = nullptr);
 void GfxDrawLine(class Blitter * blitter, const DrawPixelInfo *dpi, int left, int top, int right, int bottom, int colour, int width = 1, int dash = 0);
 void GfxDrawLine(int left, int top, int right, int bottom, int colour, int width = 1, int dash = 0);
 void DrawBox(const DrawPixelInfo *dpi, int x, int y, int dx1, int dy1, int dx2, int dy2, int dx3, int dy3);
@@ -157,16 +155,33 @@ uint GetStringListWidth(std::span<const StringID> list, FontSize fontsize = FS_N
 Dimension GetStringListBoundingBox(std::span<const StringID> list, FontSize fontsize = FS_NORMAL);
 int GetStringHeight(std::string_view str, int maxw, FontSize fontsize = FS_NORMAL);
 int GetStringHeight(StringID str, int maxw);
-int GetStringLineCount(StringID str, int maxw);
+int GetStringLineCount(std::string_view str, int maxw);
 Dimension GetStringMultiLineBoundingBox(StringID str, const Dimension &suggestion);
-Dimension GetStringMultiLineBoundingBox(std::string_view str, const Dimension &suggestion);
+Dimension GetStringMultiLineBoundingBox(std::string_view str, const Dimension &suggestion, FontSize fontsize = FS_NORMAL);
 void LoadStringWidthTable(bool monospace = false);
 
 void DrawDirtyBlocks();
 void SetDirtyBlocks(int left, int top, int right, int bottom);
 void SetPendingDirtyBlocks(int left, int top, int right, int bottom);
 void UnsetDirtyBlocks(int left, int top, int right, int bottom);
-void MarkWholeScreenDirty();
+
+/**
+ * This function mark the whole screen as dirty. This results in repainting
+ * the whole screen. Use this with care as this function will break the
+ * idea about marking only parts of the screen as 'dirty'.
+ * @ingroup dirty
+ */
+inline void MarkWholeScreenDirty()
+{
+	extern bool _whole_screen_dirty;
+	_whole_screen_dirty = true;
+}
+
+inline bool IsWholeScreenMarkedDirty()
+{
+	extern bool _whole_screen_dirty;
+	return _whole_screen_dirty;
+}
 
 void CheckBlitter();
 
@@ -175,18 +190,6 @@ bool FillDrawPixelInfo(DrawPixelInfo *n, int left, int top, int width, int heigh
 inline bool FillDrawPixelInfo(DrawPixelInfo *n, const Rect &r)
 {
 	return FillDrawPixelInfo(n, r.left, r.top, r.Width(), r.Height());
-}
-
-/**
- * Determine where to draw a centred object inside a widget.
- * @param min The top or left coordinate.
- * @param max The bottom or right coordinate.
- * @param size The height or width of the object to draw.
- * @return Offset of where to start drawing the object.
- */
-inline int CenterBounds(int min, int max, int size)
-{
-	return (min + max - size + 1) / 2;
 }
 
 /* window.cpp */
@@ -203,7 +206,6 @@ void SetMouseCursor(CursorID cursor, PaletteID pal);
 void SetAnimatedMouseCursor(const AnimCursor *table);
 void CursorTick();
 void UpdateCursorSize();
-void UpdateRouteStepSpriteSize();
 bool ChangeResInGame(int w, int h);
 void SortResolutions();
 bool ToggleFullScreen(bool fs);
@@ -211,8 +213,7 @@ bool ToggleFullScreen(bool fs);
 /* gfx.cpp */
 uint8_t GetCharacterWidth(FontSize size, char32_t key);
 uint8_t GetDigitWidth(FontSize size = FS_NORMAL);
-void GetBroadestDigit(uint *front, uint *next, FontSize size = FS_NORMAL);
-uint64_t GetBroadestDigitsValue(uint count, FontSize size = FS_NORMAL);
+std::pair<uint8_t, uint8_t> GetBroadestDigit(FontSize size);
 uint GetBroadestHourDigitsValue(FontSize size = FS_NORMAL);
 
 extern int font_height_cache[FS_END];

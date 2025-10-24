@@ -16,7 +16,7 @@
  * redefine operator new/delete. It also never zeroes memory and always reuses
  * it.
  */
-template<typename Titem, typename Tindex, Tindex Tgrowth_step, Tindex Tmax_size>
+template <typename Titem, typename Tindex, Tindex Tgrowth_step, Tindex Tmax_size>
 class SimplePool {
 public:
 	inline SimplePool() : first_unused(0), first_free(0) {}
@@ -116,13 +116,14 @@ struct SmallStackItem {
  *    accesses to the underlying pool are not guarded by locks.
  * @tparam Titem Value type to be used.
  * @tparam Tindex Index type to use for the pool.
- * @tparam Tinvalid Invalid item to keep at the bottom of each stack.
+ * @tparam Tinvalid_value Value to construct invalid item to keep at the bottom of each stack.
  * @tparam Tgrowth_step Growth step for pool.
  * @tparam Tmax_size Maximum size for pool.
  */
-template <typename Titem, typename Tindex, Titem Tinvalid, Tindex Tgrowth_step, Tindex Tmax_size>
+template <typename Titem, typename Tindex, auto Tinvalid_value, Tindex Tgrowth_step, Tindex Tmax_size>
 class SmallStack : public SmallStackItem<Titem, Tindex> {
 public:
+	static constexpr Titem Tinvalid{Tinvalid_value};
 
 	typedef SmallStackItem<Titem, Tindex> Item;
 

@@ -16,7 +16,6 @@
 #include "../gfx_func.h"
 #include "../settings_type.h"
 #include "../zoom_type.h"
-#include "../network/network_func.h"
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -202,7 +201,7 @@ public:
 	 */
 	static VideoDriver *GetInstance()
 	{
-		return static_cast<VideoDriver*>(*DriverFactoryBase::GetActiveDriver(Driver::DT_VIDEO));
+		return static_cast<VideoDriver *>(DriverFactoryBase::GetActiveDriver(Driver::DT_VIDEO).get());
 	}
 
 	static std::string GetCaption();
@@ -325,7 +324,7 @@ protected:
 #endif /* DEBUG_DUMP_COMMANDS */
 
 		/* If we are paused, run on normal speed. */
-		if (_pause_mode) return std::chrono::milliseconds(MILLISECONDS_PER_TICK);
+		if (_pause_mode.Any()) return std::chrono::milliseconds(MILLISECONDS_PER_TICK);
 		/* Infinite speed, as quickly as you can. */
 		if (_game_speed == 0) return std::chrono::microseconds(0);
 

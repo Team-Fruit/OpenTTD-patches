@@ -46,7 +46,7 @@ extern btree::btree_map<uint64_t, Money> _cargo_packet_deferred_payments;
 		 * information is lost. In that case we set it to the position of this
 		 * station */
 		for (Station *st : Station::Iterate()) {
-			for (CargoID c = 0; c < NUM_CARGO; c++) {
+			for (CargoType c = 0; c < NUM_CARGO; c++) {
 				GoodsEntry *ge = &st->goods[c];
 
 				if (ge->data == nullptr) continue;
@@ -60,9 +60,9 @@ extern btree::btree_map<uint64_t, Money> _cargo_packet_deferred_payments;
 	}
 
 	if (IsSavegameVersionBefore(SLV_120)) {
-		/* CargoPacket's first_station should be either INVALID_STATION or a valid station */
+		/* CargoPacket's first_station should be either StationID::Invalid() or a valid station */
 		for (CargoPacket *cp : CargoPacket::Iterate()) {
-			if (!Station::IsValidID(cp->first_station)) cp->first_station = INVALID_STATION;
+			if (!Station::IsValidID(cp->first_station)) cp->first_station = StationID::Invalid();
 		}
 	}
 
@@ -73,7 +73,7 @@ extern btree::btree_map<uint64_t, Money> _cargo_packet_deferred_payments;
 		for (Vehicle *v : Vehicle::Iterate()) v->cargo.InvalidateCache();
 
 		for (Station *st : Station::Iterate()) {
-			for (CargoID c = 0; c < NUM_CARGO; c++) {
+			for (CargoType c = 0; c < NUM_CARGO; c++) {
 				if (st->goods[c].data != nullptr) st->goods[c].data->cargo.InvalidateCache();
 			}
 		}
@@ -166,8 +166,8 @@ NamedSaveLoadTable GetCargoPacketDesc()
 		NSL("periods_in_transit", SLE_CONDVAR_X(CargoPacket, periods_in_transit, SLE_FILE_U8 | SLE_VAR_U16, SL_MIN_VERSION, SL_MAX_VERSION, SlXvFeatureTest(XSLFTO_AND, XSLFI_MORE_CARGO_AGE, 0, 0))),
 		NSL("periods_in_transit", SLE_CONDVAR_X(CargoPacket, periods_in_transit, SLE_UINT16, SL_MIN_VERSION, SL_MAX_VERSION, SlXvFeatureTest(XSLFTO_AND, XSLFI_MORE_CARGO_AGE))),
 		NSL("feeder_share",       SLE_VAR(CargoPacket, feeder_share,             SLE_INT64)),
-		NSL("source_type",        SLE_CONDVAR(CargoPacket, source_type,          SLE_UINT8,  SLV_125, SL_MAX_VERSION)),
-		NSL("source_id",          SLE_CONDVAR(CargoPacket, source_id,            SLE_UINT16, SLV_125, SL_MAX_VERSION)),
+		NSL("source_type",        SLE_CONDVAR(CargoPacket, source.type,          SLE_UINT8,  SLV_125, SL_MAX_VERSION)),
+		NSL("source_id",          SLE_CONDVAR(CargoPacket, source.id,            SLE_UINT16, SLV_125, SL_MAX_VERSION)),
 		NSL("travelled.x",        SLE_CONDVAR_X(CargoPacket, travelled.x,        SLE_INT32, SL_MIN_VERSION, SL_MAX_VERSION, SlXvFeatureTest(XSLFTO_AND, XSLFI_CARGO_TRAVELLED))),
 		NSL("travelled.y",        SLE_CONDVAR_X(CargoPacket, travelled.y,        SLE_INT32, SL_MIN_VERSION, SL_MAX_VERSION, SlXvFeatureTest(XSLFTO_AND, XSLFI_CARGO_TRAVELLED))),
 
@@ -199,7 +199,7 @@ static void Load_CAPA()
 
 	int index;
 	while ((index = SlIterateArray()) != -1) {
-		CargoPacket *cp = new (index) CargoPacket();
+		CargoPacket *cp = new (CargoPacketID(index)) CargoPacket();
 		SlObjectLoadFiltered(cp, slt);
 	}
 }

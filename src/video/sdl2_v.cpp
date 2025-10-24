@@ -18,6 +18,7 @@
 #include "../core/math_func.hpp"
 #include "../core/mem_func.hpp"
 #include "../core/geometry_func.hpp"
+#include "../core/utf8.hpp"
 #include "../fileio_func.h"
 #include "../framerate_type.h"
 #include "../scope.h"
@@ -767,8 +768,8 @@ bool VideoDriver_SDL_Base::PollEvent()
 				char32_t character;
 
 				uint keycode = ConvertSdlKeyIntoMy(&ev.key.keysym, &character);
-				// Only handle non-text keys here. Text is handled in
-				// SDL_TEXTINPUT below.
+				/* Only handle non-text keys here. Text is handled in
+				 * SDL_TEXTINPUT below. */
 				if (!this->edit_box_focused ||
 					keycode == WKC_DELETE ||
 					keycode == WKC_NUM_ENTER ||
@@ -796,9 +797,8 @@ bool VideoDriver_SDL_Base::PollEvent()
 			uint keycode = ConvertSdlKeycodeIntoMy(kc);
 
 			if (keycode == WKC_BACKQUOTE && FocusedWindowIsConsole()) {
-				char32_t character;
-				Utf8Decode(&character, ev.text.text);
-				HandleKeypress(keycode, character);
+				auto [len, c] = DecodeUtf8(ev.text.text);
+				if (len > 0) HandleKeypress(keycode, c);
 			} else {
 				HandleTextInput(nullptr, true);
 				HandleTextInput(ev.text.text);
@@ -820,19 +820,19 @@ bool VideoDriver_SDL_Base::PollEvent()
 
 		case SDL_WINDOWEVENT: {
 			if (ev.window.event == SDL_WINDOWEVENT_EXPOSED) {
-				// Force a redraw of the entire screen.
+				/* Force a redraw of the entire screen. */
 				this->MakeDirty(0, 0, _screen.width, _screen.height);
 			} else if (ev.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
 				int w = std::max(ev.window.data1, 64);
 				int h = std::max(ev.window.data2, 64);
 				CreateMainSurface(w, h, w != ev.window.data1 || h != ev.window.data2);
 			} else if (ev.window.event == SDL_WINDOWEVENT_ENTER) {
-				// mouse entered the window, enable cursor
+				/* mouse entered the window, enable cursor */
 				_cursor.in_window = true;
 				/* Ensure pointer lock will not occur. */
 				SDL_SetRelativeMouseMode(SDL_FALSE);
 			} else if (ev.window.event == SDL_WINDOWEVENT_LEAVE) {
-				// mouse left the window, undraw cursor
+				/* mouse left the window, undraw cursor */
 				UndrawMouseCursor();
 				_cursor.in_window = false;
 			} else if (ev.window.event == SDL_WINDOWEVENT_MOVED) {
@@ -868,6 +868,14 @@ static const char *InitializeSDL()
 	/* Check if the video-driver is already initialized. */
 	if (SDL_WasInit(SDL_INIT_VIDEO) != 0) return nullptr;
 
+#ifdef SDL_HINT_APP_NAME
+	SDL_SetHint(SDL_HINT_APP_NAME, "OpenTTD");
+#endif
+
+#ifdef SDL_HINT_APP_NAME
+	SDL_SetHint(SDL_HINT_APP_NAME, "OpenTTD");
+#endif
+
 	if (SDL_InitSubSystem(SDL_INIT_VIDEO) < 0) return SDL_GetError();
 	return nullptr;
 }
@@ -899,10 +907,6 @@ const char *VideoDriver_SDL_Base::Start(const StringList &param)
 		 */
 		if (!SDL_SetHint(SDL_HINT_MOUSE_AUTO_CAPTURE, "0")) return SDL_GetError();
 	}
-#endif
-
-#ifdef SDL_HINT_APP_NAME
-	SDL_SetHint(SDL_HINT_APP_NAME, "OpenTTD");
 #endif
 
 	this->startup_display = FindStartupDisplay(GetDriverParamInt(param, "display", -1));

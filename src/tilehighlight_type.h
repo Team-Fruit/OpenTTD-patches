@@ -16,7 +16,7 @@
 #include "viewport_type.h"
 
 /** Highlighting draw styles */
-enum HighLightStyle {
+enum HighLightStyle : uint16_t {
 	HT_NONE      = 0x000, ///< default
 	HT_RECT      = 0x010, ///< rectangle (stations, depots, ...)
 	HT_POINT     = 0x020, ///< point (lower land, raise land, level land, ...)
@@ -27,7 +27,7 @@ enum HighLightStyle {
 	HT_VEHICLE   = 0x100, ///< vehicle is accepted as target as well (bitmask)
 	HT_DIAGONAL  = 0x200, ///< Also allow 'diagonal rectangles'. Only usable in combination with #HT_RECT or #HT_POINT.
 	HT_POLY      = 0x400, ///< polyline mode; connect highlighted track with previous one
-	HT_NEW_POLY  = 0xC00, ///< start completly new polyline; implies #HT_POLY
+	HT_NEW_POLY  = 0xC00, ///< start completely new polyline; implies #HT_POLY
 	HT_DRAG_MASK = 0x0F8, ///< Mask for the tile drag-type modes.
 	HT_TUNNEL    = 0x1000,///< tunnel highlight hint
 	HT_MAP       = 0x2000,///< Allow in viewport map mode

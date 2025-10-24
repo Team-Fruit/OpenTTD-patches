@@ -10,11 +10,13 @@
 #ifndef SIGNS_TYPE_H
 #define SIGNS_TYPE_H
 
-/** The type of the IDs of signs. */
-typedef uint16_t SignID;
-struct Sign;
+#include "core/pool_id_type.hpp"
 
-static const SignID INVALID_SIGN = 0xFFFF; ///< Sentinel for an invalid sign.
+/** The type of the IDs of signs. */
+struct SignIDTag : public PoolIDTraits<uint16_t, 64000, 0xFFFF> {};
+using SignID = PoolID<SignIDTag>;
+
+struct Sign;
 
 static const uint MAX_LENGTH_SIGN_NAME_CHARS = 128; ///< The maximum length of a sign name in characters including '\0'
 

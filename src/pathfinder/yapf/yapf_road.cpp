@@ -20,11 +20,11 @@
  * This is due to the addition of the extra-large maps patch,
  * which increases MAX_MAP_SIZE by several orders of magnitude.
  * This is no longer a sensible value for pathfinding as it
- * leads to major performace issues if a path is not found.
+ * leads to major performance issues if a path is not found.
  */
 const uint MAX_RV_PF_TILES = 1 << 11;
 
-const int MAX_RV_LEADER_TARGETS = 4;
+const uint MAX_RV_LEADER_TARGETS = 4;
 
 template <class Types>
 class CYapfCostRoadT
@@ -73,7 +73,7 @@ protected:
 		int cost = 0;
 
 		bool predicted_occupied = false;
-		for (int i = 0; i < MAX_RV_LEADER_TARGETS && Yapf().leader_targets[i] != INVALID_TILE; ++i) {
+		for (uint i = 0; i < MAX_RV_LEADER_TARGETS && Yapf().leader_targets[i] != INVALID_TILE; ++i) {
 			if (Yapf().leader_targets[i] != tile) continue;
 			cost += Yapf().PfGetSettings().road_curve_penalty;
 			predicted_occupied = true;
@@ -102,11 +102,11 @@ protected:
 						if (!RoadStop::IsDriveThroughRoadStopContinuation(tile, tile - TileOffsByDiagDir(dir))) {
 							/* When we're the first road stop in a 'queue' of them we increase
 							 * cost based on the fill percentage of the whole queue. */
-							const RoadStop::Entry *entry = rs->GetEntry(dir);
+							const RoadStop::Entry &entry = rs->GetEntry(dir);
 							if (GetDriveThroughStopDisallowedRoadDirections(tile) != DRD_NONE && !tf->IsTram()) {
-								cost += (entry->GetOccupied() + rs->GetEntry(ReverseDiagDir(dir))->GetOccupied()) * Yapf().PfGetSettings().road_stop_occupied_penalty / (2 * entry->GetLength());
+								cost += (entry.GetOccupied() + rs->GetEntry(ReverseDiagDir(dir)).GetOccupied()) * Yapf().PfGetSettings().road_stop_occupied_penalty / (2 * entry.GetLength());
 							} else {
-								cost += entry->GetOccupied() * Yapf().PfGetSettings().road_stop_occupied_penalty / entry->GetLength();
+								cost += entry.GetOccupied() * Yapf().PfGetSettings().road_stop_occupied_penalty / entry.GetLength();
 							}
 						}
 
@@ -283,19 +283,19 @@ public:
 			this->dest_trackdirs = (dir == INVALID_DIAGDIR) ? INVALID_TRACKDIR_BIT : TrackdirToTrackdirBits(DiagDirToDiagTrackdir(dir));
 		};
 		if (v->current_order.IsType(OT_GOTO_STATION)) {
-			this->dest_station   = v->current_order.GetDestination();
+			this->dest_station   = v->current_order.GetDestination().ToStationID();
 			set_trackdirs();
-			this->station_type   = v->IsBus() ? STATION_BUS : STATION_TRUCK;
+			this->station_type   = v->IsBus() ? StationType::Bus : StationType::Truck;
 			this->dest_tile      = CalcClosestStationTile(this->dest_station, v->tile, this->station_type);
 			this->non_artic      = !v->HasArticulatedPart();
 		} else if (v->current_order.IsType(OT_GOTO_WAYPOINT)) {
-			this->dest_station   = v->current_order.GetDestination();
+			this->dest_station   = v->current_order.GetDestination().ToStationID();
 			set_trackdirs();
-			this->station_type   = STATION_ROADWAYPOINT;
+			this->station_type   = StationType::RoadWaypoint;
 			this->dest_tile      = CalcClosestStationTile(this->dest_station, v->tile, this->station_type);
 			this->non_artic      = !v->HasArticulatedPart();
 		} else {
-			this->dest_station   = INVALID_STATION;
+			this->dest_station   = StationID::Invalid();
 			this->dest_tile      = v->dest_tile;
 			this->dest_trackdirs = GetTileTrackdirBits(v->dest_tile, TRANSPORT_ROAD, GetRoadTramType(v->roadtype));
 		}
@@ -303,7 +303,7 @@ public:
 
 	const Station *GetDestinationStation() const
 	{
-		return this->dest_station != INVALID_STATION ? Station::GetIfValid(this->dest_station) : nullptr;
+		return this->dest_station != StationID::Invalid() ? Station::GetIfValid(this->dest_station) : nullptr;
 	}
 
 protected:
@@ -322,7 +322,7 @@ public:
 
 	inline bool PfDetectDestinationTile(TileIndex tile, Trackdir trackdir)
 	{
-		if (this->dest_station != INVALID_STATION) {
+		if (this->dest_station != StationID::Invalid()) {
 			return IsTileType(tile, MP_STATION) &&
 				GetStationIndex(tile) == this->dest_station &&
 				(this->station_type == GetStationType(tile)) &&
@@ -363,41 +363,6 @@ public:
 		return true;
 	}
 };
-
-struct FindVehiclesOnTileProcData {
-	const Vehicle *origin_vehicle;
-	TileIndex (*targets)[MAX_RV_LEADER_TARGETS];
-};
-
-static Vehicle * FindVehiclesOnTileProc(Vehicle *v, void *_data)
-{
-	FindVehiclesOnTileProcData *data = (FindVehiclesOnTileProcData*)(_data);
-
-	const Vehicle *front = v->First();
-
-	if (data->origin_vehicle == front) {
-		return nullptr;
-	}
-
-	/* only consider vehicles going to the same station as us */
-	if (!front->current_order.IsType(OT_GOTO_STATION) || data->origin_vehicle->current_order.GetDestination() != front->current_order.GetDestination()) {
-		return nullptr;
-	}
-
-	TileIndex ti = v->tile + TileOffsByDir(v->direction);
-
-	for (int i = 0; i < MAX_RV_LEADER_TARGETS; i++) {
-		if ((*data->targets)[i] == INVALID_TILE) {
-			(*data->targets)[i] = ti;
-			break;
-		}
-		if ((*data->targets)[i] == ti) {
-			break;
-		}
-	}
-
-	return nullptr;
-}
 
 template <class Types>
 class CYapfFollowRoadT
@@ -478,14 +443,32 @@ public:
 		Yapf().leader_targets[0] = INVALID_TILE;
 		if (multiple_targets && non_cached_area.Contains(tile)) {
 			/* Destination station has at least 2 usable road stops, or first is a drive-through stop,
-			 * check for other vehicles headin to the same destination directly in front */
-			for (int i = 1; i < MAX_RV_LEADER_TARGETS; ++i) {
+			 * check for other vehicles heading to the same destination directly in front */
+			for (uint i = 1; i < MAX_RV_LEADER_TARGETS; ++i) {
 				Yapf().leader_targets[i] = INVALID_TILE;
 			}
-			FindVehiclesOnTileProcData data;
-			data.origin_vehicle = v;
-			data.targets = &Yapf().leader_targets;
-			FindVehicleOnPos(tile, VEH_ROAD, &data, &FindVehiclesOnTileProc);
+
+			const RoadVehicle *origin_vehicle = v;
+			for (const RoadVehicle *u : VehiclesOnTile<VEH_ROAD>(tile)) {
+				const RoadVehicle *front = u->First();
+				if (front == origin_vehicle) continue;
+
+				/* only consider vehicles going to the same station as us */
+				if (!front->current_order.IsType(OT_GOTO_STATION) || origin_vehicle->current_order.GetDestination() != front->current_order.GetDestination()) continue;
+
+				TileIndex ti = u->tile + TileOffsByDir(u->direction);
+
+				auto &targets = Yapf().leader_targets;
+				for (uint i = 0; i < MAX_RV_LEADER_TARGETS; i++) {
+					if (targets[i] == INVALID_TILE) {
+						targets[i] = ti;
+						break;
+					}
+					if (targets[i] == ti) {
+						break;
+					}
+				}
+			}
 		}
 
 		/* find the best path */
@@ -493,18 +476,18 @@ public:
 
 		/* if path not found - return INVALID_TRACKDIR */
 		Trackdir next_trackdir = INVALID_TRACKDIR;
-		Node *pNode = Yapf().GetBestNode();
-		if (pNode != nullptr) {
+		Node *node = Yapf().GetBestNode();
+		if (node != nullptr) {
 			/* path was found or at least suggested
 			 * walk through the path back to its origin */
-			while (pNode->parent != nullptr) {
-				if (pNode->GetIsChoice()) {
-					path_cache.push_front(pNode->GetTile(), pNode->GetTrackdir());
+			while (node->parent != nullptr) {
+				if (node->GetIsChoice()) {
+					path_cache.push_front(node->GetTile(), node->GetTrackdir());
 				}
-				pNode = pNode->parent;
+				node = node->parent;
 			}
 			/* return trackdir from the best origin node (one of start nodes) */
-			Node &best_next_node = *pNode;
+			Node &best_next_node = *node;
 			assert(best_next_node.GetTile() == tile);
 			next_trackdir = best_next_node.GetTrackdir();
 			/* remove last element for the special case when tile == dest_tile */
@@ -544,11 +527,11 @@ public:
 		/* find the best path */
 		if (!Yapf().FindPath(v)) return dist;
 
-		Node *pNode = Yapf().GetBestNode();
-		if (pNode != nullptr) {
+		Node *node = Yapf().GetBestNode();
+		if (node != nullptr) {
 			/* path was found
 			 * get the path cost estimate */
-			dist = pNode->GetCostEstimate();
+			dist = node->GetCostEstimate();
 		}
 
 		return dist;

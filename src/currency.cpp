@@ -15,6 +15,7 @@
 #include "settings_type.h"
 #include "date_func.h"
 #include "string_type.h"
+#include "strings_func.h"
 
 #include "table/strings.h"
 
@@ -70,6 +71,7 @@ static const std::array<CurrencySpec, CURRENCY_END> origin_currency_specs = {{
 	{    5, "", CF_NOEURO,           "RM",       "",             "MYR", 0, STR_GAME_OPTIONS_CURRENCY_MYR    }, ///< Malaysian Ringgit
 	{    1, "", CalTime::Year{2014}, "",         NBSP "Ls",      "LVL", 1, STR_GAME_OPTIONS_CURRENCY_LVL    }, ///< latvian lats
 	{  400, "", CalTime::Year{2002}, "",         "$00",          "PTE", 1, STR_GAME_OPTIONS_CURRENCY_PTE    }, ///< portuguese escudo
+	{   50, "", CF_NOEURO,           "",         NBSP "\u20B4",  "UAH", 1, STR_GAME_OPTIONS_CURRENCY_UAH    }, ///< ukrainian hryvnia
 }};
 
 /** Array of currencies used by the system */
@@ -146,7 +148,7 @@ void CheckSwitchToEuro()
 			_currency_specs[_settings_game.locale.currency].to_euro != CF_ISEURO &&
 			CalTime::CurYear() >= _currency_specs[_settings_game.locale.currency].to_euro) {
 		_settings_game.locale.currency = 2; // this is the index of euro above.
-		AddNewsItem(STR_NEWS_EURO_INTRODUCTION, NT_ECONOMY, NF_NORMAL);
+		AddNewsItem(GetEncodedString(STR_NEWS_EURO_INTRODUCTION), NewsType::Economy, NewsStyle::Normal, {});
 	}
 }
 

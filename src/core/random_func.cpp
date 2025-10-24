@@ -29,7 +29,7 @@
 #	include <windows.h>
 #	include <bcrypt.h>
 #elif defined(__APPLE__) || defined(__NetBSD__) || defined(__FreeBSD__)
-// No includes required.
+/* No includes required. */
 #elif defined(__GLIBC__) && ((__GLIBC__ > 2) || ((__GLIBC__ == 2) && (__GLIBC_MINOR__ >= 25)))
 #	include <sys/random.h>
 #elif defined(__EMSCRIPTEN__)
@@ -88,7 +88,7 @@ void SetRandomSeed(uint32_t seed)
 uint32_t DoRandom(int line, const char *file)
 {
 	if (_networking && (!_network_server || (NetworkClientSocket::IsValidID(0) && NetworkClientSocket::Get(0)->status != NetworkClientSocket::STATUS_INACTIVE))) {
-		Debug(random, 0, "{}; {:04x}; {:02x}; {}:{}", debug_date_dumper().HexDate(), _frame_counter, (uint8_t)_current_company, file, line);
+		Debug(random, 0, "{}; {:04x}; {:02x}; {}:{}", debug_date_dumper().HexDate(), _frame_counter, _current_company, file, line);
 	}
 
 	return _random.Next();

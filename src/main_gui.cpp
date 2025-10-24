@@ -24,6 +24,7 @@
 #include "strings_func.h"
 #include "zoom_func.h"
 #include "company_base.h"
+#include "company_cmd.h"
 #include "company_func.h"
 #include "toolbar_gui.h"
 #include "statusbar_gui.h"
@@ -33,6 +34,7 @@
 #include "guitimer_func.h"
 #include "error.h"
 #include "news_gui.h"
+#include "misc_cmd.h"
 
 #include "sl/saveload.h"
 
@@ -48,24 +50,23 @@
 
 #include "safeguards.h"
 
-void CcGiveMoney(const CommandCost &result, TileIndex tile, uint32_t p1, uint32_t p2, uint64_t p3, uint32_t cmd)
+void CcGiveMoney(const CommandCost &result, Money money, CompanyID dest_company)
 {
 	if (result.Failed() || !_settings_game.economy.give_money || !_networking) return;
 
 	/* Inform the company of the action of one of its clients (controllers). */
-	SetDParam(0, p1);
-	std::string msg = GetString(STR_COMPANY_NAME);
+	std::string msg = GetString(STR_COMPANY_NAME, dest_company);
 
 	/*
 	 * bits 31-16: source company
 	 * bits 15-0: target company
 	 */
-	uint64_t auxdata = (p1 & 0xFFFF) | (((uint64_t) _local_company) << 16);
+	uint64_t auxdata = (uint64_t)dest_company.base() | (((uint64_t) _local_company.base()) << 16);
 
 	if (!_network_server) {
-		NetworkClientSendChat(NETWORK_ACTION_GIVE_MONEY, DESTTYPE_BROADCAST_SS, p2, msg, NetworkTextMessageData(result.GetCost(), auxdata));
+		NetworkClientSendChat(NETWORK_ACTION_GIVE_MONEY, DESTTYPE_BROADCAST_SS, dest_company.base(), msg, NetworkTextMessageData(result.GetCost(), auxdata));
 	} else {
-		NetworkServerSendChat(NETWORK_ACTION_GIVE_MONEY, DESTTYPE_BROADCAST_SS, p2, msg, CLIENT_ID_SERVER, NetworkTextMessageData(result.GetCost(), auxdata));
+		NetworkServerSendChat(NETWORK_ACTION_GIVE_MONEY, DESTTYPE_BROADCAST_SS, dest_company.base(), msg, CLIENT_ID_SERVER, NetworkTextMessageData(result.GetCost(), auxdata));
 	}
 }
 
@@ -97,7 +98,7 @@ bool HandlePlacePushButton(Window *w, WidgetID widget, CursorID cursor, HighLigh
 }
 
 
-void CcPlaySound_EXPLOSION(const CommandCost &result, TileIndex tile, uint32_t p1, uint32_t p2, uint64_t p3, uint32_t cmd)
+void CcPlaySound_EXPLOSION(const CommandCost &result, TileIndex tile)
 {
 	if (result.Succeeded() && _settings_client.sound.confirm) SndPlayTileFx(SND_12_EXPLOSION, tile);
 }
@@ -203,7 +204,7 @@ static constexpr NWidgetPart _nested_main_window_widgets[] = {
 	NWidget(NWID_VIEWPORT, INVALID_COLOUR, WID_M_VIEWPORT), SetResize(1, 1),
 };
 
-enum {
+enum GlobalHotKeys : int32_t {
 	GHK_QUIT,
 	GHK_ABANDON,
 	GHK_CONSOLE,
@@ -239,7 +240,7 @@ enum {
 
 struct MainWindow : Window
 {
-	GUITimer refresh;
+	GUITimer refresh{};
 
 	/* Refresh times in milliseconds */
 	static const uint LINKGRAPH_REFRESH_PERIOD = 7650;
@@ -248,14 +249,14 @@ struct MainWindow : Window
 	MainWindow(WindowDesc &desc) : Window(desc)
 	{
 		this->InitNested(0);
-		CLRBITS(this->flags, WF_WHITE_BORDER);
+		this->flags.Reset(WindowFlag::WhiteBorder);
 		ResizeWindow(this, _screen.width, _screen.height);
 
 		NWidgetViewport *nvp = this->GetWidget<NWidgetViewport>(WID_M_VIEWPORT);
-		nvp->InitializeViewport(this, TileXY(32, 32), ScaleZoomGUI(ZOOM_LVL_VIEWPORT));
+		nvp->InitializeViewport(this, TileXY(32, 32).base(), ScaleZoomGUI(ZOOM_LVL_VIEWPORT));
 
 		this->viewport->map_type = (ViewportMapType) _settings_client.gui.default_viewport_map_mode;
-		this->viewport->overlay = new LinkGraphOverlay(this, WID_M_VIEWPORT, 0, 0, 2);
+		this->viewport->overlay = new LinkGraphOverlay(this, WID_M_VIEWPORT, 0, CompanyMask{}, 2);
 		this->refresh.SetInterval(LINKGRAPH_DELAY);
 	}
 
@@ -266,7 +267,7 @@ struct MainWindow : Window
 		this->refresh.SetInterval(LINKGRAPH_REFRESH_PERIOD);
 
 		if (this->viewport->overlay->GetCargoMask() == 0 ||
-				this->viewport->overlay->GetCompanyMask() == 0) {
+				this->viewport->overlay->GetCompanyMask().None()) {
 			return;
 		}
 
@@ -366,9 +367,9 @@ struct MainWindow : Window
 			case GHK_MONEY: // Gimme money
 				/* You can only cheat for money in single player or when otherwise suitably authorised. */
 				if (!_networking || _settings_game.difficulty.money_cheat_in_multiplayer) {
-					DoCommandP(0, 10000000, 0, CMD_MONEY_CHEAT);
+					Command<CMD_MONEY_CHEAT>::Post(10000000);
 				} else if (IsNetworkSettingsAdmin()) {
-					DoCommandP(0, 10000000, 0, CMD_MONEY_CHEAT_ADMIN);
+					Command<CMD_MONEY_CHEAT_ADMIN>::Post(10000000);
 				}
 				break;
 
@@ -417,7 +418,7 @@ struct MainWindow : Window
 					const NetworkClientInfo *cio = NetworkClientInfo::GetByClientID(_network_own_client_id);
 					if (cio == nullptr) break;
 
-					ShowNetworkChatQueryWindow(NetworkClientPreferTeamChat(cio) ? DESTTYPE_TEAM : DESTTYPE_BROADCAST, cio->client_playas);
+					ShowNetworkChatQueryWindow(NetworkClientPreferTeamChat(cio) ? DESTTYPE_TEAM : DESTTYPE_BROADCAST, cio->client_playas.base());
 				}
 				break;
 
@@ -430,7 +431,7 @@ struct MainWindow : Window
 					const NetworkClientInfo *cio = NetworkClientInfo::GetByClientID(_network_own_client_id);
 					if (cio == nullptr) break;
 
-					ShowNetworkChatQueryWindow(DESTTYPE_TEAM, cio->client_playas);
+					ShowNetworkChatQueryWindow(DESTTYPE_TEAM, cio->client_playas.base());
 				}
 				break;
 
@@ -509,7 +510,7 @@ struct MainWindow : Window
 			bool in = wheel < 0;
 
 			/* When following, only change zoom - otherwise zoom to the cursor. */
-			if (this->viewport->follow_vehicle != INVALID_VEHICLE) {
+			if (this->viewport->follow_vehicle != VehicleID::Invalid()) {
 				DoZoomInOutWindow(in ? ZOOM_IN : ZOOM_OUT, this);
 			} else {
 				ZoomInOrOutToCursorWindow(in, this);
@@ -550,7 +551,7 @@ struct MainWindow : Window
 			/* Show tooltip with last month production or town name */
 			const Point p = GetTileBelowCursor();
 			const TileIndex tile = TileVirtXY(p.x, p.y);
-			if (tile < MapSize()) ShowTooltipForTile(this, tile);
+			if (tile < Map::Size()) ShowTooltipForTile(this, tile);
 		}
 	}
 
@@ -620,7 +621,7 @@ HotkeyList MainWindow::hotkeys("global", global_hotkeys);
 static WindowDesc _main_window_desc(__FILE__, __LINE__,
 	WDP_MANUAL, nullptr, 0, 0,
 	WC_MAIN_WINDOW, WC_NONE,
-	WDF_NO_CLOSE,
+	WindowDefaultFlag::NoClose,
 	_nested_main_window_widgets,
 	&MainWindow::hotkeys
 );
@@ -645,7 +646,7 @@ void ShowSelectGameWindow();
 void SetupColoursAndInitialWindow()
 {
 	for (Colours i = COLOUR_BEGIN; i != COLOUR_END; i++) {
-		const uint8_t *b = GetNonSprite(GENERAL_SPRITE_COLOUR(i), SpriteType::Recolour);
+		const uint8_t *b = GetNonSprite(GetColourPalette(i), SpriteType::Recolour);
 		assert(b != nullptr);
 		for (ColourShade j = SHADE_BEGIN; j < SHADE_END; j++) {
 			SetColourGradient(i, j, b[0xC6 + j]);

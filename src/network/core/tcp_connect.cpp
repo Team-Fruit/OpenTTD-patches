@@ -15,7 +15,7 @@
 #include "tcp.h"
 #include "../network_coordinator.h"
 #include "../network_internal.h"
-#include "../../core/ring_buffer.hpp"
+#include "../../3rdparty/cpp-ring-buffer/ring_buffer.hpp"
 
 #include "../../safeguards.h"
 
@@ -27,7 +27,7 @@
  * @param default_port If not indicated in connection_string, what port to use.
  * @param bind_address The local bind address to use. Defaults to letting the OS find one.
  */
-TCPConnecter::TCPConnecter(const std::string &connection_string, uint16_t default_port, const NetworkAddress &bind_address, int family) :
+TCPConnecter::TCPConnecter(std::string_view connection_string, uint16_t default_port, const NetworkAddress &bind_address, int family) :
 	bind_address(bind_address),
 	family(family)
 {
@@ -39,7 +39,7 @@ TCPConnecter::TCPConnecter(const std::string &connection_string, uint16_t defaul
  * @param connection_string The address to connect to.
  * @param default_port If not indicated in connection_string, what port to use.
  */
-TCPServerConnecter::TCPServerConnecter(const std::string &connection_string, uint16_t default_port) :
+TCPServerConnecter::TCPServerConnecter(std::string_view connection_string, uint16_t default_port) :
 	server_address(ServerAddress::Parse(connection_string, default_port))
 {
 	switch (this->server_address.type) {
@@ -124,7 +124,7 @@ void TCPConnecter::Connect(addrinfo *address)
 		return;
 	}
 
-	this->sock_to_address[sock] = network_address;
+	this->sock_to_address[sock] = std::move(network_address);
 	this->sockets.push_back(sock);
 }
 
@@ -148,7 +148,7 @@ bool TCPConnecter::TryNextAddress()
  */
 void TCPConnecter::OnResolved(addrinfo *ai)
 {
-	ring_buffer<addrinfo *> addresses_ipv4, addresses_ipv6;
+	jgr::ring_buffer<addrinfo *> addresses_ipv4, addresses_ipv6;
 
 	/* Apply "Happy Eyeballs" if it is likely IPv6 is functional. */
 

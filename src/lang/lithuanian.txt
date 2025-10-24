@@ -628,9 +628,7 @@ STR_SCENEDIT_FILE_MENU_QUIT                                     :Išeiti
 
 
 # Settings menu
-###length 16
 STR_SETTINGS_MENU_GAME_OPTIONS                                  :Pagrindinės nuostatos
-STR_SETTINGS_MENU_CONFIG_SETTINGS_TREE                          :Išplėstinės nuostatos
 STR_SETTINGS_MENU_AI_SETTINGS                                   :DI nustatymai
 STR_SETTINGS_MENU_GAMESCRIPT_SETTINGS                           :Žaidimo scenarijaus nustatymai
 STR_SETTINGS_MENU_NEWGRF_SETTINGS                               :Plėtinių nuostatos
@@ -1018,7 +1016,6 @@ STR_MESSAGE_HISTORY_TOOLTIP                                     :{BLACK}Paskutin
 STR_MESSAGE_NEWS_FORMAT                                         :{STRING}  -  {STRING}
 
 STR_NEWS_MESSAGE_CAPTION                                        :{WHITE}Pranešimas
-STR_NEWS_CUSTOM_ITEM                                            :{BIG_FONT}{BLACK}{STRING}
 
 STR_NEWS_FIRST_TRAIN_ARRIVAL                                    :{BIG_FONT}{BLACK}Gyventojai džiūgauja. . .{}Pirmas traukinys atvažiavo į {STATION}!
 STR_NEWS_FIRST_BUS_ARRIVAL                                      :{BIG_FONT}{BLACK}Gyventojai džiūgauja. . .{}Pirmas autobusas atvyko į {STATION}!
@@ -1152,7 +1149,7 @@ STR_GAME_OPTIONS_CURRENCY_UNITS_DROPDOWN_TOOLTIP                :{BLACK}Valiutos
 
 STR_GAME_OPTIONS_CURRENCY_CODE                                  :{STRING} ({STRING})
 
-###length 44
+###length 45
 STR_GAME_OPTIONS_CURRENCY_GBP                                   :Svarai sterlingų
 STR_GAME_OPTIONS_CURRENCY_USD                                   :Amerikos Doleris
 STR_GAME_OPTIONS_CURRENCY_EUR                                   :Eurai
@@ -1253,7 +1250,6 @@ STR_GAME_OPTIONS_PARTICIPATE_SURVEY_LINK_TOOLTIP                :{BLACK}Atidaryt
 STR_GAME_OPTIONS_PARTICIPATE_SURVEY_PREVIEW                     :{BLACK}Peržiūrėti apklausos rezultatus
 STR_GAME_OPTIONS_PARTICIPATE_SURVEY_PREVIEW_TOOLTIP             :{BLACK}Rodyti dabartinio žaidimo apklausos rezultatą
 
-STR_GAME_OPTIONS_GRAPHICS                                       :{BLACK}Grafika
 
 STR_GAME_OPTIONS_REFRESH_RATE                                   :{BLACK}Ekrano kadrų dažnis
 STR_GAME_OPTIONS_REFRESH_RATE_TOOLTIP                           :{BLACK}Pasirinkite pageidaujamą ekrano kadrų dažnį
@@ -1389,7 +1385,6 @@ STR_CITY_APPROVAL_PERMISSIVE                                    :Atlaidus (jokio
 STR_WARNING_NO_SUITABLE_AI                                      :{WHITE}Nerasta tinkamų DI...{}Galite parsisiųsti keletą DI naudonat 'Turinio internete' sistemą
 
 # Settings tree window
-STR_CONFIG_SETTING_TREE_CAPTION                                 :{WHITE}Išplėstinės nuostatos
 STR_CONFIG_SETTING_FILTER_TITLE                                 :{BLACK}Filtras:
 STR_CONFIG_SETTING_EXPAND_ALL                                   :{BLACK}Išskleisti viską
 STR_CONFIG_SETTING_COLLAPSE_ALL                                 :{BLACK}Suskleisti viską
@@ -1511,6 +1506,7 @@ STR_CONFIG_SETTING_CATCHMENT_HELPTEXT                           :Skirtingų tip�
 
 STR_CONFIG_SETTING_SERVE_NEUTRAL_INDUSTRIES                     :Leisti kompanijos stotims aptarnauti pramonės įmones su nuosavomis neutraliomis stotimis: {STRING}
 STR_CONFIG_SETTING_SERVE_NEUTRAL_INDUSTRIES_HELPTEXT            :Įgalinus šią nuostatą, pramonės įmonės su nuosavomis stotimis (pvz, naftos platformos) taip pat galės būti aptarnautos žaidėjų stočių, įrengtų netoliese. Išjungus šią nuostatą, minėtos pramonės įmonės galės būti aptarnautos tik iš nuosavų stočių. Tokiu atveju žaidėjų įrengtos stotys įmonės aptarnauti negalės, o įmonės stotis aptarnaus tik pačią įmonę
+
 
 STR_CONFIG_SETTING_EXTRADYNAMITE                                :Leisti griauti miestams priklausančius tiltus, kelius ir kt.: {STRING}
 STR_CONFIG_SETTING_EXTRADYNAMITE_HELPTEXT                       :Palengvinti miestams priklausančios infrastruktūros (kelių, tiltų, namų ir kitų objektų) pašalinimą
@@ -2068,7 +2064,9 @@ STR_CONFIG_SETTING_ENDING_YEAR_VALUE                            :{NUM}
 STR_CONFIG_SETTING_ENDING_YEAR_ZERO                             :Niekada
 
 STR_CONFIG_SETTING_ECONOMY_TYPE                                 :Ekonomika: {STRING}
+###length 2
 STR_CONFIG_SETTING_ECONOMY_TYPE_HELPTEXT                        :Tolygioje ekonomikoje gamyklų produkcija keičiasi mažesniais ir dažnesniais žingsniais. Fiksuotoje ekonomikoje jokie pokyčiai nevyksta. Nuostata gali neveikti pramonės įmonėms, įdiegtoms per plėtinius
+
 ###length 3
 STR_CONFIG_SETTING_ECONOMY_TYPE_ORIGINAL                        :Originali
 STR_CONFIG_SETTING_ECONOMY_TYPE_SMOOTH                          :Tolygi
@@ -2121,6 +2119,8 @@ STR_CONFIG_SETTING_TOWN_FOUNDING_HELPTEXT                       :Įjungiant šį
 STR_CONFIG_SETTING_TOWN_FOUNDING_FORBIDDEN                      :Uždrausta
 STR_CONFIG_SETTING_TOWN_FOUNDING_ALLOWED                        :Leista
 STR_CONFIG_SETTING_TOWN_FOUNDING_ALLOWED_CUSTOM_LAYOUT          :Leista, pasirinktinis miestų išdėstymas
+
+###length 3
 
 STR_CONFIG_SETTING_TOWN_CARGOGENMODE                            :Miesto krovinių generavimo algoritmas: {STRING}
 STR_CONFIG_SETTING_TOWN_CARGOGENMODE_HELPTEXT                   :Mieste generuojamų krovinių kiekis priklauso nuo miesto dydžio.{}Kvadratinis algoritmas: dvigubai paaugęs miestas generuos keturis kartus daugiau krovinių (keleivių ir pašto maišų).{}Tiesinis algoritmas: dvigubai paaugęs miestas generuos dukart daugiau krovinių (keleivių ir pašto maišų)
@@ -2343,7 +2343,6 @@ STR_INTRO_MULTIPLAYER                                           :{BLACK}Žaisti 
 STR_INTRO_GAME_OPTIONS                                          :{BLACK}Pagrindinės nuostatos
 STR_INTRO_HIGHSCORE                                             :{BLACK}Nugalėtojų lentelė
 STR_INTRO_HELP                                                  :{BLACK}Pagalba ir vadovai
-STR_INTRO_CONFIG_SETTINGS_TREE                                  :{BLACK}Išplėstinės nuostatos
 STR_INTRO_NEWGRF_SETTINGS                                       :{BLACK}Plėtiniai
 STR_INTRO_ONLINE_CONTENT                                        :{BLACK}Interneto turinys
 STR_INTRO_AI_SETTINGS                                           :{BLACK}DI Nustatymai
@@ -2364,7 +2363,6 @@ STR_INTRO_TOOLTIP_TOYLAND_LANDSCAPE                             :{BLACK}Žaislin
 
 STR_INTRO_TOOLTIP_GAME_OPTIONS                                  :{BLACK}Atidaryti pagrindines žaidimo nuostatas
 STR_INTRO_TOOLTIP_HIGHSCORE                                     :{BLACK}Atverti nugalėtojų lentelę
-STR_INTRO_TOOLTIP_CONFIG_SETTINGS_TREE                          :{BLACK}Atidaryti išplėstines nuostatas
 STR_INTRO_TOOLTIP_NEWGRF_SETTINGS                               :{BLACK}Atidaryti parsisiųstus plėtinius ir jų nuostatas
 STR_INTRO_TOOLTIP_ONLINE_CONTENT                                :{BLACK}Tikrinti, ar nėra naujų plėtinių arba atnaujinimų jau atsisiųstiems plėtiniams
 STR_INTRO_TOOLTIP_AI_SETTINGS                                   :{BLACK}Atidaryti DI nustatymus
@@ -2460,12 +2458,7 @@ STR_LIVERY_FREIGHT_TRAM                                         :Krovininis tram
 STR_FACE_CAPTION                                                :{WHITE}Veido pasirinkimas
 STR_FACE_CANCEL_TOOLTIP                                         :{BLACK}Nutraukia veido pasirinkimą
 STR_FACE_OK_TOOLTIP                                             :{BLACK}Užbaigia veido pasirinkimą
-STR_FACE_RANDOM                                                 :{BLACK}Atsitiktinai
 
-STR_FACE_MALE_BUTTON                                            :{BLACK}Vyras
-STR_FACE_MALE_TOOLTIP                                           :{BLACK}Pasirink vyro veidą
-STR_FACE_FEMALE_BUTTON                                          :{BLACK}Moteris
-STR_FACE_FEMALE_TOOLTIP                                         :{BLACK}Pasirink moters veidą
 STR_FACE_NEW_FACE_BUTTON                                        :{BLACK}Naujas veidas
 STR_FACE_NEW_FACE_TOOLTIP                                       :{BLACK}Parinka naują atsitiktinį veidą
 STR_FACE_ADVANCED                                               :{BLACK}Plačiau
@@ -2483,36 +2476,20 @@ STR_FACE_FACECODE_ERR                                           :{WHITE}Preziden
 STR_FACE_SAVE                                                   :{BLACK}Išsaugoti
 STR_FACE_SAVE_TOOLTIP                                           :{BLACK}Išsaugoti mėgstamą veidą
 STR_FACE_SAVE_DONE                                              :{WHITE}Šis veidas bus išsaugotas kaip tavo mėgstamas OpenTTD nustatymų faile.
-STR_FACE_EUROPEAN                                               :{BLACK}Europietiškas
-STR_FACE_EUROPEAN_TOOLTIP                                       :{BLACK}Pasirinkti europietiškus veidus
-STR_FACE_AFRICAN                                                :{BLACK}Afrikietiškas
-STR_FACE_AFRICAN_TOOLTIP                                        :{BLACK}Pasirinkti afrikietiškus veidus
 STR_FACE_YES                                                    :Taip
 STR_FACE_NO                                                     :Ne
-STR_FACE_MOUSTACHE_EARRING_TOOLTIP                              :{BLACK}Įjungti ūsus arba auskarą
 STR_FACE_HAIR                                                   :Plaukai:
-STR_FACE_HAIR_TOOLTIP                                           :{BLACK}Keisti plaukus
 STR_FACE_EYEBROWS                                               :Antakiai:
-STR_FACE_EYEBROWS_TOOLTIP                                       :{BLACK}Keisti antakius
 STR_FACE_EYECOLOUR                                              :Akių spalva:
-STR_FACE_EYECOLOUR_TOOLTIP                                      :{BLACK}Keisti akių spalvą
 STR_FACE_GLASSES                                                :Akiniai:
-STR_FACE_GLASSES_TOOLTIP                                        :{BLACK}Įjungti akinius
-STR_FACE_GLASSES_TOOLTIP_2                                      :{BLACK}Keisti akinius
 STR_FACE_NOSE                                                   :Nosis:
-STR_FACE_NOSE_TOOLTIP                                           :{BLACK}Keisti nosį
 STR_FACE_LIPS                                                   :Lūpos:
 STR_FACE_MOUSTACHE                                              :Ūsai:
-STR_FACE_LIPS_MOUSTACHE_TOOLTIP                                 :{BLACK}Pakeisti lūpas arba ūsus
 STR_FACE_CHIN                                                   :Smakras:
-STR_FACE_CHIN_TOOLTIP                                           :{BLACK}Pakeisti smakrą
 STR_FACE_JACKET                                                 :Švarkas:
-STR_FACE_JACKET_TOOLTIP                                         :{BLACK}Pakeisti švarką
 STR_FACE_COLLAR                                                 :Apykaklė:
-STR_FACE_COLLAR_TOOLTIP                                         :{BLACK}Pakeisti apykaklę
 STR_FACE_TIE                                                    :Kaklaraištis:
 STR_FACE_EARRING                                                :Auskaras:
-STR_FACE_TIE_EARRING_TOOLTIP                                    :{BLACK}Pakeisti kaklaraištį arba auskarą
 
 # Matches ServerGameType
 ###length 3
@@ -2698,7 +2675,7 @@ STR_NETWORK_CHAT_TO_COMPANY                                     :[Komandai] {STR
 STR_NETWORK_CHAT_CLIENT                                         :[Privačiai] {STRING}: {WHITE}{STRING}
 STR_NETWORK_CHAT_TO_CLIENT                                      :[Privačiai] {STRING}: {WHITE}{STRING}
 STR_NETWORK_CHAT_ALL                                            :[Visiems] {STRING}: {WHITE}{STRING}
-STR_NETWORK_CHAT_EXTERNAL                                       :[{3:STRING}] {0:STRING}: {WHITE}{1:STRING}
+STR_NETWORK_CHAT_EXTERNAL                                       :[{STRING}] {STRING}: {WHITE}{STRING}
 STR_NETWORK_CHAT_OSKTITLE                                       :{BLACK}Įveskite tekstą internetiniam pokalbiui
 
 # Network messages
@@ -2754,7 +2731,7 @@ STR_NETWORK_ERROR_CLIENT_TIMEOUT_MAP                            :žemėlapio par
 STR_NETWORK_ERROR_CLIENT_TIMEOUT_JOIN                           :žemėlapio apdorojimas užtruko per ilgai
 
 # Network related errors
-STR_NETWORK_SERVER_MESSAGE                                      :*** {1:STRING}
+STR_NETWORK_SERVER_MESSAGE                                      :*** {STRING}
 
 ###length 12
 STR_NETWORK_SERVER_MESSAGE_GAME_PAUSED                          :Žaidimas sustabdytas ({STRING})
@@ -2772,13 +2749,12 @@ STR_NETWORK_SERVER_MESSAGE_GAME_REASON_LINK_GRAPH               :laukiama, kol a
 
 STR_NETWORK_MESSAGE_CLIENT_LEAVING                              :išeinama
 STR_NETWORK_MESSAGE_CLIENT_JOINED                               :*** {STRING} prisijungė prie žaidimo
-STR_NETWORK_MESSAGE_CLIENT_JOINED_ID                            :*** {0:STRING} pasijungė į žaidimą (Client #{2:NUM})
-STR_NETWORK_MESSAGE_CLIENT_COMPANY_JOIN                         :*** {0:STRING} prisijungė prie #{2:NUM}
+STR_NETWORK_MESSAGE_CLIENT_JOINED_ID                            :*** {STRING} pasijungė į žaidimą (Client #{NUM})
 STR_NETWORK_MESSAGE_CLIENT_COMPANY_SPECTATE                     :*** {STRING} prisijungė prie stebėtojų
-STR_NETWORK_MESSAGE_CLIENT_COMPANY_NEW                          :*** {0:STRING} pradėjo naują kompaniją (#{2:NUM})
-STR_NETWORK_MESSAGE_CLIENT_LEFT                                 :*** {0:STRING} paliko žaidimą ({2:STRING})
+STR_NETWORK_MESSAGE_CLIENT_COMPANY_NEW                          :*** {STRING} pradėjo naują kompaniją (#{NUM})
+STR_NETWORK_MESSAGE_CLIENT_LEFT                                 :*** {STRING} paliko žaidimą ({STRING})
 STR_NETWORK_MESSAGE_NAME_CHANGE                                 :*** {STRING} pasikeitė savo vardą į {STRING}
-STR_NETWORK_MESSAGE_GIVE_MONEY                                  :*** {0:STRING} persiuntė {2:CURRENCY_LONG} žaidėjui {1:STRING}
+STR_NETWORK_MESSAGE_GIVE_MONEY                                  :*** {STRING} persiuntė {CURRENCY_LONG} žaidėjui {STRING}
 STR_NETWORK_MESSAGE_SERVER_SHUTDOWN                             :{WHITE}Serveris užsidarė
 STR_NETWORK_MESSAGE_SERVER_REBOOT                               :{WHITE}Serveris persikrauna...{}Prašau palaukti...
 STR_NETWORK_MESSAGE_KICKED                                      :*** {STRING} buvo išmestas. Priežastis: ({STRING})
@@ -2959,6 +2935,7 @@ STR_PICKER_MODE_ALL                                             :Visi
 
 STR_HOUSE_PICKER_CLASS_ZONE1                                    :Kraštas
 
+
 STR_STATION_CLASS_DFLT                                          :Numatytoji
 STR_STATION_CLASS_DFLT_STATION                                  :Numatytoji stotelė
 STR_STATION_CLASS_DFLT_ROADSTOP                                 :Numatytoji kelio stotelė
@@ -2990,7 +2967,6 @@ STR_SELECT_ROAD_BRIDGE_CAPTION                                  :{WHITE}Pasirink
 STR_SELECT_BRIDGE_SELECTION_TOOLTIP                             :{BLACK}Tilto statyba — spragtelkite ant pageidaujamo tilto
 STR_SELECT_BRIDGE_INFO_NAME                                     :{GOLD}{STRING}
 STR_SELECT_BRIDGE_INFO_NAME_MAX_SPEED                           :{GOLD}{STRING},{} {VELOCITY}
-STR_SELECT_BRIDGE_INFO_NAME_COST                                :{GOLD}{0:STRING},{} {WHITE}{2:CURRENCY_LONG}
 STR_SELECT_BRIDGE_INFO_NAME_MAX_SPEED_COST                      :{GOLD}{STRING},{} {VELOCITY} {WHITE}{CURRENCY_LONG}
 STR_BRIDGE_NAME_SUSPENSION_STEEL                                :Kabantis plieninis
 STR_BRIDGE_NAME_GIRDER_STEEL                                    :Plieno sijų
@@ -3161,6 +3137,7 @@ STR_FOUND_TOWN_INITIAL_SIZE_TOOLTIP                             :{BLACK}Išsirin
 STR_FOUND_TOWN_CITY                                             :{BLACK}Miestas
 STR_FOUND_TOWN_CITY_TOOLTIP                                     :{BLACK}Didemiesčiai auga greičiau nei įprasti miestai{}Pagal tam tikras nuostatas, jie didesni, nuo atsiradimo
 
+
 STR_FOUND_TOWN_ROAD_LAYOUT                                      :{YELLOW}Miesto kelių išdėstymas:
 STR_FOUND_TOWN_SELECT_LAYOUT_TOOLTIP                            :{BLACK}Pasirinkti kelio išdėstymą šiam miestui
 STR_FOUND_TOWN_SELECT_LAYOUT_ORIGINAL                           :{BLACK}Originalus
@@ -3238,7 +3215,6 @@ STR_LAI_CLEAR_DESCRIPTION_ROUGH_LAND                            :Nelygi žemė
 STR_LAI_CLEAR_DESCRIPTION_BARE_LAND                             :Lygi žemė
 STR_LAI_CLEAR_DESCRIPTION_GRASS                                 :Žolė
 STR_LAI_CLEAR_DESCRIPTION_FIELDS                                :Laukai
-STR_LAI_CLEAR_DESCRIPTION_SNOW_COVERED_LAND                     :Užpustyta žemė
 STR_LAI_CLEAR_DESCRIPTION_DESERT                                :Dykuma
 
 STR_LAI_RAIL_DESCRIPTION_TRACK                                  :Geležinkelis bėgiai
@@ -3725,7 +3701,6 @@ STR_INVALID_VEHICLE                                             :<neteisinga tra
 STR_NEWGRF_SCAN_CAPTION                                         :{WHITE}Tikrinami plėtiniai
 STR_NEWGRF_SCAN_MESSAGE                                         :{BLACK}Nuskaitomi plėtiniai. Tai gali užtrukti, priklausomai nuo kiekio...
 STR_NEWGRF_SCAN_STATUS                                          :{BLACK}Nuskaityti {NUM} plėtin{P ys iai ių} iš {NUM}
-STR_NEWGRF_SCAN_ARCHIVES                                        :Ieškoma archyvuose
 
 # Sign list window
 STR_SIGN_LIST_CAPTION                                           :{WHITE}Ženklų sąrašas - {COMMA} ženkl{P as ai ų}
@@ -4092,8 +4067,6 @@ STR_INDUSTRY_VIEW_PRODUCES_N_CARGO                              :{BLACK}Gamina: 
 STR_INDUSTRY_VIEW_CARGO_LIST_EXTENSION                          :, {STRING}{STRING}
 
 STR_INDUSTRY_VIEW_REQUIRES                                      :{BLACK}Priima:
-STR_INDUSTRY_VIEW_ACCEPT_CARGO                                  :{YELLOW}{0:STRING}{BLACK}{3:STRING}
-STR_INDUSTRY_VIEW_ACCEPT_CARGO_AMOUNT                           :{YELLOW}{STRING}{BLACK}: {CARGO_SHORT} laukia{STRING}
 
 STR_CONFIG_GAME_PRODUCTION                                      :{WHITE}Keisti gamybos apimtį (8 daugiklis, iki 2040)
 STR_CONFIG_GAME_PRODUCTION_LEVEL                                :{WHITE}Pakeisti gamybos spartą (procentais, iki 800%)
@@ -4427,8 +4400,6 @@ STR_ENGINE_PREVIEW_SHIP.ka                                      :laivą
 STR_ENGINE_PREVIEW_SHIP.kuo                                     :laivu
 STR_ENGINE_PREVIEW_SHIP.kur                                     :laive
 
-STR_ENGINE_PREVIEW_TEXT3                                        :{BLACK}{STRING}{}{5:STRING}{}{STRING}
-STR_ENGINE_PREVIEW_TEXT4                                        :{BLACK}{STRING}{}{STRING}{}{STRING}{}{STRING}
 STR_ENGINE_PREVIEW_COST_WEIGHT                                  :Kaina: {CURRENCY_LONG}  Svoris: {WEIGHT_SHORT}
 STR_ENGINE_PREVIEW_COST_MAX_SPEED                               :Kaina: {CURRENCY_LONG}  Maksimalus greitis: {VELOCITY}
 STR_ENGINE_PREVIEW_SPEED_POWER                                  :Greitis: {VELOCITY}  Galia: {POWER}
@@ -4595,8 +4566,8 @@ STR_VEHICLE_INFO_RELIABILITY_BREAKDOWNS                         :{BLACK}Patikimu
 
 STR_VEHICLE_INFO_BUILT_VALUE                                    :{LTBLUE}{ENGINE} {BLACK}Pagamintas: {LTBLUE}{NUM}{BLACK} Vertė: {LTBLUE}{CURRENCY_LONG}
 STR_VEHICLE_INFO_NO_CAPACITY                                    :{BLACK}Talpa: {LTBLUE}Nieko{STRING}
-STR_VEHICLE_INFO_CAPACITY                                       :{BLACK}Talpa: {LTBLUE}{CARGO_LONG}{3:STRING}
-STR_VEHICLE_INFO_CAPACITY_MULT                                  :{BLACK}Talpa: {LTBLUE}{CARGO_LONG}{3:STRING} (x{4:NUM})
+STR_VEHICLE_INFO_CAPACITY                                       :{BLACK}Talpa: {LTBLUE}{CARGO_LONG}{STRING}
+STR_VEHICLE_INFO_CAPACITY_MULT                                  :{BLACK}Talpa: {LTBLUE}{CARGO_LONG}{STRING} (x{NUM})
 STR_VEHICLE_INFO_CAPACITY_CAPACITY                              :{BLACK}Talpa: {LTBLUE}{CARGO_LONG}, {CARGO_LONG}{STRING}
 
 STR_VEHICLE_INFO_FEEDER_CARGO_VALUE                             :{BLACK}Pervesti už tiekėjų sistemas: {LTBLUE}{CURRENCY_LONG}
@@ -4679,7 +4650,6 @@ STR_ORDERS_TIMETABLE_VIEW_TOOLTIP                               :{BLACK}Pereiti 
 
 STR_ORDERS_LIST_TOOLTIP                                         :{BLACK}Užduočių sąrašas — užduotis pažymima ant jos spragtelėjus. Spragtelėjus laikant nuspaustą Ctrl klavišą, kad užduoties tikslo vieta būtų centruojama pagrindiniame ekrane
 STR_ORDER_INDEX                                                 :{COMMA}:{NBSP}
-STR_ORDER_TEXT                                                  :{STRING} {STRING} {STRING} {STRING}
 
 STR_ORDERS_END_OF_ORDERS                                        :- - Užduočių pabaiga- -
 STR_ORDERS_END_OF_SHARED_ORDERS                                 :- - Bendrų užduočių pabaiga - -
@@ -4774,12 +4744,6 @@ STR_ORDER_GO_NON_STOP_TO_WAYPOINT                               :Vykti nesustoja
 STR_ORDER_SERVICE_AT                                            :Vykti techninės apžiūros į
 STR_ORDER_SERVICE_NON_STOP_AT                                   :Vykti techninės apžiūros nesustojant į
 
-STR_ORDER_NEAREST_DEPOT                                         :artimiausias
-STR_ORDER_NEAREST_DEPOT.kas                                     :artimiausias
-STR_ORDER_NEAREST_DEPOT.ka                                      :artimiausią
-STR_ORDER_NEAREST_HANGAR                                        :artimiausias angaras
-STR_ORDER_NEAREST_HANGAR.kas                                    :artimiausias angaras
-STR_ORDER_NEAREST_HANGAR.ka                                     :artimiausią angarą
 ###length 3
 STR_ORDER_TRAIN_DEPOT                                           :depas
 STR_ORDER_TRAIN_DEPOT.kas                                       :depas
@@ -4792,7 +4756,6 @@ STR_ORDER_SHIP_DEPOT.kas                                        :dokas
 STR_ORDER_SHIP_DEPOT.ka                                         :doką
 ###next-name-looks-similar
 
-STR_ORDER_GO_TO_NEAREST_DEPOT_FORMAT                            :{STRING} {STRING.ka} {STRING.ka}
 STR_ORDER_GO_TO_DEPOT_FORMAT                                    :{STRING} „{DEPOT}“
 
 STR_ORDER_REFIT_ORDER                                           :(pertvarkyti {STRING.kam})
@@ -4801,8 +4764,7 @@ STR_ORDER_STOP_ORDER                                            :(sustoti)
 
 STR_ORDER_WAIT_TO_UNBUNCH                                       :(Palaukti iškrovimo)
 
-STR_ORDER_GO_TO_STATION                                         :{STRING} „{STATION}“ {STRING}
-STR_ORDER_GO_TO_STATION_CAN_T_USE_STATION                       :{PUSH_COLOUR}{RED}(Negalima naudotis stotimi){POP_COLOUR} {STRING} {STATION} {STRING}
+STR_ORDER_GO_TO_STATION_CAN_T_USE_STATION                       :{PUSH_COLOUR}{RED}(Negalima naudotis stotimi){POP_COLOUR} {STRING} {STATION}
 
 STR_ORDER_IMPLICIT                                              :(automatinis)
 
@@ -4862,7 +4824,7 @@ STR_TIMETABLE_TOOLTIP                                           :{BLACK}Tvarkara
 STR_TIMETABLE_NO_TRAVEL                                         :Nėra kelionių
 STR_TIMETABLE_NOT_TIMETABLEABLE                                 :Kelionė (automatinė; į tvarkaraštį bus įtraukta kitos užduoties)
 STR_TIMETABLE_TRAVEL_NOT_TIMETABLED                             :Kelionė (nėra tvarkaraštyje)
-STR_TIMETABLE_TRAVEL_NOT_TIMETABLED_SPEED                       :Vykti ne didesniu, nei {2:VELOCITY} greičiu (kelionės trukmė nenustatyta)
+STR_TIMETABLE_TRAVEL_NOT_TIMETABLED_SPEED                       :Vykti ne didesniu, nei {VELOCITY} greičiu (kelionės trukmė nenustatyta)
 STR_TIMETABLE_TRAVEL_FOR                                        :Keliauti {STRING.ka}
 STR_TIMETABLE_TRAVEL_FOR_SPEED                                  :Vykti {STRING} ne didesniu, nei {VELOCITY} greičiu
 STR_TIMETABLE_TRAVEL_FOR_ESTIMATED                              :Vykti ({STRING.ka}, neįtraukiant į tvarkaraštį)
@@ -4881,7 +4843,6 @@ STR_TIMETABLE_STATUS_EARLY                                      :{BLACK}Transpor
 STR_TIMETABLE_STATUS_NOT_STARTED                                :{BLACK}Tvarkaraštis dar nėra aktyvintas
 
 STR_TIMETABLE_START                                             :{BLACK}Pradėti tvarkaraštį
-
 STR_TIMETABLE_START_SECONDS_QUERY                               :Sekundės iki tvarkaraščio pradžios
 
 STR_TIMETABLE_CHANGE_TIME                                       :{BLACK}Keisti trukmę
@@ -4991,7 +4952,6 @@ STR_SCREENSHOT_HEIGHTMAP_SCREENSHOT                             :{BLACK}Teminio 
 STR_SCREENSHOT_MINIMAP_SCREENSHOT                               :{BLACK}Mini žemėlapio kopija
 
 # Script Parameters
-STR_AI_SETTINGS_CAPTION                                         :{WHITE}{STRING} Parametrai
 STR_AI_SETTINGS_CAPTION_AI                                      :DI
 STR_AI_SETTINGS_CAPTION_GAMESCRIPT                              :Žaidimo scenarijus
 STR_AI_SETTINGS_CLOSE                                           :{BLACK}Uždaryti
@@ -5080,7 +5040,6 @@ STR_ERROR_SCREENSHOT_FAILED                                     :{WHITE}Ekrano v
 
 # Error message titles
 STR_ERROR_MESSAGE_CAPTION                                       :{YELLOW}Žinutė
-STR_ERROR_MESSAGE_CAPTION_OTHER_COMPANY                         :{YELLOW}Žinutė nuo {STRING}
 
 # Generic construction errors
 STR_ERROR_OFF_EDGE_OF_MAP                                       :{WHITE}Už žemelapio kraštų
@@ -5099,7 +5058,6 @@ STR_ERROR_TERRAFORM_LIMIT_REACHED                               :{WHITE}...pasie
 STR_ERROR_CLEARING_LIMIT_REACHED                                :{WHITE}... pasiekta langelių valymo riba
 STR_ERROR_TREE_PLANT_LIMIT_REACHED                              :{WHITE}... pasiektas leistinas sodinimų skaičius
 STR_ERROR_NAME_MUST_BE_UNIQUE                                   :{WHITE}Vardas turi būti unikalus
-STR_ERROR_GENERIC_OBJECT_IN_THE_WAY                             :{WHITE}{1:STRING} kelyje
 STR_ERROR_NOT_ALLOWED_WHILE_PAUSED                              :{WHITE}Negalima pauzės režime
 
 # Local authority errors
@@ -5406,6 +5364,10 @@ STR_ERROR_CAN_T_SELL_TRAIN                                      :{WHITE}Priemone
 STR_ERROR_CAN_T_SELL_ROAD_VEHICLE                               :{WHITE}Automobilio parduoti negalima...
 STR_ERROR_CAN_T_SELL_SHIP                                       :{WHITE}Laivo parduoti negalima...
 STR_ERROR_CAN_T_SELL_AIRCRAFT                                   :{WHITE}Negalima parduoti lėktuvo...
+
+###length VEHICLE_TYPES
+
+###length VEHICLE_TYPES
 
 STR_ERROR_TOO_MANY_VEHICLES_IN_GAME                             :{WHITE}Per daug transporto priemonių žaidime
 STR_ERROR_CAN_T_CHANGE_SERVICING                                :{WHITE}Aptarnavimo intervalo keisti negalima...
@@ -6186,18 +6148,7 @@ STR_SAVEGAME_NAME_SPECTATOR                                     :Stebėtojas, {1
 
 # Viewport strings
 STR_VIEWPORT_TOWN_POP                                           :{WHITE}{TOWN} ({COMMA})
-STR_VIEWPORT_TOWN                                               :{WHITE}{TOWN}
-STR_VIEWPORT_TOWN_TINY_BLACK                                    :{TINY_FONT}{BLACK}{TOWN}
-STR_VIEWPORT_TOWN_TINY_WHITE                                    :{TINY_FONT}{WHITE}{TOWN}
-
-STR_VIEWPORT_SIGN_SMALL_BLACK                                   :{TINY_FONT}{BLACK}{SIGN}
-STR_VIEWPORT_SIGN_SMALL_WHITE                                   :{TINY_FONT}{WHITE}{SIGN}
-
 STR_VIEWPORT_STATION                                            :{STATION} {STATION_FEATURES}
-STR_VIEWPORT_STATION_TINY                                       :{TINY_FONT}{STATION}
-
-STR_VIEWPORT_WAYPOINT                                           :{WAYPOINT}
-STR_VIEWPORT_WAYPOINT_TINY                                      :{TINY_FONT}{WAYPOINT}
 
 # Simple strings to get specific types of data
 STR_COMPANY_NAME                                                :{COMPANY}
@@ -6234,8 +6185,6 @@ STR_JUST_DATE_LONG                                              :{DATE_LONG}
 STR_JUST_DATE_ISO                                               :{DATE_ISO}
 STR_JUST_STRING                                                 :{STRING}
 STR_JUST_STRING1                                                :{STRING}
-STR_JUST_STRING2                                                :{STRING}
-STR_JUST_STRING4                                                :{STRING}
 STR_JUST_STRING_STRING                                          :{STRING}{STRING}
 STR_JUST_RAW_STRING                                             :{STRING}
 STR_JUST_BIG_RAW_STRING                                         :{BIG_FONT}{STRING}
@@ -6259,3 +6208,4 @@ STR_PLANE                                                       :{BLACK}{PLANE}
 STR_SHIP                                                        :{BLACK}{SHIP}
 
 STR_TOOLBAR_RAILTYPE_VELOCITY                                   :{STRING} ({VELOCITY})
+

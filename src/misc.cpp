@@ -123,18 +123,18 @@ void InitializeGame(uint size_x, uint size_y, bool reset_date, bool reset_settin
 	ClearSpecialEventsLog();
 	ClearDesyncMsgLog();
 
-	_pause_mode = PM_UNPAUSED;
+	_pause_mode = {};
 	_pause_countdown = 0;
 	_game_speed = 100;
 	CalTime::Detail::now.sub_date_fract = 0;
-	EconTime::Detail::years_elapsed = YearDelta{0};
+	EconTime::Detail::years_elapsed = EconTime::YearDelta{0};
 	_tick_counter = 0;
 	DateDetail::_tick_skip_counter = 0;
 	_scaled_tick_counter = 0;
 	_state_ticks = INITIAL_STATE_TICKS_VALUE;
 	DateDetail::_state_ticks_offset = StateTicksDelta{0};
-	_cur_tileloop_tile = 1;
-	_aux_tileloop_tile = 1;
+	_cur_tileloop_tile = TileIndex{1};
+	_aux_tileloop_tile = TileIndex{1};
 	_thd.redsq = INVALID_TILE;
 	_road_layout_change_counter = 0;
 	_loaded_local_company = COMPANY_SPECTATOR;
@@ -154,7 +154,6 @@ void InitializeGame(uint size_x, uint size_y, bool reset_date, bool reset_settin
 		MakeNewgameSettingsLive();
 	} else {
 		UpdateEffectiveDayLengthFactor();
-		SetupTickRate();
 	}
 
 	_newgrf_profilers.clear();
@@ -179,7 +178,8 @@ void InitializeGame(uint size_x, uint size_y, bool reset_date, bool reset_settin
 	ClearBridgeSimulatedSignalMapping();
 	ClearBridgeSignalStyleMapping();
 	ClearCargoPacketDeferredPayments();
-	PoolBase::Clean(PT_NORMAL);
+	ClearTemplateReplacements();
+	PoolBase::Clean(PoolType::Normal);
 
 	extern void ClearNewSignalStyleMapping();
 	ClearNewSignalStyleMapping();

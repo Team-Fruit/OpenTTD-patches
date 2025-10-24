@@ -19,11 +19,11 @@
 #include "queue.h"
 #include <memory>
 
-#include "../../tile_type.h"
-#include "../../track_type.h"
+#include "../tile_type.h"
+#include "../track_type.h"
 
-#include "../../core/pod_pool.hpp"
-#include "../../3rdparty/robin_hood/robin_hood.h"
+#include "../core/pod_pool.hpp"
+#include "../3rdparty/robin_hood/robin_hood.h"
 
 static const int AYSTAR_DEF_MAX_SEARCH_NODES = 10000; ///< Reference limit for #AyStar::max_search_nodes
 
@@ -60,8 +60,6 @@ struct OpenListNode {
 	int g;
 	PathNode path;
 };
-
-bool CheckIgnoreFirstTile(const PathNode *node);
 
 struct AyStar;
 
@@ -138,8 +136,6 @@ struct AyStar {
 	void *user_target;
 	void *user_data;
 
-	uint8_t loops_per_tick; ///< How many loops are there called before Main() gives control back to the caller. 0 = until done.
-	uint max_path_cost;     ///< If the g-value goes over this number, it stops searching, 0 = infinite.
 	uint max_search_nodes;  ///< The maximum number of nodes that will be expanded, 0 = infinite.
 
 	/* These should be filled with the neighbours of a tile by
@@ -160,7 +156,7 @@ struct AyStar {
 
 protected:
 
-	inline uint32_t HashKey(TileIndex tile, Trackdir td) const { return tile | (td << 28); }
+	inline uint32_t HashKey(TileIndex tile, Trackdir td) const { return tile.base() | (td << 28); }
 
 	PodPool<PathNode*, sizeof(PathNode), 8192> closedlist_nodes;
 	robin_hood::unordered_flat_map<uint32_t, uint32_t> closedlist_hash;

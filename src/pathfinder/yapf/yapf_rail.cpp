@@ -108,7 +108,9 @@ private:
 			tile = TileAdd(tile, diff);
 		} while (IsCompatibleTrainStationTile(tile, start) && tile != this->origin_tile);
 
-		TriggerStationRandomisation(nullptr, start, SRT_PATH_RESERVATION);
+		auto *st = Station::GetByTile(start);
+		TriggerStationRandomisation(st, start, StationRandomTrigger::PathReservation);
+		TriggerStationAnimation(st, start, StationAnimationTrigger::PathReservation);
 
 		return true;
 	}
@@ -129,12 +131,18 @@ private:
 				this->res_fail_td = td;
 				return false;
 			}
+
+			if (IsRailWaypointTile(tile)) {
+				auto *st = BaseStation::GetByTile(tile);
+				TriggerStationRandomisation(st, tile, StationRandomTrigger::PathReservation);
+				TriggerStationAnimation(st, tile, StationAnimationTrigger::PathReservation);
+			}
 		}
 
 		return tile != this->res_dest_tile || td != this->res_dest_td;
 	}
 
-	/** Unreserve a single track/platform. Stops when the previous failer is reached. */
+	/** Unreserve a single track/platform. Stops when the previous failure is reached. */
 	bool UnreserveSingleTrack(TileIndex tile, Trackdir td)
 	{
 		if (IsRailStationTile(tile)) {
@@ -357,10 +365,10 @@ public:
 	{
 		const Train *v = Yapf().GetVehicle();
 		TrackFollower F(v);
-		if (old_node.flags_u.flags_s.reverse_pending && old_node.segment->end_segment_reason & (ESRB_SAFE_TILE | ESRB_DEPOT | ESRB_DEAD_END)) {
+		if (old_node.flags_u.flags_s.reverse_pending && old_node.segment->end_segment_reason.Any({EndSegmentReason::SafeTile, EndSegmentReason::Depot, EndSegmentReason::DeadEnd})) {
 			Node *rev_node = &old_node;
 			uint length = 0;
-			while (rev_node && !(rev_node->segment->end_segment_reason & ESRB_REVERSE)) {
+			while (rev_node && !rev_node->segment->end_segment_reason.Test(EndSegmentReason::Reverse)) {
 				length += rev_node->GetNodeLength(v, Yapf(), *this);
 				rev_node = rev_node->parent;
 			}
@@ -372,7 +380,7 @@ public:
 					});
 				}
 				return;
-			} else if (old_node.segment->end_segment_reason & (ESRB_DEPOT | ESRB_DEAD_END)) {
+			} else if (old_node.segment->end_segment_reason.Any({EndSegmentReason::Depot, EndSegmentReason::DeadEnd})) {
 				return;
 			}
 		}
@@ -432,14 +440,14 @@ public:
 		Node *n = Yapf().GetBestNode();
 
 		/* walk through the path back to the origin */
-		Node *pNode = n;
-		while (pNode->parent != nullptr) {
-			pNode = pNode->parent;
+		Node *node = n;
+		while (node->parent != nullptr) {
+			node = node->parent;
 		}
 
 		/* if the origin node is our front vehicle tile/Trackdir then we didn't reverse
 		 * but we can also look at the cost (== 0 -> not reversed, == reverse_penalty -> reversed) */
-		return FindDepotData(n->GetLastTile(), n->cost, pNode->cost != 0);
+		return FindDepotData(n->GetLastTile(), n->cost, node->cost != 0);
 	}
 };
 
@@ -515,19 +523,19 @@ public:
 		if (!bFound) return false;
 
 		/* Found a destination, set as reservation target. */
-		Node *pNode = Yapf().GetBestNode();
-		this->SetReservationTarget(pNode, pNode->GetLastTile(), pNode->GetLastTrackdir());
+		Node *node = Yapf().GetBestNode();
+		this->SetReservationTarget(node, node->GetLastTile(), node->GetLastTrackdir());
 
 		/* Walk through the path back to the origin. */
-		Node *pPrev = nullptr;
-		while (pNode->parent != nullptr) {
-			pPrev = pNode;
-			pNode = pNode->parent;
+		Node *prev = nullptr;
+		while (node->parent != nullptr) {
+			prev = node;
+			node = node->parent;
 
-			this->FindSafePositionOnNode(pPrev);
+			this->FindSafePositionOnNode(prev);
 		}
 
-		return dont_reserve || this->TryReservePath(nullptr, pNode->GetLastTile());
+		return dont_reserve || this->TryReservePath(nullptr, node->GetLastTile());
 	}
 };
 
@@ -557,10 +565,10 @@ public:
 	{
 		const Train *v = Yapf().GetVehicle();
 		TrackFollower F(v);
-		if (old_node.flags_u.flags_s.reverse_pending && old_node.segment->end_segment_reason & (ESRB_SAFE_TILE | ESRB_DEPOT | ESRB_DEAD_END)) {
+		if (old_node.flags_u.flags_s.reverse_pending && old_node.segment->end_segment_reason.Any({EndSegmentReason::SafeTile, EndSegmentReason::Depot, EndSegmentReason::DeadEnd})) {
 			Node *rev_node = &old_node;
 			uint length = 0;
-			while (rev_node != nullptr && !(rev_node->segment->end_segment_reason & ESRB_REVERSE)) {
+			while (rev_node != nullptr && !rev_node->segment->end_segment_reason.Test(EndSegmentReason::Reverse)) {
 				length += rev_node->GetNodeLength(v, Yapf(), *this);
 				rev_node = rev_node->parent;
 			}
@@ -572,7 +580,7 @@ public:
 					});
 				}
 				return;
-			} else if (old_node.segment->end_segment_reason & (ESRB_DEPOT | ESRB_DEAD_END)) {
+			} else if (old_node.segment->end_segment_reason.Any({EndSegmentReason::Depot, EndSegmentReason::DeadEnd})) {
 				return;
 			}
 		}
@@ -617,7 +625,7 @@ public:
 		if (dest != nullptr) *dest = INVALID_TILE;
 
 		/* set origin and destination nodes */
-		PBSTileInfo origin = FollowTrainReservation(v, nullptr, FTRF_OKAY_UNUSED);
+		PBSTileInfo origin = FollowTrainReservation(v, nullptr, FollowTrainReservationFlag::OkayUnused);
 		Yapf().SetOrigin(origin.tile, origin.trackdir, INVALID_TILE, INVALID_TRACKDIR, 1);
 		Yapf().SetTreatFirstRedTwoWaySignalAsEOL(true);
 		Yapf().SetDestination(v);
@@ -627,32 +635,32 @@ public:
 
 		/* if path not found - return INVALID_TRACKDIR */
 		Trackdir next_trackdir = INVALID_TRACKDIR;
-		Node *pNode = Yapf().GetBestNode();
-		if (pNode != nullptr) {
+		Node *node = Yapf().GetBestNode();
+		if (node != nullptr) {
 			/* reserve till end of path */
-			this->SetReservationTarget(pNode, pNode->GetLastTile(), pNode->GetLastTrackdir());
+			this->SetReservationTarget(node, node->GetLastTile(), node->GetLastTrackdir());
 
 			/* path was found or at least suggested
 			 * walk through the path back to the origin */
-			Node *pPrev = nullptr;
-			while (pNode->parent != nullptr) {
-				pPrev = pNode;
-				pNode = pNode->parent;
+			Node *prev = nullptr;
+			while (node->parent != nullptr) {
+				prev = node;
+				node = node->parent;
 
-				this->FindSafePositionOnNode(pPrev);
+				this->FindSafePositionOnNode(prev);
 			}
 
 			/* If the best PF node has no parent, then there is no (valid) best next trackdir to return.
 			 * This occurs when the PF is called while the train is already at its destination. */
-			if (pPrev == nullptr) return INVALID_TRACKDIR;
+			if (prev == nullptr) return INVALID_TRACKDIR;
 
 			/* return trackdir from the best origin node (one of start nodes) */
-			Node &best_next_node = *pPrev;
+			Node &best_next_node = *prev;
 			next_trackdir = best_next_node.GetTrackdir();
 
 			if (reserve_track && path_found) {
 				if (dest != nullptr) *dest = Yapf().GetBestNode()->GetLastTile();
-				this->TryReservePath(target, pNode->GetLastTile());
+				this->TryReservePath(target, node->GetLastTile());
 			}
 		}
 
@@ -694,13 +702,13 @@ public:
 
 		/* path was found
 		 * walk through the path back to the origin */
-		Node *pNode = Yapf().GetBestNode();
-		while (pNode->parent != nullptr) {
-			pNode = pNode->parent;
+		Node *node = Yapf().GetBestNode();
+		while (node->parent != nullptr) {
+			node = node->parent;
 		}
 
 		/* check if it was reversed origin */
-		bool reversed = (pNode->cost != 0);
+		bool reversed = (node->cost != 0);
 		return reversed;
 	}
 };
@@ -816,7 +824,7 @@ FindDepotData YapfTrainFindNearestDepot(const Train *v, int max_penalty)
 {
 	const Train *last_veh = v->Last();
 
-	PBSTileInfo origin = FollowTrainReservation(v, nullptr, FTRF_OKAY_UNUSED);
+	PBSTileInfo origin = FollowTrainReservation(v, nullptr, FollowTrainReservationFlag::OkayUnused);
 	TileIndex last_tile = last_veh->tile;
 	Trackdir td_rev = ReverseTrackdir(last_veh->GetVehicleTrackdir());
 

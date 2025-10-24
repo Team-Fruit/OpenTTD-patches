@@ -14,14 +14,14 @@
 
 #include "vehicle_base.h"
 #include "water_map.h"
-#include "core/ring_buffer.hpp"
+#include "3rdparty/cpp-ring-buffer/ring_buffer.hpp"
 
 extern const DiagDirection _ship_search_directions[TRACK_END][DIAGDIR_END];
 
 void GetShipSpriteSize(EngineID engine, uint &width, uint &height, int &xoffs, int &yoffs, EngineImageType image_type);
 WaterClass GetEffectiveWaterClass(TileIndex tile);
 
-typedef ring_buffer<Trackdir> ShipPathCache;
+typedef jgr::ring_buffer<Trackdir> ShipPathCache;
 
 /** Maximum segments of ship path cache */
 static const uint8_t SHIP_PATH_CACHE_LENGTH = 32;
@@ -32,13 +32,13 @@ static_assert((SHIP_PATH_CACHE_LENGTH & SHIP_PATH_CACHE_MASK) == 0, ""); // Must
  * All ships have this type.
  */
 struct Ship final : public SpecializedVehicle<Ship, VEH_SHIP> {
-	TrackBits state;                  ///< The "track" the ship is following.
-	ShipPathCache cached_path;        ///< Cached path.
-	Direction rotation;               ///< Visible direction.
-	int16_t rotation_x_pos;           ///< NOSAVE: X Position before rotation.
-	int16_t rotation_y_pos;           ///< NOSAVE: Y Position before rotation.
-	uint8_t lost_count;               ///< Count of number of failed pathfinder attempts
-	uint8_t critical_breakdown_count; ///< Counter for the number of critical breakdowns since last service
+	TrackBits state{};                    ///< The "track" the ship is following.
+	ShipPathCache cached_path{};          ///< Cached path.
+	Direction rotation = INVALID_DIR;     ///< Visible direction.
+	int16_t rotation_x_pos = 0;           ///< NOSAVE: X Position before rotation.
+	int16_t rotation_y_pos = 0;           ///< NOSAVE: Y Position before rotation.
+	uint8_t lost_count = 0;               ///< Count of number of failed pathfinder attempts
+	uint8_t critical_breakdown_count = 0; ///< Counter for the number of critical breakdowns since last service
 
 	/** We don't want GCC to zero our struct! It already is zeroed and has an index! */
 	Ship() : SpecializedVehicleBase() {}

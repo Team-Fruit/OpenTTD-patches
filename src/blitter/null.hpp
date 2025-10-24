@@ -39,7 +39,7 @@ public:
 	void ScrollBuffer(void *video, int left, int top, int width, int height, int scroll_x, int scroll_y) override {};
 	size_t BufferSize(uint width, uint height) override { return 0; };
 	void PaletteAnimate(const Palette &palette) override { };
-	Blitter::PaletteAnimation UsePaletteAnimation() override { return Blitter::PALETTE_ANIMATION_NONE; };
+	Blitter::PaletteAnimation UsePaletteAnimation() override { return Blitter::PaletteAnimation::None; };
 
 	const char *GetName() override { return "null"; }
 };
@@ -48,7 +48,7 @@ public:
 class FBlitter_Null : public BlitterFactory {
 public:
 	FBlitter_Null() : BlitterFactory("null", "Null Blitter (does nothing)") {}
-	Blitter *CreateInstance() override { return new Blitter_Null(); }
+	std::unique_ptr<Blitter> CreateInstance() override { return std::make_unique<Blitter_Null>(); }
 };
 
 #endif /* BLITTER_NULL_HPP */

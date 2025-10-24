@@ -28,7 +28,7 @@ public:
 	 * Initiate the connecting.
 	 * @param connection_string The address of the TURN server.
 	 */
-	NetworkTurnConnecter(ClientNetworkTurnSocketHandler *handler, const std::string &connection_string) : TCPConnecter(connection_string, NETWORK_TURN_SERVER_PORT), handler(handler) {}
+	NetworkTurnConnecter(ClientNetworkTurnSocketHandler *handler, std::string_view connection_string) : TCPConnecter(connection_string, NETWORK_TURN_SERVER_PORT), handler(handler) {}
 
 	void OnFailure() override
 	{
@@ -91,12 +91,12 @@ void ClientNetworkTurnSocketHandler::Connect()
  * Not until you run Connect() on the resulting instance will it start setting
  * up the TURN connection.
  * @param token The token as received from the Game Coordinator.
- * @param tracking_number The tracking number as recieved from the Game Coordinator.
+ * @param tracking_number The tracking number as received from the Game Coordinator.
  * @param ticket The ticket as received from the Game Coordinator.
  * @param connection_string Connection string of the TURN server.
  * @return The handler for this TURN connection.
  */
-/* static */ std::unique_ptr<ClientNetworkTurnSocketHandler> ClientNetworkTurnSocketHandler::Turn(const std::string &token, uint8_t tracking_number, const std::string &ticket, const std::string &connection_string)
+/* static */ std::unique_ptr<ClientNetworkTurnSocketHandler> ClientNetworkTurnSocketHandler::Turn(std::string_view token, uint8_t tracking_number, std::string_view ticket, std::string_view connection_string)
 {
 	auto turn_handler = std::make_unique<ClientNetworkTurnSocketHandler>(token, tracking_number, connection_string);
 

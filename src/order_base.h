@@ -27,18 +27,20 @@
 #include <vector>
 #include "3rdparty/cpp-btree/btree_map.h"
 
-typedef Pool<OrderPoolItem, OrderID, 256, 0xFF0000> OrderPool;
-typedef Pool<OrderList, OrderListID, 128, 64000> OrderListPool;
+using OrderPool = Pool<OrderPoolItem, OrderID, 256>;
+using OrderListPool = Pool<OrderList, OrderListID, 128>;
 extern OrderPool _order_pool;
 extern OrderListPool _orderlist_pool;
 extern btree::btree_map<uint32_t, uint32_t> _order_destination_refcount_map;
 extern bool _order_destination_refcount_map_valid;
 
+static const StationID ORDER_NO_VIA_STATION{0xFFFE};
+
 inline uint32_t OrderDestinationRefcountMapKey(DestinationID dest, CompanyID cid, OrderType order_type, VehicleType veh_type)
 {
 	static_assert(sizeof(dest) == 2);
 	static_assert(OT_END <= 16);
-	return (((uint32_t) dest) << 16) | (((uint32_t) cid) << 8) | (((uint32_t) order_type) << 4) | ((uint32_t) veh_type);
+	return (((uint32_t) dest.base()) << 16) | (((uint32_t) cid.base()) << 8) | (((uint32_t) order_type) << 4) | ((uint32_t) veh_type);
 }
 
 template <typename F> void IterateOrderRefcountMapForDestinationID(DestinationID dest, F handler)
@@ -64,6 +66,7 @@ void ClearOrderDestinationRefcountMap();
  * xdata users:
  * OT_COUNTER: Counter operation value (not counter ID)
  * OCV_SLOT_OCCUPANCY, OCV_VEH_IN_SLOT: Trace restrict slot ID
+ * OCV_VEH_IN_SLOT_GROUP: Trace restrict slot group ID
  * OCV_COUNTER_VALUE: Bits 0-15: Counter comparison value, Bits 16-31: Counter ID
  * OCV_TIMETABLE: Timetable lateness/earliness
  * OCV_TIME_DATE: Time/date
@@ -80,6 +83,7 @@ void ClearOrderDestinationRefcountMap();
  * OCV_FREE_PLATFORMS: Bits 0-15: Station ID to test + 1
  * OCV_CARGO_WAITING_AMOUNT: Bits 0-15: Station ID to test + 1
  * OCV_CARGO_WAITING_AMOUNT_PERCENTAGE: Bits 0-15: Station ID to test + 1, Bit 16: Refit mode
+ * OCV_DISPATCH_SLOT: OCDM_ROUTE_ID: Bits 0-15: Route ID
  */
 
 struct OrderExtraInfo {
@@ -94,6 +98,8 @@ struct OrderExtraInfo {
 namespace upstream_sl {
 	SaveLoadTable GetOrderDescription();
 	SaveLoadTable GetOrderListDescription();
+	template <typename T>
+	class SlOrders;
 	class SlVehicleCommon;
 	class SlVehicleDisaster;
 }
@@ -111,6 +117,8 @@ private:
 	friend struct OrderExtraDataStructHandler;                            ///< Saving and loading of orders.
 	friend struct VehicleOrderExtraDataStructHandler;                     ///< Saving and loading of orders.
 	friend upstream_sl::SaveLoadTable upstream_sl::GetOrderDescription(); ///< Saving and loading of orders.
+	template <typename T>
+	friend class upstream_sl::SlOrders;
 	friend upstream_sl::SlVehicleCommon;
 	friend upstream_sl::SlVehicleDisaster;
 	friend void Load_ORDX();                                             ///< Saving and loading of orders.
@@ -121,7 +129,7 @@ private:
 	uint16_t flags{};              ///< Load/unload types, depot order/action types.
 	DestinationID dest{};          ///< The destination of the order.
 	uint8_t type{};                ///< The type of order + non-stop flags
-	CargoID refit_cargo{};         ///< Refit CargoID
+	CargoType refit_cargo{};       ///< Refit CargoType
 	uint8_t occupancy{};           ///< Estimate of vehicle occupancy on departure, for the current order, 0 indicates invalid, 1 - 101 indicate 0 - 100%
 
 	TimetableTicks wait_time{};    ///< How long in ticks to wait at the destination.
@@ -216,10 +224,8 @@ public:
 	}
 
 	Order() : flags(0), refit_cargo(CARGO_NO_REFIT), max_speed(UINT16_MAX) {}
-	Order(uint8_t type, uint8_t flags, DestinationID dest) : flags(flags), dest(dest), type(type), refit_cargo(CARGO_NO_REFIT), occupancy(0), wait_time(0), travel_time(0), max_speed(UINT16_MAX) {}
+	Order(uint8_t type, uint16_t flags, DestinationID dest) : flags(flags), dest(dest), type(type), refit_cargo(CARGO_NO_REFIT), occupancy(0), wait_time(0), travel_time(0), max_speed(UINT16_MAX) {}
 	~Order() {}
-
-	Order(uint64_t packed);
 
 	Order(const Order& other)
 	{
@@ -233,6 +239,12 @@ public:
 		this->AssignOrder(other);
 		return *this;
 	}
+
+	auto GetCmdRefTuple()
+	{
+		return std::tie(this->type, this->flags, this->dest);
+	}
+	static constexpr char CMD_TUPLE_FMT[] = "t: {:X}, f: {:X}, d: {}";
 
 	/**
 	 * Check whether this order is of the given type.
@@ -257,7 +269,7 @@ public:
 	void Free();
 
 	void MakeGoToStation(StationID destination);
-	void MakeGoToDepot(DepotID destination, OrderDepotTypeFlags order, OrderNonStopFlags non_stop_type = ONSF_NO_STOP_AT_INTERMEDIATE_STATIONS, OrderDepotActionFlags action = ODATF_SERVICE_ONLY, CargoID cargo = CARGO_NO_REFIT);
+	void MakeGoToDepot(DestinationID destination, OrderDepotTypeFlags order, OrderNonStopFlags non_stop_type = ONSF_NO_STOP_AT_INTERMEDIATE_STATIONS, OrderDepotActionFlags action = ODATF_SERVICE_ONLY, CargoType cargo = CARGO_NO_REFIT);
 	void MakeGoToWaypoint(StationID destination);
 	void MakeLoading(bool ordered);
 	void MakeLeaveStation();
@@ -268,6 +280,7 @@ public:
 	void MakeLoadingAdvance(StationID destination);
 	void MakeReleaseSlot();
 	void MakeTryAcquireSlot();
+	void MakeReleaseSlotGroup();
 	void MakeChangeCounter();
 	void MakeLabel(OrderLabelSubType subtype);
 
@@ -277,7 +290,7 @@ public:
 	 */
 	inline bool IsGotoOrder() const
 	{
-		return IsType(OT_GOTO_WAYPOINT) || IsType(OT_GOTO_DEPOT) || IsType(OT_GOTO_STATION);
+		return this->IsType(OT_GOTO_WAYPOINT) || this->IsType(OT_GOTO_DEPOT) || this->IsType(OT_GOTO_STATION);
 	}
 
 	/**
@@ -286,12 +299,12 @@ public:
 	 */
 	inline bool IsBaseStationOrder() const
 	{
-		return IsType(OT_IMPLICIT) || IsType(OT_GOTO_STATION) || IsType(OT_GOTO_WAYPOINT);
+		return this->IsType(OT_IMPLICIT) || this->IsType(OT_GOTO_STATION) || this->IsType(OT_GOTO_WAYPOINT);
 	}
 
 	/**
 	 * Gets the destination of this order.
-	 * @pre IsType(OT_GOTO_WAYPOINT) || IsType(OT_GOTO_DEPOT) || IsType(OT_GOTO_STATION) || IsType(OT_SLOT) || IsType(OT_COUNTER) || IsType(OT_LABEL).
+	 * @pre IsType(OT_GOTO_WAYPOINT) || IsType(OT_GOTO_DEPOT) || IsType(OT_GOTO_STATION) || IsSlotCounterOrder() || IsType(OT_LABEL).
 	 * @return the destination of the order.
 	 */
 	inline DestinationID GetDestination() const { return this->dest; }
@@ -299,7 +312,7 @@ public:
 	/**
 	 * Sets the destination of this order.
 	 * @param destination the new destination of the order.
-	 * @pre IsType(OT_GOTO_WAYPOINT) || IsType(OT_GOTO_DEPOT) || IsType(OT_GOTO_STATION) || IsType(OT_SLOT) || IsType(OT_COUNTER) || IsType(OT_LABEL).
+	 * @pre IsType(OT_GOTO_WAYPOINT) || IsType(OT_GOTO_DEPOT) || IsType(OT_GOTO_STATION) || IsSlotCounterOrder() || IsType(OT_LABEL).
 	 */
 	inline void SetDestination(DestinationID destination) { this->dest = destination; }
 
@@ -322,9 +335,9 @@ public:
 	 * @pre IsType(OT_GOTO_DEPOT) || IsType(OT_GOTO_STATION)
 	 * @return the cargo type.
 	 */
-	inline CargoID GetRefitCargo() const { return this->refit_cargo; }
+	inline CargoType GetRefitCargo() const { return this->refit_cargo; }
 
-	void SetRefit(CargoID cargo);
+	void SetRefit(CargoType cargo);
 
 	/**
 	 * Update the jump_counter of this order.
@@ -349,7 +362,7 @@ public:
 	 * @param cargo_id The cargo type index.
 	 * @return The load type for this cargo.
 	 */
-	inline OrderLoadFlags GetCargoLoadTypeRaw(CargoID cargo_id) const
+	inline OrderLoadFlags GetCargoLoadTypeRaw(CargoType cargo_id) const
 	{
 		assert(cargo_id < NUM_CARGO);
 		if (!this->extra) return OLF_LOAD_IF_POSSIBLE;
@@ -361,7 +374,7 @@ public:
 	 * @param cargo_id The cargo type index.
 	 * @return The load type for this cargo.
 	 */
-	inline OrderLoadFlags GetCargoLoadType(CargoID cargo_id) const
+	inline OrderLoadFlags GetCargoLoadType(CargoType cargo_id) const
 	{
 		assert(cargo_id < NUM_CARGO);
 		OrderLoadFlags olf = this->GetLoadType();
@@ -383,7 +396,7 @@ public:
 	 * @param cargo_id The cargo type index.
 	 * @return The unload type for this cargo.
 	 */
-	inline OrderUnloadFlags GetCargoUnloadTypeRaw(CargoID cargo_id) const
+	inline OrderUnloadFlags GetCargoUnloadTypeRaw(CargoType cargo_id) const
 	{
 		assert(cargo_id < NUM_CARGO);
 		if (!this->extra) return OUF_UNLOAD_IF_POSSIBLE;
@@ -395,7 +408,7 @@ public:
 	 * @param cargo_id The cargo type index.
 	 * @return The unload type for this cargo.
 	 */
-	inline OrderUnloadFlags GetCargoUnloadType(CargoID cargo_id) const
+	inline OrderUnloadFlags GetCargoUnloadType(CargoType cargo_id) const
 	{
 		assert(cargo_id < NUM_CARGO);
 		OrderUnloadFlags ouf = this->GetUnloadType();
@@ -407,7 +420,7 @@ public:
 	{
 		if ((this->GetLoadType() == OLFB_CARGO_TYPE_LOAD) || (this->GetUnloadType() == OUFB_CARGO_TYPE_UNLOAD)) {
 			CargoTypes output_mask = cargo_mask;
-			for (CargoID cargo : SetCargoBitIterator(cargo_mask)) {
+			for (CargoType cargo : SetCargoBitIterator(cargo_mask)) {
 				if (!filter_func(this, cargo)) ClrBit(output_mask, cargo);
 			}
 			return output_mask;
@@ -427,15 +440,15 @@ public:
 	/** Extra depot flags. */
 	inline OrderDepotExtraFlags GetDepotExtraFlags() const { return (OrderDepotExtraFlags)GB(this->flags, 8, 8); }
 	/** What waypoint flags? */
-	inline OrderWaypointFlags GetWaypointFlags() const { return (OrderWaypointFlags)GB(this->flags, 0, 3); }
+	inline OrderWaypointFlags GetWaypointFlags() const { return static_cast<OrderWaypointFlags>(GB(this->flags, 0, 3)); }
 	/** What variable do we have to compare? */
-	inline OrderConditionVariable GetConditionVariable() const { return (OrderConditionVariable)GB(this->dest, 11, 5); }
+	inline OrderConditionVariable GetConditionVariable() const { return static_cast<OrderConditionVariable>(GB(this->dest.value, 11, 5)); }
 	/** What is the comparator to use? */
 	inline OrderConditionComparator GetConditionComparator() const { return (OrderConditionComparator)GB(this->type, 5, 3); }
 	/** Get the order to skip to. */
 	inline VehicleOrderID GetConditionSkipToOrder() const { return this->flags; }
 	/** Get the value to base the skip on. */
-	inline uint16_t GetConditionValue() const { return GB(this->dest, 0, 11); }
+	inline uint16_t GetConditionValue() const { return GB(this->dest.value, 0, 11); }
 	/** Get counter for the 'jump xx% of times' option */
 	inline int8_t GetJumpCounter() const { return GB(this->GetXData(), 0, 8); }
 	/** Get counter operation */
@@ -462,7 +475,7 @@ public:
 	 * @param load_type The load type.
 	 * @param cargo_id The cargo type index.
 	 */
-	inline void SetLoadType(OrderLoadFlags load_type, CargoID cargo_id)
+	inline void SetLoadType(OrderLoadFlags load_type, CargoType cargo_id)
 	{
 		assert(cargo_id < NUM_CARGO);
 		this->CheckExtraInfoAlloced();
@@ -482,7 +495,7 @@ public:
 	 * @param unload_type The unload type.
 	 * @param cargo_id The cargo type index.
 	 */
-	inline void SetUnloadType(OrderUnloadFlags unload_type, CargoID cargo_id)
+	inline void SetUnloadType(OrderUnloadFlags unload_type, CargoType cargo_id)
 	{
 		assert(cargo_id < NUM_CARGO);
 		this->CheckExtraInfoAlloced();
@@ -500,15 +513,15 @@ public:
 	/** Set what we are going to do in the depot. */
 	inline void SetDepotExtraFlags(OrderDepotExtraFlags depot_extra_flags) { SB(this->flags, 8, 8, depot_extra_flags); }
 	/** Set waypoint flags. */
-	inline void SetWaypointFlags(OrderWaypointFlags waypoint_flags) { SB(this->flags, 0, 3, waypoint_flags); }
+	inline void SetWaypointFlags(OrderWaypointFlags waypoint_flags) { SB(this->flags, 0, 3, waypoint_flags.base()); }
 	/** Set variable we have to compare. */
-	inline void SetConditionVariable(OrderConditionVariable condition_variable) { SB(this->dest, 11, 5, condition_variable); }
+	inline void SetConditionVariable(OrderConditionVariable condition_variable) { SB(this->dest.value, 11, 5, condition_variable); }
 	/** Set the comparator to use. */
 	inline void SetConditionComparator(OrderConditionComparator condition_comparator) { SB(this->type, 5, 3, condition_comparator); }
 	/** Get the order to skip to. */
 	inline void SetConditionSkipToOrder(VehicleOrderID order_id) { this->flags = order_id; }
 	/** Set the value to base the skip on. */
-	inline void SetConditionValue(uint16_t value) { SB(this->dest, 0, 11, value); }
+	inline void SetConditionValue(uint16_t value) { SB(this->dest.value, 0, 11, value); }
 	/** Set counter for the 'jump xx% of times' option */
 	inline void SetJumpCounter(int8_t jump_counter) { SB(this->GetXDataRef(), 0, 8, jump_counter); }
 	/** Set counter operation */
@@ -527,8 +540,10 @@ public:
 	 * autofilled we can be sure that any non-zero values for their wait_time and travel_time are
 	 * explicitly set (but travel_time is actually unused for conditionals). */
 
+	inline bool IsSlotCounterOrder() const { return this->IsType(OT_COUNTER) || this->IsType(OT_SLOT) || this->IsType(OT_SLOT_GROUP); }
+
 	/* Does this order not have any associated travel or wait times */
-	inline bool HasNoTimetableTimes() const { return this->IsType(OT_COUNTER) || this->IsType(OT_SLOT) || this->IsType(OT_LABEL); }
+	inline bool HasNoTimetableTimes() const { return this->IsSlotCounterOrder() || this->IsType(OT_LABEL); }
 
 	/** Does this order have an explicit wait time set? */
 	inline bool IsWaitTimetabled() const
@@ -648,7 +663,7 @@ public:
 
 	bool ShouldStopAtStation(StationID last_station_visited, StationID station, bool waypoint) const;
 	bool ShouldStopAtStation(const Vehicle *v, StationID station, bool waypoint) const;
-	bool CanLeaveWithCargo(bool has_cargo, CargoID cargo) const;
+	bool CanLeaveWithCargo(bool has_cargo, CargoType cargo) const;
 
 	TileIndex GetLocation(const Vehicle *v, bool airport = false) const;
 	TileIndex GetAuxiliaryLocation(bool secondary = false) const;
@@ -703,6 +718,11 @@ public:
 		return (OrderSlotSubType)GB(this->flags, 0, 8);
 	}
 
+	inline OrderSlotGroupSubType GetSlotGroupSubType() const
+	{
+		return (OrderSlotGroupSubType)GB(this->flags, 0, 8);
+	}
+
 	inline OrderLabelSubType GetLabelSubType() const
 	{
 		return (OrderLabelSubType)GB(this->flags, 0, 8);
@@ -714,18 +734,18 @@ public:
 	}
 
 	const char *GetLabelText() const;
-	void SetLabelText(const char *text);
+	void SetLabelText(std::string_view text);
 
 	void AssignOrder(const Order &other);
 	bool Equals(const Order &other) const;
+	bool IsDerivedFrom(const Order &other) const;
 
-	uint64_t Pack() const;
 	uint16_t MapOldOrder() const;
 	void ConvertFromOldSavegame();
 };
 
 struct OrderPoolItem : OrderPool::PoolItem<&_order_pool> {
-	Order order;
+	Order order{};
 	OrderPoolItem *next = nullptr; ///< Pointer to next order. If nullptr, end of list
 	uint32_t next_ref = 0;
 
@@ -753,9 +773,9 @@ private:
 
 public:
 	CargoStationIDStackSet()
-			: first(ALL_CARGOTYPES, INVALID_STATION) {}
+			: first(ALL_CARGOTYPES, StationID::Invalid()) {}
 
-	const StationIDStack& Get(CargoID cargo) const
+	const StationIDStack& Get(CargoType cargo) const
 	{
 		if (HasBit(first.cargo_mask, cargo)) return first.station;
 		for (size_t i = 0; i < more.size(); i++) {
@@ -770,7 +790,7 @@ public:
 template <typename F> CargoTypes FilterCargoMask(F filter_func, CargoTypes cargo_mask = ALL_CARGOTYPES)
 {
 	CargoTypes output_mask = cargo_mask;
-	for (CargoID cargo : SetCargoBitIterator(cargo_mask)) {
+	for (CargoType cargo : SetCargoBitIterator(cargo_mask)) {
 		if (!filter_func(cargo)) ClrBit(output_mask, cargo);
 	}
 	return output_mask;
@@ -778,19 +798,20 @@ template <typename F> CargoTypes FilterCargoMask(F filter_func, CargoTypes cargo
 
 template <typename T, typename F> T CargoMaskValueFilter(CargoTypes &cargo_mask, F filter_func)
 {
-	CargoID first_cargo_id = FindFirstBit(cargo_mask);
+	CargoType first_cargo_id = FindFirstBit(cargo_mask);
 	T value = filter_func(first_cargo_id);
 	CargoTypes other_cargo_mask = cargo_mask;
 	ClrBit(other_cargo_mask, first_cargo_id);
-	for (CargoID cargo : SetCargoBitIterator(other_cargo_mask)) {
+	for (CargoType cargo : SetCargoBitIterator(other_cargo_mask)) {
 		if (value != filter_func(cargo)) ClrBit(cargo_mask, cargo);
 	}
 	return value;
 }
 
 struct DispatchSlot {
-	uint32_t offset;
-	uint16_t flags;
+	uint32_t offset = 0;
+	uint16_t flags = 0;
+	DispatchSlotRouteID route_id = 0;
 
 	bool operator<(const DispatchSlot &other) const
 	{
@@ -805,10 +826,9 @@ struct DispatchSlot {
 		SDSF_FIRST_TAG                            = 8,  ///< First tag flag
 		SDSF_LAST_TAG                             = 11, ///< Last tag flag
 	};
-};
 
-enum ScheduledDispatchSupplementaryNameType : uint16_t {
-	SDSNT_DEPARTURE_TAG                           = 0, ///< Departure slot tag
+	static constexpr uint16_t PERMITTED_FLAG_MASK = GetBitMaskSC<uint16_t>(SDSF_REUSE_SLOT, 1) |
+			GetBitMaskFL<uint16_t>(SDSF_FIRST_TAG, SDSF_LAST_TAG);
 };
 
 struct DispatchSchedule {
@@ -818,6 +838,26 @@ struct DispatchSchedule {
 		StateTicks scheduled_dispatch_start_tick;
 		int32_t scheduled_dispatch_last_dispatch;
 	};
+
+	enum class SupplementaryNameType : uint16_t {
+		DepartureTag = 0, ///< Departure slot tag
+		RouteID      = 1, ///< Route ID
+	};
+
+	static inline uint32_t SupplementaryNameKey(SupplementaryNameType name_type, uint16_t id)
+	{
+		return (static_cast<uint32_t>(to_underlying(name_type)) << 16) | id;
+	}
+
+	static inline SupplementaryNameType TypeFromSupplementaryNameKey(uint32_t key)
+	{
+		return static_cast<SupplementaryNameType>(key >> 16);
+	}
+
+	static inline uint16_t IDFromSupplementaryNameKey(uint32_t key)
+	{
+		return static_cast<uint16_t>(key & 0xFFFF);
+	}
 
 private:
 	friend NamedSaveLoadTable GetDispatchScheduleDescription();         ///< Saving and loading of dispatch schedules
@@ -848,8 +888,10 @@ public:
 	inline std::vector<DispatchSlot> &GetScheduledDispatchMutable() { return this->scheduled_dispatch; }
 
 	void SetScheduledDispatch(std::vector<DispatchSlot> dispatch_list);
-	void AddScheduledDispatch(uint32_t offset);
+	void AddScheduledDispatch(uint32_t offset, uint16_t slot_flags, DispatchSlotRouteID route_id);
 	void RemoveScheduledDispatch(uint32_t offset);
+	void ResortDispatchOffsets();
+	uint32_t AdjustScheduledDispatchOffset(uint32_t offset, int32_t adjust) const;
 	void AdjustScheduledDispatch(int32_t adjust);
 	void ClearScheduledDispatch() { this->scheduled_dispatch.clear(); }
 	bool UpdateScheduledDispatchToDate(StateTicks now);
@@ -919,7 +961,7 @@ public:
 	inline void SetScheduledDispatchReuseSlots(bool reuse_slots) { AssignBit(this->scheduled_dispatch_flags, SDF_REUSE_SLOTS, reuse_slots); }
 
 	/**
-	 * Get the scheduled dispatch maximum alowed delay, in scaled tick
+	 * Get the scheduled dispatch maximum allowed delay, in scaled ticks
 	 * @return  scheduled dispatch last dispatch
 	 */
 	inline int32_t GetScheduledDispatchDelay() const { return this->scheduled_dispatch_max_delay; }
@@ -938,9 +980,31 @@ public:
 	inline std::string &ScheduleName() { return this->name; }
 	inline const std::string &ScheduleName() const { return this->name; }
 
-	std::string_view GetSupplementaryName(ScheduledDispatchSupplementaryNameType name_type, uint16_t id) const;
-	void SetSupplementaryName(ScheduledDispatchSupplementaryNameType name_type, uint16_t id, std::string name);
+	std::string_view GetSupplementaryName(SupplementaryNameType name_type, uint16_t id) const;
+	void SetSupplementaryName(SupplementaryNameType name_type, uint16_t id, std::string name);
+	bool RemoveSupplementaryName(SupplementaryNameType name_type, uint16_t id);
 	btree::btree_map<uint32_t, std::string> &GetSupplementaryNameMap() { return this->supplementary_names; }
+	const btree::btree_map<uint32_t, std::string> &GetSupplementaryNameMap() const { return this->supplementary_names; }
+
+	template <typename F>
+	void IterateRouteIDNames(F handler) const
+	{
+		const auto &names = this->supplementary_names;
+		auto iter = names.lower_bound(SupplementaryNameKey(DispatchSchedule::SupplementaryNameType::RouteID, 1));
+		for (; iter != names.end() && DispatchSchedule::TypeFromSupplementaryNameKey(iter->first) == DispatchSchedule::SupplementaryNameType::RouteID; ++iter) {
+			uint16_t route_id = DispatchSchedule::IDFromSupplementaryNameKey(iter->first);
+			if (route_id >= INVALID_DISPATCH_SLOT_ROUTE_ID) break;
+			handler(static_cast<DispatchSlotRouteID>(route_id), iter->second);
+		}
+	}
+
+	std::vector<std::pair<DispatchSlotRouteID, std::string_view>> GetSortedRouteIDNames() const;
+
+	bool HasSupplementaryNameOfType(SupplementaryNameType name_type) const
+	{
+		auto iter = this->supplementary_names.lower_bound(SupplementaryNameKey(name_type, 0));
+		return iter != this->supplementary_names.end() && TypeFromSupplementaryNameKey(iter->first) == name_type;
+	}
 };
 
 static_assert(DispatchSchedule::DEPARTURE_TAG_COUNT == 1 + (DispatchSlot::SDSF_LAST_TAG - DispatchSlot::SDSF_FIRST_TAG));
@@ -998,24 +1062,26 @@ private:
 	friend void AfterLoadVehiclesPhase1(bool part_of_load); ///< For instantiating the shared vehicle chain
 	friend NamedSaveLoadTable GetOrderListDescription(); ///< Saving and loading of order lists.
 	friend upstream_sl::SaveLoadTable upstream_sl::GetOrderListDescription(); ///< Saving and loading of order lists.
+	template <typename T>
+	friend class upstream_sl::SlOrders;
 	friend void Ptrs_ORDL(); ///< Saving and loading of order lists.
 
 	std::vector<Order> orders;        ///< Order list.
 
-	VehicleOrderID num_manual_orders; ///< NOSAVE: How many manually added orders are there in the list.
-	uint num_vehicles;                ///< NOSAVE: Number of vehicles that share this order list.
-	Vehicle *first_shared;            ///< NOSAVE: pointer to the first vehicle in the shared order chain.
+	Colours route_overlay_colour = COLOUR_WHITE;
 
-	Ticks timetable_duration;         ///< NOSAVE: Total timetabled duration of the order list.
-	Ticks total_duration;             ///< NOSAVE: Total (timetabled or not) duration of the order list.
+	VehicleOrderID num_manual_orders = 0; ///< NOSAVE: How many manually added orders are there in the list.
+	uint num_vehicles = 0;                ///< NOSAVE: Number of vehicles that share this order list.
+	Vehicle *first_shared = nullptr;      ///< NOSAVE: pointer to the first vehicle in the shared order chain.
 
-	std::vector<DispatchSchedule> dispatch_schedules; ///< Scheduled dispatch schedules
+	Ticks timetable_duration{};           ///< NOSAVE: Total timetabled duration of the order list.
+	Ticks total_duration{};               ///< NOSAVE: Total (timetabled or not) duration of the order list.
+
+	std::vector<DispatchSchedule> dispatch_schedules{}; ///< Scheduled dispatch schedules
 
 public:
 	/** Default constructor producing an invalid order list. */
-	OrderList()
-		: num_manual_orders(0), num_vehicles(0), first_shared(nullptr),
-		  timetable_duration(0), total_duration(0) { }
+	OrderList() {}
 
 	/**
 	 * Create an order list with the given order chain for the given vehicle.
@@ -1154,7 +1220,7 @@ public:
 
 	void InsertOrderAt(Order &&new_order, VehicleOrderID index);
 	void DeleteOrderAt(VehicleOrderID index);
-	void MoveOrder(VehicleOrderID from, VehicleOrderID to);
+	void MoveOrders(VehicleOrderID from, VehicleOrderID to, uint16_t count);
 
 	/**
 	 * Is this a shared order list?
@@ -1229,6 +1295,16 @@ public:
 
 	inline DispatchSchedule &GetDispatchScheduleByIndex(uint index) { return this->dispatch_schedules[index]; }
 	inline const DispatchSchedule &GetDispatchScheduleByIndex(uint index) const { return this->dispatch_schedules[index]; }
+
+	Colours GetRouteOverlayColour() const
+	{
+		return this->route_overlay_colour;
+	}
+
+	void SetRouteOverlayColour(Colours colour)
+	{
+		this->route_overlay_colour = colour;
+	}
 
 	/**
 	 * Returns an iterable ensemble of orders

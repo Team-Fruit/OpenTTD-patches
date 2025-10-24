@@ -14,9 +14,12 @@
 #include "../../strings_func.h"
 #include "../../settings_type.h"
 #include "../../engine_base.h"
+#include "../../engine_cmd.h"
 #include "../../articulated_vehicles.h"
 #include "../../string_func.h"
+#include "../../company_cmd.h"
 #include "../../3rdparty/nlohmann/json.hpp"
+
 #include "table/strings.h"
 
 #include "../../safeguards.h"
@@ -31,11 +34,10 @@ std::optional<std::string> ScriptEventEnginePreview::GetName()
 {
 	if (!this->IsEngineValid()) return std::nullopt;
 
-	::SetDParam(0, this->engine);
-	return GetString(STR_ENGINE_NAME);
+	return ::StrMakeValid(::GetString(STR_ENGINE_NAME, this->engine), {});
 }
 
-CargoID ScriptEventEnginePreview::GetCargoType()
+CargoType ScriptEventEnginePreview::GetCargoType()
 {
 	if (!this->IsEngineValid()) return INVALID_CARGO;
 	CargoArray cap = ::GetCapacityOfArticulatedParts(this->engine);
@@ -43,7 +45,7 @@ CargoID ScriptEventEnginePreview::GetCargoType()
 	auto it = std::max_element(std::cbegin(cap), std::cend(cap));
 	if (*it == 0) return INVALID_CARGO;
 
-	return CargoID(std::distance(std::cbegin(cap), it));
+	return CargoType(std::distance(std::cbegin(cap), it));
 }
 
 int32_t ScriptEventEnginePreview::GetCapacity()
@@ -105,13 +107,13 @@ bool ScriptEventEnginePreview::AcceptPreview()
 {
 	EnforceCompanyModeValid(false);
 	if (!this->IsEngineValid()) return false;
-	return ScriptObject::DoCommand(0, this->engine, 0, CMD_WANT_ENGINE_PREVIEW);
+	return ScriptObject::Command<CMD_WANT_ENGINE_PREVIEW>::Do(this->engine);
 }
 
 bool ScriptEventCompanyAskMerger::AcceptMerger()
 {
 	EnforceCompanyModeValid(false);
-	return ScriptObject::DoCommand(0, this->owner, 0, CMD_BUY_COMPANY);
+	return ScriptObject::Command<CMD_BUY_COMPANY>::Do(ScriptCompany::FromScriptCompanyID(this->owner), false);
 }
 
 ScriptEventAdminPort::ScriptEventAdminPort(const std::string &json) :
@@ -120,7 +122,7 @@ ScriptEventAdminPort::ScriptEventAdminPort(const std::string &json) :
 {
 }
 /**
- * Convert a JSON part fo Squirrel.
+ * Convert a JSON part for Squirrel.
  * @param vm The VM used.
  * @param json The JSON part to convert to Squirrel.
  */

@@ -16,6 +16,17 @@
 #	define Point OTTD_Point
 #endif /* __APPLE__ */
 
+/**
+ * Determine where to position a centred object.
+ * @param min The top or left coordinate.
+ * @param max The bottom or right coordinate.
+ * @param size The height or width of the object to draw.
+ * @return Offset of where to position the object.
+ */
+inline int CentreBounds(int min, int max, int size)
+{
+	return (min + max - size + 1) / 2;
+}
 
 /** Coordinates of a point in 2D */
 struct Point {
@@ -51,10 +62,10 @@ struct Dimension {
 
 /** Padding dimensions to apply to each side of a Rect. */
 struct RectPadding {
-	uint8_t left;
-	uint8_t top;
-	uint8_t right;
-	uint8_t bottom;
+	uint8_t left = 0;
+	uint8_t top = 0;
+	uint8_t right = 0;
+	uint8_t bottom = 0;
 
 	static const RectPadding zero;
 
@@ -75,10 +86,10 @@ inline const RectPadding RectPadding::zero{};
 
 /** Specification of a rectangle with absolute coordinates of all edges */
 struct Rect {
-	int left;
-	int top;
-	int right;
-	int bottom;
+	int left = 0;
+	int top = 0;
+	int right = 0;
+	int bottom = 0;
 
 	/**
 	 * Get width of Rect.
@@ -225,7 +236,20 @@ struct Rect {
 	inline bool Contains(const Point &pt) const
 	{
 		/* This is a local version of IsInsideMM, to avoid including math_func everywhere. */
-		return (uint)(pt.x - this->left) < (uint)(this->right - this->left) && (uint)(pt.y - this->top) < (uint)(this->bottom - this->top);
+		return (uint)(pt.x - this->left) <= (uint)(this->right - this->left) && (uint)(pt.y - this->top) <= (uint)(this->bottom - this->top);
+	}
+
+	/**
+	 * Centre a dimension within this Rect.
+	 * @param width The horizontal dimension.
+	 * @param height The vertical dimension.
+	 * @return the new resized Rect.
+	 */
+	[[nodiscard]] inline Rect CentreTo(int width, int height) const
+	{
+		int new_left = CentreBounds(this->left, this->right, width);
+		int new_right = CentreBounds(this->top, this->bottom, height);
+		return {new_left, new_right, new_left + width, new_right + height};
 	}
 };
 
@@ -252,10 +276,10 @@ OutT ConvertRect(const InT &in)
  * (relative) width/height
  */
 struct PointDimension {
-	int x;
-	int y;
-	int width;
-	int height;
+	int x = 0;
+	int y = 0;
+	int width = 0;
+	int height = 0;
 };
 
 #endif /* GEOMETRY_TYPE_HPP */

@@ -10,6 +10,7 @@
 #ifndef STRINGFILTER_TYPE_H
 #define STRINGFILTER_TYPE_H
 
+#include "string_type.h"
 #include "strings_type.h"
 #include <vector>
 
@@ -32,27 +33,31 @@ struct StringFilter {
 private:
 	/** State of a single filter word */
 	struct WordState {
-		const char *start;                         ///< Word to filter for.
+		std::string word;                          ///< Word to filter for.
 		bool match;                                ///< Already matched?
 	};
 
-	const char *filter_buffer;                     ///< Parsed filter string. Words separated by 0.
 	std::vector<WordState> word_index;             ///< Word index and filter state.
-	uint word_matches;                             ///< Summary of filter state: Number of words matched.
+	uint word_matches = 0;                         ///< Summary of filter state: Number of words matched.
 
 	const bool *case_sensitive;                    ///< Match case-sensitively (usually a static variable).
 	bool locale_aware;                             ///< Match words using the current locale.
+
+#ifdef WITH_LOCALE_STRING
+	LocaleStringList locale_words;
+
+	friend void StringFilterSetupLocale(StringFilter &sf);
+	friend bool StringFilterAddLocaleLine(StringFilter &sf, std::string_view str);
+#endif
 
 public:
 	/**
 	 * Constructor for filter.
 	 * @param case_sensitive Pointer to a (usually static) variable controlling the case-sensitivity. nullptr means always case-insensitive.
 	 */
-	StringFilter(const bool *case_sensitive = nullptr, bool locale_aware = true) : filter_buffer(nullptr), word_matches(0), case_sensitive(case_sensitive), locale_aware(locale_aware) {}
-	~StringFilter() { free(this->filter_buffer); }
+	StringFilter(const bool *case_sensitive = nullptr, bool locale_aware = true) : case_sensitive(case_sensitive), locale_aware(locale_aware) {}
 
-	void SetFilterTerm(const char *str);
-	void SetFilterTerm(const std::string &str);
+	void SetFilterTerm(std::string_view str);
 
 	/**
 	 * Check whether any filter words were entered.
@@ -61,9 +66,8 @@ public:
 	bool IsEmpty() const { return this->word_index.empty(); }
 
 	void ResetState();
-	void AddLine(const char *str);
-	void AddLine(const std::string &str);
-	void AddLine(StringID str);
+	void AddLine(const char *) = delete; // prevent implicit construction of string_view from potential nullptr
+	void AddLine(std::string_view str);
 
 	/**
 	 * Get the matching state of the current item.

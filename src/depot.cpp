@@ -45,11 +45,11 @@ Depot::~Depot()
 	TraceRestrictRemoveDestinationID(TROCAF_DEPOT, this->index);
 
 	/* Delete the depot-window */
-	CloseWindowById(WC_VEHICLE_DEPOT, this->xy);
+	CloseWindowById(WC_VEHICLE_DEPOT, this->xy.base());
 
 	/* Delete the depot list */
 	VehicleType vt = GetDepotVehicleType(this->xy);
-	CloseWindowById(GetWindowClassForVehicleType(vt), VehicleListIdentifier(VL_DEPOT_LIST, vt, GetTileOwner(this->xy), this->index).Pack());
+	CloseWindowById(GetWindowClassForVehicleType(vt), VehicleListIdentifier(VL_DEPOT_LIST, vt, GetTileOwner(this->xy), this->index).ToWindowNumber());
 
 	/* Delete any depot departure window */
 	CloseDepotDeparturesWindow(this->xy);

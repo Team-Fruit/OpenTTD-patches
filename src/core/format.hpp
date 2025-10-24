@@ -26,6 +26,17 @@
 
 #include <type_traits>
 
+namespace format_detail {
+	template<typename T>
+	concept FmtAsBase = T::fmt_as_base || false;
+
+	template<typename T>
+	concept FmtAsBaseHex = T::fmt_as_base_hex || false;
+
+	template<typename T>
+	concept FmtAsTileIndex = T::fmt_as_tile_index || false;
+};
+
 template <typename E, typename Char>
 struct fmt::formatter<E, Char, std::enable_if_t<std::is_enum<E>::value>> : fmt::formatter<typename std::underlying_type<E>::type> {
 	using underlying_type = typename std::underlying_type<E>::type;
@@ -43,7 +54,7 @@ struct fmt::formatter<E, Char, std::enable_if_t<std::is_enum<E>::value>> : fmt::
 };
 
 template <typename T, typename Char>
-struct fmt::formatter<T, Char, std::enable_if_t<std::is_base_of<StrongTypedefBase, T>::value>> : fmt::formatter<typename T::BaseType> {
+struct fmt::formatter<T, Char, std::enable_if_t<format_detail::FmtAsBase<T>>> : fmt::formatter<typename T::BaseType> {
 	using underlying_type = typename T::BaseType;
 	using parent = typename fmt::formatter<underlying_type>;
 
@@ -58,64 +69,133 @@ struct fmt::formatter<T, Char, std::enable_if_t<std::is_base_of<StrongTypedefBas
 	}
 };
 
+extern fmt::format_context::iterator FmtTileIndexValueIntl(fmt::format_context &ctx, uint32_t value);
+
+template <typename T, typename Char>
+struct fmt::formatter<T, Char, std::enable_if_t<format_detail::FmtAsTileIndex<T>>> : fmt::formatter<uint32_t> {
+	bool use_base_fmt{};
+
+	using underlying_type = uint32_t;
+	using parent = typename fmt::formatter<underlying_type>;
+
+	constexpr fmt::format_parse_context::iterator parse(fmt::format_parse_context &ctx)
+	{
+		auto it = ctx.begin();
+		if (it == ctx.end() || *it == '}') {
+			return ctx.begin();
+		}
+		this->use_base_fmt = true;
+		return parent::parse(ctx);
+	}
+
+	fmt::format_context::iterator format(const T &t, format_context &ctx) const
+	{
+		if (this->use_base_fmt) {
+			return parent::format(t.base(), ctx);
+		}
+		return FmtTileIndexValueIntl(ctx, t.base());
+	}
+};
+
+template <typename T, typename Char>
+struct fmt::formatter<T, Char, std::enable_if_t<format_detail::FmtAsBaseHex<T>>> : fmt::formatter<typename T::BaseType> {
+	bool use_base_fmt{};
+
+	using underlying_type = typename T::BaseType;
+	using parent = typename fmt::formatter<underlying_type>;
+
+	constexpr fmt::format_parse_context::iterator parse(fmt::format_parse_context &ctx)
+	{
+		auto it = ctx.begin();
+		if (it == ctx.end() || *it == '}') {
+			return ctx.begin();
+		}
+		this->use_base_fmt = true;
+		return parent::parse(ctx);
+	}
+
+	fmt::format_context::iterator format(const T &t, format_context &ctx) const
+	{
+		if (this->use_base_fmt) {
+			return parent::format(t.base(), ctx);
+		} else {
+			return fmt::format_to(ctx.out(), "0x{:X}", t.base());
+		}
+	}
+};
+
+template <typename T>
+class trivial_appender {
+protected:
+	T *container;
+
+public:
+	constexpr trivial_appender(T &buf) : container(&buf) {}
+
+	constexpr trivial_appender &operator=(char c)
+	{
+		this->container->push_back(c);
+		return *this;
+	}
+
+	constexpr trivial_appender &operator*() { return *this; }
+	constexpr trivial_appender &operator++() { return *this; }
+	constexpr trivial_appender operator++(int) { return *this; }
+};
+
 /**
  * Base fmt format target class. Users should take by reference.
  * Not directly instantiable, use format_to_buffer, format_buffer, format_buffer_sized, format_to_fixed or format_to_fixed_z.
  */
 struct format_target {
 protected:
-	enum {
-		FL_FIXED = 1,
-		FL_OVERFLOW = 2,
+	using grow_handler = void (*)(fmt::detail::buffer<char> &buf, size_t capacity);
+
+	struct base_buffer : public fmt::detail::buffer<char> {
+		base_buffer(grow_handler grow, char *buf, size_t size = 0, size_t capacity = 0) : buffer(grow, buf, size, capacity) {}
+
+		void set_state(char *buf, size_t capacity)
+		{
+			this->set(buf, capacity);
+		}
 	};
+	base_buffer buffer; // Must be only member
 
-	fmt::detail::buffer<char> &target; // This can point to any subtype of fmt::basic_memory_buffer
-	uint8_t flags;
-
-	format_target(fmt::detail::buffer<char> &buffer, uint8_t flags) : target(buffer), flags(flags) {}
+	format_target(grow_handler grow, char *buf, size_t size = 0, size_t capacity = 0) : buffer(grow, buf, size, capacity) {}
 	~format_target() = default;
 
-protected:
-	fmt::detail::buffer<char> &GetTargetFmtBuffer() const { return this->target; }
+	template <typename T>
+	static T &from_buf(fmt::detail::buffer<char> &buf)
+	{
+		format_target *self = reinterpret_cast<format_target *>(&buf);
+		return *static_cast<T *>(self);
+	}
+
+	void push_back_utf8_impl(char32_t c);
 
 public:
 	format_target(const format_target &other) = delete;
 	format_target& operator=(const format_target &other) = delete;
 
-	inline size_t size() const noexcept;
-	inline bool empty() const noexcept { return this->size() == 0; }
-	void restore_size(size_t);
-	inline const char *data() const noexcept;
-	inline char *data() noexcept { return const_cast<char *>(const_cast<const format_target *>(this)->data()); }
-
-	char *begin() noexcept { return this->data(); }
-	char *end() noexcept { return this->data() + this->size(); }
-	const char *begin() const noexcept { return this->data(); }
-	const char *end() const noexcept { return this->data() + this->size(); }
-
 	template <typename... T>
 	void format(fmt::format_string<T...> fmtstr, T&&... args)
 	{
-		if (has_overflowed()) return;
-		fmt::detail::vformat_to(this->target, fmt::string_view(fmtstr), fmt::make_format_args(args...), {});
+		fmt::detail::vformat_to(this->buffer, fmt::string_view(fmtstr), fmt::make_format_args(args...), {});
 	}
 
 	void vformat(fmt::string_view fmtstr, fmt::format_args args)
 	{
-		if (has_overflowed()) return;
-		fmt::detail::vformat_to(this->target, fmtstr, args, {});
+		fmt::detail::vformat_to(this->buffer, fmtstr, args, {});
 	}
 
 	void push_back(char c)
 	{
-		if (has_overflowed()) return;
-		this->target.push_back(c);
+		this->buffer.push_back(c);
 	}
 
 	void append(const char* begin, const char* end)
 	{
-		if (has_overflowed()) return;
-		this->target.append<char>(begin, end);
+		this->buffer.append<char>(begin, end);
 	}
 
 	void append(std::string_view str) { this->append(str.data(), str.data() + str.size()); }
@@ -123,77 +203,127 @@ public:
 	template <typename F>
 	void append_ptr_last_func(size_t to_reserve, F func)
 	{
-		if (has_overflowed()) return;
-		this->target.try_reserve(this->target.size() + to_reserve);
-		char *buf = this->target.data() + this->target.size();
-		const char *last = this->target.data() + this->target.capacity() - 1;
+		this->buffer.try_reserve(this->buffer.size() + to_reserve);
+		char *buf = this->buffer.data() + this->buffer.size();
+		const char *last = this->buffer.data() + this->buffer.capacity() - 1;
 		if (last > buf) {
 			char *result = func(buf, last);
-			this->target.try_resize(result - this->target.data());
+			this->buffer.try_resize(result - this->buffer.data());
 		}
 	}
 
 	template <typename F>
 	void append_span_func(size_t to_reserve, F func)
 	{
-		if (has_overflowed()) return;
-		this->target.try_reserve(this->target.size() + to_reserve);
-		const auto size = this->target.size();
-		const auto capacity = this->target.capacity();
+		this->buffer.try_reserve(this->buffer.size() + to_reserve);
+		const auto size = this->buffer.size();
+		const auto capacity = this->buffer.capacity();
 		if (size == capacity) return;
-		size_t written = func(std::span<char>{this->target.data() + size, capacity - size});
-		this->target.try_resize(size + written);
+		size_t written = func(std::span<char>{this->buffer.data() + size, capacity - size});
+		this->buffer.try_resize(size + written);
 	}
 
 	std::span<char> append_as_span(size_t to_append)
 	{
-		if (has_overflowed()) return {};
-		const auto orig_size = this->target.size();
-		this->target.try_resize(orig_size + to_append);
-		return std::span<char>(this->target.data() + orig_size, this->target.size() - orig_size);
+		const auto orig_size = this->buffer.size();
+		this->buffer.try_resize(orig_size + to_append);
+		return std::span<char>(this->buffer.data() + orig_size, this->buffer.size() - orig_size);
 	}
 
-	bool has_overflowed() const { return (this->flags & FL_OVERFLOW) != 0; }
-};
+	void push_back_utf8(char32_t c)
+	{
+		if (c < 0x80) {
+			this->push_back((char)c);
+		} else {
+			this->push_back_utf8_impl(c);
+		}
+	}
 
-/**
- * format_target subtype which outputs to an existing fmt::basic_memory_buffer/fmt::memory_buffer.
- */
-struct format_to_buffer : public format_target {
-	template <size_t SIZE, typename Allocator>
-	format_to_buffer(fmt::basic_memory_buffer<char, SIZE, Allocator> &buffer) : format_target(buffer, 0) {}
-
-	/** Only for internal use */
-	struct format_to_buffer_internal_tag{};
-	format_to_buffer(format_to_buffer_internal_tag tag, fmt::detail::buffer<char> &buffer, uint8_t flags) : format_target(buffer, 0) {}
+	trivial_appender<format_target> back_inserter() { return trivial_appender<format_target>(*this); }
 
 	/** Only for specialised uses */
-	fmt::detail::buffer<char> &GetTargetBuffer() const { return this->GetTargetFmtBuffer(); }
+	fmt::detail::buffer<char> &GetFmtBuffer() { return this->buffer; }
+};
+static_assert(sizeof(format_target) == sizeof(fmt::detail::buffer<char>));
+
+/**
+ * format_target subtype with support for read, get size, restore, etc.
+ * Mainly for specialised uses.
+ */
+struct format_target_ctrl : public format_target {
+protected:
+	enum {
+		FL_FIXED = 1,
+		FL_OVERFLOW = 2,
+	};
+	uint8_t flags;
+
+	format_target_ctrl(uint8_t flags, grow_handler grow, char *buf, size_t size = 0, size_t capacity = 0) : format_target(grow, buf, size, capacity), flags(flags) {}
+
+public:
+	inline size_t size() const noexcept;
+	inline bool empty() const noexcept { return this->size() == 0; }
+	void restore_size(size_t);
+	inline const char *data() const noexcept;
+	inline char *data() noexcept { return const_cast<char *>(const_cast<const format_target_ctrl *>(this)->data()); }
+
+	char *begin() noexcept { return this->data(); }
+	char *end() noexcept { return this->data() + this->size(); }
+	const char *begin() const noexcept { return this->data(); }
+	const char *end() const noexcept { return this->data() + this->size(); }
+
+	bool has_overflowed() const noexcept { return this->flags & FL_OVERFLOW; }
+};
+
+namespace format_detail {
+	template<typename T>
+	concept FmtUsingFormatValueMethod = requires(const T &a) {
+		{ a.fmt_format_value(std::declval<format_target &>()) };
+	};
 };
 
 template <typename T, typename Char>
-struct fmt::formatter<T, Char, std::enable_if_t<std::is_base_of<fmt_formattable, T>::value>> {
+struct fmt::formatter<T, Char, std::enable_if_t<format_detail::FmtUsingFormatValueMethod<T>>> {
 	constexpr fmt::format_parse_context::iterator parse(fmt::format_parse_context &ctx) {
 		return ctx.begin();
 	}
 
 	fmt::format_context::iterator format(const T& obj, format_context &ctx) const {
-		format_to_buffer output(format_to_buffer::format_to_buffer_internal_tag{}, fmt::detail::get_container(ctx.out()), 0);
-		obj.fmt_format_value(output);
+		fmt::detail::buffer<char> &buf = fmt::detail::get_container(ctx.out());
+		obj.fmt_format_value(reinterpret_cast<format_target &>(buf));
 		return ctx.out();
 	}
+};
+
+namespace format_detail {
+	void FmtResizeForCStr(fmt::detail::buffer<char> &buffer);
 };
 
 /**
  * Common functionality for format_buffer and format_buffer_size.
  */
-template <size_t SIZE>
-struct format_buffer_base : public format_to_buffer {
+struct format_buffer_base : public format_target_ctrl {
 private:
-	fmt::basic_memory_buffer<char, SIZE> buffer;
+	static void grow(fmt::detail::buffer<char> &, size_t);
 
 protected:
-	format_buffer_base() : format_to_buffer(buffer) {}
+	format_buffer_base(size_t storage_size) : format_target_ctrl(0, grow, this->local_storage(), 0, storage_size) {}
+
+	~format_buffer_base()
+	{
+		this->deallocate();
+	}
+
+	char *local_storage()
+	{
+		return reinterpret_cast<char *>(this) + sizeof(format_buffer_base);
+	}
+
+	void deallocate()
+	{
+		char *data = this->buffer.data();
+		if (data != this->local_storage()) free(data);
+	}
 
 public:
 	char *begin() noexcept { return this->buffer.begin(); }
@@ -205,6 +335,8 @@ public:
 	size_t capacity() const noexcept { return this->buffer.capacity(); }
 	char *data() noexcept { return this->buffer.data(); }
 	const char *data() const noexcept { return this->buffer.data(); }
+	char &back() noexcept { return this->buffer[this->size() - 1]; }
+	const char &back() const noexcept { return this->buffer[this->size() - 1]; }
 
 	void clear() { this->buffer.clear(); }
 
@@ -214,32 +346,39 @@ public:
 	/* Return a null terminated c string, this may cause the buffer to re-allocated to make room for the null terminator */
 	const char *c_str()
 	{
-		if (this->size() == this->capacity()) this->buffer.try_reserve(this->capacity() + 1);
+		if (this->size() == this->capacity()) format_detail::FmtResizeForCStr(this->buffer);
 		*(this->end()) = '\0';
 		return this->data();
 	}
 };
 
 /**
- * format_to_buffer subtype where the fmt::memory_buffer is built-in.
+ * format_target subtype with equivalent functionality to fmt::memory_buffer.
  *
  * Includes convenience wrappers to access the buffer.
  * Can be used as a fmt argument.
  */
-struct format_buffer final : public format_buffer_base<fmt::inline_buffer_size> {
-	format_buffer() {}
+struct format_buffer final : public format_buffer_base {
+	static constexpr size_t STORAGE_SIZE = 512 - sizeof(format_buffer_base);
+	alignas(alignof(void *)) char storage[STORAGE_SIZE];
+
+	format_buffer() : format_buffer_base(STORAGE_SIZE) {}
 };
+static_assert(sizeof(format_buffer) == sizeof(format_buffer_base) + format_buffer::STORAGE_SIZE);
 
 /**
- * format_to_buffer subtype where the fmt::memory_buffer is built-in.
+ * format_target subtype with equivalent functionality to fmt::memory_buffer.
  * The inline buffer size is adjustable as a template parameter.
  *
  * Includes convenience wrappers to access the buffer.
  * Can be used as a fmt argument.
  */
 template <size_t SIZE>
-struct format_buffer_sized final : public format_buffer_base<SIZE> {
-	format_buffer_sized() {}
+struct format_buffer_sized final : public format_buffer_base {
+	static_assert(SIZE > 0);
+	alignas(alignof(void *)) char storage[SIZE];
+
+	format_buffer_sized() : format_buffer_base(SIZE) {}
 };
 
 template <typename T>
@@ -259,36 +398,35 @@ struct fmt::formatter<format_buffer, char> : public format_by_string_view_cast<f
 template <size_t SIZE>
 struct fmt::formatter<format_buffer_sized<SIZE>, char> : public format_by_string_view_cast<format_buffer_sized<SIZE>> {};
 
-struct format_to_fixed_base : public format_target {
-	friend format_target;
+struct format_to_fixed_base : public format_target_ctrl {
+	friend format_target_ctrl;
+
 private:
-	/* Use an inner wrapper struct so that the fmt::detail::buffer<char> methods don't create ambiguous overloads or
-	 * otherwise interfere with format_target (even with private inheritance).
-	 * Casting from the inner_wrapper to the containing format_to_fixed_base is slightly ugly, but only required within grow(). */
-	struct inner_wrapper final : public fmt::detail::buffer<char> {
-		char * const buffer_ptr;
-		const size_t buffer_size;
-		char discard[32];
+	char discard[31];
+	char * const fixed_ptr;
+	const size_t fixed_size;
 
-		void grow(size_t) override;
-		void restore_size_impl(size_t size);
-
-		inner_wrapper(char *dst, size_t size) : buffer(dst, 0, size), buffer_ptr(dst), buffer_size(size) {}
-	};
-	inner_wrapper inner;
+	static void grow(fmt::detail::buffer<char> &, size_t);
 
 protected:
-	format_to_fixed_base(char *dst, size_t size, uint flags) : format_target(this->inner, flags), inner(dst, size) {}
+	format_to_fixed_base(char *dst, size_t size) : format_target_ctrl(FL_FIXED, grow, dst, 0, size), fixed_ptr(dst), fixed_size(size) {}
 	~format_to_fixed_base() = default;
 
 public:
-	char *data() noexcept { return this->inner.buffer_ptr; }
-	const char *data() const noexcept { return this->inner.buffer_ptr; }
+	char *data() noexcept { return this->fixed_ptr; }
+	const char *data() const noexcept { return this->fixed_ptr; }
 
 	size_t size() const noexcept
 	{
-		return (this->flags & FL_OVERFLOW) != 0 ? this->inner.buffer_size : this->inner.size();
+		if (this->has_overflowed()) {
+			return this->fixed_size;
+		} else {
+			return this->buffer.size();
+		}
 	}
+
+	size_t fixed_capacity() const noexcept { return this->fixed_size; }
+	void restore_size(size_t size);
 
 	bool empty() const noexcept { return this->size() == 0; }
 
@@ -306,8 +444,8 @@ public:
  * Does not null-terminate.
  */
 struct format_to_fixed final : public format_to_fixed_base {
-	format_to_fixed(char *dst, size_t size) : format_to_fixed_base(dst, size, FL_FIXED) {}
-	format_to_fixed(std::span<char> buf) : format_to_fixed_base(buf.data(), buf.size(), FL_FIXED) {}
+	format_to_fixed(char *dst, size_t size) : format_to_fixed_base(dst, size) {}
+	format_to_fixed(std::span<char> buf) : format_to_fixed_base(buf.data(), buf.size()) {}
 };
 
 /**
@@ -316,7 +454,7 @@ struct format_to_fixed final : public format_to_fixed_base {
  * Null-termination only occurs when the finalise method is called.
  */
 struct format_to_fixed_z final : public format_to_fixed_base {
-	format_to_fixed_z(char *dst, const char *last) : format_to_fixed_base(dst, last - dst, FL_FIXED) {}
+	format_to_fixed_z(char *dst, const char *last) : format_to_fixed_base(dst, last - dst) {}
 
 	/**
 	 * Add null terminator, and return pointer to end of string/null terminator.
@@ -335,6 +473,10 @@ struct format_to_fixed_z final : public format_to_fixed_base {
 	template <typename... T>
 	static char *format_to(char *dst, const char *last, fmt::format_string<T...> fmtstr, T&&... args)
 	{
+		if (dst == last) {
+			*dst = '\0';
+			return dst;
+		}
 		format_to_fixed_z buf(dst, last);
 		buf.vformat(fmtstr, fmt::make_format_args(args...));
 		return buf.finalise();
@@ -346,33 +488,33 @@ struct format_to_fixed_z final : public format_to_fixed_base {
  *
  * Does not null-terminate.
  */
-template<size_t N>
+template <size_t N>
 struct format_buffer_fixed final : public format_to_fixed_base {
 	char strbuffer[N];
 
-	format_buffer_fixed() : format_to_fixed_base(this->strbuffer, N, FL_FIXED) {}
+	format_buffer_fixed() : format_to_fixed_base(this->strbuffer, N) {}
 };
 
-const char *format_target::data() const noexcept
+const char *format_target_ctrl::data() const noexcept
 {
 	if ((this->flags & FL_FIXED) != 0) {
-		return static_cast<const format_to_fixed_base *>(this)->inner.buffer_ptr;
+		return static_cast<const format_to_fixed_base *>(this)->fixed_ptr;
 	} else {
-		return this->target.data();
+		return this->buffer.data();
 	}
 }
 
-size_t format_target::size() const noexcept
+size_t format_target_ctrl::size() const noexcept
 {
-	if ((this->flags & FL_FIXED) != 0) {
-		return static_cast<const format_to_fixed_base *>(this)->size();
+	if ((this->flags & FL_OVERFLOW) != 0) {
+		return static_cast<const format_to_fixed_base *>(this)->fixed_size;
 	} else {
-		return this->target.size();
+		return this->buffer.size();
 	}
 }
 
 template <typename F>
-struct format_lambda_wrapper : public fmt_formattable {
+struct format_lambda_wrapper {
 	F lm;
 
 	format_lambda_wrapper(F lm) : lm(std::move(lm)) {}
@@ -395,6 +537,20 @@ auto format_lambda(F func)
 			func(output, std::forward<T>(args)...);
 		});
 	};
+};
+
+/**
+ * fmt::detail::buffer<char> implementation for a minimum overhead strictly non-growing and non-truncating fixed-size buffer.
+ * Calls NOT_REACHED on overflow.
+ */
+struct fmt_base_fixed_non_growing final : public fmt::detail::buffer<char> {
+private:
+	static void grow(fmt::detail::buffer<char> &, size_t);
+
+public:
+	fmt_base_fixed_non_growing(char *buf, size_t capacity, size_t initial_size = 0) : buffer(grow, buf, initial_size, capacity) {}
+
+	format_target &as_format_target() { return reinterpret_cast<format_target &>(*this); }
 };
 
 #endif /* FORMAT_HPP */

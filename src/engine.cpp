@@ -25,6 +25,7 @@
 #include "engine_gui.h"
 #include "engine_func.h"
 #include "engine_base.h"
+#include "engine_cmd.h"
 #include "engine_override.h"
 #include "company_base.h"
 #include "vehicle_func.h"
@@ -68,20 +69,20 @@ static_assert(lengthof(_orig_rail_vehicle_info) + lengthof(_orig_road_vehicle_in
 
 const uint EngineOverrideManager::NUM_DEFAULT_ENGINES = _engine_counts[VEH_TRAIN] + _engine_counts[VEH_ROAD] + _engine_counts[VEH_SHIP] + _engine_counts[VEH_AIRCRAFT];
 
-Engine::Engine(VehicleType type, EngineID base)
+Engine::Engine(VehicleType type, uint16_t local_id)
 {
 	this->type = type;
-	this->grf_prop.local_id = base;
-	this->list_position = base;
-	this->preview_company = INVALID_COMPANY;
-	this->display_last_variant = INVALID_ENGINE;
+	this->grf_prop.local_id = local_id;
+	this->list_position = local_id;
+	this->preview_company = CompanyID::Invalid();
+	this->display_last_variant = EngineID::Invalid();
 
 	/* Check if this base engine is within the original engine data range */
-	if (base >= _engine_counts[type]) {
+	if (local_id >= _engine_counts[type]) {
 		/* 'power' defaults to zero, so we also have to default to 'wagon' */
 		if (type == VEH_TRAIN) this->u.rail.railveh_type = RAILVEH_WAGON;
 		/* Set model life to maximum to make wagons available */
-		this->info.base_life = YearDelta{0xFF};
+		this->info.base_life = CalTime::YearDelta{0xFF};
 		/* Set road vehicle tractive effort to the default value */
 		if (type == VEH_ROAD) this->u.road.tractive_effort = 0x4C;
 		/* Aircraft must have CT_INVALID as default, as there is no property */
@@ -99,43 +100,43 @@ Engine::Engine(VehicleType type, EngineID base)
 		/* Set cargo aging period to the default value. */
 		this->info.cargo_age_period = CARGO_AGING_TICKS;
 		/* Not a variant */
-		this->info.variant_id = INVALID_ENGINE;
+		this->info.variant_id = EngineID::Invalid();
 		return;
 	}
 
 	/* Copy the original engine info for this slot */
-	this->info = _orig_engine_info[_engine_offsets[type] + base];
+	this->info = _orig_engine_info[_engine_offsets[type] + local_id];
 
 	/* Copy the original engine data for this slot */
 	switch (type) {
 		default: NOT_REACHED();
 
 		case VEH_TRAIN:
-			this->u.rail = _orig_rail_vehicle_info[base];
+			this->u.rail = _orig_rail_vehicle_info[local_id];
 			this->original_image_index = this->u.rail.image_index;
-			this->info.string_id = STR_VEHICLE_NAME_TRAIN_ENGINE_RAIL_KIRBY_PAUL_TANK_STEAM + base;
+			this->info.string_id = STR_VEHICLE_NAME_TRAIN_ENGINE_RAIL_KIRBY_PAUL_TANK_STEAM + local_id;
 
 			/* Set the default model life of original wagons to "infinite" */
-			if (this->u.rail.railveh_type == RAILVEH_WAGON) this->info.base_life = YearDelta{0xFF};
+			if (this->u.rail.railveh_type == RAILVEH_WAGON) this->info.base_life = CalTime::YearDelta{0xFF};
 
 			break;
 
 		case VEH_ROAD:
-			this->u.road = _orig_road_vehicle_info[base];
+			this->u.road = _orig_road_vehicle_info[local_id];
 			this->original_image_index = this->u.road.image_index;
-			this->info.string_id = STR_VEHICLE_NAME_ROAD_VEHICLE_MPS_REGAL_BUS + base;
+			this->info.string_id = STR_VEHICLE_NAME_ROAD_VEHICLE_MPS_REGAL_BUS + local_id;
 			break;
 
 		case VEH_SHIP:
-			this->u.ship = _orig_ship_vehicle_info[base];
+			this->u.ship = _orig_ship_vehicle_info[local_id];
 			this->original_image_index = this->u.ship.image_index;
-			this->info.string_id = STR_VEHICLE_NAME_SHIP_MPS_OIL_TANKER + base;
+			this->info.string_id = STR_VEHICLE_NAME_SHIP_MPS_OIL_TANKER + local_id;
 			break;
 
 		case VEH_AIRCRAFT:
-			this->u.air = _orig_aircraft_vehicle_info[base];
+			this->u.air = _orig_aircraft_vehicle_info[local_id];
 			this->original_image_index = this->u.air.image_index;
-			this->info.string_id = STR_VEHICLE_NAME_AIRCRAFT_SAMPSON_U52 + base;
+			this->info.string_id = STR_VEHICLE_NAME_AIRCRAFT_SAMPSON_U52 + local_id;
 			break;
 	}
 }
@@ -146,7 +147,7 @@ Engine::Engine(VehicleType type, EngineID base)
  */
 bool Engine::IsEnabled() const
 {
-	return this->info.string_id != STR_NEWGRF_INVALID_ENGINE && HasBit(this->info.climates, _settings_game.game_creation.landscape);
+	return this->info.string_id != STR_NEWGRF_INVALID_ENGINE && this->info.climates.Test(_settings_game.game_creation.landscape);
 }
 
 /**
@@ -192,7 +193,7 @@ bool Engine::CanCarryCargo() const
 
 bool Engine::CanPossiblyCarryCargo() const
 {
-	if (this->IsArticulatedCallbackVehicleType() && HasBit(this->info.callback_mask, CBM_VEHICLE_ARTIC_ENGINE)) return true;
+	if (this->IsArticulatedCallbackVehicleType() && this->info.callback_mask.Test(VehicleCallbackMask::ArticEngine)) return true;
 
 	switch (this->type) {
 		case VEH_TRAIN:
@@ -228,16 +229,16 @@ bool Engine::CanPossiblyCarryCargo() const
  * @param attempt_refit cargo ID to attempt to use, when v is nullptr
  * @return Capacity
  */
-uint Engine::DetermineCapacity(const Vehicle *v, uint16_t *mail_capacity, CargoID attempt_refit) const
+uint Engine::DetermineCapacity(const Vehicle *v, uint16_t *mail_capacity, CargoType attempt_refit) const
 {
 	assert(v == nullptr || this->index == v->engine_type);
 	if (mail_capacity != nullptr) *mail_capacity = 0;
 
 	if (!this->CanCarryCargo()) return 0;
 
-	bool new_multipliers = HasBit(this->info.misc_flags, EF_NO_DEFAULT_CARGO_MULTIPLIER);
-	CargoID default_cargo = this->GetDefaultCargoType();
-	CargoID cargo_type;
+	bool new_multipliers = this->info.misc_flags.Test(EngineMiscFlag::NoDefaultCargoMultiplier);
+	CargoType default_cargo = this->GetDefaultCargoType();
+	CargoType cargo_type;
 	if (v != nullptr) {
 		cargo_type = v->cargo_type;
 	} else {
@@ -248,12 +249,12 @@ uint Engine::DetermineCapacity(const Vehicle *v, uint16_t *mail_capacity, CargoI
 		}
 	}
 
-	if (mail_capacity != nullptr && this->type == VEH_AIRCRAFT && IsCargoInClass(cargo_type, CC_PASSENGERS)) {
+	if (mail_capacity != nullptr && this->type == VEH_AIRCRAFT && IsCargoInClass(cargo_type, CargoClass::Passengers)) {
 		*mail_capacity = GetEngineProperty(this->index, PROP_AIRCRAFT_MAIL_CAPACITY, this->u.air.mail_capacity, v);
 	}
 
 	/* Check the refit capacity callback if we are not in the default configuration, or if we are using the new multiplier algorithm. */
-	if (HasBit(this->info.callback_mask, CBM_VEHICLE_REFIT_CAPACITY) &&
+	if (this->info.callback_mask.Test(VehicleCallbackMask::RefitCapacity) &&
 			(new_multipliers || default_cargo != cargo_type || (v != nullptr && v->cargo_subtype != 0))) {
 		uint16_t callback;
 		if (this->refit_capacity_values != nullptr) {
@@ -292,13 +293,13 @@ uint Engine::DetermineCapacity(const Vehicle *v, uint16_t *mail_capacity, CargoI
 
 		case VEH_AIRCRAFT:
 			capacity = GetEngineProperty(this->index, PROP_AIRCRAFT_PASSENGER_CAPACITY, this->u.air.passenger_capacity, v);
-			if (!IsCargoInClass(cargo_type, CC_PASSENGERS)) {
+			if (!IsCargoInClass(cargo_type, CargoClass::Passengers)) {
 				extra_mail_cap = GetEngineProperty(this->index, PROP_AIRCRAFT_MAIL_CAPACITY, this->u.air.mail_capacity, v);
 			}
-			if (IsValidCargoID(GetCargoIDByLabel(CT_MAIL))) {
-				if (!new_multipliers && cargo_type == GetCargoIDByLabel(CT_MAIL)) return capacity + extra_mail_cap;
+			if (IsValidCargoType(GetCargoTypeByLabel(CT_MAIL))) {
+				if (!new_multipliers && cargo_type == GetCargoTypeByLabel(CT_MAIL)) return capacity + extra_mail_cap;
 			}
-			default_cargo = GetCargoIDByLabel(CT_PASSENGERS); // Always use 'passengers' wrt. cargo multipliers
+			default_cargo = GetCargoTypeByLabel(CT_PASSENGERS); // Always use 'passengers' wrt. cargo multipliers
 			break;
 
 		default: NOT_REACHED();
@@ -315,8 +316,8 @@ uint Engine::DetermineCapacity(const Vehicle *v, uint16_t *mail_capacity, CargoI
 		uint16_t default_multiplier = new_multipliers ? 0x100 : CargoSpec::Get(default_cargo)->multiplier;
 		uint16_t cargo_multiplier = CargoSpec::Get(cargo_type)->multiplier;
 		capacity *= cargo_multiplier;
-		if (extra_mail_cap > 0 && IsValidCargoID(GetCargoIDByLabel(CT_MAIL))) {
-			uint mail_multiplier = CargoSpec::Get(GetCargoIDByLabel(CT_MAIL))->multiplier;
+		if (extra_mail_cap > 0 && IsValidCargoType(GetCargoTypeByLabel(CT_MAIL))) {
+			uint mail_multiplier = CargoSpec::Get(GetCargoTypeByLabel(CT_MAIL))->multiplier;
 			capacity += (default_multiplier * extra_mail_cap * cargo_multiplier + mail_multiplier / 2) / mail_multiplier;
 		}
 		capacity = (capacity + default_multiplier / 2) / default_multiplier;
@@ -502,10 +503,10 @@ uint Engine::GetDisplayMaxTractiveEffort() const
  * Returns the vehicle's (not model's!) life length in days.
  * @return the life length
  */
-DateDelta Engine::GetLifeLengthInDays() const
+CalTime::DateDelta Engine::GetLifeLengthInDays() const
 {
 	/* Assume leap years; this gives the player a bit more than the given amount of years, but never less. */
-	return DateDelta{(this->info.lifelength + _settings_game.vehicle.extend_vehicle_life).base() * DAYS_IN_LEAP_YEAR};
+	return CalTime::DateDelta{(this->info.lifelength + _settings_game.vehicle.extend_vehicle_life).base() * DAYS_IN_LEAP_YEAR};
 }
 
 /**
@@ -558,7 +559,7 @@ bool Engine::IsVariantHidden(CompanyID c) const
 	 * the last display variant rather than the actual parent variant. */
 	const Engine *re = this;
 	const Engine *ve = re->GetDisplayVariant();
-	while (!(ve->IsHidden(c)) && re->info.variant_id != INVALID_ENGINE) {
+	while (!(ve->IsHidden(c)) && re->info.variant_id != EngineID::Invalid()) {
 		re = Engine::Get(re->info.variant_id);
 		ve = re->GetDisplayVariant();
 	}
@@ -586,23 +587,23 @@ void EngineOverrideManager::ResetToDefaultMapping()
  * @param grfid The GrfID that defines the scope of grf_local_id.
  *              If a newgrf overrides the engines of another newgrf, the "scope grfid" is the ID of the overridden newgrf.
  *              If dynnamic_engines is disabled, all newgrf share the same ID scope identified by INVALID_GRFID.
- * @return The engine ID if present, or INVALID_ENGINE if not.
+ * @return The engine ID if present, or EngineID::Invalid() if not.
  */
 EngineID EngineOverrideManager::GetID(VehicleType type, uint16_t grf_local_id, uint32_t grfid)
 {
 	auto iter = this->mapping_index.find(HashKey(type, grf_local_id, grfid));
-	EngineID id = (iter != this->mapping_index.end()) ? iter->second : INVALID_ENGINE;
+	EngineID id = (iter != this->mapping_index.end()) ? iter->second : EngineID::Invalid();
 
 #ifdef _DEBUG
-	EngineID index = 0;
+	EngineID index = EngineID::Begin();
 	for (const EngineIDMapping &eid : this->mappings) {
 		if (eid.type == type && eid.grfid == grfid && eid.internal_id == grf_local_id) {
 			assert(id == index);
 			return index;
 		}
-		index++;
+		++index;
 	}
-	assert(id == INVALID_ENGINE);
+	assert(id == EngineID::Invalid());
 #endif
 	return id;
 }
@@ -638,10 +639,10 @@ void EngineOverrideManager::RemoveFromIndex(EngineID id)
 void EngineOverrideManager::ReIndex()
 {
 	this->mapping_index.clear();
-	EngineID index = 0;
+	EngineID index = EngineID::Begin();
 	for (const EngineIDMapping &eid : this->mappings) {
 		this->mapping_index.insert({ HashKey(eid), index });
-		index++;
+		++index;
 	}
 }
 
@@ -654,14 +655,14 @@ void SetupEngines()
 	_engine_pool.CleanPool();
 
 	assert(_engine_mngr.mappings.size() >= EngineOverrideManager::NUM_DEFAULT_ENGINES);
-	[[maybe_unused]] uint index = 0;
+	[[maybe_unused]] EngineID index = EngineID::Begin();
 	for (const EngineIDMapping &eid : _engine_mngr.mappings) {
 		/* Assert is safe; there won't be more than 256 original vehicles
 		 * in any case, and we just cleaned the pool. */
 		assert(Engine::CanAllocateItem());
 		[[maybe_unused]] const Engine *e = new Engine(eid.type, eid.internal_id);
 		assert(e->index == index);
-		index++;
+		++index;
 	}
 }
 
@@ -686,7 +687,7 @@ static bool IsWagon(EngineID index)
 static void ClearLastVariant(EngineID engine_id, VehicleType type)
 {
 	for (Engine *e : Engine::IterateType(type)) {
-		if (e->display_last_variant == engine_id) e->display_last_variant = INVALID_ENGINE;
+		if (e->display_last_variant == engine_id) e->display_last_variant = EngineID::Invalid();
 	}
 }
 
@@ -697,7 +698,7 @@ static void RetireEngineIfPossible(Engine *e, int age_threshold)
 		if ((ymd.year.base() * 12) + ymd.month + age_threshold >= _settings_game.vehicle.no_expire_vehicles_after.base() * 12) return;
 	}
 
-	e->company_avail = 0;
+	e->company_avail = CompanyMask{};
 	ClearLastVariant(e->index, e->type);
 	AddRemoveEngineFromAutoreplaceAndBuildWindows(e->type);
 }
@@ -710,7 +711,7 @@ void CalcEngineReliability(Engine *e, bool new_month)
 {
 	/* Get source engine for reliability age. This is normally our engine unless variant reliability syncing is requested. */
 	Engine *re = e;
-	while (re->info.variant_id != INVALID_ENGINE && HasFlag(re->info.extra_flags, ExtraEngineFlags::SyncReliability)) {
+	while (re->info.variant_id != EngineID::Invalid() && re->info.extra_flags.Test(ExtraEngineFlag::SyncReliability)) {
 		re = Engine::Get(re->info.variant_id);
 	}
 
@@ -718,7 +719,7 @@ void CalcEngineReliability(Engine *e, bool new_month)
 	if (new_month && re->index > e->index && age != INT32_MAX) age++; /* parent variant's age has not yet updated. */
 
 	/* Check for early retirement */
-	if (e->company_avail != 0 && !_settings_game.vehicle.never_expire_vehicles && e->info.base_life != 0xFF) {
+	if (e->company_avail.Any() && !_settings_game.vehicle.never_expire_vehicles && e->info.base_life != 0xFF) {
 		int retire_early = e->info.retire_early;
 		uint retire_early_max_age = std::max(0, e->duration_phase_1 + e->duration_phase_2 - retire_early * 12);
 		if (retire_early != 0 && age >= retire_early_max_age) {
@@ -762,7 +763,7 @@ void SetYearEngineAgingStops()
 		const EngineInfo *ei = &e->info;
 
 		/* Exclude certain engines */
-		if (!HasBit(ei->climates, _settings_game.game_creation.landscape)) continue;
+		if (!ei->climates.Test(_settings_game.game_creation.landscape)) continue;
 		if (e->type == VEH_TRAIN && e->u.rail.railveh_type == RAILVEH_WAGON) continue;
 
 		/* Base year ending date on half the model life */
@@ -783,9 +784,9 @@ void StartupOneEngine(Engine *e, const CalTime::YearMonthDay &aging_ymd, const C
 	const EngineInfo *ei = &e->info;
 
 	e->age = 0;
-	e->flags = 0;
-	e->company_avail = 0;
-	e->company_hidden = 0;
+	e->flags = {};
+	e->company_avail = CompanyMask{};
+	e->company_hidden = CompanyMask{};
 
 	/* Vehicles with the same base_intro date shall be introduced at the same time.
 	 * Make sure they use the same randomisation of the date. */
@@ -800,33 +801,31 @@ void StartupOneEngine(Engine *e, const CalTime::YearMonthDay &aging_ymd, const C
 	/* Don't randomise the start-date in the first two years after gamestart to ensure availability
 	 * of engines in early starting games.
 	 * Note: TTDP uses fixed 1922 */
-	e->intro_date = ei->base_intro <= CalTime::ConvertYMDToDate(_settings_game.game_creation.starting_year + 2, 0, 1) ? ei->base_intro : (DateDelta)GB(r, 0, 9) + ei->base_intro;
+	e->intro_date = ei->base_intro <= CalTime::ConvertYMDToDate(_settings_game.game_creation.starting_year + 2, 0, 1) ? ei->base_intro : CalTime::DateDelta{(int)GB(r, 0, 9)} + ei->base_intro;
 
 	/* Get parent variant index for syncing reliability via random seed. */
 	const Engine *re = e;
-	while (re->info.variant_id != INVALID_ENGINE && HasFlag(re->info.extra_flags, ExtraEngineFlags::SyncReliability)) {
+	while (re->info.variant_id != EngineID::Invalid() && re->info.extra_flags.Test(ExtraEngineFlag::SyncReliability)) {
 		re = Engine::Get(re->info.variant_id);
 	}
 
 	SetRandomSeed(_settings_game.game_creation.generation_seed ^ seed ^
-	              (re->index << 16) ^ (re->info.base_intro.base() << 12) ^ (re->info.decay_speed << 8) ^
+	              (re->index.base() << 16) ^ (re->info.base_intro.base() << 12) ^ (re->info.decay_speed << 8) ^
 	              (re->info.lifelength.base() << 4) ^ re->info.retire_early ^
 	              e->type ^
 	              e->GetGRFID());
 
 	/* Base reliability defined as a percentage of UINT16_MAX. */
-	const uint16_t RELIABILITY_START = UINT16_MAX * 48 / 100;
-	const uint16_t RELIABILITY_MAX   = UINT16_MAX * 75 / 100;
-	const uint16_t RELIABILITY_FINAL = UINT16_MAX * 25 / 100;
-
-	static_assert(RELIABILITY_START == 0x7AE0);
-	static_assert(RELIABILITY_MAX   == 0xBFFF);
-	static_assert(RELIABILITY_FINAL == 0x3FFF);
+	const uint16_t RELIABILITY_MAX   = UINT16_MAX * _settings_game.difficulty.max_reliability_floor / 100;
+	const uint16_t RELIABILITY_START = RELIABILITY_MAX - UINT16_MAX * 27 / 100;
+	const uint16_t RELIABILITY_FINAL = RELIABILITY_MAX - UINT16_MAX * 50 / 100;
 
 	r = Random();
-	/* 14 bits gives a value between 0 and 16383, which is up to an additional 25%p reliability on top of the base reliability. */
+	/* 14 bits gives a value between 0 and 16383, which is up to an additional 25%p reliability on top of the base reliability.
+	 * reliability_max needs adjusted random component to fill space between max_reliability_floor and 100 - with the default
+	 * floor of 75, this is (100 - 75) / 25 = 1 */
 	e->reliability_start = GB(r, 16, 14) + RELIABILITY_START;
-	e->reliability_max   = GB(r,  0, 14) + RELIABILITY_MAX;
+	e->reliability_max   = GB(r,  0, 14) * (100 - _settings_game.difficulty.max_reliability_floor) / 25 + RELIABILITY_MAX;
 
 	r = Random();
 	e->reliability_final = GB(r, 16, 14) + RELIABILITY_FINAL;
@@ -846,14 +845,14 @@ void StartupOneEngine(Engine *e, const CalTime::YearMonthDay &aging_ymd, const C
 		if (intro_ymd.day > 1) intro_months++; // Engines are introduced at the first month start at/after intro date.
 		int expire_stop_months = std::max(expire_stop_ymd.year.base() * 12 + expire_stop_ymd.month, intro_months + e->duration_phase_1);
 		e->age = std::min(aging_months, expire_stop_months) - intro_months;
-		e->company_avail = MAX_UVALUE(CompanyMask);
-		e->flags |= ENGINE_AVAILABLE;
+		e->company_avail.Set();
+		e->flags.Set(EngineFlag::Available);
 	}
 
 	/* prevent certain engines from ever appearing. */
-	if (!HasBit(ei->climates, _settings_game.game_creation.landscape)) {
-		e->flags |= ENGINE_AVAILABLE;
-		e->company_avail = 0;
+	if (!ei->climates.Test(_settings_game.game_creation.landscape)) {
+		e->flags.Set(EngineFlag::Available);
+		e->company_avail = CompanyMask{};
 	}
 }
 
@@ -911,7 +910,7 @@ static void EnableEngineForCompany(EngineID eid, CompanyID company)
 	Engine *e = Engine::Get(eid);
 	Company *c = Company::Get(company);
 
-	SetBit(e->company_avail, company);
+	e->company_avail.Set(company);
 	if (e->type == VEH_TRAIN) {
 		c->avail_railtypes = GetCompanyRailTypes(c->index);
 	} else if (e->type == VEH_ROAD) {
@@ -939,7 +938,7 @@ static void DisableEngineForCompany(EngineID eid, CompanyID company)
 	Engine *e = Engine::Get(eid);
 	Company *c = Company::Get(company);
 
-	ClrBit(e->company_avail, company);
+	e->company_avail.Reset(company);
 	if (e->type == VEH_TRAIN) {
 		c->avail_railtypes = GetCompanyRailTypes(c->index);
 	} else if (e->type == VEH_ROAD) {
@@ -962,8 +961,8 @@ static void AcceptEnginePreview(EngineID eid, CompanyID company, int recursion_d
 {
 	Engine *e = Engine::Get(eid);
 
-	e->preview_company = INVALID_COMPANY;
-	e->preview_asked = MAX_UVALUE(CompanyMask);
+	e->preview_company = CompanyID::Invalid();
+	e->preview_asked.Set();
 
 	EnableEngineForCompany(eid, company);
 
@@ -979,7 +978,7 @@ static void AcceptEnginePreview(EngineID eid, CompanyID company, int recursion_d
 
 	/* Find variants to be included in preview. */
 	for (Engine *ve : Engine::IterateType(e->type)) {
-		if (ve->index != eid && ve->info.variant_id == eid && HasFlag(ve->info.extra_flags, ExtraEngineFlags::JoinPreview)) {
+		if (ve->index != eid && ve->info.variant_id == eid && ve->info.extra_flags.Test(ExtraEngineFlag::JoinPreview)) {
 			AcceptEnginePreview(ve->index, company, recursion_depth + 1);
 		}
 	}
@@ -988,18 +987,18 @@ static void AcceptEnginePreview(EngineID eid, CompanyID company, int recursion_d
 /**
  * Get the best company for an engine preview.
  * @param e Engine to preview.
- * @return Best company if it exists, #INVALID_COMPANY otherwise.
+ * @return Best company if it exists, #CompanyID::Invalid() otherwise.
  */
 static CompanyID GetPreviewCompany(Engine *e)
 {
-	CompanyID best_company = INVALID_COMPANY;
+	CompanyID best_company = CompanyID::Invalid();
 
 	/* For trains the cargomask has no useful meaning, since you can attach other wagons */
 	CargoTypes cargomask = e->type != VEH_TRAIN ? GetUnionOfArticulatedRefitMasks(e->index, true) : ALL_CARGOTYPES;
 
 	int32_t best_hist = -1;
 	for (const Company *c : Company::Iterate()) {
-		if (c->block_preview == 0 && !HasBit(e->preview_asked, c->index) &&
+		if (c->block_preview == 0 && !e->preview_asked.Test(c->index) &&
 				c->old_economy[0].performance_history > best_hist) {
 
 			/* Check whether the company uses similar vehicles */
@@ -1048,21 +1047,21 @@ void EnginesDailyLoop()
 
 	for (Engine *e : Engine::Iterate()) {
 		EngineID i = e->index;
-		if (e->flags & ENGINE_EXCLUSIVE_PREVIEW) {
-			if (e->preview_company != INVALID_COMPANY) {
+		if (e->flags.Test(EngineFlag::ExclusivePreview)) {
+			if (e->preview_company != CompanyID::Invalid()) {
 				if (!--e->preview_wait) {
 					CloseWindowById(WC_ENGINE_PREVIEW, i);
-					e->preview_company = INVALID_COMPANY;
+					e->preview_company = CompanyID::Invalid();
 				}
-			} else if (CountBits(e->preview_asked) < MAX_COMPANIES) {
+			} else if (CountBits(e->preview_asked.base()) < MAX_COMPANIES) {
 				e->preview_company = GetPreviewCompany(e);
 
-				if (e->preview_company == INVALID_COMPANY) {
-					e->preview_asked = MAX_UVALUE(CompanyMask);
+				if (e->preview_company == CompanyID::Invalid()) {
+					e->preview_asked.Set();
 					continue;
 				}
 
-				SetBit(e->preview_asked, e->preview_company);
+				e->preview_asked.Set(e->preview_company);
 				e->preview_wait = 20;
 				/* AIs are intentionally not skipped for preview even if they cannot build a certain
 				 * vehicle type. This is done to not give poor performing human companies an "unfair"
@@ -1083,27 +1082,25 @@ void EnginesDailyLoop()
 void ClearEnginesHiddenFlagOfCompany(CompanyID cid)
 {
 	for (Engine *e : Engine::Iterate()) {
-		SB(e->company_hidden, cid, 1, 0);
+		e->company_hidden.Reset(cid);
 	}
 }
 
 /**
  * Set the visibility of an engine.
- * @param tile Unused.
  * @param flags Operation to perform.
- * @param p1 Unused.
- * @param p2 Bit 31: 0=visible, 1=hidden, other bits for the #EngineID.
- * @param text Unused.
+ * @param engine_id Engine id..
+ * @param hide Set for hidden, unset for visible.
  * @return The cost of this operation or an error.
  */
-CommandCost CmdSetVehicleVisibility(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint32_t p2, const char *text)
+CommandCost CmdSetVehicleVisibility(DoCommandFlags flags, EngineID engine_id, bool hide)
 {
-	Engine *e = Engine::GetIfValid(GB(p2, 0, 31));
+	Engine *e = Engine::GetIfValid(engine_id);
 	if (e == nullptr || _current_company >= MAX_COMPANIES) return CMD_ERROR;
 	if (!IsEngineBuildable(e->index, e->type, _current_company)) return CMD_ERROR;
 
-	if ((flags & DC_EXEC) != 0) {
-		AssignBit(e->company_hidden, _current_company, HasBit(p2, 31));
+	if (flags.Test(DoCommandFlag::Execute)) {
+		e->company_hidden.Set(_current_company, hide);
 		AddRemoveEngineFromAutoreplaceAndBuildWindows(e->type);
 	}
 
@@ -1113,44 +1110,35 @@ CommandCost CmdSetVehicleVisibility(TileIndex tile, DoCommandFlag flags, uint32_
 /**
  * Accept an engine prototype. XXX - it is possible that the top-company
  * changes while you are waiting to accept the offer? Then it becomes invalid
- * @param tile unused
  * @param flags operation to perform
- * @param p1 engine-prototype offered
- * @param p2 unused
- * @param text unused
+ * @param engine_id engine-prototype offered
  * @return the cost of this operation or an error
  */
-CommandCost CmdWantEnginePreview(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint32_t p2, const char *text)
+CommandCost CmdWantEnginePreview(DoCommandFlags flags, EngineID engine_id)
 {
-	Engine *e = Engine::GetIfValid(p1);
-	if (e == nullptr || !(e->flags & ENGINE_EXCLUSIVE_PREVIEW) || e->preview_company != _current_company) return CMD_ERROR;
+	Engine *e = Engine::GetIfValid(engine_id);
+	if (e == nullptr || !e->flags.Test(EngineFlag::ExclusivePreview) || e->preview_company != _current_company) return CMD_ERROR;
 
-	if (flags & DC_EXEC) AcceptEnginePreview(p1, _current_company);
+	if (flags.Test(DoCommandFlag::Execute)) AcceptEnginePreview(engine_id, _current_company);
 
 	return CommandCost();
 }
 
 /**
  * Allow or forbid a specific company to use an engine
- * @param tile unused
  * @param flags operation to perform
- * @param p1 engine id
- * @param p2 various bitstuffed elements
- * - p2 = (bit  0 - 7) - Company to allow/forbid the use of an engine.
- * - p2 = (bit 31) - 0 to forbid, 1 to allow.
- * @param text unused
+ * @param engine_id engine id
+ * @param company_id Company to allow/forbid the use of an engine.
+ * @param allow false to forbid, true to allow.
  * @return the cost of this operation or an error
  */
-CommandCost CmdEngineCtrl(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint32_t p2, const char *text)
+CommandCost CmdEngineCtrl(DoCommandFlags flags, EngineID engine_id, CompanyID company_id, bool allow)
 {
 	if (_current_company != OWNER_DEITY) return CMD_ERROR;
-	EngineID engine_id = (EngineID)p1;
-	CompanyID company_id = (CompanyID)GB(p2, 0, 8);
-	bool allow = HasBit(p2, 31);
 
 	if (!Engine::IsValidID(engine_id) || !Company::IsValidID(company_id)) return CMD_ERROR;
 
-	if (flags & DC_EXEC) {
+	if (flags.Test(DoCommandFlag::Execute)) {
 		if (allow) {
 			EnableEngineForCompany(engine_id, company_id);
 		} else {
@@ -1172,33 +1160,24 @@ static void NewVehicleAvailable(Engine *e)
 
 	/* In case the company didn't build the vehicle during the intro period,
 	 * prevent that company from getting future intro periods for a while. */
-	if (e->flags & ENGINE_EXCLUSIVE_PREVIEW) {
+	if (e->flags.Test(EngineFlag::ExclusivePreview)) {
 		for (Company *c : Company::Iterate()) {
-			uint block_preview = c->block_preview;
+			if (!e->company_avail.Test(c->index)) continue;
 
-			if (!HasBit(e->company_avail, c->index)) continue;
-
-			/* We assume the user did NOT build it.. prove me wrong ;) */
-			c->block_preview = 20;
-
-			for (const Vehicle *v : Vehicle::Iterate()) {
-				if ((v->type == VEH_TRAIN && !HasBit(v->subtype, GVSF_VIRTUAL)) || v->type == VEH_ROAD || v->type == VEH_SHIP ||
-						(v->type == VEH_AIRCRAFT && Aircraft::From(v)->IsNormalAircraft())) {
-					if (v->owner == c->index && v->engine_type == index) {
-						/* The user did prove me wrong, so restore old value */
-						c->block_preview = block_preview;
-						break;
-					}
-				}
+			/* Check the company's 'ALL_GROUP' group statistics. This only includes countable vehicles, which is fine
+			 * as those are the only engines that can be given exclusive previews. */
+			if (GetGroupNumEngines(c->index, ALL_GROUP, e->index) == 0) {
+				/* The company did not build this engine during preview. */
+				c->block_preview = 20;
 			}
 		}
 	}
 
-	e->flags = (e->flags & ~ENGINE_EXCLUSIVE_PREVIEW) | ENGINE_AVAILABLE;
+	e->flags.Reset(EngineFlag::ExclusivePreview).Set(EngineFlag::Available);
 	AddRemoveEngineFromAutoreplaceAndBuildWindows(e->type);
 
 	/* Now available for all companies */
-	e->company_avail = MAX_UVALUE(CompanyMask);
+	e->company_avail.Set();
 
 	/* Do not introduce new rail wagons */
 	if (IsWagon(index)) return;
@@ -1217,10 +1196,11 @@ static void NewVehicleAvailable(Engine *e)
 	if (!IsVehicleTypeDisabled(e->type, true)) AI::BroadcastNewEvent(new ScriptEventEngineAvailable(index));
 
 	/* Only provide the "New Vehicle available" news paper entry, if engine can be built. */
-	if (!IsVehicleTypeDisabled(e->type, false) && !HasFlag(e->info.extra_flags, ExtraEngineFlags::NoNews)) {
-		SetDParam(0, GetEngineCategoryName(index));
-		SetDParam(1, PackEngineNameDParam(index, EngineNameContext::PreviewNews));
-		AddNewsItem(STR_NEWS_NEW_VEHICLE_NOW_AVAILABLE_WITH_TYPE, NT_NEW_VEHICLES, NF_VEHICLE, NR_ENGINE, index);
+	if (!IsVehicleTypeDisabled(e->type, false) && !e->info.extra_flags.Test(ExtraEngineFlag::NoNews)) {
+		AddNewsItem(GetEncodedString(STR_NEWS_NEW_VEHICLE_NOW_AVAILABLE_WITH_TYPE,
+				GetEngineCategoryName(index),
+				PackEngineNameDParam(index, EngineNameContext::PreviewNews)),
+			NewsType::NewVehicles, NewsStyle::Vehicle, {}, index);
 	}
 
 	/* Update the toolbar. */
@@ -1245,7 +1225,7 @@ void EnginesMonthlyLoop()
 		bool refresh = false;
 		for (Engine *e : Engine::Iterate()) {
 			/* Age the vehicle */
-			if ((e->flags & ENGINE_AVAILABLE) && e->age != INT32_MAX && (!no_engine_aging || e->age < e->duration_phase_1)) {
+			if (e->flags.Test(EngineFlag::Available) && e->age != INT32_MAX && (!no_engine_aging || e->age < e->duration_phase_1)) {
 				e->age++;
 				CalcEngineReliability(e, true);
 				refresh = true;
@@ -1256,10 +1236,10 @@ void EnginesMonthlyLoop()
 
 			if (e->intro_date > no_introduce_after) continue;
 
-			if (!(e->flags & ENGINE_AVAILABLE) && CalTime::CurDate() >= (e->intro_date + DAYS_IN_YEAR)) {
+			if (!e->flags.Test(EngineFlag::Available) && CalTime::CurDate() >= (e->intro_date + DAYS_IN_YEAR)) {
 				/* Introduce it to all companies */
 				NewVehicleAvailable(e);
-			} else if (!(e->flags & (ENGINE_AVAILABLE | ENGINE_EXCLUSIVE_PREVIEW)) && CalTime::CurDate() >= e->intro_date) {
+			} else if (!e->flags.Any({EngineFlag::Available, EngineFlag::ExclusivePreview}) && CalTime::CurDate() >= e->intro_date) {
 				/* Introduction date has passed...
 				 * Check if it is allowed to build this vehicle type at all
 				 * based on the current game settings. If not, it does not
@@ -1270,12 +1250,12 @@ void EnginesMonthlyLoop()
 				if (IsWagon(e->index)) continue;
 
 				/* Engine has no preview */
-				if (HasFlag(e->info.extra_flags, ExtraEngineFlags::NoPreview)) continue;
+				if (e->info.extra_flags.Test(ExtraEngineFlag::NoPreview)) continue;
 
 				/* Show preview dialog to one of the companies. */
-				e->flags |= ENGINE_EXCLUSIVE_PREVIEW;
-				e->preview_company = INVALID_COMPANY;
-				e->preview_asked = 0;
+				e->flags.Set(EngineFlag::ExclusivePreview);
+				e->preview_company = CompanyID::Invalid();
+				e->preview_asked = CompanyMask{};
 			}
 		}
 
@@ -1295,7 +1275,7 @@ void EnginesMonthlyLoop()
  * @param name New name of an engine.
  * @return \c false if the name is being used already, else \c true.
  */
-static bool IsUniqueEngineName(const char *name)
+static bool IsUniqueEngineName(std::string_view name)
 {
 	for (const Engine *e : Engine::Iterate()) {
 		if (!e->name.empty() && e->name == name) return false;
@@ -1306,26 +1286,24 @@ static bool IsUniqueEngineName(const char *name)
 
 /**
  * Rename an engine.
- * @param tile unused
  * @param flags operation to perform
- * @param p1 engine ID to rename
- * @param p2 unused
+ * @param engine_id engine ID to rename
  * @param text the new name or an empty string when resetting to the default
  * @return the cost of this operation or an error
  */
-CommandCost CmdRenameEngine(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint32_t p2, const char *text)
+CommandCost CmdRenameEngine(DoCommandFlags flags, EngineID engine_id, const std::string &text)
 {
-	Engine *e = Engine::GetIfValid(p1);
+	Engine *e = Engine::GetIfValid(engine_id);
 	if (e == nullptr) return CMD_ERROR;
 
-	bool reset = StrEmpty(text);
+	bool reset = text.empty();
 
 	if (!reset) {
 		if (Utf8StringLength(text) >= MAX_LENGTH_ENGINE_NAME_CHARS) return CMD_ERROR;
 		if (!IsUniqueEngineName(text)) return CommandCost(STR_ERROR_NAME_MUST_BE_UNIQUE);
 	}
 
-	if (flags & DC_EXEC) {
+	if (flags.Test(DoCommandFlag::Execute)) {
 		if (reset) {
 			e->name.clear();
 		} else {
@@ -1360,10 +1338,10 @@ bool IsEngineBuildable(EngineID engine, VehicleType type, CompanyID company)
 	/* check if it's available ... */
 	if (company == OWNER_DEITY) {
 		/* ... for any company (preview does not count) */
-		if (!(e->flags & ENGINE_AVAILABLE) || e->company_avail == 0) return false;
+		if (!e->flags.Test(EngineFlag::Available) || e->company_avail.None()) return false;
 	} else {
 		/* ... for this company */
-		if (!HasBit(e->company_avail, company)) return false;
+		if (!e->company_avail.Test(company)) return false;
 	}
 
 	if (!e->IsEnabled()) return false;
@@ -1371,12 +1349,12 @@ bool IsEngineBuildable(EngineID engine, VehicleType type, CompanyID company)
 	if (type == VEH_TRAIN && company != OWNER_DEITY) {
 		/* Check if the rail type is available to this company */
 		const Company *c = Company::Get(company);
-		if (((GetRailTypeInfo(e->u.rail.railtype))->compatible_railtypes & c->avail_railtypes) == 0) return false;
+		if (!GetRailTypeInfo(e->u.rail.railtype)->compatible_railtypes.Any(c->avail_railtypes)) return false;
 	}
 	if (type == VEH_ROAD && company != OWNER_DEITY) {
 		/* Check if the road type is available to this company */
 		const Company *c = Company::Get(company);
-		if ((GetRoadTypeInfo(e->u.road.roadtype)->powered_roadtypes & c->avail_roadtypes) == ROADTYPES_NONE) return false;
+		if (!GetRoadTypeInfo(e->u.road.roadtype)->powered_roadtypes.Any(c->avail_roadtypes)) return false;
 	}
 
 	return true;
@@ -1402,10 +1380,10 @@ bool IsEngineRefittable(EngineID engine)
 
 	/* Are there suffixes?
 	 * Note: This does not mean the suffixes are actually available for every consist at any time. */
-	if (HasBit(ei->callback_mask, CBM_VEHICLE_CARGO_SUFFIX)) return true;
+	if (ei->callback_mask.Test(VehicleCallbackMask::CargoSuffix)) return true;
 
 	/* Is there any cargo except the default cargo? */
-	CargoID default_cargo = e->GetDefaultCargoType();
+	CargoType default_cargo = e->GetDefaultCargoType();
 	CargoTypes default_cargo_mask = 0;
 	SetBit(default_cargo_mask, default_cargo);
 	return default_cargo != INVALID_CARGO && ei->refit_mask != default_cargo_mask;
@@ -1425,16 +1403,17 @@ void CheckEngines()
 		if (e->type == VEH_TRAIN && e->u.rail.railveh_type == RAILVEH_WAGON) continue;
 
 		/* We have an available engine... yay! */
-		if ((e->flags & ENGINE_AVAILABLE) != 0 && e->company_avail != 0) return;
+		if (e->flags.Test(EngineFlag::Available) && e->company_avail.Any()) return;
 
 		/* Okay, try to find the earliest date. */
 		min_date = std::min(min_date, e->info.base_intro);
 	}
 
 	if (min_date < INT32_MAX) {
-		SetDParam(0, min_date);
-		ShowErrorMessage(STR_ERROR_NO_VEHICLES_AVAILABLE_YET, STR_ERROR_NO_VEHICLES_AVAILABLE_YET_EXPLANATION, WL_WARNING);
+		ShowErrorMessage(GetEncodedString(STR_ERROR_NO_VEHICLES_AVAILABLE_YET),
+			GetEncodedString(STR_ERROR_NO_VEHICLES_AVAILABLE_YET_EXPLANATION, min_date), WL_WARNING);
 	} else {
-		ShowErrorMessage(STR_ERROR_NO_VEHICLES_AVAILABLE_AT_ALL, STR_ERROR_NO_VEHICLES_AVAILABLE_AT_ALL_EXPLANATION, WL_WARNING);
+		ShowErrorMessage(GetEncodedString(STR_ERROR_NO_VEHICLES_AVAILABLE_AT_ALL),
+			GetEncodedString(STR_ERROR_NO_VEHICLES_AVAILABLE_AT_ALL_EXPLANATION), WL_WARNING);
 	}
 }

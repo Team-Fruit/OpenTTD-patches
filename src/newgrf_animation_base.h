@@ -57,7 +57,7 @@ struct AnimationBase {
 
 		/* Acquire the animation speed from the NewGRF. */
 		uint8_t animation_speed = spec->animation.speed;
-		if (HasBit(spec->callback_mask, Tbase::cbm_animation_speed)) {
+		if (spec->callback_mask.Test(Tbase::cbm_animation_speed)) {
 			uint16_t callback = GetCallback(Tbase::cb_animation_speed, 0, 0, spec, obj, tile, extra_data);
 			if (callback != CALLBACK_FAILED) {
 				if (callback >= 0x100 && spec->grf_prop.grffile->grf_version >= 8) ErrorUnknownCallbackResult(spec->grf_prop.grfid, Tbase::cb_animation_speed, callback);
@@ -76,7 +76,7 @@ struct AnimationBase {
 
 		bool frame_set_by_callback = false;
 
-		if (HasBit(spec->callback_mask, Tbase::cbm_animation_next_frame)) {
+		if (spec->callback_mask.Test(Tbase::cbm_animation_next_frame)) {
 			uint16_t callback = GetCallback(Tbase::cb_animation_next_frame, random_animation ? Random() : 0, 0, spec, obj, tile, extra_data);
 
 			if (callback != CALLBACK_FAILED) {
@@ -105,7 +105,7 @@ struct AnimationBase {
 		if (!frame_set_by_callback) {
 			if (frame < num_frames) {
 				frame++;
-			} else if (frame == num_frames && spec->animation.status == ANIM_STATUS_LOOPING) {
+			} else if (frame == num_frames && spec->animation.status == AnimationStatus::Looping) {
 				/* This animation loops, so start again from the beginning */
 				frame = 0;
 			} else {
@@ -142,8 +142,8 @@ struct AnimationBase {
 			case 0xFF: DeleteAnimatedTile(tile);     break;
 			default:
 				bool changed = Tframehelper::Set(obj, tile, callback);
-				if (callback >= spec->animation.frames && (spec->animation.status != ANIM_STATUS_LOOPING || spec->animation.frames == 0) &&
-						!HasBit(spec->callback_mask, Tbase::cbm_animation_next_frame)) {
+				if (callback >= spec->animation.frames && (spec->animation.status != AnimationStatus::Looping || spec->animation.frames == 0) &&
+						!spec->callback_mask.Test(Tbase::cbm_animation_next_frame)) {
 					/* The animation would be stopped on this frame in the next AnimateTile call, don't bother animating it */
 					if (changed) MarkTileDirtyByTile(tile, VMDF_NOT_MAP_MODE);
 					break;
@@ -178,7 +178,7 @@ struct AnimationBase {
 
 	static uint8_t GetAnimationSpeed(const Tspec *spec)
 	{
-		if (HasBit(spec->callback_mask, Tbase::cbm_animation_speed)) return 0;
+		if (spec->callback_mask.Test(Tbase::cbm_animation_speed)) return 0;
 		return spec->animation.speed;
 	}
 };

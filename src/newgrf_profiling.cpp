@@ -7,6 +7,8 @@
 
  /** @file newgrf_profiling.cpp Profiling of NewGRF action 2 handling. */
 
+#include "stdafx.h"
+
 #include "newgrf_profiling.h"
 #include "date_func.h"
 #include "fileio_func.h"
@@ -20,6 +22,7 @@
 
 #include <chrono>
 
+#include "safeguards.h"
 
 std::vector<NewGRFProfiler> _newgrf_profilers;
 
@@ -29,7 +32,7 @@ std::vector<NewGRFProfiler> _newgrf_profilers;
  * @param grffile   The GRF file to collect profiling data on
  * @param end_date  Game date to end profiling on
  */
-NewGRFProfiler::NewGRFProfiler(const GRFFile *grffile) : grffile{ grffile }, active{ false }, cur_call{}
+NewGRFProfiler::NewGRFProfiler(const GRFFile *grffile) : grffile(grffile)
 {
 }
 
@@ -97,14 +100,14 @@ uint32_t NewGRFProfiler::Finish()
 	if (!this->active) return 0;
 
 	if (this->calls.empty()) {
-		IConsolePrint(CC_DEBUG, "Finished profile of NewGRF [{:08X}], no events collected, not writing a file.", BSWAP32(this->grffile->grfid));
+		IConsolePrint(CC_DEBUG, "Finished profile of NewGRF [{:08X}], no events collected, not writing a file.", std::byteswap(this->grffile->grfid));
 
 		this->Abort();
 		return 0;
 	}
 
 	std::string filename = this->GetOutputFilename();
-	IConsolePrint(CC_DEBUG, "Finished profile of NewGRF [{:08X}], writing {} events to '{}'.", BSWAP32(this->grffile->grfid), this->calls.size(), filename);
+	IConsolePrint(CC_DEBUG, "Finished profile of NewGRF [{:08X}], writing {} events to '{}'.", std::byteswap(this->grffile->grfid), this->calls.size(), filename);
 
 	uint32_t total_microseconds = 0;
 
@@ -115,7 +118,7 @@ uint32_t NewGRFProfiler::Finish()
 	} else {
 		fmt::print(*f, "Tick,Sprite,Feature,Item,CallbackID,Microseconds,Depth,Result\n");
 		for (const Call &c : this->calls) {
-			fmt::print(*f, "{},{},{:#X},{},{:#X},{},{},{}\n", c.tick, c.root_sprite, c.feat, c.item, (uint)c.cb, c.time, c.subs, c.result);
+			fmt::print(*f, "{},{},0x{:X},{},0x{:X},{},{},{}\n", c.tick, c.root_sprite, c.feat, c.item, (uint)c.cb, c.time, c.subs, c.result);
 			total_microseconds += c.time;
 		}
 	}
@@ -136,7 +139,7 @@ void NewGRFProfiler::Abort()
  */
 std::string NewGRFProfiler::GetOutputFilename() const
 {
-	return fmt::format("{}grfprofile-{:%Y%m%d-%H%M}-{:08X}.csv", FiosGetScreenshotDir(), fmt::localtime(time(nullptr)), BSWAP32(this->grffile->grfid));
+	return fmt::format("{}grfprofile-{:%Y%m%d-%H%M}-{:08X}.csv", FiosGetScreenshotDir(), fmt::localtime(time(nullptr)), std::byteswap(this->grffile->grfid));
 }
 
 /* static */ uint32_t NewGRFProfiler::FinishAll()

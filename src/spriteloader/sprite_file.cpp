@@ -9,9 +9,12 @@
 
 #include "../stdafx.h"
 #include "sprite_file_type.hpp"
+#include "../safeguards.h"
+
+#include <array>
 
 /** Signature of a container version 2 GRF. */
-extern const uint8_t _grf_cont_v2_sig[8] = {'G', 'R', 'F', 0x82, 0x0D, 0x0A, 0x1A, 0x0A};
+extern const std::array<uint8_t, 8> _grf_cont_v2_sig = {'G', 'R', 'F', 0x82, 0x0D, 0x0A, 0x1A, 0x0A};
 
 /**
  * Get the container version of the currently opened GRF file.

@@ -16,7 +16,7 @@
 /**
  * Describes the behaviour of a tile during flooding.
  */
-enum FloodingBehaviour {
+enum FloodingBehaviour : uint8_t {
 	FLOOD_NONE,    ///< The tile does not flood neighboured tiles.
 	FLOOD_ACTIVE,  ///< The tile floods neighboured tiles.
 	FLOOD_PASSIVE, ///< The tile does not actively flood neighboured tiles, but it prevents them from drying up.
@@ -40,8 +40,7 @@ void MakeWaterKeepingClass(TileIndex tile, Owner o);
 void CheckForDockingTile(TileIndex t);
 
 void RiverModifyDesertZone(TileIndex tile, void *data);
-void MakeRiverAndModifyDesertZoneAround(TileIndex tile);
-static const uint RIVER_OFFSET_DESERT_DISTANCE = 5; ///< Circular tile search radius to create non-desert around a river tile.
+static const uint RIVER_OFFSET_DESERT_DISTANCE = 5; ///< Circular tile search diameter to create non-desert around a river tile.
 
 bool IsWateredTile(TileIndex tile, Direction from);
 

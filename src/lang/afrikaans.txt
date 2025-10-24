@@ -390,9 +390,7 @@ STR_SCENEDIT_FILE_MENU_QUIT                                     :Verlaat
 
 
 # Settings menu
-###length 16
 STR_SETTINGS_MENU_GAME_OPTIONS                                  :Spel opsies
-STR_SETTINGS_MENU_CONFIG_SETTINGS_TREE                          :Stellings
 STR_SETTINGS_MENU_NEWGRF_SETTINGS                               :NewGRF stellings
 STR_SETTINGS_MENU_TRANSPARENCY_OPTIONS                          :Deursigtigheid opsies
 STR_SETTINGS_MENU_TOWN_NAMES_DISPLAYED                          :Dorp name vertoon
@@ -759,7 +757,6 @@ STR_MESSAGE_HISTORY_TOOLTIP                                     :{BLACK}'n Lys v
 STR_MESSAGE_NEWS_FORMAT                                         :{STRING}  -  {STRING}
 
 STR_NEWS_MESSAGE_CAPTION                                        :{WHITE}Boodskap
-STR_NEWS_CUSTOM_ITEM                                            :{BIG_FONT}{BLACK}{STRING}
 
 STR_NEWS_FIRST_TRAIN_ARRIVAL                                    :{BIG_FONT}{BLACK}Burgers vier fees . . .{}Die eerste trein het by {STATION} aangekom!
 STR_NEWS_FIRST_BUS_ARRIVAL                                      :{BIG_FONT}{BLACK}Burgers vier fees . . .{}Die eerste bus het by {STATION} aangekom!
@@ -871,7 +868,7 @@ STR_GAME_OPTIONS_CURRENCY_UNITS_FRAME                           :{BLACK}Geldeenh
 STR_GAME_OPTIONS_CURRENCY_UNITS_DROPDOWN_TOOLTIP                :{BLACK}Geld eendheid keuse
 
 
-###length 44
+###length 45
 STR_GAME_OPTIONS_CURRENCY_GBP                                   :Britse Pond
 STR_GAME_OPTIONS_CURRENCY_USD                                   :Amerikaanse Dollar
 STR_GAME_OPTIONS_CURRENCY_EUR                                   :Euro
@@ -1053,7 +1050,6 @@ STR_CITY_APPROVAL_PERMISSIVE                                    :Permissief
 STR_WARNING_NO_SUITABLE_AI                                      :{WHITE}Geen geskikte KI beskikbaar...{}Jy kan verskeie KI's aflaai deur middel van die 'Aanlyn Inhoud' stelsel
 
 # Settings tree window
-STR_CONFIG_SETTING_TREE_CAPTION                                 :{WHITE}Stellings
 STR_CONFIG_SETTING_FILTER_TITLE                                 :{BLACK}Filter string:
 STR_CONFIG_SETTING_EXPAND_ALL                                   :{BLACK}Brei alles uit
 STR_CONFIG_SETTING_COLLAPSE_ALL                                 :{BLACK}Krimp alles in
@@ -1160,6 +1156,7 @@ STR_CONFIG_SETTING_CATCHMENT_HELPTEXT                           :Laat verskillen
 
 STR_CONFIG_SETTING_SERVE_NEUTRAL_INDUSTRIES                     :Maatskappy stasies kan industriëe bedien met aangehegte neutrale stasies: {STRING}
 STR_CONFIG_SETTING_SERVE_NEUTRAL_INDUSTRIES_HELPTEXT            :Indien gekies, kan industrieë met aangeslote stasies (soos Olie Rigs) ook bedien word deur maatskappybesitte stasies wat in die omgewing gebou word. As dit af is, mag hierdie industrieë slegs deur hul aangeslote stasies bedien word. Enige nabygeleë maatskappystasies sal dit nie kan bedien nie, en die aangehegte stasie sal ook niks anders as die industrie bedien nie
+
 
 STR_CONFIG_SETTING_EXTRADYNAMITE                                :Laat verwydering van meer stad-besite paaie, bruge, ens toe: {STRING}
 STR_CONFIG_SETTING_EXTRADYNAMITE_HELPTEXT                       :Maak dit makliker om dorps eiendom en infrastruktuur te verwyder
@@ -1669,6 +1666,8 @@ STR_CONFIG_SETTING_ENDING_YEAR_VALUE                            :{NUM}
 ###setting-zero-is-special
 STR_CONFIG_SETTING_ENDING_YEAR_ZERO                             :Nooit
 
+###length 2
+
 ###length 3
 
 STR_CONFIG_SETTING_FEEDER_PAYMENT_SHARE                         :Persentasie van wins om te betaal in voerder systeem: {STRING}
@@ -1713,6 +1712,8 @@ STR_CONFIG_SETTING_TOWN_FOUNDING_HELPTEXT                       :Aktiveering van
 STR_CONFIG_SETTING_TOWN_FOUNDING_FORBIDDEN                      :Verbode
 STR_CONFIG_SETTING_TOWN_FOUNDING_ALLOWED                        :Toegelaat
 STR_CONFIG_SETTING_TOWN_FOUNDING_ALLOWED_CUSTOM_LAYOUT          :Toegelaat, eie dorp uitleg
+
+###length 3
 
 STR_CONFIG_SETTING_TOWN_CARGOGENMODE                            :Stad-vragproduksie: {STRING}
 STR_CONFIG_SETTING_TOWN_CARGOGENMODE_HELPTEXT                   :Hoeveel vrag word deur huise in dorpe geproduseer, relatief tot die algemene bevolking van die stad.{} Kwadratiese groei: 'n Dorp wat twee keer so groot is, genereer vier keer soveel passasiers.{} Lineêre groei: 'n Stad twee keer so groot, genereer twee keer soveel passasiers.
@@ -1899,7 +1900,6 @@ STR_INTRO_MULTIPLAYER                                           :{BLACK}Multispe
 
 STR_INTRO_GAME_OPTIONS                                          :{BLACK}Spel Opsies
 STR_INTRO_HIGHSCORE                                             :{BLACK}Hoogste Tellings Tafel
-STR_INTRO_CONFIG_SETTINGS_TREE                                  :{BLACK}Stellings
 STR_INTRO_NEWGRF_SETTINGS                                       :{BLACK}NewGRF Stellings
 STR_INTRO_ONLINE_CONTENT                                        :{BLACK}Soek aanlyn
 STR_INTRO_QUIT                                                  :{BLACK}Verlaat
@@ -1918,7 +1918,6 @@ STR_INTRO_TOOLTIP_TOYLAND_LANDSCAPE                             :{BLACK}Kies 'sp
 
 STR_INTRO_TOOLTIP_GAME_OPTIONS                                  :{BLACK}Vertoon speletjie opsies
 STR_INTRO_TOOLTIP_HIGHSCORE                                     :{BLACK}Vertoon hoogste tellings tafel
-STR_INTRO_TOOLTIP_CONFIG_SETTINGS_TREE                          :{BLACK}Vertoon instellings
 STR_INTRO_TOOLTIP_NEWGRF_SETTINGS                               :{BLACK}Wys NewGRF stellings
 STR_INTRO_TOOLTIP_ONLINE_CONTENT                                :{BLACK}Kyk vir nuwe of bygewerkde inhoud om af te laai
 STR_INTRO_TOOLTIP_QUIT                                          :{BLACK}Verlaat 'OpenTTD'
@@ -1991,12 +1990,7 @@ STR_LIVERY_FREIGHT_TRAM                                         :Vrag Trem
 STR_FACE_CAPTION                                                :{WHITE}Gesig Keuse
 STR_FACE_CANCEL_TOOLTIP                                         :{BLACK}Kanselleer nuwe gesig keuse
 STR_FACE_OK_TOOLTIP                                             :{BLACK}Aanvar nuwe gesig keuse
-STR_FACE_RANDOM                                                 :{BLACK}Lukraake
 
-STR_FACE_MALE_BUTTON                                            :{BLACK}Manlik
-STR_FACE_MALE_TOOLTIP                                           :{BLACK}Kies manlik gesigte
-STR_FACE_FEMALE_BUTTON                                          :{BLACK}Vroulik
-STR_FACE_FEMALE_TOOLTIP                                         :{BLACK}Kies vroulik gesigte
 STR_FACE_NEW_FACE_BUTTON                                        :{BLACK}Nuwe Gesig
 STR_FACE_NEW_FACE_TOOLTIP                                       :{BLACK}Genereer nuwe lukrake gesig
 STR_FACE_ADVANCED                                               :{BLACK}Voorlopend
@@ -2014,36 +2008,20 @@ STR_FACE_FACECODE_ERR                                           :{WHITE}Kon nie 
 STR_FACE_SAVE                                                   :{BLACK}Spaar
 STR_FACE_SAVE_TOOLTIP                                           :{BLACK}Spaar gunsteling gesig
 STR_FACE_SAVE_DONE                                              :{WHITE}Die gesig sal as u gunsteling gesig in die OpenTTD stellings lêer gespaar word.
-STR_FACE_EUROPEAN                                               :{BLACK}Europiese
-STR_FACE_EUROPEAN_TOOLTIP                                       :{BLACK}Kies europese gesigte
-STR_FACE_AFRICAN                                                :{BLACK}Afrikaanse
-STR_FACE_AFRICAN_TOOLTIP                                        :{BLACK}Kies Afrikaanse gesigte
 STR_FACE_YES                                                    :Ja
 STR_FACE_NO                                                     :Nee
-STR_FACE_MOUSTACHE_EARRING_TOOLTIP                              :{BLACK}Aktiveer snor of oorbel
 STR_FACE_HAIR                                                   :Hare:
-STR_FACE_HAIR_TOOLTIP                                           :{BLACK}Verander hare
 STR_FACE_EYEBROWS                                               :Winkbroue:
-STR_FACE_EYEBROWS_TOOLTIP                                       :{BLACK}Verander winkbroue
 STR_FACE_EYECOLOUR                                              :Oog kleur:
-STR_FACE_EYECOLOUR_TOOLTIP                                      :{BLACK}Verander oogkleur
 STR_FACE_GLASSES                                                :Brille:
-STR_FACE_GLASSES_TOOLTIP                                        :{BLACK}Aktiveer brille
-STR_FACE_GLASSES_TOOLTIP_2                                      :{BLACK}Verander brille
 STR_FACE_NOSE                                                   :Neus:
-STR_FACE_NOSE_TOOLTIP                                           :{BLACK}Verander neus
 STR_FACE_LIPS                                                   :Lippe:
 STR_FACE_MOUSTACHE                                              :Snor:
-STR_FACE_LIPS_MOUSTACHE_TOOLTIP                                 :{BLACK}Verander lippe of snor
 STR_FACE_CHIN                                                   :Ken:
-STR_FACE_CHIN_TOOLTIP                                           :{BLACK}Verander ken
 STR_FACE_JACKET                                                 :Jas:
-STR_FACE_JACKET_TOOLTIP                                         :{BLACK}Verander jas
 STR_FACE_COLLAR                                                 :Kraag:
-STR_FACE_COLLAR_TOOLTIP                                         :{BLACK}Verander kraag
 STR_FACE_TIE                                                    :Das:
 STR_FACE_EARRING                                                :Oorbel:
-STR_FACE_TIE_EARRING_TOOLTIP                                    :{BLACK}Verander das of oorbel
 
 # Matches ServerGameType
 ###length 3
@@ -2211,7 +2189,7 @@ STR_NETWORK_ERROR_CLIENT_TIMEOUT_MAP                            :die kaart af la
 STR_NETWORK_ERROR_CLIENT_TIMEOUT_JOIN                           :verwerking van die kaart het te lank gevat
 
 # Network related errors
-STR_NETWORK_SERVER_MESSAGE                                      :*** {1:STRING}
+STR_NETWORK_SERVER_MESSAGE                                      :*** {STRING}
 
 ###length 12
 STR_NETWORK_SERVER_MESSAGE_GAME_PAUSED                          :Spel geonderbreek ({STRING})
@@ -2227,11 +2205,10 @@ STR_NETWORK_SERVER_MESSAGE_GAME_REASON_GAME_SCRIPT              :speletjie skrif
 
 STR_NETWORK_MESSAGE_CLIENT_LEAVING                              :verlaat
 STR_NETWORK_MESSAGE_CLIENT_JOINED                               :*** {STRING} het by die spel aangesluit
-STR_NETWORK_MESSAGE_CLIENT_JOINED_ID                            :*** {STRING} het die spel aangesluit (Client #{2:NUM})
-STR_NETWORK_MESSAGE_CLIENT_COMPANY_JOIN                         :*** {STRING} het by maatskappy #{2:NUM} aangesluit
+STR_NETWORK_MESSAGE_CLIENT_JOINED_ID                            :*** {STRING} het die spel aangesluit (Client #{NUM})
 STR_NETWORK_MESSAGE_CLIENT_COMPANY_SPECTATE                     :*** {STRING} het aangesluit by die spektators
-STR_NETWORK_MESSAGE_CLIENT_COMPANY_NEW                          :*** {STRING} het 'n nuwe maatskappy gestig (#{2:NUM})
-STR_NETWORK_MESSAGE_CLIENT_LEFT                                 :*** {STRING} het die spel verlaat ({2:STRING})
+STR_NETWORK_MESSAGE_CLIENT_COMPANY_NEW                          :*** {STRING} het 'n nuwe maatskappy gestig (#{NUM})
+STR_NETWORK_MESSAGE_CLIENT_LEFT                                 :*** {STRING} het die spel verlaat ({STRING})
 STR_NETWORK_MESSAGE_NAME_CHANGE                                 :*** {STRING} het sy/haar naam verander na {STRING}
 STR_NETWORK_MESSAGE_SERVER_SHUTDOWN                             :{WHITE}Die verskaffer het die sessie toegemaak
 STR_NETWORK_MESSAGE_SERVER_REBOOT                               :{WHITE}Die verskaffer is besig om te weerbegin...{}Wag asb...
@@ -2397,6 +2374,7 @@ STR_STATION_BUILD_PLATFORM_LENGTH                               :{BLACK}Perron l
 STR_STATION_BUILD_PLATFORM_LENGTH_TOOLTIP                       :{BLACK}Kies treinstasie lengte
 STR_STATION_BUILD_DRAG_DROP                                     :{BLACK}Sleep & Drop
 STR_STATION_BUILD_DRAG_DROP_TOOLTIP                             :{BLACK}Bou 'n stasie gebruikend sleep & drop
+
 
 
 
@@ -2587,6 +2565,7 @@ STR_FOUND_TOWN_INITIAL_SIZE_TOOLTIP                             :{BLACK}Kies dor
 STR_FOUND_TOWN_CITY                                             :{BLACK}Stad
 STR_FOUND_TOWN_CITY_TOOLTIP                                     :{BLACK}Stede groei viniger as gewone dorpe{}Afhangende van stellings, is hulle grooter waneer hulle gestig word
 
+
 STR_FOUND_TOWN_ROAD_LAYOUT                                      :{YELLOW}Straat uitleg van dorp:
 STR_FOUND_TOWN_SELECT_LAYOUT_TOOLTIP                            :{BLACK}Kies straat uitleg wat vir die dorp gebruik word
 STR_FOUND_TOWN_SELECT_LAYOUT_ORIGINAL                           :{BLACK}Oorspronklik
@@ -2656,7 +2635,6 @@ STR_LAI_CLEAR_DESCRIPTION_ROUGH_LAND                            :Ongelyke land
 STR_LAI_CLEAR_DESCRIPTION_BARE_LAND                             :Kaal land
 STR_LAI_CLEAR_DESCRIPTION_GRASS                                 :Gras
 STR_LAI_CLEAR_DESCRIPTION_FIELDS                                :Velde
-STR_LAI_CLEAR_DESCRIPTION_SNOW_COVERED_LAND                     :Sneeu-bedekte land
 STR_LAI_CLEAR_DESCRIPTION_DESERT                                :Woestyn
 
 STR_LAI_RAIL_DESCRIPTION_TRACK                                  :Spoorweg spoor
@@ -3079,7 +3057,6 @@ STR_INVALID_VEHICLE                                             :<ongeldige voer
 STR_NEWGRF_SCAN_CAPTION                                         :{WHITE}Skandeer NewGRFs
 STR_NEWGRF_SCAN_MESSAGE                                         :{BLACK}Skandeer NewGRFs. Na mate van die hoeveelheid, kan dit 'n tydtjie neem
 STR_NEWGRF_SCAN_STATUS                                          :{BLACK}{NUM} NewGRF{P "" s} van omtrend {NUM} NewGRF{P "" s} is geskandeer
-STR_NEWGRF_SCAN_ARCHIVES                                        :Skandering van argiewe
 
 # Sign list window
 STR_SIGN_LIST_CAPTION                                           :{WHITE}Teken Lys - {COMMA} Teken{P "" s}
@@ -3403,8 +3380,6 @@ STR_INDUSTRY_VIEW_PRODUCES_N_CARGO                              :{BLACK}Produsee
 STR_INDUSTRY_VIEW_CARGO_LIST_EXTENSION                          :, {STRING}{STRING}
 
 STR_INDUSTRY_VIEW_REQUIRES                                      :{BLACK}Benodig:
-STR_INDUSTRY_VIEW_ACCEPT_CARGO                                  :{YELLOW}{STRING}{BLACK}{3:STRING}
-STR_INDUSTRY_VIEW_ACCEPT_CARGO_AMOUNT                           :{YELLOW}{STRING}{BLACK}: {CARGO_SHORT} wagtend{STRING}
 
 STR_CONFIG_GAME_PRODUCTION                                      :{WHITE}Verander produksie (veelvoude van 8, tot en met 2040)
 STR_CONFIG_GAME_PRODUCTION_LEVEL                                :{WHITE}Verander produksie vlakke (persentasie, tot 800%)
@@ -3825,8 +3800,8 @@ STR_VEHICLE_INFO_RELIABILITY_BREAKDOWNS                         :{BLACK}Betrouba
 
 STR_VEHICLE_INFO_BUILT_VALUE                                    :{LTBLUE}{ENGINE} {BLACK}Gebou: {LTBLUE}{NUM}{BLACK} Waarde: {LTBLUE}{CURRENCY_LONG}
 STR_VEHICLE_INFO_NO_CAPACITY                                    :{BLACK}Kapasiteit: {LTBLUE}Geen{STRING}
-STR_VEHICLE_INFO_CAPACITY                                       :{BLACK}Kapasiteit: {LTBLUE}{CARGO_LONG}{3:STRING}
-STR_VEHICLE_INFO_CAPACITY_MULT                                  :{BLACK}Kapasiteit: {LTBLUE}{CARGO_LONG}{3:STRING} (x{4:NUM})
+STR_VEHICLE_INFO_CAPACITY                                       :{BLACK}Kapasiteit: {LTBLUE}{CARGO_LONG}{STRING}
+STR_VEHICLE_INFO_CAPACITY_MULT                                  :{BLACK}Kapasiteit: {LTBLUE}{CARGO_LONG}{STRING} (x{NUM})
 STR_VEHICLE_INFO_CAPACITY_CAPACITY                              :{BLACK}Kapasiteit: {LTBLUE}{CARGO_LONG}, {CARGO_LONG}{STRING}
 
 STR_VEHICLE_INFO_FEEDER_CARGO_VALUE                             :{BLACK}Oordragkrediet: {LTBLUE}{CURRENCY_LONG}
@@ -3992,15 +3967,12 @@ STR_ORDER_GO_NON_STOP_TO_WAYPOINT                               :Gaan sonder-sto
 STR_ORDER_SERVICE_AT                                            :Diens by
 STR_ORDER_SERVICE_NON_STOP_AT                                   :Diens geen-stop by
 
-STR_ORDER_NEAREST_DEPOT                                         :die naaste
-STR_ORDER_NEAREST_HANGAR                                        :die naaste vliegtuigloods
 ###length 3
 STR_ORDER_TRAIN_DEPOT                                           :Treindepot
 STR_ORDER_ROAD_VEHICLE_DEPOT                                    :Pad Voertuig Diensstasie
 STR_ORDER_SHIP_DEPOT                                            :Skeepswerf
 ###next-name-looks-similar
 
-STR_ORDER_GO_TO_NEAREST_DEPOT_FORMAT                            :{STRING} {STRING} {STRING}
 STR_ORDER_GO_TO_DEPOT_FORMAT                                    :{STRING} {DEPOT}
 
 STR_ORDER_REFIT_ORDER                                           :(Herbou na {STRING})
@@ -4008,7 +3980,7 @@ STR_ORDER_REFIT_STOP_ORDER                                      :(Herbou na {STR
 STR_ORDER_STOP_ORDER                                            :(Stop)
 
 
-STR_ORDER_GO_TO_STATION                                         :{STRING} {STATION} {STRING}
+STR_ORDER_GO_TO_STATION                                         :{STRING} {STATION}
 
 STR_ORDER_IMPLICIT                                              :(Implesiete)
 
@@ -4066,7 +4038,7 @@ STR_TIMETABLE_TOOLTIP                                           :{BLACK}Rooster 
 STR_TIMETABLE_NO_TRAVEL                                         :Geen reis
 STR_TIMETABLE_NOT_TIMETABLEABLE                                 :Reis (outomaties; getabuleer volgens eiehandige bevel)
 STR_TIMETABLE_TRAVEL_NOT_TIMETABLED                             :Reis (Nie op rooster nie)
-STR_TIMETABLE_TRAVEL_NOT_TIMETABLED_SPEED                       :Reis nie meer as {2:VELOCITY} nie (nie volgens tydrooster nie)
+STR_TIMETABLE_TRAVEL_NOT_TIMETABLED_SPEED                       :Reis nie meer as {VELOCITY} nie (nie volgens tydrooster nie)
 STR_TIMETABLE_TRAVEL_FOR                                        :Reis vir {STRING}
 STR_TIMETABLE_TRAVEL_FOR_SPEED                                  :Reis vir {STRING} met die meeste {VELOCITY}
 STR_TIMETABLE_TRAVEL_FOR_ESTIMATED                              :Reis (vir {STRING}, nie volgens tydrooster nie)
@@ -4083,7 +4055,6 @@ STR_TIMETABLE_STATUS_ON_TIME                                    :{BLACK}Die voer
 STR_TIMETABLE_STATUS_LATE                                       :{BLACK}Die voertuig loop tans {STRING} laat
 STR_TIMETABLE_STATUS_EARLY                                      :{BLACK}Die voertuig loop tans {STRING} vroeg
 STR_TIMETABLE_STATUS_NOT_STARTED                                :{BLACK}Hierdie rooster het nog nie begin nie
-
 
 
 STR_TIMETABLE_CHANGE_TIME                                       :{BLACK}Verander Tyd
@@ -4265,7 +4236,6 @@ STR_ERROR_SCREENSHOT_FAILED                                     :{WHITE}Skermsko
 
 # Error message titles
 STR_ERROR_MESSAGE_CAPTION                                       :{YELLOW}Boodskap
-STR_ERROR_MESSAGE_CAPTION_OTHER_COMPANY                         :{YELLOW}Boodskap van {STRING}
 
 # Generic construction errors
 STR_ERROR_OFF_EDGE_OF_MAP                                       :{WHITE}Van die kaart af
@@ -4284,7 +4254,6 @@ STR_ERROR_TERRAFORM_LIMIT_REACHED                               :{WHITE}... land
 STR_ERROR_CLEARING_LIMIT_REACHED                                :{WHITE}... teël skoonmaak limiet bereik
 STR_ERROR_TREE_PLANT_LIMIT_REACHED                              :{WHITE}... bome se plant beperking bereik
 STR_ERROR_NAME_MUST_BE_UNIQUE                                   :{WHITE}Naam moet unike wees
-STR_ERROR_GENERIC_OBJECT_IN_THE_WAY                             :{WHITE}{1:STRING} in die pad
 STR_ERROR_NOT_ALLOWED_WHILE_PAUSED                              :{WHITE}Nie toegelaat terwyl onderbreek
 
 # Local authority errors
@@ -4581,6 +4550,10 @@ STR_ERROR_CAN_T_SELL_TRAIN                                      :{WHITE}Kan nie 
 STR_ERROR_CAN_T_SELL_ROAD_VEHICLE                               :{WHITE}Kan nie pad voertuig verkoop nie
 STR_ERROR_CAN_T_SELL_SHIP                                       :{WHITE}Skip kan nie verkoop word nie...
 STR_ERROR_CAN_T_SELL_AIRCRAFT                                   :{WHITE}Vliegtuig kan nie verkoop word nie...
+
+###length VEHICLE_TYPES
+
+###length VEHICLE_TYPES
 
 STR_ERROR_TOO_MANY_VEHICLES_IN_GAME                             :{WHITE}Te veel voertuie in spel
 STR_ERROR_CAN_T_CHANGE_SERVICING                                :{WHITE}Kan nie diens interval verander nie...
@@ -5077,18 +5050,7 @@ STR_SAVEGAME_NAME_SPECTATOR                                     :Spektator, {1:S
 
 # Viewport strings
 STR_VIEWPORT_TOWN_POP                                           :{WHITE}{TOWN} ({COMMA})
-STR_VIEWPORT_TOWN                                               :{WHITE}{TOWN}
-STR_VIEWPORT_TOWN_TINY_BLACK                                    :{TINY_FONT}{BLACK}{TOWN}
-STR_VIEWPORT_TOWN_TINY_WHITE                                    :{TINY_FONT}{WHITE}{TOWN}
-
-STR_VIEWPORT_SIGN_SMALL_BLACK                                   :{TINY_FONT}{BLACK}{SIGN}
-STR_VIEWPORT_SIGN_SMALL_WHITE                                   :{TINY_FONT}{WHITE}{SIGN}
-
 STR_VIEWPORT_STATION                                            :{STATION} {STATION_FEATURES}
-STR_VIEWPORT_STATION_TINY                                       :{TINY_FONT}{STATION}
-
-STR_VIEWPORT_WAYPOINT                                           :{WAYPOINT}
-STR_VIEWPORT_WAYPOINT_TINY                                      :{TINY_FONT}{WAYPOINT}
 
 # Simple strings to get specific types of data
 STR_COMPANY_NAME                                                :{COMPANY}
@@ -5141,3 +5103,4 @@ STR_PLANE                                                       :{BLACK}{PLANE}
 STR_SHIP                                                        :{BLACK}{SHIP}
 
 STR_TOOLBAR_RAILTYPE_VELOCITY                                   :{STRING} ({VELOCITY})
+

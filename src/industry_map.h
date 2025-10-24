@@ -19,7 +19,7 @@
  * They all are pointing toward array _industry_draw_tile_data, in table/industry_land.h
  * How to calculate the correct position ? GFXid << 2 | IndustryStage (0 to 3)
  */
-enum IndustryGraphics {
+enum IndustryGraphics : uint8_t {
 	GFX_COAL_MINE_TOWER_NOT_ANIMATED   =   0,
 	GFX_COAL_MINE_TOWER_ANIMATED       =   1,
 	GFX_POWERPLANT_CHIMNEY             =   8,
@@ -63,7 +63,7 @@ enum IndustryGraphics {
 inline IndustryID GetIndustryIndex(TileIndex t)
 {
 	dbg_assert_tile(IsTileType(t, MP_INDUSTRY), t);
-	return _m[t].m2;
+	return static_cast<IndustryID>(_m[t].m2);
 }
 
 /**
@@ -180,7 +180,7 @@ inline void SetIndustryConstructionCounter(TileIndex tile, uint8_t value)
 /**
  * Reset the construction stage counter of the industry,
  * as well as the completion bit.
- * In fact, it is the same as restarting construction frmo ground up
+ * In fact, it is the same as restarting construction from the ground up.
  * @param tile the tile to query
  * @pre IsTileType(tile, MP_INDUSTRY)
  */
@@ -247,10 +247,10 @@ inline void SetIndustryRandomBits(TileIndex tile, uint8_t bits)
  * @pre IsTileType(tile, MP_INDUSTRY)
  * @return requested triggers
  */
-inline uint8_t GetIndustryTriggers(TileIndex tile)
+inline IndustryRandomTriggers GetIndustryRandomTriggers(TileIndex tile)
 {
 	dbg_assert_tile(IsTileType(tile, MP_INDUSTRY), tile);
-	return GB(_me[tile].m6, 3, 3);
+	return static_cast<IndustryRandomTriggers>(GB(_me[tile].m6, 3, 3));
 }
 
 
@@ -261,10 +261,10 @@ inline uint8_t GetIndustryTriggers(TileIndex tile)
  * @param triggers the triggers to set
  * @pre IsTileType(tile, MP_INDUSTRY)
  */
-inline void SetIndustryTriggers(TileIndex tile, uint8_t triggers)
+inline void SetIndustryRandomTriggers(TileIndex tile, IndustryRandomTriggers triggers)
 {
 	dbg_assert_tile(IsTileType(tile, MP_INDUSTRY), tile);
-	SB(_me[tile].m6, 3, 3, triggers);
+	SB(_me[tile].m6, 3, 3, triggers.base());
 }
 
 /**
@@ -279,11 +279,11 @@ inline void MakeIndustry(TileIndex t, IndustryID index, IndustryGfx gfx, uint8_t
 {
 	SetTileType(t, MP_INDUSTRY);
 	_m[t].m1 = 0;
-	_m[t].m2 = index;
+	_m[t].m2 = index.base();
 	SetIndustryRandomBits(t, random); // m3
 	_m[t].m4 = 0;
 	SetIndustryGfx(t, gfx); // m5, part of m6
-	SetIndustryTriggers(t, 0); // rest of m6
+	SetIndustryRandomTriggers(t, {}); // rest of m6
 	SetWaterClass(t, wc);
 	_me[t].m7 = 0;
 }

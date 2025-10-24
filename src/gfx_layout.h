@@ -15,6 +15,7 @@
 #include "core/math_func.hpp"
 
 #include "3rdparty/cpp-btree/btree_map.h"
+#include "3rdparty/svector/svector.h"
 
 #include <map>
 #include <string>
@@ -31,7 +32,7 @@ struct FontState {
 	FontSize fontsize;       ///< Current font size.
 	TextColour cur_colour;   ///< Current text colour.
 
-	std::stack<TextColour, std::vector<TextColour>> colour_stack; ///< Stack of colours to assist with colour switching.
+	std::stack<TextColour, ankerl::svector<TextColour, 3>> colour_stack; ///< Stack of colours to assist with colour switching.
 
 	FontState() : fontsize(FS_END), cur_colour(TC_INVALID) {}
 	FontState(TextColour colour, FontSize fontsize) : fontsize(fontsize), cur_colour(colour) {}
@@ -160,7 +161,7 @@ class Layouter : public std::vector<std::unique_ptr<const ParagraphLayouter::Lin
 		using is_transparent = void; ///< Enable map queries with various key types
 
 		/** Comparison operator for LineCacheKey and LineCacheQuery */
-		template<typename Key1, typename Key2>
+		template <typename Key1, typename Key2>
 		bool operator()(const Key1 &lhs, const Key2 &rhs) const
 		{
 			if (lhs.state_before.fontsize != rhs.state_before.fontsize) return lhs.state_before.fontsize < rhs.state_before.fontsize;
@@ -172,15 +173,14 @@ class Layouter : public std::vector<std::unique_ptr<const ParagraphLayouter::Lin
 public:
 	/** Item in the linecache */
 	struct LineCacheItem {
+		/* Due to the type of data in the buffer differing depending on the Layouter, we need to pass our own deleter routine. */
+		using Buffer = std::unique_ptr<void, void(*)(void *)>;
 		/* Stuff that cannot be freed until the ParagraphLayout is freed */
-		void *buffer;              ///< Accessed by our ParagraphLayout::nextLine.
+		Buffer buffer{nullptr, [](void *){}}; ///< Accessed by our ParagraphLayout::nextLine.
 		FontMap runs;              ///< Accessed by our ParagraphLayout::nextLine.
 
 		FontState state_after;     ///< Font state after the line.
 		std::unique_ptr<ParagraphLayouter> layout = nullptr; ///< Layout of the line.
-
-		LineCacheItem() : buffer(nullptr) {}
-		~LineCacheItem() { free(buffer); }
 	};
 private:
 	typedef std::map<LineCacheKey, LineCacheItem, LineCacheCompare> LineCache;

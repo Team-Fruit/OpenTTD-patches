@@ -55,7 +55,6 @@ enum VarTypes {
 	SLE_VAR_I64   =  7 << 4,
 	SLE_VAR_U64   =  8 << 4,
 	SLE_VAR_NULL  =  9 << 4, ///< useful to write zeros in savegame.
-	SLE_VAR_STRB  = 10 << 4, ///< string (with pre-allocated buffer)
 	SLE_VAR_STR   = 12 << 4, ///< string pointer
 	SLE_VAR_STRQ  = 13 << 4, ///< string pointer enclosed in quotes
 	SLE_VAR_NAME  = 14 << 4, ///< old custom name to be converted to a std::string
@@ -79,7 +78,6 @@ enum VarTypes {
 	SLE_UINT64       = SLE_FILE_U64 | SLE_VAR_U64,
 	SLE_CHAR         = SLE_FILE_I8  | SLE_VAR_CHAR,
 	SLE_STRINGID     = SLE_FILE_STRINGID | SLE_VAR_U32,
-	SLE_STRINGBUF    = SLE_FILE_STRING   | SLE_VAR_STRB,
 	SLE_STRING       = SLE_FILE_STRING   | SLE_VAR_STR,
 	SLE_STRINGQUOTE  = SLE_FILE_STRING   | SLE_VAR_STRQ,
 	SLE_NAME         = SLE_FILE_STRINGID | SLE_VAR_NAME,
@@ -89,7 +87,6 @@ enum VarTypes {
 	/* Shortcut values */
 	SLE_UINT  = SLE_UINT32,
 	SLE_INT   = SLE_INT32,
-	SLE_STRB  = SLE_STRINGBUF,
 	SLE_STR   = SLE_STRING,
 	SLE_STRQ  = SLE_STRINGQUOTE,
 
@@ -113,6 +110,7 @@ enum SaveLoadTypes {
 	SL_STDSTR,           ///< Save/load a std::string.
 	SL_REFRING,          ///< Save/load a ring of #SL_REF elements.
 	SL_VARVEC,           ///< Save/load a primitive type vector.
+	SL_CUSTOMLIST,       ///< Save/load a custom container of #SL_VAR elements.
 
 	SL_STRUCT,           ///< Save/load a struct.
 	SL_STRUCTLIST,       ///< Save/load a list of structs.
@@ -126,6 +124,17 @@ typedef uint8_t SaveLoadType; ///< Save/load type. @see SaveLoadTypes
 
 using SaveLoadStructHandlerFactory = std::unique_ptr<class SaveLoadStructHandler> (*)();
 using SaveLoadIncludeFunctor = void (*)(std::vector<struct SaveLoad> &);
+
+enum class SaveLoadCustomContainerOp {
+	GetLength,
+	Save,
+	Load,
+};
+
+using SaveLoadCustomContainerFunctor = size_t (*)(void *list, SaveLoadCustomContainerOp op, VarType conv, size_t count);
+union SaveLoadCustomHandlers {
+	SaveLoadCustomContainerFunctor container_functor;
+};
 
 /** SaveLoad type struct. Do NOT use this directly but use the SLE_ macros defined just below! */
 struct SaveLoad {
@@ -142,13 +151,17 @@ struct SaveLoad {
 		 * variable, or the offset within a struct which is then bound to a variable
 		 * during runtime. Decision on which one to use is controlled by the function
 		 * that is called to save it. address: global=true, offset: global=false */
-		void *address;                                       ///< address of variable OR offset of variable in the struct (max offset is 65536)
+		void *address;                                       ///< address of variable OR offset of variable in the struct
 		SaveLoadStructHandlerFactory struct_handler_factory; ///< factory function pointer for SaveLoadStructHandler
 		SaveLoadIncludeFunctor include_functor;              ///< include functor for SL_INCLUDE
 	};
 
+	union {
+		SaveLoadStructHandler *struct_handler = nullptr;
+		SaveLoadCustomHandlers custom;
+	};
+
 	SlXvFeatureTest ext_feature_test;  ///< extended feature test
-	SaveLoadStructHandler *struct_handler = nullptr;
 };
 
 inline constexpr SaveLoad SLTAG(uint16_t label_tag, SaveLoad save_load)
@@ -189,7 +202,7 @@ inline constexpr NamedSaveLoad NSLT(const char *name, SaveLoad save_load)
 	return { name, save_load, NSLF_TABLE_ONLY };
 }
 
-template<typename T, auto... ARGS>
+template <typename T, auto... ARGS>
 inline constexpr SaveLoadStructHandlerFactory MakeSaveLoadStructHandlerFactory()
 {
 	SaveLoadStructHandlerFactory factory = []() -> std::unique_ptr<class SaveLoadStructHandler> {
@@ -200,7 +213,7 @@ inline constexpr SaveLoadStructHandlerFactory MakeSaveLoadStructHandlerFactory()
 
 inline constexpr NamedSaveLoad NSL_STRUCT_COMMON(const char *name, NamedSaveLoadFlags nsl_flags, SaveLoadStructHandlerFactory factory, SaveLoadVersion from, SaveLoadVersion to, SlXvFeatureTest extver)
 {
-	return { name, SaveLoad { true, SL_STRUCT, SLE_FILE_STRUCT, 0, from, to, SLTAG_DEFAULT, { .struct_handler_factory = factory }, extver }, nsl_flags };
+	return { name, SaveLoad { true, SL_STRUCT, SLE_FILE_STRUCT, 0, from, to, SLTAG_DEFAULT, { .struct_handler_factory = factory }, { nullptr }, extver }, nsl_flags };
 }
 
 inline constexpr NamedSaveLoad NSL_STRUCT(const char *name, SaveLoadStructHandlerFactory factory, SaveLoadVersion from = SL_MIN_VERSION, SaveLoadVersion to = SL_MAX_VERSION, SlXvFeatureTest extver = {})
@@ -227,7 +240,7 @@ inline constexpr NamedSaveLoad NSLT_STRUCT(const char *name, Args&&... args)
 
 inline constexpr NamedSaveLoad NSLT_STRUCTLIST(const char *name, SaveLoadStructHandlerFactory factory, SaveLoadVersion from = SL_MIN_VERSION, SaveLoadVersion to = SL_MAX_VERSION, SlXvFeatureTest extver = {})
 {
-	return { name, SaveLoad { true, SL_STRUCTLIST, SLE_FILE_STRUCT, 0, from, to, SLTAG_DEFAULT, { .struct_handler_factory = factory }, extver }, NSLF_TABLE_ONLY };
+	return { name, SaveLoad { true, SL_STRUCTLIST, SLE_FILE_STRUCT, 0, from, to, SLTAG_DEFAULT, { .struct_handler_factory = factory }, { nullptr }, extver }, NSLF_TABLE_ONLY };
 }
 
 template <typename T>

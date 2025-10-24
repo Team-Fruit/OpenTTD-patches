@@ -17,7 +17,7 @@
 
 #include "../../safeguards.h"
 
-constexpr int DIRECT_NEIGHBOR_COST = 100;
+constexpr int DIRECT_NEIGHBOUR_COST = 100;
 constexpr int NODES_PER_REGION = 4;
 constexpr uint32_t MAX_NUMBER_OF_NODES = 65536;
 
@@ -38,7 +38,7 @@ struct CYapfRegionPatchNodeKey {
 
 inline uint ManhattanDistance(const CYapfRegionPatchNodeKey &a, const CYapfRegionPatchNodeKey &b)
 {
-	return (Delta(a.water_region_patch.x, b.water_region_patch.x) + Delta(a.water_region_patch.y, b.water_region_patch.y)) * DIRECT_NEIGHBOR_COST;
+	return (Delta(a.water_region_patch.x, b.water_region_patch.x) + Delta(a.water_region_patch.y, b.water_region_patch.y)) * DIRECT_NEIGHBOUR_COST;
 }
 
 /** Yapf Node for water regions. */
@@ -92,7 +92,7 @@ public:
 	void AddOrigin(const WaterRegionPatchDesc &water_region_patch)
 	{
 		if (water_region_patch.label == INVALID_WATER_REGION_PATCH) return;
-		if (!HasOrigin(water_region_patch)) this->origin_keys.push_back(CYapfRegionPatchNodeKey{ water_region_patch });
+		if (!HasOrigin(water_region_patch)) this->origin_keys.emplace_back(water_region_patch);
 	}
 
 	bool HasOrigin(const WaterRegionPatchDesc &water_region_patch)
@@ -166,13 +166,13 @@ protected:
 public:
 	inline void PfFollowNode(Node &old_node)
 	{
-		TVisitWaterRegionPatchCallBack visitFunc = [&](const WaterRegionPatchDesc &water_region_patch)
+		TVisitWaterRegionPatchCallBack visit_func = [&](const WaterRegionPatchDesc &water_region_patch)
 		{
 			Node &node = Yapf().CreateNewNode();
 			node.Set(&old_node, water_region_patch);
 			Yapf().AddNewNode(node, TrackFollower{});
 		};
-		VisitWaterRegionPatchNeighbors(old_node.key.water_region_patch, visitFunc);
+		VisitWaterRegionPatchNeighbours(old_node.key.water_region_patch, visit_func);
 	}
 
 	inline char TransportTypeChar() const { return '^'; }
@@ -183,14 +183,14 @@ public:
 
 		/* We reserve 4 nodes (patches) per water region. The vast majority of water regions have 1 or 2 regions so this should be a pretty
 		 * safe limit. We cap the limit at 65536 which is at a region size of 16x16 is equivalent to one node per region for a 4096x4096 map. */
-		Tpf pf(std::min(static_cast<uint32_t>(MapSize() * NODES_PER_REGION) / WATER_REGION_NUMBER_OF_TILES, MAX_NUMBER_OF_NODES));
+		Tpf pf(std::min(static_cast<uint32_t>(Map::Size() * NODES_PER_REGION) / WATER_REGION_NUMBER_OF_TILES, MAX_NUMBER_OF_NODES));
 		pf.SetDestination(start_water_region_patch);
 
 		if (v->current_order.IsType(OT_GOTO_STATION)) {
-			DestinationID station_id = v->current_order.GetDestination();
+			StationID station_id = v->current_order.GetDestination().ToStationID();
 			const BaseStation *station = BaseStation::Get(station_id);
 			TileArea tile_area;
-			station->GetTileArea(&tile_area, STATION_DOCK);
+			station->GetTileArea(&tile_area, StationType::Dock);
 			for (const auto &tile : tile_area) {
 				if (IsDockingTile(tile) && IsShipDestinationTile(tile, station_id)) {
 					pf.AddOrigin(GetWaterRegionPatchInfo(tile));

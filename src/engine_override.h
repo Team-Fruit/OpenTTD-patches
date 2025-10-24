@@ -12,15 +12,16 @@
 
 #include "engine_type.h"
 #include "vehicle_type.h"
+#include "core/typed_container.hpp"
 
 #include "3rdparty/robin_hood/robin_hood.h"
 #include <vector>
 
 struct EngineIDMapping {
-	uint32_t grfid;          ///< The GRF ID of the file the entity belongs to
-	uint16_t internal_id;    ///< The internal ID within the GRF file
-	VehicleType type;        ///< The engine type
-	uint8_t  substitute_id;  ///< The (original) entity ID to use if this GRF is not available (currently not used)
+	uint32_t grfid = 0;        ///< The GRF ID of the file the entity belongs to
+	uint16_t internal_id = 0;  ///< The internal ID within the GRF file
+	VehicleType type{};        ///< The engine type
+	uint8_t substitute_id{};   ///< The (original) entity ID to use if this GRF is not available (currently not used)
 };
 
 /**
@@ -28,7 +29,7 @@ struct EngineIDMapping {
  * Note: This is not part of Engine, as the data in the EngineOverrideManager and the engine pool get resetted in different cases.
  */
 struct EngineOverrideManager {
-	std::vector<EngineIDMapping> mappings;
+	TypedIndexContainer<std::vector<EngineIDMapping>, EngineID> mappings;
 
 	static const uint NUM_DEFAULT_ENGINES; ///< Number of default entries
 

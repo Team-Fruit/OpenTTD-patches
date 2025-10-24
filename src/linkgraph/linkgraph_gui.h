@@ -23,17 +23,15 @@
  * Only the cargo type of the most saturated linkgraph is taken into account.
  */
 struct LinkProperties {
-	LinkProperties() : capacity(0), usage(0), planned(0), cargo(INVALID_CARGO), time(0), shared(false) {}
-
 	/** Return the usage of the link to display. */
 	uint Usage() const { return std::max(this->usage, this->planned); }
 
-	uint capacity; ///< Capacity of the link.
-	uint usage;    ///< Actual usage of the link.
-	uint planned;  ///< Planned usage of the link.
-	CargoID cargo; ///< Cargo type of the link.
-	uint32_t time; ///< Travel time of the link.
-	bool shared;   ///< If this is a shared link to be drawn dashed.
+	uint capacity = 0;               ///< Capacity of the link.
+	uint usage = 0;                  ///< Actual usage of the link.
+	uint planned = 0;                ///< Planned usage of the link.
+	CargoType cargo = INVALID_CARGO; ///< Cargo type of the link.
+	uint32_t time = 0;               ///< Travel time of the link.
+	bool shared = false;             ///< If this is a shared link to be drawn dashed.
 
 	bool operator==(const LinkProperties&) const = default;
 };
@@ -124,7 +122,7 @@ protected:
 	bool IsPointVisible(Point pt, const DrawPixelInfo *dpi, int padding = 0) const;
 	void GetWidgetDpi(DrawPixelInfo *dpi, uint margin = 0) const;
 
-	static void AddStats(CargoID new_cargo, uint new_cap, uint new_usg, uint new_plan, uint32_t time, bool new_shared, LinkProperties &cargo);
+	static void AddStats(CargoType new_cargo, uint new_cap, uint new_usg, uint new_plan, uint32_t time, bool new_shared, LinkProperties &cargo);
 	static void DrawVertex(class Blitter *blitter, const DrawPixelInfo *dpi, int x, int y, int size, int colour, int border_colour);
 };
 
@@ -145,8 +143,8 @@ public:
 	void OnInvalidateData(int data = 0, bool gui_scope = true) override;
 
 private:
-	LinkGraphOverlay *overlay;
-	size_t num_cargo;
+	LinkGraphOverlay *overlay = nullptr;
+	size_t num_cargo = 0;
 
 	void UpdateOverlayCompanies();
 	void UpdateOverlayCargoes();

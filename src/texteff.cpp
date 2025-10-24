@@ -67,9 +67,8 @@ TextEffectID AddTextEffect(StringID msg, int center, int y, uint8_t duration, Te
 
 	/* Make sure we only dirty the new area */
 	te.width_normal = 0;
-	SetDParam(0, param1);
-	SetDParam(1, param2);
-	te.UpdatePosition(ZOOM_LVL_TEXT_EFFECT, center, y, msg);
+	auto params = MakeParameters(param1, param2);
+	te.UpdatePosition(ZOOM_LVL_TEXT_EFFECT, center, y, params, msg);
 
 	return i;
 }
@@ -83,18 +82,16 @@ void UpdateTextEffect(TextEffectID te_id, StringID msg, uint64_t param1, uint64_
 	te->params_1 = param1;
 	te->params_2 = param2;
 
-	SetDParam(0, param1);
-	SetDParam(1, param2);
-	te->UpdatePosition(ZOOM_LVL_TEXT_EFFECT, te->center, te->top, te->string_id);
+	auto params = MakeParameters(param1, param2);
+	te->UpdatePosition(ZOOM_LVL_TEXT_EFFECT, te->center, te->top, params, msg);
 }
 
 void UpdateAllTextEffectVirtCoords()
 {
 	for (auto &te : _text_effects) {
 		if (te.string_id == INVALID_STRING_ID) continue;
-		SetDParam(0, te.params_1);
-		SetDParam(1, te.params_2);
-		te.UpdatePosition(ZOOM_LVL_TEXT_EFFECT, te.center, te.top, te.string_id);
+		auto params = MakeParameters(te.params_1, te.params_2);
+		te.UpdatePosition(ZOOM_LVL_TEXT_EFFECT, te.center, te.top, params, te.string_id);
 	}
 }
 
@@ -141,10 +138,13 @@ void DrawTextEffects(ViewportDrawerDynamic *vdd, DrawPixelInfo *dpi, bool load_t
 	const int top_threshold = dpi->top - ScaleByZoom(WidgetDimensions::scaled.framerect.Horizontal() + GetCharacterHeight(FS_NORMAL), dpi->zoom);
 	const bool show_loading = (_settings_client.gui.loading_indicators && !load_transparent);
 
+	ViewportStringFlags flags{};
+	if (dpi->zoom >= ZOOM_LVL_TEXT_EFFECT) flags.Set(ViewportStringFlag::Small);
+
 	for (TextEffect &te : _text_effects) {
 		if (te.string_id == INVALID_STRING_ID) continue;
 		if ((te.mode == TE_RISING || show_loading) && te.top > top_threshold && te.top < bottom_threshold) {
-			ViewportAddString(vdd, dpi, ZOOM_LVL_TEXT_EFFECT, &te, te.string_id, te.string_id, STR_NULL, te.params_1, te.params_2);
+			ViewportAddString(vdd, dpi, &te, flags, te.string_id, te.params_1, te.params_2);
 		}
 	}
 }

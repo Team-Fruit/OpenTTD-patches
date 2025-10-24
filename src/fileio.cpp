@@ -8,6 +8,7 @@
 /** @file fileio.cpp Standard In/Out file operations */
 
 #include "stdafx.h"
+#include "core/alloc_type.hpp"
 #include "fileio_func.h"
 #include "spriteloader/spriteloader.hpp"
 #include "debug.h"
@@ -44,6 +45,7 @@ static const char * const _subdirs[] = {
 	"save" PATHSEP "autosave" PATHSEP,
 	"scenario" PATHSEP,
 	"scenario" PATHSEP "heightmap" PATHSEP,
+	"orderlist" PATHSEP,
 	"gm" PATHSEP,
 	"data" PATHSEP,
 	"baseset" PATHSEP,
@@ -55,6 +57,7 @@ static const char * const _subdirs[] = {
 	"game" PATHSEP "library" PATHSEP,
 	"screenshot" PATHSEP,
 	"social_integration" PATHSEP,
+	"docs" PATHSEP,
 };
 static_assert(lengthof(_subdirs) == NUM_SUBDIRS);
 
@@ -121,7 +124,7 @@ static void FillValidSearchPaths(bool only_local_path)
  * @param subdir the subdirectory to look in
  * @return true if and only if the file can be opened
  */
-bool FioCheckFileExists(const std::string &filename, Subdirectory subdir)
+bool FioCheckFileExists(std::string_view filename, Subdirectory subdir)
 {
 	auto f = FioFOpenFile(filename, "rb", subdir);
 	return f.has_value();
@@ -147,7 +150,7 @@ bool FileExists(const std::string &filename)
  * @param filename Filename to look for.
  * @return String containing the path if the path was found, else an empty string.
  */
-std::string FioFindFullPath(Subdirectory subdir, const std::string &filename)
+std::string FioFindFullPath(Subdirectory subdir, std::string_view filename)
 {
 	assert(subdir < NUM_SUBDIRS);
 
@@ -186,7 +189,7 @@ std::string FioFindDirectory(Subdirectory subdir)
 	return _personal_dir;
 }
 
-static std::optional<FileHandle> FioFOpenFileSp(const std::string &filename, const char *mode, Searchpath sp, Subdirectory subdir, size_t *filesize, std::string *output_filename)
+static std::optional<FileHandle> FioFOpenFileSp(std::string_view filename, const char *mode, Searchpath sp, Subdirectory subdir, size_t *filesize, std::string *output_filename)
 {
 #if defined(_WIN32)
 	/* fopen is implemented as a define with ellipses for
@@ -201,7 +204,7 @@ static std::optional<FileHandle> FioFOpenFileSp(const std::string &filename, con
 	if (subdir == NO_DIRECTORY) {
 		buf = filename;
 	} else {
-		buf = _searchpaths[sp] + _subdirs[subdir] + filename;
+		buf = fmt::format("{}{}{}", _searchpaths[sp], _subdirs[subdir], filename);
 	}
 
 	auto f = FileHandle::Open(buf, mode);
@@ -248,7 +251,7 @@ static std::optional<FileHandle> FioFOpenFileTar(const TarFileListEntry &entry, 
  * @param subdir Subdirectory to open.
  * @return File handle of the opened file, or \c nullptr if the file is not available.
  */
-std::optional<FileHandle> FioFOpenFile(const std::string &filename, const char *mode, Subdirectory subdir, size_t *filesize, std::string *output_filename)
+std::optional<FileHandle> FioFOpenFile(std::string_view filename, const char *mode, Subdirectory subdir, size_t *filesize, std::string *output_filename)
 {
 	std::optional<FileHandle> f = std::nullopt;
 	assert(subdir < NUM_SUBDIRS || subdir == NO_DIRECTORY);
@@ -261,14 +264,13 @@ std::optional<FileHandle> FioFOpenFile(const std::string &filename, const char *
 	/* We can only use .tar in case of data-dir, and read-mode */
 	if (!f.has_value() && mode[0] == 'r' && subdir != NO_DIRECTORY) {
 		/* Filenames in tars are always forced to be lowercase */
-		std::string resolved_name = filename;
+		std::string resolved_name{filename};
 		strtolower(resolved_name);
 
 		/* Resolve ".." */
 		std::istringstream ss(resolved_name);
 		std::vector<std::string> tokens;
-		std::string token;
-		while (std::getline(ss, token, PATHSEPCHAR)) {
+		for (std::string token; std::getline(ss, token, PATHSEPCHAR); /* nothing */) {
 			if (token == "..") {
 				if (tokens.size() < 2) return std::nullopt;
 				tokens.pop_back();
@@ -421,26 +423,26 @@ uint TarScanner::DoScan(Subdirectory sd)
 	return num;
 }
 
-/* static */ uint TarScanner::DoScan(TarScanner::Mode mode)
+/* static */ uint TarScanner::DoScan(TarScanner::Modes modes)
 {
 	Debug(misc, 2, "Scanning for tars");
 	TarScanner fs;
 	uint num = 0;
-	if (mode & TarScanner::BASESET) {
+	if (modes.Test(TarScanner::Mode::Baseset)) {
 		num += fs.DoScan(BASESET_DIR);
 	}
-	if (mode & TarScanner::NEWGRF) {
+	if (modes.Test(TarScanner::Mode::NewGRF)) {
 		num += fs.DoScan(NEWGRF_DIR);
 	}
-	if (mode & TarScanner::AI) {
+	if (modes.Test(TarScanner::Mode::AI)) {
 		num += fs.DoScan(AI_DIR);
 		num += fs.DoScan(AI_LIBRARY_DIR);
 	}
-	if (mode & TarScanner::GAME) {
+	if (modes.Test(TarScanner::Mode::Game)) {
 		num += fs.DoScan(GAME_DIR);
 		num += fs.DoScan(GAME_LIBRARY_DIR);
 	}
-	if (mode & TarScanner::SCENARIO) {
+	if (modes.Test(TarScanner::Mode::Scenario)) {
 		num += fs.DoScan(SCENARIO_DIR);
 		num += fs.DoScan(HEIGHTMAP_DIR);
 	}
@@ -465,7 +467,7 @@ bool TarScanner::AddFile(Subdirectory sd, const std::string &filename)
  * header contains garbage and is malicious. So, we cannot rely on the string
  * being properly terminated.
  * As such, do not use strlen to determine the actual length (explicitly or
- * implictly via the std::string constructor), but pass the buffer bounds
+ * implicitly via the std::string constructor), but pass the buffer bounds
  * explicitly.
  * @param buffer The buffer to read from.
  * @return The string data.
@@ -597,7 +599,7 @@ bool TarScanner::AddFile(const std::string &filename, size_t, [[maybe_unused]] c
 
 				/* Store the first directory name we detect */
 				Debug(misc, 6, "Found dir in tar: {}", name);
-				if (_tar_list[this->subdir][filename].empty()) _tar_list[this->subdir][filename] = name;
+				if (_tar_list[this->subdir][filename].empty()) _tar_list[this->subdir][filename] = std::move(name);
 				break;
 
 			default:
@@ -822,7 +824,7 @@ void DetermineBasePaths(const char *exe)
 	_searchpaths[SP_PERSONAL_DIR].clear();
 #else
 	if (!homedir.empty()) {
-		tmp = homedir;
+		tmp = std::move(homedir);
 		tmp += PATHSEP;
 		tmp += PERSONAL_DIR;
 		AppendPathSeparator(tmp);
@@ -894,7 +896,7 @@ void DetermineBasePaths(const char *exe)
 #else
 	tmp = GLOBAL_DATA_DIR;
 	AppendPathSeparator(tmp);
-	_searchpaths[SP_INSTALLATION_DIR] = tmp;
+	_searchpaths[SP_INSTALLATION_DIR] = std::move(tmp);
 #endif
 #ifdef WITH_COCOA
 extern void CocoaSetApplicationBundleDir();
@@ -921,7 +923,7 @@ void DeterminePaths(const char *exe, bool only_local_path)
 
 #ifdef USE_XDG
 	std::string config_home;
-	const std::string homedir = GetHomeDir();
+	std::string homedir = GetHomeDir();
 	const char *xdg_config_home = std::getenv("XDG_CONFIG_HOME");
 	if (xdg_config_home != nullptr) {
 		config_home = xdg_config_home;
@@ -929,7 +931,7 @@ void DeterminePaths(const char *exe, bool only_local_path)
 		config_home += PERSONAL_DIR[0] == '.' ? &PERSONAL_DIR[1] : PERSONAL_DIR;
 	} else if (!homedir.empty()) {
 		/* Defaults to ~/.config */
-		config_home = homedir;
+		config_home = std::move(homedir);
 		config_home += PATHSEP ".config" PATHSEP;
 		config_home += PERSONAL_DIR[0] == '.' ? &PERSONAL_DIR[1] : PERSONAL_DIR;
 	}
@@ -949,7 +951,7 @@ void DeterminePaths(const char *exe, bool only_local_path)
 		if (!personal_dir.empty()) {
 			auto end = personal_dir.find_last_of(PATHSEPCHAR);
 			if (end != std::string::npos) personal_dir.erase(end + 1);
-			config_dir = personal_dir;
+			config_dir = std::move(personal_dir);
 		} else {
 #ifdef USE_XDG
 			/* No previous configuration file found. Use the configuration folder from XDG. */
@@ -1012,7 +1014,7 @@ void DeterminePaths(const char *exe, bool only_local_path)
 	Debug(misc, 1, "{} found as personal directory", _personal_dir);
 
 	static const Subdirectory default_subdirs[] = {
-		SAVE_DIR, AUTOSAVE_DIR, SCENARIO_DIR, HEIGHTMAP_DIR, BASESET_DIR, NEWGRF_DIR, AI_DIR, AI_LIBRARY_DIR, GAME_DIR, GAME_LIBRARY_DIR, SCREENSHOT_DIR, SOCIAL_INTEGRATION_DIR
+		SAVE_DIR, AUTOSAVE_DIR, SCENARIO_DIR, HEIGHTMAP_DIR, ORDERLIST_DIR, BASESET_DIR, NEWGRF_DIR, AI_DIR, AI_LIBRARY_DIR, GAME_DIR, GAME_LIBRARY_DIR, SCREENSHOT_DIR, SOCIAL_INTEGRATION_DIR
 	};
 
 	for (const auto &default_subdir : default_subdirs) {
@@ -1054,30 +1056,40 @@ void SanitizeFilename(std::string &filename)
 }
 
 /**
- * Load a file into memory.
+ * Read an entire file into a buffer.
  * @param filename Name of the file to load.
- * @param[out] lenp Length of loaded data.
  * @param maxsize Maximum size to load.
- * @return Pointer to new memory containing the loaded data, or \c nullptr if loading failed.
+ * @return Buffer containing the loaded data, or \c std::nullopt if loading failed.
  * @note If \a maxsize less than the length of the file, loading fails.
  */
-std::unique_ptr<char[]> ReadFileToMem(const std::string &filename, size_t &lenp, size_t maxsize)
+std::optional<UniqueBuffer<uint8_t>> ReadFileToBuffer(const std::string &filename, size_t maxsize)
 {
 	auto in = FileHandle::Open(filename, "rb");
-	if (!in.has_value()) return nullptr;
+	if (!in.has_value()) return std::nullopt;
 
-	fseek(*in, 0, SEEK_END);
-	size_t len = ftell(*in);
-	fseek(*in, 0, SEEK_SET);
-	if (len > maxsize) return nullptr;
+	return ReadFileToBuffer(*in, maxsize);
+}
 
-	std::unique_ptr<char[]> mem = std::make_unique<char[]>(len + 1);
+/**
+ * Read an entire file into a buffer.
+ * @param fh File handle to load, the current file position is not preserved, the file handle must have been opened in binary (not text) mode.
+ * @param maxsize Maximum size to load.
+ * @return Buffer containing the loaded data, or \c std::nullopt if loading failed.
+ * @note If \a maxsize less than the length of the file, loading fails.
+ */
+std::optional<UniqueBuffer<uint8_t>> ReadFileToBuffer(FileHandle &fh, size_t maxsize)
+{
+	fseek(fh, 0, SEEK_END);
+	size_t len = ftell(fh);
+	fseek(fh, 0, SEEK_SET);
+	if (len > maxsize) return std::nullopt;
+
+	std::unique_ptr<uint8_t[]> mem = std::make_unique<uint8_t[]>(len + 1);
 
 	mem.get()[len] = 0;
-	if (fread(mem.get(), len, 1, *in) != 1) return nullptr;
+	if (fread(mem.get(), len, 1, fh) != 1) return std::nullopt;
 
-	lenp = len;
-	return mem;
+	return UniqueBuffer<uint8_t>(std::move(mem), len);
 }
 
 /**

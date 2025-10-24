@@ -53,7 +53,7 @@ inline bool IsObjectTypeTile(TileIndex t, ObjectType type)
 inline ObjectID GetObjectIndex(TileIndex t)
 {
 	dbg_assert_tile(IsTileType(t, MP_OBJECT), t);
-	return _m[t].m2 | _m[t].m5 << 16;
+	return ObjectID(_m[t].m2 | _m[t].m5 << 16);
 }
 
 /**
@@ -69,7 +69,7 @@ inline uint8_t GetObjectRandomBits(TileIndex t)
 }
 
 /**
- * Get the ground type of ths tile.
+ * Get the ground type of this tile.
  * @param t The tile to get the ground type of.
  * @pre IsTileType(t, MP_OBJECT)
  * @return The ground type.
@@ -193,10 +193,10 @@ inline void MakeObject(TileIndex t, Owner o, ObjectID index, WaterClass wc, uint
 	SetTileType(t, MP_OBJECT);
 	SetTileOwner(t, o);
 	SetWaterClass(t, wc);
-	_m[t].m2 = index;
+	_m[t].m2 = index.base();
 	_m[t].m3 = random;
 	_m[t].m4 = 0;
-	_m[t].m5 = index >> 16;
+	_m[t].m5 = index.base() >> 16;
 	SB(_me[t].m6, 2, 4, 0);
 	_me[t].m7 = 0;
 }

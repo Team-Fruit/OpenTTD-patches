@@ -45,11 +45,11 @@ public:
 	void SetDestination(const Ship *v)
 	{
 		if (v->current_order.IsType(OT_GOTO_STATION)) {
-			this->dest_station   = v->current_order.GetDestination();
-			this->dest_tile      = CalcClosestStationTile(this->dest_station, v->tile, STATION_DOCK);
+			this->dest_station   = v->current_order.GetDestination().ToStationID();
+			this->dest_tile      = CalcClosestStationTile(this->dest_station, v->tile, StationType::Dock);
 			this->dest_trackdirs = INVALID_TRACKDIR_BIT;
 		} else {
-			this->dest_station   = INVALID_STATION;
+			this->dest_station   = StationID::Invalid();
 			this->dest_tile      = v->dest_tile;
 			this->dest_trackdirs = GetTileTrackdirBits(v->dest_tile, TRANSPORT_WATER, 0);
 		}
@@ -73,7 +73,7 @@ public:
 	/** Called by YAPF to detect if node ends in the desired destination. */
 	inline bool PfDetectDestination(Node &n)
 	{
-		return this->PfDetectDestinationTile(n.segment_last_tile, n.segment_last_td);
+		return this->PfDetectDestinationTile(n.GetTile(), n.GetTrackdir());
 	}
 
 	inline bool PfDetectDestinationTile(TileIndex tile, Trackdir trackdir)
@@ -84,7 +84,7 @@ public:
 			return GetWaterRegionPatchInfo(tile) == this->intermediate_dest_region_patch;
 		}
 
-		if (this->dest_station != INVALID_STATION) return IsDockingTile(tile) && IsShipDestinationTile(tile, this->dest_station);
+		if (this->dest_station != StationID::Invalid()) return IsDockingTile(tile) && IsShipDestinationTile(tile, this->dest_station);
 
 		return tile == this->dest_tile && ((this->dest_trackdirs & TrackdirToTrackdirBits(trackdir)) != TRACKDIR_BIT_NONE);
 	}
@@ -104,8 +104,8 @@ public:
 			return true;
 		}
 
-		TileIndex tile = n.segment_last_tile;
-		DiagDirection exitdir = TrackdirToExitdir(n.segment_last_td);
+		TileIndex tile = n.GetTile();
+		DiagDirection exitdir = TrackdirToExitdir(n.GetTrackdir());
 		int x1 = 2 * TileX(tile) + dg_dir_to_x_offs[(int)exitdir];
 		int y1 = 2 * TileY(tile) + dg_dir_to_y_offs[(int)exitdir];
 		int x2 = 2 * TileX(destination_tile);
@@ -286,7 +286,7 @@ public:
 			return result;
 		}
 
-		return INVALID_TRACKDIR;
+		NOT_REACHED();
 	}
 
 	/**
@@ -352,15 +352,6 @@ public:
 		return 0;
 	}
 
-	static Vehicle *CountShipProc(Vehicle *v, void *data)
-	{
-		uint *count = (uint*)data;
-		/* Ignore other vehicles (aircraft) and ships inside depot. */
-		if ((v->vehstatus & VS_HIDDEN) == 0) (*count)++;
-
-		return nullptr;
-	}
-
 	/**
 	 * Called by YAPF to calculate the cost from the origin to the given node.
 	 * Calculates only the cost of given node, adds it to the parent node cost
@@ -376,7 +367,10 @@ public:
 		if (IsDockingTile(n.GetTile())) {
 			/* Check docking tile for occupancy. */
 			uint count = 0;
-			HasVehicleOnPos(n.GetTile(), VEH_SHIP, &count, &CountShipProc);
+			for (const Vehicle *v : VehiclesOnTile(n.GetTile(), VEH_SHIP)) {
+				/* Ignore other vehicles (aircraft) and ships inside depot. */
+				if (!v->vehstatus.Test(VehState::Hidden)) count++;
+			}
 			c += count * 3 * YAPF_TILE_LENGTH;
 		}
 

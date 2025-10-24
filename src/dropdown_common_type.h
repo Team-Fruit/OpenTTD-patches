@@ -10,13 +10,15 @@
 #ifndef DROPDOWN_COMMON_TYPE_H
 #define DROPDOWN_COMMON_TYPE_H
 
+#include "dropdown_type.h"
 #include "gfx_func.h"
 #include "gfx_type.h"
 #include "palette_func.h"
 #include "string_func.h"
 #include "strings_func.h"
-#include "table/strings.h"
 #include "window_gui.h"
+
+#include "table/strings.h"
 
 /**
  * Drop down divider component.
@@ -37,7 +39,7 @@ public:
 		uint8_t c1 = GetColourGradient(bg_colour, SHADE_DARK);
 		uint8_t c2 = GetColourGradient(bg_colour, SHADE_LIGHTEST);
 
-		int mid = CenterBounds(full.top, full.bottom, 0);
+		int mid = CentreBounds(full.top, full.bottom, 0);
 		GfxFillRect(full.left, mid - WidgetDimensions::scaled.bevel.bottom, full.right, mid - 1, c1);
 		GfxFillRect(full.left, mid, full.right, mid + WidgetDimensions::scaled.bevel.top - 1, c2);
 	}
@@ -55,16 +57,9 @@ class DropDownString : public TBase {
 	Dimension dim; ///< Dimensions of string.
 public:
 	template <typename... Args>
-	explicit DropDownString(StringID string, Args&&... args) : TBase(std::forward<Args>(args)...)
+	explicit DropDownString(std::string &&string, Args&&... args) : TBase(std::forward<Args>(args)...)
 	{
-		this->SetString(GetString(string));
-	}
-
-	template <typename... Args>
-	explicit DropDownString(const std::string &string, Args&&... args) : TBase(std::forward<Args>(args)...)
-	{
-		SetDParamStr(0, string);
-		this->SetString(GetString(STR_JUST_RAW_STRING));
+		this->SetString(std::move(string));
 	}
 
 	void SetString(std::string &&string)
@@ -136,7 +131,7 @@ public:
 	{
 		bool rtl = TEnd ^ (_current_text_dir == TD_RTL);
 		Rect ir = r.WithWidth(this->dbounds.width, rtl);
-		DrawSprite(this->sprite, this->palette, CenterBounds(ir.left, ir.right, this->dsprite.width), CenterBounds(r.top, r.bottom, this->dsprite.height));
+		DrawSprite(this->sprite, this->palette, CentreBounds(ir.left, ir.right, this->dsprite.width), CentreBounds(r.top, r.bottom, this->dsprite.height));
 		this->TBase::Draw(full, r.Indent(this->dbounds.width + WidgetDimensions::scaled.hsep_normal, rtl), sel, bg_colour);
 	}
 };
@@ -183,12 +178,12 @@ public:
 	template <typename... Args>
 	explicit DropDownIndent(uint indent, Args&&... args) : TBase(std::forward<Args>(args)...), indent(indent) {}
 
-	uint Width() const override { return (WidgetDimensions::scaled.hsep_indent * this->indent) + this->TBase::Width(); }
+	uint Width() const override { return this->indent * WidgetDimensions::scaled.hsep_indent + this->TBase::Width(); }
 
 	void Draw(const Rect &full, const Rect &r, bool sel, Colours bg_colour) const override
 	{
 		bool rtl = TEnd ^ (_current_text_dir == TD_RTL);
-		this->TBase::Draw(full, r.Indent((WidgetDimensions::scaled.hsep_indent * this->indent), rtl), sel, bg_colour);
+		this->TBase::Draw(full, r.Indent(this->indent * WidgetDimensions::scaled.hsep_indent, rtl), sel, bg_colour);
 	}
 };
 
@@ -196,7 +191,7 @@ public:
 using DropDownListDividerItem = DropDownDivider<DropDownListItem>;
 using DropDownListStringItem = DropDownString<DropDownListItem>;
 using DropDownListIconItem = DropDownIcon<DropDownString<DropDownListItem>>;
-using DropDownListCheckedItem = DropDownCheck<DropDownString<DropDownListItem>>;
+using DropDownListCheckedItem = DropDownIndent<DropDownCheck<DropDownString<DropDownListItem>>>;
 using DropDownListIndentStringItem = DropDownIndent<DropDownString<DropDownListItem>>;
 
 #endif /* DROPDOWN_COMMON_TYPE_H */

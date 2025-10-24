@@ -12,17 +12,13 @@ jobs:
   linux:
     name: Linux (Dedicated)
 
-    runs-on: arc-runner-linux
+    runs-on: ubuntu-latest
     container:
       # manylinux_2_28 is based on AlmaLinux 8, and already has a lot of things
       # installed and preconfigured. It makes it easier to build OpenTTD.
       # This distro is based on glibc 2.28, released in 2018.
       image: quay.io/pypa/manylinux_2_28_x86_64
 
-    defaults:
-      run:
-        shell: bash
-  
     steps:
     - name: Download source
       uses: actions/download-artifact@v4
@@ -86,7 +82,7 @@ jobs:
         cd build
 
         echo "::group::CMake"
-        cmake ${GITHUB_WORKSPACE} \
+        CMAKE_POLICY_VERSION_MINIMUM=3.5 cmake ${GITHUB_WORKSPACE} \
           -DCMAKE_TOOLCHAIN_FILE=/vcpkg/scripts/buildsystems/vcpkg.cmake \
           -DCMAKE_BUILD_TYPE=Release \
           -DOPTION_DEDICATED=ON \

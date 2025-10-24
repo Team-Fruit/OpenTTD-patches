@@ -14,6 +14,9 @@
 
 #include "../../safeguards.h"
 
+/** Number of bytes per item to charge to script allocation limit. */
+static const size_t SCRIPT_LIST_BYTES_PER_ITEM = 64;
+
 /**
  * Base class for any ScriptList sorter.
  */
@@ -472,10 +475,59 @@ public:
 
 
 
+bool ScriptList::SaveObject(HSQUIRRELVM vm)
+{
+	sq_pushstring(vm, "List");
+	sq_newarray(vm, 0);
+	sq_pushinteger(vm, this->sorter_type);
+	sq_arrayappend(vm, -2);
+	sq_pushbool(vm, this->sort_ascending ? SQTrue : SQFalse);
+	sq_arrayappend(vm, -2);
+	sq_newtable(vm);
+	for (ScriptListMap::iterator iter = this->items.begin(); iter != this->items.end(); iter++) {
+		sq_pushinteger(vm, iter->first);
+		sq_pushinteger(vm, iter->second);
+		sq_rawset(vm, -3);
+	}
+	sq_arrayappend(vm, -2);
+	return true;
+}
+
+bool ScriptList::LoadObject(HSQUIRRELVM vm)
+{
+	if (sq_gettype(vm, -1) != OT_ARRAY) return false;
+	sq_pushnull(vm);
+	if (SQ_FAILED(sq_next(vm, -2))) return false;
+	if (sq_gettype(vm, -1) != OT_INTEGER) return false;
+	SQInteger type;
+	sq_getinteger(vm, -1, &type);
+	sq_pop(vm, 2);
+	if (SQ_FAILED(sq_next(vm, -2))) return false;
+	if (sq_gettype(vm, -1) != OT_BOOL) return false;
+	SQBool order;
+	sq_getbool(vm, -1, &order);
+	sq_pop(vm, 2);
+	if (SQ_FAILED(sq_next(vm, -2))) return false;
+	if (sq_gettype(vm, -1) != OT_TABLE) return false;
+	sq_pushnull(vm);
+	while (SQ_SUCCEEDED(sq_next(vm, -2))) {
+		if (sq_gettype(vm, -2) != OT_INTEGER && sq_gettype(vm, -1) != OT_INTEGER) return false;
+		SQInteger key, value;
+		sq_getinteger(vm, -2, &key);
+		sq_getinteger(vm, -1, &value);
+		this->AddItem(key, value);
+		sq_pop(vm, 2);
+	}
+	sq_pop(vm, 3);
+	if (SQ_SUCCEEDED(sq_next(vm, -2))) return false;
+	sq_pop(vm, 1);
+	this->Sort(static_cast<SorterType>(type), order == SQTrue);
+	return true;
+}
+
 ScriptList::ScriptList()
 {
 	/* Default sorter */
-	this->sorter         = nullptr;
 	this->sorter_type    = SORT_BY_VALUE;
 	this->sort_ascending = false;
 	this->initialized    = false;
@@ -485,7 +537,9 @@ ScriptList::ScriptList()
 
 ScriptList::~ScriptList()
 {
-	delete this->sorter;
+	if (_squirrel_allocator != nullptr) {
+		Squirrel::DecreaseAllocatedSize(SCRIPT_LIST_BYTES_PER_ITEM * this->items.size());
+	}
 }
 
 bool ScriptList::HasItem(SQInteger item)
@@ -496,6 +550,7 @@ bool ScriptList::HasItem(SQInteger item)
 void ScriptList::Clear()
 {
 	this->modifications++;
+	Squirrel::DecreaseAllocatedSize(SCRIPT_LIST_BYTES_PER_ITEM * this->items.size());
 
 	this->items.clear();
 	this->values.clear();
@@ -505,6 +560,8 @@ void ScriptList::Clear()
 
 void ScriptList::AddOrSetItem(SQInteger item, SQInteger value)
 {
+	this->modifications++;
+
 	auto res = this->items.insert(std::make_pair(item, value));
 	if (!res.second) {
 		/* Key was already present, insertion did not take place */
@@ -512,7 +569,7 @@ void ScriptList::AddOrSetItem(SQInteger item, SQInteger value)
 		return;
 	}
 
-	this->modifications++;
+	Squirrel::IncreaseAllocatedSize(SCRIPT_LIST_BYTES_PER_ITEM);
 	if (this->values_inited) {
 		this->values.insert(std::make_pair(value, item));
 	}
@@ -520,6 +577,8 @@ void ScriptList::AddOrSetItem(SQInteger item, SQInteger value)
 
 void ScriptList::AddToItemValue(SQInteger item, SQInteger value)
 {
+	this->modifications++;
+
 	auto res = this->items.insert(std::make_pair(item, value));
 	if (!res.second) {
 		/* Key was already present, insertion did not take place */
@@ -527,7 +586,7 @@ void ScriptList::AddToItemValue(SQInteger item, SQInteger value)
 		return;
 	}
 
-	this->modifications++;
+	Squirrel::IncreaseAllocatedSize(SCRIPT_LIST_BYTES_PER_ITEM);
 	if (this->values_inited) {
 		this->values.insert(std::make_pair(value, item));
 	}
@@ -543,6 +602,7 @@ void ScriptList::AddItem(SQInteger item, SQInteger value)
 		return;
 	}
 
+	Squirrel::IncreaseAllocatedSize(SCRIPT_LIST_BYTES_PER_ITEM);
 	if (this->values_inited) {
 		this->values.insert(std::make_pair(value, item));
 	}
@@ -556,6 +616,7 @@ ScriptList::ScriptListMap::iterator ScriptList::RemoveIter(ScriptList::ScriptLis
 	if (this->initialized) this->sorter->Remove(item);
 
 	ScriptListMap::iterator new_item_iter = this->items.erase(item_iter);
+	Squirrel::DecreaseAllocatedSize(SCRIPT_LIST_BYTES_PER_ITEM);
 	if (this->values_inited) {
 		ScriptListValueSet::iterator new_reverse_iter = this->values.erase(this->values.find(std::make_pair(value, item)));
 
@@ -575,6 +636,7 @@ ScriptList::ScriptListValueSet::iterator ScriptList::RemoveValueIter(ScriptList:
 
 	ScriptListMap::iterator new_item_iter = this->items.erase(this->items.find(item));
 	ScriptListValueSet::iterator new_value_iter = this->values.erase(value_iter);
+	Squirrel::DecreaseAllocatedSize(SCRIPT_LIST_BYTES_PER_ITEM);
 
 	if (this->initialized) this->sorter->PostErase(item, new_item_iter, new_value_iter);
 
@@ -606,20 +668,19 @@ void ScriptList::InitSorter()
 		switch (this->sorter_type) {
 			case SORT_BY_ITEM:
 				if (this->sort_ascending) {
-					this->sorter = new ScriptListSorterItemAscending(this);
+					this->sorter = std::make_unique<ScriptListSorterItemAscending>(this);
 				} else {
-					this->sorter = new ScriptListSorterItemDescending(this);
+					this->sorter = std::make_unique<ScriptListSorterItemDescending>(this);
 				}
 				break;
 
 			case SORT_BY_VALUE:
 				if (this->sort_ascending) {
-					this->sorter = new ScriptListSorterValueAscending(this);
+					this->sorter = std::make_unique<ScriptListSorterValueAscending>(this);
 				} else {
-					this->sorter = new ScriptListSorterValueDescending(this);
+					this->sorter = std::make_unique<ScriptListSorterValueDescending>(this);
 				}
 				break;
-
 			default: NOT_REACHED();
 		}
 	}
@@ -705,8 +766,7 @@ void ScriptList::Sort(SorterType sorter, bool ascending)
 	if (sorter != SORT_BY_VALUE && sorter != SORT_BY_ITEM) return;
 	if (sorter == this->sorter_type && ascending == this->sort_ascending) return;
 
-	delete this->sorter;
-	this->sorter = nullptr;
+	this->sorter.reset();
 	this->sorter_type    = sorter;
 	this->sort_ascending = ascending;
 	this->initialized    = false;
@@ -725,11 +785,11 @@ void ScriptList::AddList(ScriptList *list)
 			this->InitValues();
 		}
 		this->modifications++;
+		Squirrel::IncreaseAllocatedSize(SCRIPT_LIST_BYTES_PER_ITEM * this->items.size());
 	} else {
 		ScriptListMap *list_items = &list->items;
 		for (auto &it : *list_items) {
-			this->AddItem(it.first);
-			this->SetValue(it.first, it.second);
+			this->AddOrSetItem(it.first, it.second);
 		}
 	}
 }
@@ -740,12 +800,12 @@ void ScriptList::SwapList(ScriptList *list)
 
 	this->items.swap(list->items);
 	this->values.swap(list->values);
-	Swap(this->sorter, list->sorter);
-	Swap(this->sorter_type, list->sorter_type);
-	Swap(this->sort_ascending, list->sort_ascending);
-	Swap(this->initialized, list->initialized);
-	Swap(this->values_inited, list->values_inited);
-	Swap(this->modifications, list->modifications);
+	std::swap(this->sorter, list->sorter);
+	std::swap(this->sorter_type, list->sorter_type);
+	std::swap(this->sort_ascending, list->sort_ascending);
+	std::swap(this->initialized, list->initialized);
+	std::swap(this->values_inited, list->values_inited);
+	std::swap(this->modifications, list->modifications);
 	if (this->sorter != nullptr) this->sorter->Retarget(this);
 	if (list->sorter != nullptr) list->sorter->Retarget(list);
 }

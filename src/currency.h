@@ -24,7 +24,7 @@ static constexpr CalTime::Year MIN_EURO_YEAR{2000}; ///< The earliest year custo
  * savegame compatibility and in order to refer to them quickly, especially
  * for referencing the custom one.
  */
-enum Currencies {
+enum Currencies : uint8_t {
 	CURRENCY_GBP,       ///< British Pound
 	CURRENCY_USD,       ///< US Dollar
 	CURRENCY_EUR,       ///< Euro
@@ -69,6 +69,7 @@ enum Currencies {
 	CURRENCY_MYR,       ///< Malaysian Ringgit
 	CURRENCY_LVL,       ///< Latvian Lats
 	CURRENCY_PTE,       ///< Portuguese Escudo
+	CURRENCY_UAH,       ///< Ukrainian Hryvnia
 	CURRENCY_END,       ///< always the last item
 };
 

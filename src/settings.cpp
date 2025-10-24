@@ -22,8 +22,6 @@
  */
 
 #include "stdafx.h"
-#include <array>
-#include <limits>
 #include "currency.h"
 #include "screenshot.h"
 #include "network/network.h"
@@ -53,7 +51,11 @@
 #include "music/music_driver.hpp"
 #include "blitter/factory.hpp"
 #include "base_media_base.h"
+#include "base_media_graphics.h"
+#include "base_media_music.h"
+#include "base_media_sounds.h"
 #include "gamelog.h"
+#include "settings_cmd.h"
 #include "settings_func.h"
 #include "ini_type.h"
 #include "ai/ai_config.hpp"
@@ -81,6 +83,8 @@
 #include "graph_gui.h"
 #include "string_func_extra.h"
 #include "engine_override.h"
+#include "core/backup_type.hpp"
+#include "core/string_consumer.hpp"
 
 #include "void_map.h"
 #include "station_base.h"
@@ -97,6 +101,8 @@
 #include "table/settings_compat.h"
 
 #include <algorithm>
+#include <array>
+#include <limits>
 #include <vector>
 
 #include "safeguards.h"
@@ -184,8 +190,8 @@ static const SettingTable _secrets_setting_tables[] = {
 	_network_secrets_settings,
 };
 
-typedef void SettingDescProc(IniFile &ini, const SettingTable &desc, const char *grpname, void *object, bool only_startup);
-typedef void SettingDescProcList(IniFile &ini, const char *grpname, StringList &list);
+using SettingDescProc = void(IniFile &ini, const SettingTable &desc, std::string_view grpname, void *object, bool only_startup);
+using SettingDescProcList = void(IniFile &ini, std::string_view grpname, StringList &list);
 
 static bool IsSignedVarMemType(VarType vt);
 
@@ -237,24 +243,21 @@ enum IniFileVersion : uint32_t {
 const uint16_t INIFILE_VERSION = (IniFileVersion)(IFV_MAX_VERSION - 1); ///< Current ini-file version of OpenTTD.
 
 /**
- * Find the index value of a ONEofMANY type in a string separated by |
+ * Find the index value of a ONEofMANY type in a string
  * @param str the current value of the setting for which a value needs found
- * @param len length of the string
  * @param many full domain of values the ONEofMANY setting can have
- * @return the integer index of the full-list, or SIZE_MAX if not found
+ * @return the integer index of the full-list, or std::nullopt if not found
  */
-size_t OneOfManySettingDesc::ParseSingleValue(const char *str, size_t len, const std::vector<std::string> &many)
+std::optional<uint32_t> OneOfManySettingDesc::ParseSingleValue(std::string_view str, const std::vector<std::string> &many)
 {
+	StringConsumer consumer{str};
+	auto digit = consumer.TryReadIntegerBase<uint32_t>(10);
 	/* check if it's an integer */
-	if (isdigit(*str)) return std::strtoul(str, nullptr, 0);
+	if (digit.has_value()) return digit;
 
-	size_t idx = 0;
-	for (auto one : many) {
-		if (one.size() == len && strncmp(one.c_str(), str, len) == 0) return idx;
-		idx++;
-	}
-
-	return SIZE_MAX;
+	auto it = std::ranges::find(many, str);
+	if (it == many.end()) return std::nullopt;
+	return static_cast<uint32_t>(it - many.begin());
 }
 
 /**
@@ -263,10 +266,10 @@ size_t OneOfManySettingDesc::ParseSingleValue(const char *str, size_t len, const
  * @param str the current value of the setting for which a value needs found.
  * @return Either true/false, or nullopt if no boolean value found.
  */
-std::optional<bool> BoolSettingDesc::ParseSingleValue(const char *str)
+std::optional<bool> BoolSettingDesc::ParseSingleValue(std::string_view str)
 {
-	if (strcmp(str, "true") == 0 || strcmp(str, "on") == 0 || strcmp(str, "1") == 0) return true;
-	if (strcmp(str, "false") == 0 || strcmp(str, "off") == 0 || strcmp(str, "0") == 0) return false;
+	if (str == "true" || str == "on" || str == "1") return true;
+	if (str == "false" || str == "off" || str == "0") return false;
 
 	return std::nullopt;
 }
@@ -275,29 +278,26 @@ std::optional<bool> BoolSettingDesc::ParseSingleValue(const char *str)
  * Find the set-integer value MANYofMANY type in a string
  * @param many full domain of values the MANYofMANY setting can have
  * @param str the current string value of the setting, each individual
- * of separated by a whitespace,tab or | character
- * @return the 'fully' set integer, or SIZE_MAX if a set is not found
+ * of separated by a whitespace, tab or | character
+ * @return the 'fully' set integer, or std::nullopt if a set is not found
  */
-static size_t LookupManyOfMany(const std::vector<std::string> &many, const char *str)
+static std::optional<uint32_t> LookupManyOfMany(const std::vector<std::string> &many, std::string_view str)
 {
-	const char *s;
-	size_t r;
-	size_t res = 0;
+	static const std::string_view separators{" \t|"};
 
-	for (;;) {
+	uint32_t res = 0;
+	StringConsumer consumer{str};
+	while (consumer.AnyBytesLeft()) {
 		/* skip "whitespace" */
-		while (*str == ' ' || *str == '\t' || *str == '|') str++;
-		if (*str == 0) break;
+		consumer.SkipUntilCharNotIn(separators);
 
-		s = str;
-		while (*s != 0 && *s != ' ' && *s != '\t' && *s != '|') s++;
+		std::string_view value = consumer.ReadUntilCharIn(separators);
+		if (value.empty()) break;
 
-		r = OneOfManySettingDesc::ParseSingleValue(str, s - str, many);
-		if (r == SIZE_MAX) return r;
+		auto r = OneOfManySettingDesc::ParseSingleValue(value, many);
+		if (!r.has_value()) return r;
 
-		SetBit(res, (uint8_t)r); // value found, set it
-		if (*s == 0) break;
-		str = s + 1;
+		SetBit(res, static_cast<uint8_t>(*r)); // value found, set it
 	}
 	return res;
 }
@@ -437,70 +437,68 @@ void ManyOfManySettingDesc::FormatIntValue(format_target &buf, uint32_t value) c
  * @param str Input string that will be parsed based on the type of desc.
  * @return The value from the parse string, or the default value of the setting.
  */
-size_t IntSettingDesc::ParseValue(const char *str) const
+int32_t IntSettingDesc::ParseValue(std::string_view str) const
 {
-	char *end;
-	size_t val = std::strtoul(str, &end, 0);
-	if (end == str) {
-		if (this->flags & SF_CONVERT_BOOL_TO_INT) {
-			if (strcmp(str, "true") == 0 || strcmp(str, "on") == 0) return 1;
-			if (strcmp(str, "false") == 0 || strcmp(str, "off") == 0) return 0;
+	StringConsumer consumer{str};
+	/* The actual settings value might be int32 or uint32. Read as int64 and just cast away the high bits. */
+	auto value = consumer.TryReadIntegerBase<int64_t>(10);
+	if (!value.has_value()) {
+		if (this->flags.Test(SettingFlag::ConvertBoolToInt)) {
+			if (str == "true" || str == "on") return 1;
+			if (str == "false" || str == "off") return 0;
 		}
-		ErrorMessageData msg(STR_CONFIG_ERROR, STR_CONFIG_ERROR_INVALID_VALUE);
-		msg.SetDParamStr(0, str);
-		msg.SetDParamStr(1, this->name);
-		_settings_error_list.push_back(msg);
-		return this->def;
+		_settings_error_list.emplace_back(
+			GetEncodedString(STR_CONFIG_ERROR),
+			GetEncodedString(STR_CONFIG_ERROR_INVALID_VALUE, str, this->name));
+		return this->GetDefaultValue();
 	}
-	if (*end != '\0') {
-		ErrorMessageData msg(STR_CONFIG_ERROR, STR_CONFIG_ERROR_TRAILING_CHARACTERS);
-		msg.SetDParamStr(0, this->name);
-		_settings_error_list.push_back(msg);
+	if (consumer.AnyBytesLeft()) {
+		_settings_error_list.emplace_back(
+			GetEncodedString(STR_CONFIG_ERROR),
+			GetEncodedString(STR_CONFIG_ERROR_TRAILING_CHARACTERS, this->name));
 	}
-	return val;
+	return static_cast<int32_t>(*value);
 }
 
-size_t OneOfManySettingDesc::ParseValue(const char *str) const
+int32_t OneOfManySettingDesc::ParseValue(std::string_view str) const
 {
-	size_t r = OneOfManySettingDesc::ParseSingleValue(str, strlen(str), this->many);
+	auto r = OneOfManySettingDesc::ParseSingleValue(str, this->many);
 	/* if the first attempt of conversion from string to the appropriate value fails,
 	 * look if we have defined a converter from old value to new value. */
-	if (r == SIZE_MAX && this->many_cnvt != nullptr) r = this->many_cnvt(str);
-	if (r != SIZE_MAX) return r; // and here goes converted value
+	if (!r.has_value() && this->many_cnvt != nullptr) r = this->many_cnvt(str);
+	if (r.has_value()) return *r; // and here goes converted value
 
-	ErrorMessageData msg(STR_CONFIG_ERROR, STR_CONFIG_ERROR_INVALID_VALUE);
-	msg.SetDParamStr(0, str);
-	msg.SetDParamStr(1, this->name);
-	_settings_error_list.push_back(msg);
-	return this->def;
+	_settings_error_list.emplace_back(
+		GetEncodedString(STR_CONFIG_ERROR),
+		GetEncodedString(STR_CONFIG_ERROR_INVALID_VALUE, str, this->name));
+	return this->GetDefaultValue();
 }
 
-size_t ManyOfManySettingDesc::ParseValue(const char *str) const
+int32_t ManyOfManySettingDesc::ParseValue(std::string_view str) const
 {
-	size_t r = LookupManyOfMany(this->many, str);
-	if (r != SIZE_MAX) return r;
-	ErrorMessageData msg(STR_CONFIG_ERROR, STR_CONFIG_ERROR_INVALID_VALUE);
-	msg.SetDParamStr(0, str);
-	msg.SetDParamStr(1, this->name);
-	_settings_error_list.push_back(msg);
-	return this->def;
+	auto r = LookupManyOfMany(this->many, str);
+	if (r.has_value()) return *r;
+
+	_settings_error_list.emplace_back(
+		GetEncodedString(STR_CONFIG_ERROR),
+		GetEncodedString(STR_CONFIG_ERROR_INVALID_VALUE, str, this->name));
+	return this->GetDefaultValue();
 }
 
-size_t BoolSettingDesc::ParseValue(const char *str) const
+int32_t BoolSettingDesc::ParseValue(std::string_view str) const
 {
 	auto r = BoolSettingDesc::ParseSingleValue(str);
 	if (r.has_value()) return *r;
 
-	ErrorMessageData msg(STR_CONFIG_ERROR, STR_CONFIG_ERROR_INVALID_VALUE);
-	msg.SetDParamStr(0, str);
-	msg.SetDParamStr(1, this->name);
-	_settings_error_list.push_back(msg);
-	return this->def;
+	_settings_error_list.emplace_back(
+		GetEncodedString(STR_CONFIG_ERROR),
+		GetEncodedString(STR_CONFIG_ERROR_INVALID_VALUE, str, this->name));
+	return this->GetDefaultValue();
 }
 
 static bool ValidateEnumSetting(const IntSettingDesc *sdb, int32_t &val)
 {
-	if (sdb->flags & SF_ENUM_PRE_CB_VALIDATE && sdb->pre_check != nullptr && !sdb->pre_check(val)) return false;
+	if (sdb->flags.Test(SettingFlag::EnumPreCallbackValidate) && sdb->pre_check != nullptr && !sdb->pre_check(val)) return false;
 	for (const SettingDescEnumEntry *enumlist = sdb->enumlist; enumlist != nullptr && enumlist->str != STR_NULL; enumlist++) {
 		if (enumlist->val == val) {
 			return true;
@@ -538,41 +536,54 @@ StringID IntSettingDesc::GetHelp() const
 }
 
 /**
- * Set the DParams for drawing the value of the setting.
- * @param first_param First DParam to use
+ * Get parameters for drawing the value of the setting.
  * @param value Setting value to set params for.
  */
-void IntSettingDesc::SetValueDParams(uint first_param, int32_t value) const
+std::pair<StringParameter, StringParameter> IntSettingDesc::GetValueParams(int32_t value) const
 {
-	const uint initial_first_param = first_param;
-	if (this->set_value_dparams_cb != nullptr) {
-		this->set_value_dparams_cb(*this, first_param, value);
-	} else if (this->IsBoolSetting()) {
-		SetDParam(first_param++, value != 0 ? STR_CONFIG_SETTING_ON : STR_CONFIG_SETTING_OFF);
-	} else {
-		if ((this->flags & SF_ENUM) != 0) {
-			StringID str = STR_UNDEFINED;
-			for (const SettingDescEnumEntry *enumlist = this->enumlist; enumlist != nullptr && enumlist->str != STR_NULL; enumlist++) {
-				if (enumlist->val == value) {
-					str = enumlist->str;
-					break;
-				}
+	if (this->get_value_params_cb != nullptr) {
+		return this->get_value_params_cb(*this, value);
+	}
+
+	if (this->IsBoolSetting()) {
+		return {value != 0 ? STR_CONFIG_SETTING_ON : STR_CONFIG_SETTING_OFF, {}};
+	}
+
+	if (this->flags.Test(SettingFlag::Enum)) {
+		StringID str = STR_UNDEFINED;
+		for (const SettingDescEnumEntry *enumlist = this->enumlist; enumlist != nullptr && enumlist->str != STR_NULL; enumlist++) {
+			if (enumlist->val == value) {
+				str = enumlist->str;
+				break;
 			}
-			SetDParam(first_param++, str);
-		} else if ((this->flags & SF_GUI_DROPDOWN) != 0) {
-			SetDParam(first_param++, this->str_val - this->min + value);
-		} else {
-			SetDParam(first_param++, this->str_val + ((value == 0 && (this->flags & SF_GUI_0_IS_SPECIAL) != 0) ? 1 : 0));
 		}
-		SetDParam(first_param++, value);
+		return {str, value};
 	}
-	if (this->guiproc != nullptr) {
-		SettingOnGuiCtrlData data;
-		data.type = SOGCT_VALUE_DPARAMS;
-		data.offset = initial_first_param;
-		data.val = value;
-		this->guiproc(data);
+
+	if (this->flags.Test(SettingFlag::GuiDropdown)) {
+		auto [min_val, _] = this->GetRange();
+		return {this->str_val - min_val + value, value};
 	}
+
+	return {this->str_val + ((value == 0 && this->flags.Test(SettingFlag::GuiZeroIsSpecial)) ? 1 : 0), value};
+}
+
+/**
+ * Get the default value of the setting.
+ * @return The default value.
+ */
+int32_t IntSettingDesc::GetDefaultValue() const
+{
+	return this->get_def_cb != nullptr ? this->get_def_cb(*this) : this->def;
+}
+
+/**
+ * Get the min/max range for the setting.
+ * @return The min/max range.
+ */
+std::tuple<int32_t, uint32_t> IntSettingDesc::GetRange() const
+{
+	return this->get_range_cb != nullptr ? this->get_range_cb(*this) : std::tuple(this->min, this->max);
 }
 
 /**
@@ -591,13 +602,14 @@ void IntSettingDesc::MakeValueValidAndWrite(const void *object, int32_t val) con
  * Make the value valid given the limitations of this setting.
  *
  * In the case of int settings this is ensuring the value is between the minimum and
- * maximum value, with a special case for 0 if SF_GUI_0_IS_SPECIAL is set.
+ * maximum value, with a special case for 0 if SettingFlag::GuiZeroIsSpecial is set.
  * This is generally done by clamping the value so it is within the allowed value range.
- * However, for SF_GUI_DROPDOWN the default is used when the value is not valid.
+ * However, for SettingFlag::GuiDropdown the default is used when the value is not valid.
  * @param val The value to make valid.
  */
 void IntSettingDesc::MakeValueValid(int32_t &val) const
 {
+	auto [min_val, max_val] = this->GetRange();
 	/* We need to take special care of the uint32_t type as we receive from the function
 	 * a signed integer. While here also bail out on 64-bit settings as those are not
 	 * supported. Unsigned 8 and 16-bit variables are safe since they fit into a signed
@@ -612,38 +624,38 @@ void IntSettingDesc::MakeValueValid(int32_t &val) const
 		case SLE_VAR_U16:
 		case SLE_VAR_I32: {
 			/* Override the minimum value. No value below this->min, except special value 0 */
-			if (!(this->flags & SF_GUI_0_IS_SPECIAL) || val != 0) {
-				if (this->flags & SF_ENUM) {
-					if (!ValidateEnumSetting(this, val)) val = (int32_t)(size_t)this->def;
-				} else if (!(this->flags & SF_GUI_DROPDOWN)) {
+			if (!this->flags.Test(SettingFlag::GuiZeroIsSpecial) || val != 0) {
+				if (this->flags.Test(SettingFlag::Enum)) {
+					if (!ValidateEnumSetting(this, val)) val = GetDefaultValue();
+				} else if (!this->flags.Test(SettingFlag::GuiDropdown)) {
 					/* Clamp value-type setting to its valid range */
-					val = Clamp(val, this->min, this->max);
-				} else if (val < this->min || val > (int32_t)this->max) {
+					val = Clamp(val, min_val, max_val);
+				} else if (val < min_val || val > static_cast<int32_t>(max_val)) {
 					/* Reset invalid discrete setting (where different values change gameplay) to its default value */
-					val = this->def;
+					val = this->GetDefaultValue();
 				}
 			}
 			break;
 		}
 		case SLE_VAR_U32: {
 			/* Override the minimum value. No value below this->min, except special value 0 */
-			uint32_t uval = (uint32_t)val;
-			if (!(this->flags & SF_GUI_0_IS_SPECIAL) || uval != 0) {
-				if (this->flags & SF_ENUM) {
+			uint32_t uval = static_cast<uint32_t>(val);
+			if (!this->flags.Test(SettingFlag::GuiZeroIsSpecial) || uval != 0) {
+				if (this->flags.Test(SettingFlag::Enum)) {
 					if (!ValidateEnumSetting(this, val)) {
-						uval = (uint32_t)(size_t)this->def;
+						uval = (uint32_t)this->GetDefaultValue();
 					} else {
 						uval = (uint32_t)val;
 					}
-				} else if (!(this->flags & SF_GUI_DROPDOWN)) {
+				} else if (!this->flags.Test(SettingFlag::GuiDropdown)) {
 					/* Clamp value-type setting to its valid range */
-					uval = ClampU(uval, this->min, this->max);
-				} else if (uval < (uint)this->min || uval > this->max) {
+					uval = ClampU(uval, min_val, max_val);
+				} else if (uval < static_cast<uint32_t>(min_val) || uval > max_val) {
 					/* Reset invalid discrete setting to its default value */
-					uval = (uint32_t)this->def;
+					uval = static_cast<uint32_t>(this->GetDefaultValue());
 				}
 			}
-			val = (int32_t)uval;
+			val = static_cast<int32_t>(uval);
 			return;
 		}
 		case SLE_VAR_I64:
@@ -688,8 +700,8 @@ void StringSettingDesc::MakeValueValid(std::string &str) const
 	/* In case a maximum length is imposed by the setting, the length
 	 * includes the '\0' termination for network transfer purposes.
 	 * Also ensure the string is valid after chopping of some bytes. */
-	std::string stdstr(str, 0, this->max_length - 1);
-	str.assign(StrMakeValid(stdstr, SVS_NONE));
+	str.erase(this->max_length - 1, std::string::npos);
+	StrMakeValidInPlace(str, {});
 }
 
 /**
@@ -735,7 +747,7 @@ static const char *GetSettingConfigName(const SettingDesc &sd)
  * @param object pointer to the object been loaded
  * @param only_startup load only the startup settings set
  */
-static void IniLoadSettings(IniFile &ini, const SettingTable &settings_table, const char *grpname, void *object, bool only_startup)
+static void IniLoadSettings(IniFile &ini, const SettingTable &settings_table, std::string_view grpname, void *object, bool only_startup)
 {
 	const IniGroup *group;
 	const IniGroup *group_def = ini.GetGroup(grpname);
@@ -744,7 +756,7 @@ static void IniLoadSettings(IniFile &ini, const SettingTable &settings_table, co
 		if (!SlIsObjectCurrentlyValid(sd->save.version_from, sd->save.version_to, sd->save.ext_feature_test)) continue;
 		if (sd->startup != only_startup) continue;
 		const IniItem *item = nullptr;
-		if (!(sd->flags & SF_NO_NEWGAME)) {
+		if (!sd->flags.Test(SettingFlag::NoNewgame)) {
 			/* For settings.xx.yy load the settings from [xx] yy = ? */
 			std::string s{ GetSettingConfigName(*sd) };
 			auto sc = s.find('.');
@@ -784,15 +796,15 @@ static void IniLoadSettings(IniFile &ini, const SettingTable &settings_table, co
 
 void IntSettingDesc::ParseValue(const IniItem *item, void *object) const
 {
-	size_t val = (item == nullptr) ? this->def : this->ParseValue(item->value.has_value() ? item->value->c_str() : "");
-	this->MakeValueValidAndWrite(object, (int32_t)val);
+	int32_t val = (item != nullptr && item->value.has_value()) ? this->ParseValue(*item->value) : this->GetDefaultValue();
+	this->MakeValueValidAndWrite(object, val);
 }
 
 void StringSettingDesc::ParseValue(const IniItem *item, void *object) const
 {
 	std::string str = (item == nullptr) ? this->def : item->value.value_or("");
 	this->MakeValueValid(str);
-	if (this->flags & SF_RUN_CALLBACKS_ON_PARSE) {
+	if (this->flags.Test(SettingFlag::RunCallbacksOnParse)) {
 		if (this->pre_check != nullptr && !this->pre_check(str)) str = this->def;
 		if (this->post_callback != nullptr) this->post_callback(str);
 	}
@@ -804,9 +816,9 @@ void ListSettingDesc::ParseValue(const IniItem *item, void *object) const
 	const char *str = (item == nullptr) ? this->def : item->value.has_value() ? item->value->c_str() : nullptr;
 	void *ptr = GetVariableAddress(object, this->save);
 	if (!LoadIntList(str, ptr, this->save.length, GetVarMemType(this->save.conv))) {
-		ErrorMessageData msg(STR_CONFIG_ERROR, STR_CONFIG_ERROR_ARRAY);
-		msg.SetDParamStr(0, this->name);
-		_settings_error_list.push_back(msg);
+		_settings_error_list.emplace_back(
+			GetEncodedString(STR_CONFIG_ERROR),
+			GetEncodedString(STR_CONFIG_ERROR_ARRAY, this->name));
 
 		/* Use default */
 		LoadIntList(this->def, ptr, this->save.length, GetVarMemType(this->save.conv));
@@ -825,7 +837,7 @@ void ListSettingDesc::ParseValue(const IniItem *item, void *object) const
  * values are reloaded when saving). If settings indeed have changed, we get
  * these and save them.
  */
-static void IniSaveSettings(IniFile &ini, const SettingTable &settings_table, const char *grpname, void *object, bool)
+static void IniSaveSettings(IniFile &ini, const SettingTable &settings_table, std::string_view grpname, void *object, bool)
 {
 	IniGroup *group_def = nullptr, *group;
 
@@ -833,8 +845,8 @@ static void IniSaveSettings(IniFile &ini, const SettingTable &settings_table, co
 		/* If the setting is not saved to the configuration
 		 * file, just continue with the next setting */
 		if (!SlIsObjectCurrentlyValid(sd->save.version_from, sd->save.version_to, sd->save.ext_feature_test)) continue;
-		if (sd->flags & SF_NOT_IN_CONFIG) continue;
-		if (sd->flags & SF_NO_NEWGAME) continue;
+		if (sd->flags.Test(SettingFlag::NotInConfig)) continue;
+		if (sd->flags.Test(SettingFlag::NoNewgame)) continue;
 
 		/* XXX - wtf is this?? (group override?) */
 		std::string s{ GetSettingConfigName(*sd) };
@@ -882,7 +894,7 @@ void BoolSettingDesc::FormatIntValue(format_target &buf, uint32_t value) const
 
 bool IntSettingDesc::IsSameValue(const IniItem *item, void *object) const
 {
-	int32_t item_value = (int32_t)this->ParseValue(item->value->c_str());
+	int32_t item_value = static_cast<int32_t>(this->ParseValue(*item->value));
 	int32_t object_value = this->Read(object);
 	return item_value == object_value;
 }
@@ -890,12 +902,12 @@ bool IntSettingDesc::IsSameValue(const IniItem *item, void *object) const
 bool IntSettingDesc::IsDefaultValue(void *object) const
 {
 	int32_t object_value = this->Read(object);
-	return this->def == object_value;
+	return this->GetDefaultValue() == object_value;
 }
 
 void IntSettingDesc::ResetToDefault(void *object) const
 {
-	this->Write(object, this->def);
+	this->Write(object, this->GetDefaultValue());
 }
 
 void StringSettingDesc::FormatValue(format_target &buf, const void *object) const
@@ -964,7 +976,7 @@ void ListSettingDesc::ResetToDefault(void *) const
  * @param grpname character string identifying the section-header of the ini file that will be parsed
  * @param list new list with entries of the given section
  */
-static void IniLoadSettingList(IniFile &ini, const char *grpname, StringList &list)
+static void IniLoadSettingList(IniFile &ini, std::string_view grpname, StringList &list)
 {
 	const IniGroup *group = ini.GetGroup(grpname);
 
@@ -986,7 +998,7 @@ static void IniLoadSettingList(IniFile &ini, const char *grpname, StringList &li
  * @param list pointer to an string(pointer) array that will be used as the
  *             source to be saved into the relevant ini section
  */
-static void IniSaveSettingList(IniFile &ini, const char *grpname, StringList &list)
+static void IniSaveSettingList(IniFile &ini, std::string_view grpname, StringList &list)
 {
 	IniGroup &group = ini.GetOrCreateGroup(grpname);
 	group.Clear();
@@ -1002,7 +1014,7 @@ static void IniSaveSettingList(IniFile &ini, const char *grpname, StringList &li
  * @param grpname character string identifying the section-header of the ini file that will be parsed
  * @param desc Destination WindowDescPreferences
  */
-void IniLoadWindowSettings(IniFile &ini, const char *grpname, void *desc)
+void IniLoadWindowSettings(IniFile &ini, std::string_view grpname, WindowDescPreferences *desc)
 {
 	IniLoadSettings(ini, _window_settings, grpname, desc, false);
 }
@@ -1013,7 +1025,7 @@ void IniLoadWindowSettings(IniFile &ini, const char *grpname, void *desc)
  * @param grpname character string identifying the section-header of the ini file
  * @param desc Source WindowDescPreferences
  */
-void IniSaveWindowSettings(IniFile &ini, const char *grpname, void *desc)
+void IniSaveWindowSettings(IniFile &ini, std::string_view grpname, WindowDescPreferences *desc)
 {
 	IniSaveSettings(ini, _window_settings, grpname, desc, false);
 }
@@ -1025,14 +1037,14 @@ void IniSaveWindowSettings(IniFile &ini, const char *grpname, void *desc)
  */
 bool SettingDesc::IsEditable(bool do_command) const
 {
-	if (!do_command && !(this->flags & SF_NO_NETWORK_SYNC) && IsNonAdminNetworkClient() && !(this->flags & SF_PER_COMPANY)) return false;
-	if (do_command && (this->flags & SF_NO_NETWORK_SYNC)) return false;
-	if ((this->flags & SF_NETWORK_ONLY) && !_networking && _game_mode != GM_MENU) return false;
-	if ((this->flags & SF_NO_NETWORK) && _networking) return false;
-	if ((this->flags & SF_NEWGAME_ONLY) &&
+	if (!do_command && !this->flags.Test(SettingFlag::NoNetworkSync) && IsNonAdminNetworkClient() && !this->flags.Test(SettingFlag::PerCompany)) return false;
+	if (do_command && this->flags.Test(SettingFlag::NoNetworkSync)) return false;
+	if (this->flags.Test(SettingFlag::NetworkOnly) && !_networking && _game_mode != GM_MENU) return false;
+	if (this->flags.Test(SettingFlag::NoNetwork) && _networking) return false;
+	if (this->flags.Test(SettingFlag::NewgameOnly) &&
 			(_game_mode == GM_NORMAL ||
-			(_game_mode == GM_EDITOR && !(this->flags & SF_SCENEDIT_TOO)))) return false;
-	if ((this->flags & SF_SCENEDIT_ONLY) && _game_mode != GM_EDITOR) return false;
+			(_game_mode == GM_EDITOR && !this->flags.Test(SettingFlag::SceneditToo)))) return false;
+	if (this->flags.Test(SettingFlag::SceneditOnly) && _game_mode != GM_EDITOR) return false;
 	return true;
 }
 
@@ -1042,8 +1054,8 @@ bool SettingDesc::IsEditable(bool do_command) const
  */
 SettingType SettingDesc::GetType() const
 {
-	if (this->flags & SF_PER_COMPANY) return ST_COMPANY;
-	return (this->flags & SF_NOT_IN_SAVE) ? ST_CLIENT : ST_GAME;
+	if (this->flags.Test(SettingFlag::PerCompany)) return ST_COMPANY;
+	return this->flags.Test(SettingFlag::NotInSave) ? ST_CLIENT : ST_GAME;
 }
 
 /**
@@ -1087,29 +1099,28 @@ static StringID SettingHelpWallclockTriple(const IntSettingDesc &sd)
 }
 
 /** Setting values for velocity unit localisation */
-static void SettingsValueVelocityUnit(const IntSettingDesc &, uint first_param, int32_t value)
+static std::pair<StringParameter, StringParameter> SettingsValueVelocityUnit(const IntSettingDesc &, int32_t value)
 {
 	StringID val;
 	switch (value) {
 		case 0: val = STR_CONFIG_SETTING_LOCALISATION_UNITS_VELOCITY_IMPERIAL; break;
 		case 1: val = STR_CONFIG_SETTING_LOCALISATION_UNITS_VELOCITY_METRIC; break;
 		case 2: val = STR_CONFIG_SETTING_LOCALISATION_UNITS_VELOCITY_SI; break;
-		case 3: val = EconTime::UsingWallclockUnits(_game_mode == GM_MENU) ? STR_CONFIG_SETTING_LOCALISATION_UNITS_VELOCITY_GAMEUNITS_SECS : STR_CONFIG_SETTING_LOCALISATION_UNITS_VELOCITY_GAMEUNITS_DAYS; break;
+		case 3: val = (EconTime::UsingWallclockUnits(_game_mode == GM_MENU) || GetGameSettings().economy.day_length_factor > 1) ? STR_CONFIG_SETTING_LOCALISATION_UNITS_VELOCITY_GAMEUNITS_SECS : STR_CONFIG_SETTING_LOCALISATION_UNITS_VELOCITY_GAMEUNITS_DAYS; break;
 		case 4: val = STR_CONFIG_SETTING_LOCALISATION_UNITS_VELOCITY_KNOTS; break;
 		default: NOT_REACHED();
 	}
-	SetDParam(first_param, val);
+	return {val, {}};
 }
 
 /** A negative value has another string (the one after "strval"). */
-static void SettingsValueAbsolute(const IntSettingDesc &sd, uint first_param, int32_t value)
+static std::pair<StringParameter, StringParameter> SettingsValueAbsolute(const IntSettingDesc &sd, int32_t value)
 {
-	SetDParam(first_param, sd.str_val + ((value >= 0) ? 1 : 0));
-	SetDParam(first_param + 1, abs(value));
+	return {sd.str_val + ((value >= 0) ? 1 : 0), abs(value)};
 }
 
 /** Service Interval Settings Default Value displays the correct units or as a percentage */
-static void ServiceIntervalSettingsValueText(const IntSettingDesc &sd, uint first_param, int32_t value)
+static std::pair<StringParameter, StringParameter> ServiceIntervalSettingsValueText(const IntSettingDesc &sd, int32_t value)
 {
 	VehicleDefaultSettings *vds;
 	if (_game_mode == GM_MENU || !Company::IsValidID(_current_company)) {
@@ -1118,16 +1129,17 @@ static void ServiceIntervalSettingsValueText(const IntSettingDesc &sd, uint firs
 		vds = &Company::Get(_current_company)->settings.vehicle;
 	}
 
+	StringID str;
 	if (value == 0) {
-		SetDParam(first_param, sd.str_val + 3);
+		str = sd.str_val + 3;
 	} else if (vds->servint_ispercent) {
-		SetDParam(first_param, sd.str_val + 2);
+		str = sd.str_val + 2;
 	} else if (EconTime::UsingWallclockUnits(_game_mode == GM_MENU)) {
-		SetDParam(first_param, sd.str_val + 1);
+		str = sd.str_val + 1;
 	} else {
-		SetDParam(first_param, sd.str_val);
+		str = sd.str_val;
 	}
-	SetDParam(first_param + 1, value);
+	return {str, value};
 }
 
 /** Reposition the main toolbar as the setting changed. */
@@ -1148,7 +1160,7 @@ static void v_PositionStatusbar(int32_t new_value)
 
 /**
  * Redraw the smallmap after a colour scheme change.
- * @param p1 Callback parameter.
+ * @param new_value Callback parameter.
  */
 static void RedrawSmallmap(int32_t new_value)
 {
@@ -1174,7 +1186,7 @@ static void UpdateConsists(int32_t new_value)
 		/* Update the consist of all trains so the maximum speed is set correctly. */
 		if (t->IsFrontEngine() || t->IsFreeWagon()) {
 			t->ConsistChanged(CCF_TRACK);
-			if (t->lookahead != nullptr) SetBit(t->lookahead->flags, TRLF_APPLY_ADVISORY);
+			if (t->lookahead != nullptr) t->lookahead->flags.Set(TrainReservationLookAheadFlag::ApplyAdvisory);
 		}
 	}
 
@@ -1267,7 +1279,7 @@ static void UpdateServiceInterval(VehicleType type, int32_t new_value)
  * Checks if the service intervals in the settings are specified as percentages and corrects the default value accordingly.
  * @param new_value Contains the service interval's default value in days, or 50 (default in percentage).
  */
-static int32_t GetDefaultServiceInterval(VehicleType type)
+static int32_t GetDefaultServiceInterval(const IntSettingDesc &sd, VehicleType type)
 {
 	VehicleDefaultSettings *vds;
 	if (_game_mode == GM_MENU || !Company::IsValidID(_current_company)) {
@@ -1276,28 +1288,19 @@ static int32_t GetDefaultServiceInterval(VehicleType type)
 		vds = &Company::Get(_current_company)->settings.vehicle;
 	}
 
-	int32_t new_value;
-	if (vds->servint_ispercent) {
-		new_value = DEF_SERVINT_PERCENT;
-	} else if (EconTime::UsingWallclockUnits(_game_mode == GM_MENU)) {
+	if (vds->servint_ispercent) return DEF_SERVINT_PERCENT;
+
+	if (EconTime::UsingWallclockUnits((_game_mode == GM_MENU))) {
 		switch (type) {
-			case VEH_TRAIN:    new_value = DEF_SERVINT_MINUTES_TRAINS; break;
-			case VEH_ROAD:     new_value = DEF_SERVINT_MINUTES_ROADVEH; break;
-			case VEH_AIRCRAFT: new_value = DEF_SERVINT_MINUTES_AIRCRAFT; break;
-			case VEH_SHIP:     new_value = DEF_SERVINT_MINUTES_SHIPS; break;
-			default: NOT_REACHED();
-		}
-	} else {
-		switch (type) {
-			case VEH_TRAIN:    new_value = DEF_SERVINT_DAYS_TRAINS; break;
-			case VEH_ROAD:     new_value = DEF_SERVINT_DAYS_ROADVEH; break;
-			case VEH_AIRCRAFT: new_value = DEF_SERVINT_DAYS_AIRCRAFT; break;
-			case VEH_SHIP:     new_value = DEF_SERVINT_DAYS_SHIPS; break;
+			case VEH_TRAIN:    return DEF_SERVINT_MINUTES_TRAINS;
+			case VEH_ROAD:     return DEF_SERVINT_MINUTES_ROADVEH;
+			case VEH_AIRCRAFT: return DEF_SERVINT_MINUTES_AIRCRAFT;
+			case VEH_SHIP:     return DEF_SERVINT_MINUTES_SHIPS;
 			default: NOT_REACHED();
 		}
 	}
 
-	return new_value;
+	return sd.def;
 }
 
 /**
@@ -1334,7 +1337,7 @@ static void ChangeTimekeepingUnits(int32_t)
 			/* If the new mode is calendar units, sync the economy date with the calendar date. */
 			new_economy_date = ToEconTimeCast(CalTime::CurDate());
 			new_economy_date_fract = CalTime::CurDateFract();
-			EconTime::Detail::period_display_offset -= YearDelta{CalTime::CurYear().base() - EconTime::CurYear().base()};
+			EconTime::Detail::period_display_offset -= EconTime::YearDelta{CalTime::CurYear().base() - EconTime::CurYear().base()};
 		}
 
 		/* Update link graphs and vehicles, as these include stored economy dates. */
@@ -1345,7 +1348,6 @@ static void ChangeTimekeepingUnits(int32_t)
 		EconTime::Detail::SetDate(new_economy_date, new_economy_date_fract);
 
 		UpdateOrderUIOnDateChange();
-		SetupTickRate();
 	}
 
 	UpdateTimeSettings(0);
@@ -1391,9 +1393,29 @@ static void ChangeMinutesPerYear(int32_t new_value)
 	 * This can only happen in the menu, since the pre_cb ensures this setting can only be changed there, or if we're already using wallclock units.
 	 */
 	if (_game_mode == GM_MENU && (_settings_newgame.economy.minutes_per_calendar_year != CalTime::DEF_MINUTES_PER_YEAR)) {
-		_settings_newgame.economy.timekeeping_units = TKU_WALLCLOCK;
-		InvalidateWindowClassesData(WC_GAME_OPTIONS, 0);
+		if (_settings_newgame.economy.timekeeping_units != TKU_WALLCLOCK) {
+			_settings_newgame.economy.timekeeping_units = TKU_WALLCLOCK;
+			ChangeTimekeepingUnits(TKU_WALLCLOCK);
+		}
 	}
+}
+
+static std::tuple<int32_t, uint32_t> GetServiceIntervalRange(const IntSettingDesc &)
+{
+	VehicleDefaultSettings *vds;
+	if (_game_mode == GM_MENU || !Company::IsValidID(_current_company)) {
+		vds = &_settings_client.company.vehicle;
+	} else {
+		vds = &Company::Get(_current_company)->settings.vehicle;
+	}
+
+	if (vds->servint_ispercent) return { MIN_SERVINT_PERCENT, MAX_SERVINT_PERCENT };
+
+	if (EconTime::UsingWallclockUnits(_game_mode == GM_MENU)) {
+		return { MIN_SERVINT_MINUTES, MAX_SERVINT_MINUTES };
+	}
+
+	return { MIN_SERVINT_DAYS, MAX_SERVINT_DAYS };
 }
 
 static void TrainAccelerationModelChanged(int32_t new_value)
@@ -1402,7 +1424,7 @@ static void TrainAccelerationModelChanged(int32_t new_value)
 		if (t->IsFrontEngine()) {
 			t->tcache.cached_max_curve_speed = t->GetCurveSpeedLimit();
 			t->UpdateAcceleration();
-			if (t->lookahead != nullptr) SetBit(t->lookahead->flags, TRLF_APPLY_ADVISORY);
+			if (t->lookahead != nullptr) t->lookahead->flags.Set(TrainReservationLookAheadFlag::ApplyAdvisory);
 		}
 	}
 
@@ -1421,12 +1443,12 @@ static void TrainAccelerationModelChanged(int32_t new_value)
 static bool CheckTrainBrakingModelChange(int32_t &new_value)
 {
 	if (new_value == TBM_REALISTIC && (_game_mode == GM_NORMAL || _game_mode == GM_EDITOR)) {
-		for (TileIndex t = 0; t < MapSize(); t++) {
+		for (TileIndex t(0); t < Map::Size(); t++) {
 			if (IsTileType(t, MP_RAILWAY) && GetRailTileType(t) == RAIL_TILE_SIGNALS) {
 				uint signals = GetPresentSignals(t);
 				if ((signals & 0x3) & ((signals & 0x3) - 1) || (signals & 0xC) & ((signals & 0xC) - 1)) {
 					/* Signals in both directions */
-					ShowErrorMessage(STR_CONFIG_SETTING_REALISTIC_BRAKING_SIGNALS_NOT_ALLOWED, INVALID_STRING_ID, WL_ERROR);
+					ShowErrorMessage(GetEncodedString(STR_CONFIG_SETTING_REALISTIC_BRAKING_SIGNALS_NOT_ALLOWED), {}, WL_ERROR);
 					ShowExtraViewportWindow(t);
 					SetRedErrorSquare(t);
 					return false;
@@ -1434,7 +1456,7 @@ static bool CheckTrainBrakingModelChange(int32_t &new_value)
 				if (((signals & 0x3) && IsSignalTypeUnsuitableForRealisticBraking(GetSignalType(t, TRACK_LOWER))) ||
 						((signals & 0xC) && IsSignalTypeUnsuitableForRealisticBraking(GetSignalType(t, TRACK_UPPER)))) {
 					/* Banned signal types present */
-					ShowErrorMessage(STR_CONFIG_SETTING_REALISTIC_BRAKING_SIGNALS_NOT_ALLOWED, INVALID_STRING_ID, WL_ERROR);
+					ShowErrorMessage(GetEncodedString(STR_CONFIG_SETTING_REALISTIC_BRAKING_SIGNALS_NOT_ALLOWED), {}, WL_ERROR);
 					ShowExtraViewportWindow(t);
 					SetRedErrorSquare(t);
 					return false;
@@ -1449,7 +1471,7 @@ static bool CheckTrainBrakingModelChange(int32_t &new_value)
 static void TrainBrakingModelChanged(int32_t new_value)
 {
 	for (Train *t : Train::Iterate()) {
-		if (!(t->vehstatus & VS_CRASHED)) {
+		if (!t->vehstatus.Test(VehState::Crashed)) {
 			t->crash_anim_pos = 0;
 		}
 		if (t->IsFrontEngine()) {
@@ -1457,7 +1479,7 @@ static void TrainBrakingModelChanged(int32_t new_value)
 		}
 	}
 	if (new_value == TBM_REALISTIC && (_game_mode == GM_NORMAL || _game_mode == GM_EDITOR)) {
-		for (TileIndex t = 0; t < MapSize(); t++) {
+		for (TileIndex t(0); t < Map::Size(); t++) {
 			if (IsTileType(t, MP_RAILWAY) && GetRailTileType(t) == RAIL_TILE_SIGNALS) {
 				TrackBits bits = GetTrackBits(t);
 				do {
@@ -1476,22 +1498,22 @@ static void TrainBrakingModelChanged(int32_t new_value)
 		_long_reserve_disabled = true;
 		for (Train *v : Train::IterateFrontOnly()) {
 			v_cur = v;
-			if (!v->IsPrimaryVehicle() || (v->vehstatus & VS_CRASHED) != 0 || HasBit(v->subtype, GVSF_VIRTUAL) || v->track == TRACK_BIT_DEPOT) continue;
+			if (!v->IsPrimaryVehicle() || v->vehstatus.Test(VehState::Crashed) || HasBit(v->subtype, GVSF_VIRTUAL) || v->track == TRACK_BIT_DEPOT) continue;
 			TryPathReserve(v, true, HasStationTileRail(v->tile));
 		}
 		_long_reserve_disabled = false;
 		for (Train *v : Train::IterateFrontOnly()) {
 			v_cur = v;
-			if (!v->IsPrimaryVehicle() || (v->vehstatus & VS_CRASHED) != 0 || HasBit(v->subtype, GVSF_VIRTUAL) || v->track == TRACK_BIT_DEPOT) continue;
+			if (!v->IsPrimaryVehicle() || v->vehstatus.Test(VehState::Crashed) || HasBit(v->subtype, GVSF_VIRTUAL) || v->track == TRACK_BIT_DEPOT) continue;
 			TryPathReserve(v, true, HasStationTileRail(v->tile));
-			if (v->lookahead != nullptr) SetBit(v->lookahead->flags, TRLF_APPLY_ADVISORY);
+			if (v->lookahead != nullptr) v->lookahead->flags.Set(TrainReservationLookAheadFlag::ApplyAdvisory);
 		}
 	} else if (new_value == TBM_ORIGINAL && (_game_mode == GM_NORMAL || _game_mode == GM_EDITOR)) {
 		Train *v_cur = nullptr;
 		SCOPE_INFO_FMT([&v_cur], "TrainBrakingModelChanged: {}", VehicleInfoDumper(v_cur));
 		for (Train *v : Train::IterateFrontOnly()) {
 			v_cur = v;
-			if (!v->IsPrimaryVehicle() || (v->vehstatus & VS_CRASHED) != 0 || HasBit(v->subtype, GVSF_VIRTUAL) || v->track == TRACK_BIT_DEPOT) {
+			if (!v->IsPrimaryVehicle() || v->vehstatus.Test(VehState::Crashed) || HasBit(v->subtype, GVSF_VIRTUAL) || v->track == TRACK_BIT_DEPOT) {
 				v->lookahead.reset();
 				continue;
 			}
@@ -1523,7 +1545,7 @@ static void TrainSlopeSteepnessChanged(int32_t new_value)
 	for (Train *t : Train::IterateFrontOnly()) {
 		if (t->IsFrontEngine()) {
 			t->CargoChanged();
-			if (t->lookahead != nullptr) SetBit(t->lookahead->flags, TRLF_APPLY_ADVISORY);
+			if (t->lookahead != nullptr) t->lookahead->flags.Set(TrainReservationLookAheadFlag::ApplyAdvisory);
 		}
 	}
 }
@@ -1654,7 +1676,7 @@ static void ScriptMaxOpsChange(int32_t new_value)
 {
 	if (_networking && !_network_server) return;
 
-	GameInstance *g = Game::GetGameInstance();
+	GameInstance *g = Game::GetInstance();
 	if (g != nullptr && !g->IsDead()) {
 		g->LimitOpsTillSuspend(new_value);
 	}
@@ -1672,7 +1694,7 @@ static bool CheckScriptMaxMemoryChange(int32_t &new_value)
 
 	size_t limit = static_cast<size_t>(new_value) << 20;
 
-	GameInstance *g = Game::GetGameInstance();
+	GameInstance *g = Game::GetInstance();
 	if (g != nullptr && !g->IsDead()) {
 		if (g->GetAllocatedMemory() > limit) return false;
 	}
@@ -1692,7 +1714,7 @@ static void ScriptMaxMemoryChange(int32_t new_value)
 
 	size_t limit = static_cast<size_t>(new_value) << 20;
 
-	GameInstance *g = Game::GetGameInstance();
+	GameInstance *g = Game::GetInstance();
 	if (g != nullptr && !g->IsDead()) {
 		g->SetMemoryAllocationLimit(limit);
 	}
@@ -1706,7 +1728,7 @@ static void ScriptMaxMemoryChange(int32_t new_value)
 
 /**
  * Invalidate the company details window after the shares setting changed.
- * @param p1 Unused.
+ * @param new_value Unused.
  * @return Always true.
  */
 static void InvalidateCompanyWindow(int32_t new_value)
@@ -1739,6 +1761,13 @@ static void ViewportMapShowTunnelModeChanged(int32_t new_value)
 	MarkAllViewportMapLandscapesDirty();
 }
 
+static void ShowVehicleRouteModeChanged(int32_t new_value)
+{
+	InvalidateWindowClassesData(WC_GAME_OPTIONS);
+	InvalidateWindowClassesData(WC_VEHICLE_VIEW, VIWD_ROUTE_OVERLAY);
+	MarkWholeScreenDirty();
+}
+
 static void ViewportMapLandscapeModeChanged(int32_t new_value)
 {
 	extern void MarkAllViewportMapLandscapesDirty();
@@ -1766,19 +1795,22 @@ static void ClimateThresholdModeChanged(int32_t new_value)
 	InvalidateWindowClassesData(WC_GAME_OPTIONS);
 }
 
-static void VelocityUnitsChanged(int32_t new_value) {
+static void VelocityUnitsChanged(int32_t new_value)
+{
 	InvalidateWindowClassesData(WC_PAYMENT_RATES);
 	InvalidateWindowClassesData(WC_TRACE_RESTRICT);
 	MarkWholeScreenDirty();
 }
 
-static void ChangeTrackTypeSortMode(int32_t new_value) {
+static void ChangeTrackTypeSortMode(int32_t new_value)
+{
 	extern void SortRailTypes();
 	SortRailTypes();
 	MarkWholeScreenDirty();
 }
 
-static void TrainSpeedAdaptationChanged(int32_t new_value) {
+static void TrainSpeedAdaptationChanged(int32_t new_value)
+{
 	extern void ClearAllSignalSpeedRestrictions();
 	ClearAllSignalSpeedRestrictions();
 	for (Train *t : Train::Iterate()) {
@@ -1787,7 +1819,8 @@ static void TrainSpeedAdaptationChanged(int32_t new_value) {
 	SetWindowClassesDirty(WC_VEHICLE_DETAILS);
 }
 
-static void AutosaveModeChanged(int32_t new_value) {
+static void AutosaveModeChanged(int32_t new_value)
+{
 	extern void ChangeAutosaveFrequency(bool reset);
 	ChangeAutosaveFrequency(false);
 	InvalidateWindowClassesData(WC_GAME_OPTIONS);
@@ -1839,7 +1872,7 @@ static void MaxNoAIsChange(int32_t new_value)
 	if (GetGameSettings().difficulty.max_no_competitors != 0 &&
 			AI::GetInfoList()->size() == 0 &&
 			!IsNonAdminNetworkClient()) {
-		ShowErrorMessage(STR_WARNING_NO_SUITABLE_AI, INVALID_STRING_ID, WL_CRITICAL);
+		ShowErrorMessage(GetEncodedString(STR_WARNING_NO_SUITABLE_AI), {}, WL_CRITICAL);
 	}
 
 	InvalidateWindowClassesData(WC_GAME_OPTIONS, 0);
@@ -1869,11 +1902,11 @@ static void RoadSideChanged(int32_t new_value)
  * @param value that was read from config file
  * @return the "hopefully" converted value
  */
-static size_t ConvertLandscape(const char *value)
+static std::optional<uint32_t> ConvertLandscape(std::string_view value)
 {
 	/* try with the old values */
 	static std::vector<std::string> _old_landscape_values{"normal", "hilly", "desert", "candy"};
-	return OneOfManySettingDesc::ParseSingleValue(value, strlen(value), _old_landscape_values);
+	return OneOfManySettingDesc::ParseSingleValue(value, _old_landscape_values);
 }
 
 static bool CheckFreeformEdges(int32_t &new_value)
@@ -1883,39 +1916,39 @@ static bool CheckFreeformEdges(int32_t &new_value)
 		for (Ship *s : Ship::Iterate()) {
 			/* Check if there is a ship on the northern border. */
 			if (TileX(s->tile) == 0 || TileY(s->tile) == 0) {
-				ShowErrorMessage(STR_CONFIG_SETTING_EDGES_NOT_EMPTY, INVALID_STRING_ID, WL_ERROR);
+				ShowErrorMessage(GetEncodedString(STR_CONFIG_SETTING_EDGES_NOT_EMPTY), {}, WL_ERROR);
 				return false;
 			}
 		}
 		for (const BaseStation *st : BaseStation::Iterate()) {
 			/* Check if there is a non-deleted buoy on the northern border. */
 			if (st->IsInUse() && (TileX(st->xy) == 0 || TileY(st->xy) == 0)) {
-				ShowErrorMessage(STR_CONFIG_SETTING_EDGES_NOT_EMPTY, INVALID_STRING_ID, WL_ERROR);
+				ShowErrorMessage(GetEncodedString(STR_CONFIG_SETTING_EDGES_NOT_EMPTY), {}, WL_ERROR);
 				return false;
 			}
 		}
 	} else {
-		for (uint i = 0; i < MapMaxX(); i++) {
+		for (uint i = 0; i < Map::MaxX(); i++) {
 			if (TileHeight(TileXY(i, 1)) != 0) {
-				ShowErrorMessage(STR_CONFIG_SETTING_EDGES_NOT_WATER, INVALID_STRING_ID, WL_ERROR);
+				ShowErrorMessage(GetEncodedString(STR_CONFIG_SETTING_EDGES_NOT_WATER), {}, WL_ERROR);
 				return false;
 			}
 		}
-		for (uint i = 1; i < MapMaxX(); i++) {
-			if (!IsTileType(TileXY(i, MapMaxY() - 1), MP_WATER) || TileHeight(TileXY(1, MapMaxY())) != 0) {
-				ShowErrorMessage(STR_CONFIG_SETTING_EDGES_NOT_WATER, INVALID_STRING_ID, WL_ERROR);
+		for (uint i = 1; i < Map::MaxX(); i++) {
+			if (!IsTileType(TileXY(i, Map::MaxY() - 1), MP_WATER) || TileHeight(TileXY(1, Map::MaxY())) != 0) {
+				ShowErrorMessage(GetEncodedString(STR_CONFIG_SETTING_EDGES_NOT_WATER), {}, WL_ERROR);
 				return false;
 			}
 		}
-		for (uint i = 0; i < MapMaxY(); i++) {
+		for (uint i = 0; i < Map::MaxY(); i++) {
 			if (TileHeight(TileXY(1, i)) != 0) {
-				ShowErrorMessage(STR_CONFIG_SETTING_EDGES_NOT_WATER, INVALID_STRING_ID, WL_ERROR);
+				ShowErrorMessage(GetEncodedString(STR_CONFIG_SETTING_EDGES_NOT_WATER), {}, WL_ERROR);
 				return false;
 			}
 		}
-		for (uint i = 1; i < MapMaxY(); i++) {
-			if (!IsTileType(TileXY(MapMaxX() - 1, i), MP_WATER) || TileHeight(TileXY(MapMaxX(), i)) != 0) {
-				ShowErrorMessage(STR_CONFIG_SETTING_EDGES_NOT_WATER, INVALID_STRING_ID, WL_ERROR);
+		for (uint i = 1; i < Map::MaxY(); i++) {
+			if (!IsTileType(TileXY(Map::MaxX() - 1, i), MP_WATER) || TileHeight(TileXY(Map::MaxX(), i)) != 0) {
+				ShowErrorMessage(GetEncodedString(STR_CONFIG_SETTING_EDGES_NOT_WATER), {}, WL_ERROR);
 				return false;
 			}
 		}
@@ -1928,15 +1961,15 @@ static void UpdateFreeformEdges(int32_t new_value)
 	if (_game_mode == GM_MENU) return;
 
 	if (new_value != 0) {
-		for (uint x = 0; x < MapSizeX(); x++) MakeVoid(TileXY(x, 0));
-		for (uint y = 0; y < MapSizeY(); y++) MakeVoid(TileXY(0, y));
+		for (uint x = 0; x < Map::SizeX(); x++) MakeVoid(TileXY(x, 0));
+		for (uint y = 0; y < Map::SizeY(); y++) MakeVoid(TileXY(0, y));
 	} else {
 		/* Make tiles at the border water again. */
-		for (uint i = 0; i < MapMaxX(); i++) {
+		for (uint i = 0; i < Map::MaxX(); i++) {
 			SetTileHeight(TileXY(i, 0), 0);
 			MakeSea(TileXY(i, 0));
 		}
-		for (uint i = 0; i < MapMaxY(); i++) {
+		for (uint i = 0; i < Map::MaxY(); i++) {
 			SetTileHeight(TileXY(0, i), 0);
 			MakeSea(TileXY(0, i));
 		}
@@ -1958,17 +1991,17 @@ bool CheckMapEdgesAreWater(bool allow_non_flat_void)
 		return false;
 	};
 	check_tile(        0,         0, SLOPE_S);
-	check_tile(        0, MapMaxY(), SLOPE_W);
-	check_tile(MapMaxX(),         0, SLOPE_E);
-	check_tile(MapMaxX(), MapMaxY(), SLOPE_N);
+	check_tile(        0, Map::MaxY(), SLOPE_W);
+	check_tile(Map::MaxX(),         0, SLOPE_E);
+	check_tile(Map::MaxX(), Map::MaxY(), SLOPE_N);
 
-	for (uint x = 1; x < MapMaxX(); x++) {
+	for (uint x = 1; x < Map::MaxX(); x++) {
 		if (!check_tile(x, 0, SLOPE_SE)) return false;
-		if (!check_tile(x, MapMaxY(), SLOPE_NW)) return false;
+		if (!check_tile(x, Map::MaxY(), SLOPE_NW)) return false;
 	}
-	for (uint y = 1; y < MapMaxY(); y++) {
+	for (uint y = 1; y < Map::MaxY(); y++) {
 		if (!check_tile(0, y, SLOPE_SW)) return false;
-		if (!check_tile(MapMaxX(), y, SLOPE_NE)) return false;
+		if (!check_tile(Map::MaxX(), y, SLOPE_NE)) return false;
 	}
 
 	return true;
@@ -1979,7 +2012,7 @@ static bool CheckMapEdgeMode(int32_t &new_value)
 	if (_game_mode == GM_MENU || !_settings_game.construction.freeform_edges || new_value == 0) return true;
 
 	if (!CheckMapEdgesAreWater(true)) {
-		ShowErrorMessage(STR_CONFIG_SETTING_EDGES_NOT_WATER, INVALID_STRING_ID, WL_ERROR);
+		ShowErrorMessage(GetEncodedString(STR_CONFIG_SETTING_EDGES_NOT_WATER), {}, WL_ERROR);
 		return false;
 	}
 
@@ -1992,13 +2025,13 @@ static void MapEdgeModeChanged(int32_t new_value)
 
 	if (_game_mode == GM_MENU || !_settings_game.construction.freeform_edges || new_value == 0) return;
 
-	for (uint x = 0; x <= MapMaxX(); x++) {
+	for (uint x = 0; x <= Map::MaxX(); x++) {
 		SetTileHeight(TileXY(x, 0), 0);
-		SetTileHeight(TileXY(x, MapMaxY()), 0);
+		SetTileHeight(TileXY(x, Map::MaxY()), 0);
 	}
-	for (uint y = 1; y < MapMaxY(); y++) {
+	for (uint y = 1; y < Map::MaxY(); y++) {
 		SetTileHeight(TileXY(0, y), 0);
-		SetTileHeight(TileXY(MapMaxX(), y), 0);
+		SetTileHeight(TileXY(Map::MaxX(), y), 0);
 	}
 }
 
@@ -2011,7 +2044,7 @@ static bool CheckDynamicEngines(int32_t &new_value)
 	if (_game_mode == GM_MENU) return true;
 
 	if (!EngineOverrideManager::ResetToCurrentNewGRFConfig()) {
-		ShowErrorMessage(STR_CONFIG_SETTING_DYNAMIC_ENGINES_EXISTING_VEHICLES, INVALID_STRING_ID, WL_ERROR);
+		ShowErrorMessage(GetEncodedString(STR_CONFIG_SETTING_DYNAMIC_ENGINES_EXISTING_VEHICLES), {}, WL_ERROR);
 		return false;
 	}
 
@@ -2025,9 +2058,9 @@ static bool CheckMaxHeightLevel(int32_t &new_value)
 
 	/* Check if at least one mountain on the map is higher than the new value.
 	 * If yes, disallow the change. */
-	for (TileIndex t = 0; t < MapSize(); t++) {
+	for (TileIndex t(0); t < Map::Size(); t++) {
 		if ((int32_t)TileHeight(t) > new_value) {
-			ShowErrorMessage(STR_CONFIG_SETTING_TOO_HIGH_MOUNTAIN, INVALID_STRING_ID, WL_ERROR);
+			ShowErrorMessage(GetEncodedString(STR_CONFIG_SETTING_TOO_HIGH_MOUNTAIN), {}, WL_ERROR);
 			/* Return old, unchanged value */
 			return false;
 		}
@@ -2135,7 +2168,7 @@ static bool CheckTTDPatchSettingFlag(uint flag)
 {
 	extern bool HasTTDPatchFlagBeenObserved(uint flag);
 	if (_networking && HasTTDPatchFlagBeenObserved(flag)) {
-		ShowErrorMessage(STR_CONFIG_SETTING_NETWORK_CHANGE_NOT_ALLOWED, STR_CONFIG_SETTING_NETWORK_CHANGE_NOT_ALLOWED_NEWGRF, WL_ERROR);
+		ShowErrorMessage(GetEncodedString(STR_CONFIG_SETTING_NETWORK_CHANGE_NOT_ALLOWED), GetEncodedString(STR_CONFIG_SETTING_NETWORK_CHANGE_NOT_ALLOWED_NEWGRF), WL_ERROR);
 		return false;
 	}
 
@@ -2236,8 +2269,8 @@ static bool LinkGraphDistributionSettingGUI(SettingOnGuiCtrlData &data)
 {
 	switch (data.type) {
 		case SOGCT_DESCRIPTION_TEXT:
-			SetDParam(0, data.text);
-			data.text = STR_CONFIG_SETTING_DISTRIBUTION_HELPTEXT_EXTRA;
+			_temp_special_strings[0] = GetString(STR_CONFIG_SETTING_DISTRIBUTION_HELPTEXT_EXTRA, data.text);
+			data.text = SPECSTR_TEMP_START;
 			return true;
 
 		default:
@@ -2249,8 +2282,8 @@ static bool AllowRoadStopsUnderBridgesSettingGUI(SettingOnGuiCtrlData &data)
 {
 	switch (data.type) {
 		case SOGCT_DESCRIPTION_TEXT:
-			SetDParam(0, data.text);
-			data.text = STR_CONFIG_SETTING_ALLOW_ROAD_STATIONS_UNDER_BRIDGES_HELPTEXT_EXTRA;
+			_temp_special_strings[0] = GetString(STR_CONFIG_SETTING_ALLOW_ROAD_STATIONS_UNDER_BRIDGES_HELPTEXT_EXTRA, data.text);
+			data.text = SPECSTR_TEMP_START;
 			return true;
 
 		default:
@@ -2280,8 +2313,8 @@ static bool TreePlacerSettingGUI(SettingOnGuiCtrlData &data)
 {
 	switch (data.type) {
 		case SOGCT_DESCRIPTION_TEXT:
-			SetDParam(0, data.text);
-			data.text = STR_CONFIG_SETTING_TREE_PLACER_HELPTEXT_EXTRA;
+			_temp_special_strings[0] = GetString(STR_CONFIG_SETTING_TREE_PLACER_HELPTEXT_EXTRA, data.text);
+			data.text = SPECSTR_TEMP_START;
 			return true;
 
 		default:
@@ -2293,8 +2326,8 @@ static bool DefaultSignalsSettingGUI(SettingOnGuiCtrlData &data)
 {
 	switch (data.type) {
 		case SOGCT_DESCRIPTION_TEXT:
-			SetDParam(0, data.text);
-			data.text = STR_CONFIG_SETTING_SHOW_ALL_SIG_DEF_HELPTEXT_EXTRA;
+			_temp_special_strings[0] = GetString(STR_CONFIG_SETTING_SHOW_ALL_SIG_DEF_HELPTEXT_EXTRA, data.text);
+			data.text = SPECSTR_TEMP_START;
 			return true;
 
 		default:
@@ -2306,8 +2339,8 @@ static bool ChunnelSettingGUI(SettingOnGuiCtrlData &data)
 {
 	switch (data.type) {
 		case SOGCT_DESCRIPTION_TEXT:
-			SetDParam(0, 3);
-			SetDParam(1, 8);
+			_temp_special_strings[0] = GetString(data.text, 3, 8);
+			data.text = SPECSTR_TEMP_START;
 			return true;
 
 		default:
@@ -2315,32 +2348,30 @@ static bool ChunnelSettingGUI(SettingOnGuiCtrlData &data)
 	}
 }
 
-static bool TownCargoScaleGUI(SettingOnGuiCtrlData &data)
+static std::pair<StringParameter, StringParameter> TownCargoScaleValueText(const IntSettingDesc &sd, int32_t value)
 {
-	switch (data.type) {
-		case SOGCT_VALUE_DPARAMS:
-			if (GetGameSettings().economy.day_length_factor > 1 && GetGameSettings().economy.town_cargo_scale_mode == CSM_DAYLENGTH) {
-				SetDParam(data.offset, STR_CONFIG_SETTING_CARGO_SCALE_VALUE_ECON_SPEED_REDUCTION_MULT);
-			}
-			return true;
-
-		default:
-			return false;
+	StringID str = STR_CONFIG_SETTING_CARGO_SCALE_VALUE;
+	if (GetGameSettings().economy.day_length_factor > 1 && GetGameSettings().economy.town_cargo_scale_mode == CSM_DAYLENGTH) {
+		str = STR_CONFIG_SETTING_CARGO_SCALE_VALUE_ECON_SPEED_REDUCTION_MULT;
 	}
+	return {str, value};
+}
+
+static std::pair<StringParameter, StringParameter> IndustryCargoScaleValueText(const IntSettingDesc &sd, int32_t value)
+{
+	StringID str = STR_CONFIG_SETTING_CARGO_SCALE_VALUE;
+	if (GetGameSettings().economy.day_length_factor > 1 && GetGameSettings().economy.industry_cargo_scale_mode == CSM_DAYLENGTH) {
+		str = STR_CONFIG_SETTING_CARGO_SCALE_VALUE_ECON_SPEED_REDUCTION_MULT;
+	}
+	return {str, value};
 }
 
 static bool IndustryCargoScaleGUI(SettingOnGuiCtrlData &data)
 {
 	switch (data.type) {
 		case SOGCT_DESCRIPTION_TEXT:
-			SetDParam(0, data.text);
-			data.text = STR_CONFIG_SETTING_INDUSTRY_CARGO_SCALE_HELPTEXT_EXTRA;
-			return true;
-
-		case SOGCT_VALUE_DPARAMS:
-			if (GetGameSettings().economy.day_length_factor > 1 && GetGameSettings().economy.industry_cargo_scale_mode == CSM_DAYLENGTH) {
-				SetDParam(data.offset, STR_CONFIG_SETTING_CARGO_SCALE_VALUE_ECON_SPEED_REDUCTION_MULT);
-			}
+			_temp_special_strings[0] = GetString(STR_CONFIG_SETTING_INDUSTRY_CARGO_SCALE_HELPTEXT_EXTRA, data.text);
+			data.text = SPECSTR_TEMP_START;
 			return true;
 
 		default:
@@ -2348,13 +2379,14 @@ static bool IndustryCargoScaleGUI(SettingOnGuiCtrlData &data)
 	}
 }
 
+static std::pair<StringParameter, StringParameter> CalendarModeDisabledValueText(const IntSettingDesc &sd, int32_t value)
+{
+	return {EconTime::UsingWallclockUnits(_game_mode == GM_MENU) ? sd.str_val : STR_CONFIG_SETTING_DISABLED_TIMEKEEPING_MODE_CALENDAR, value};
+}
+
 static bool CalendarModeDisabledGUI(SettingOnGuiCtrlData &data)
 {
 	switch (data.type) {
-		case SOGCT_VALUE_DPARAMS:
-			if (!EconTime::UsingWallclockUnits(_game_mode == GM_MENU)) SetDParam(data.offset, STR_CONFIG_SETTING_DISABLED_TIMEKEEPING_MODE_CALENDAR);
-			return true;
-
 		case SOGCT_GUI_DISABLE:
 			if (!EconTime::UsingWallclockUnits(_game_mode == GM_MENU)) data.val = 1;
 			return true;
@@ -2364,13 +2396,14 @@ static bool CalendarModeDisabledGUI(SettingOnGuiCtrlData &data)
 	}
 }
 
-static bool WallclockModeDisabledGUI(SettingOnGuiCtrlData &data)
+[[maybe_unused]] static std::pair<StringParameter, StringParameter> WallclockModeDisabledDropDownText(const IntSettingDesc &sd, int32_t value)
+{
+	return {EconTime::UsingWallclockUnits(_game_mode == GM_MENU) ? STR_CONFIG_SETTING_DISABLED_TIMEKEEPING_MODE_WALLCLOCK : sd.str_val + value, std::monostate{}};
+}
+
+[[maybe_unused]] static bool WallclockModeDisabledGUI(SettingOnGuiCtrlData &data)
 {
 	switch (data.type) {
-		case SOGCT_VALUE_DPARAMS:
-			if (EconTime::UsingWallclockUnits(_game_mode == GM_MENU)) SetDParam(data.offset, STR_CONFIG_SETTING_DISABLED_TIMEKEEPING_MODE_WALLCLOCK);
-			return true;
-
 		case SOGCT_GUI_DISABLE:
 			if (EconTime::UsingWallclockUnits(_game_mode == GM_MENU)) data.val = 1;
 			return true;
@@ -2431,19 +2464,19 @@ static void HandleOldDiffCustom(bool savegame)
 	}
 }
 
-static void AILoadConfig(const IniFile &ini, const char *grpname)
+static void AILoadConfig(const IniFile &ini, std::string_view grpname)
 {
 	const IniGroup *group = ini.GetGroup(grpname);
 
 	/* Clean any configured AI */
-	for (CompanyID c = COMPANY_FIRST; c < MAX_COMPANIES; c++) {
+	for (CompanyID c = CompanyID::Begin(); c < MAX_COMPANIES; ++c) {
 		AIConfig::GetConfig(c, AIConfig::SSS_FORCE_NEWGAME)->Change(std::nullopt);
 	}
 
 	/* If no group exists, return */
 	if (group == nullptr) return;
 
-	CompanyID c = COMPANY_FIRST;
+	CompanyID c = CompanyID::Begin();
 	for (const IniItem &item : group->items) {
 		AIConfig *config = AIConfig::GetConfig(c, AIConfig::SSS_FORCE_NEWGAME);
 
@@ -2455,12 +2488,12 @@ static void AILoadConfig(const IniFile &ini, const char *grpname)
 			}
 		}
 		if (item.value.has_value()) config->StringToSettings(*item.value);
-		c++;
+		++c;
 		if (c >= MAX_COMPANIES) break;
 	}
 }
 
-static void GameLoadConfig(const IniFile &ini, const char *grpname)
+static void GameLoadConfig(const IniFile &ini, std::string_view grpname)
 {
 	const IniGroup *group = ini.GetGroup(grpname);
 
@@ -2499,7 +2532,7 @@ static void GraphicsSetLoadConfig(IniFile &ini)
 		if (const IniItem *item = group->GetItem("name"); item != nullptr && item->value) BaseGraphics::ini_data.name = *item->value;
 
 		if (const IniItem *item = group->GetItem("shortname"); item != nullptr && item->value && item->value->size() == 8) {
-			BaseGraphics::ini_data.shortname = BSWAP32(std::strtoul(item->value->c_str(), nullptr, 16));
+			BaseGraphics::ini_data.shortname = std::byteswap<uint32_t>(std::strtoul(item->value->c_str(), nullptr, 16));
 		}
 
 		if (const IniItem *item = group->GetItem("extra_version"); item != nullptr && item->value) BaseGraphics::ini_data.extra_version = std::strtoul(item->value->c_str(), nullptr, 10);
@@ -2509,8 +2542,9 @@ static void GraphicsSetLoadConfig(IniFile &ini)
 			if (params.has_value()) {
 				BaseGraphics::ini_data.extra_params = params.value();
 			} else {
-				SetDParamStr(0, BaseGraphics::ini_data.name);
-				ShowErrorMessage(STR_CONFIG_ERROR, STR_CONFIG_ERROR_ARRAY, WL_CRITICAL);
+				ShowErrorMessage(GetEncodedString(STR_CONFIG_ERROR),
+					GetEncodedString(STR_CONFIG_ERROR_ARRAY, BaseGraphics::ini_data.name),
+					WL_CRITICAL);
 			}
 		}
 	}
@@ -2522,17 +2556,16 @@ static void GraphicsSetLoadConfig(IniFile &ini)
  * @param grpname   Group name containing the configuration of the GRF.
  * @param is_static GRF is static.
  */
-static GRFConfig *GRFLoadConfig(const IniFile &ini, const char *grpname, bool is_static)
+static GRFConfigList GRFLoadConfig(const IniFile &ini, std::string_view grpname, bool is_static)
 {
 	const IniGroup *group = ini.GetGroup(grpname);
-	GRFConfig *first = nullptr;
-	GRFConfig **curr = &first;
+	GRFConfigList list;
 
-	if (group == nullptr) return nullptr;
+	if (group == nullptr) return list;
 
 	uint num_grfs = 0;
 	for (const IniItem &item : group->items) {
-		GRFConfig *c = nullptr;
+		std::unique_ptr<GRFConfig> c{};
 
 		std::array<uint8_t, 4> grfid_buf;
 		MD5Hash md5sum;
@@ -2558,17 +2591,17 @@ static GRFConfig *GRFLoadConfig(const IniFile &ini, const char *grpname, bool is
 				uint32_t grfid = grfid_buf[0] | (grfid_buf[1] << 8) | (grfid_buf[2] << 16) | (grfid_buf[3] << 24);
 				if (has_md5sum) {
 					const GRFConfig *s = FindGRFConfig(grfid, FGCM_EXACT, &md5sum);
-					if (s != nullptr) c = new GRFConfig(*s);
+					if (s != nullptr) c = std::make_unique<GRFConfig>(*s);
 				}
 				if (c == nullptr && !FioCheckFileExists(std::string(item_name), NEWGRF_DIR)) {
 					const GRFConfig *s = FindGRFConfig(grfid, FGCM_NEWEST_VALID);
-					if (s != nullptr) c = new GRFConfig(*s);
+					if (s != nullptr) c = std::make_unique<GRFConfig>(*s);
 				}
 			}
 		}
 		std::string filename = std::string(item_name);
 
-		if (c == nullptr) c = new GRFConfig(filename);
+		if (c == nullptr) c = std::make_unique<GRFConfig>(filename);
 
 		/* Parse parameters */
 		if (item.value.has_value() && !item.value->empty()) {
@@ -2576,62 +2609,57 @@ static GRFConfig *GRFLoadConfig(const IniFile &ini, const char *grpname, bool is
 			if (params.has_value()) {
 				c->SetParams(params.value());
 			} else {
-				SetDParamStr(0, filename);
-				ShowErrorMessage(STR_CONFIG_ERROR, STR_CONFIG_ERROR_ARRAY, WL_CRITICAL);
+				ShowErrorMessage(GetEncodedString(STR_CONFIG_ERROR),
+					GetEncodedString(STR_CONFIG_ERROR_ARRAY, filename),
+					WL_CRITICAL);
 			}
 		}
 
 		/* Check if item is valid */
-		if (!FillGRFDetails(c, is_static) || HasBit(c->flags, GCF_INVALID)) {
+		if (!FillGRFDetails(*c, is_static) || c->flags.Test(GRFConfigFlag::Invalid)) {
+			StringID reason;
 			if (c->status == GCS_NOT_FOUND) {
-				SetDParam(1, STR_CONFIG_ERROR_INVALID_GRF_NOT_FOUND);
-			} else if (HasBit(c->flags, GCF_UNSAFE)) {
-				SetDParam(1, STR_CONFIG_ERROR_INVALID_GRF_UNSAFE);
-			} else if (HasBit(c->flags, GCF_SYSTEM)) {
-				SetDParam(1, STR_CONFIG_ERROR_INVALID_GRF_SYSTEM);
-			} else if (HasBit(c->flags, GCF_INVALID)) {
-				SetDParam(1, STR_CONFIG_ERROR_INVALID_GRF_INCOMPATIBLE);
+				reason = STR_CONFIG_ERROR_INVALID_GRF_NOT_FOUND;
+			} else if (c->flags.Test(GRFConfigFlag::Unsafe)) {
+				reason = STR_CONFIG_ERROR_INVALID_GRF_UNSAFE;
+			} else if (c->flags.Test(GRFConfigFlag::System)) {
+				reason = STR_CONFIG_ERROR_INVALID_GRF_SYSTEM;
+			} else if (c->flags.Test(GRFConfigFlag::Invalid)) {
+				reason = STR_CONFIG_ERROR_INVALID_GRF_INCOMPATIBLE;
 			} else {
-				SetDParam(1, STR_CONFIG_ERROR_INVALID_GRF_UNKNOWN);
+				reason = STR_CONFIG_ERROR_INVALID_GRF_UNKNOWN;
 			}
 
-			SetDParamStr(0, filename.empty() ? item.name.c_str() : filename);
-			ShowErrorMessage(STR_CONFIG_ERROR, STR_CONFIG_ERROR_INVALID_GRF, WL_CRITICAL);
-			delete c;
+			ShowErrorMessage(GetEncodedString(STR_CONFIG_ERROR),
+				GetEncodedString(STR_CONFIG_ERROR_INVALID_GRF, filename.empty() ? item.name.c_str() : filename, reason),
+				WL_CRITICAL);
 			continue;
 		}
 
 		/* Check for duplicate GRFID (will also check for duplicate filenames) */
-		bool duplicate = false;
-		for (const GRFConfig *gc = first; gc != nullptr; gc = gc->next) {
-			if (gc->ident.grfid == c->ident.grfid) {
-				SetDParamStr(0, c->filename);
-				SetDParamStr(1, gc->filename);
-				ShowErrorMessage(STR_CONFIG_ERROR, STR_CONFIG_ERROR_DUPLICATE_GRFID, WL_CRITICAL);
-				duplicate = true;
-				break;
-			}
-		}
-		if (duplicate) {
-			delete c;
+		auto found = std::ranges::find_if(list, [&c](const auto &gc) { return gc->ident.grfid == c->ident.grfid; });
+		if (found != std::end(list)) {
+			ShowErrorMessage(GetEncodedString(STR_CONFIG_ERROR),
+				GetEncodedString(STR_CONFIG_ERROR_DUPLICATE_GRFID, c->filename, (*found)->filename),
+				WL_CRITICAL);
 			continue;
 		}
 
 		if (is_static) {
 			/* Mark file as static to avoid saving in savegame. */
-			SetBit(c->flags, GCF_STATIC);
+			c->flags.Set(GRFConfigFlag::Static);
 		} else if (++num_grfs > NETWORK_MAX_GRF_COUNT) {
 			/* Check we will not load more non-static NewGRFs than allowed. This could trigger issues for game servers. */
-			ShowErrorMessage(STR_CONFIG_ERROR, STR_NEWGRF_ERROR_TOO_MANY_NEWGRFS_LOADED, WL_CRITICAL);
+			ShowErrorMessage(GetEncodedString(STR_CONFIG_ERROR),
+				GetEncodedString(STR_NEWGRF_ERROR_TOO_MANY_NEWGRFS_LOADED), WL_CRITICAL);
 			break;
 		}
 
 		/* Add item to list */
-		*curr = c;
-		curr = &c->next;
+		list.push_back(std::move(c));
 	}
 
-	return first;
+	return list;
 }
 
 static IniFileVersion LoadVersionFromConfig(const IniFile &ini)
@@ -2643,18 +2671,18 @@ static IniFileVersion LoadVersionFromConfig(const IniFile &ini)
 	/* Older ini-file versions don't have this key yet. */
 	if (version_number == nullptr || !version_number->value.has_value()) return IFV_0;
 
-	uint32_t version = 0;
-	IntFromChars(version_number->value->data(), version_number->value->data() + version_number->value->size(), version);
+	auto version_result = IntFromChars<uint32_t>(*version_number->value);
+	if (!version_result.has_value()) return IFV_0;
 
-	return static_cast<IniFileVersion>(version);
+	return static_cast<IniFileVersion>(*version_result);
 }
 
-static void AISaveConfig(IniFile &ini, const char *grpname)
+static void AISaveConfig(IniFile &ini, std::string_view grpname)
 {
 	IniGroup &group = ini.GetOrCreateGroup(grpname);
 	group.Clear();
 
-	for (CompanyID c = COMPANY_FIRST; c < MAX_COMPANIES; c++) {
+	for (CompanyID c = CompanyID::Begin(); c < MAX_COMPANIES; ++c) {
 		AIConfig *config = AIConfig::GetConfig(c, AIConfig::SSS_FORCE_NEWGAME);
 		std::string name;
 		std::string value = config->SettingsToString();
@@ -2669,7 +2697,7 @@ static void AISaveConfig(IniFile &ini, const char *grpname)
 	}
 }
 
-static void GameSaveConfig(IniFile &ini, const char *grpname)
+static void GameSaveConfig(IniFile &ini, std::string_view grpname)
 {
 	IniGroup &group = ini.GetOrCreateGroup(grpname);
 	group.Clear();
@@ -2711,27 +2739,26 @@ static void GraphicsSetSaveConfig(IniFile &ini)
 	group.Clear();
 
 	group.GetOrCreateItem("name").SetValue(used_set->name);
-	group.GetOrCreateItem("shortname").SetValue(fmt::format("{:08X}", BSWAP32(used_set->shortname)));
+	group.GetOrCreateItem("shortname").SetValue(fmt::format("{:08X}", std::byteswap(used_set->shortname)));
 
 	const GRFConfig *extra_cfg = used_set->GetExtraConfig();
 	if (extra_cfg != nullptr && !extra_cfg->param.empty()) {
 		group.GetOrCreateItem("extra_version").SetValue(fmt::format("{}", extra_cfg->version));
-		group.GetOrCreateItem("extra_params").SetValue(GRFBuildParamList(extra_cfg));
+		group.GetOrCreateItem("extra_params").SetValue(GRFBuildParamList(*extra_cfg));
 	}
 }
 
 /* Save a GRF configuration to the given group name */
-static void GRFSaveConfig(IniFile &ini, const char *grpname, const GRFConfig *list)
+static void GRFSaveConfig(IniFile &ini, std::string_view grpname, const GRFConfigList &list)
 {
 	IniGroup &group = ini.GetOrCreateGroup(grpname);
 	group.Clear();
-	const GRFConfig *c;
 
-	for (c = list; c != nullptr; c = c->next) {
+	for (const auto &c : list) {
 		/* Hex grfid (4 bytes in nibbles), "|", hex md5sum (16 bytes in nibbles), "|", file system path. */
 		format_buffer key;
-		key.format("{:08X}|{}|{}", BSWAP32(c->ident.grfid), c->ident.md5sum, c->filename);
-		group.GetOrCreateItem(key).SetValue(GRFBuildParamList(c));
+		key.format("{:08X}|{}|{}", std::byteswap(c->ident.grfid), c->ident.md5sum, c->filename);
+		group.GetOrCreateItem(key).SetValue(GRFBuildParamList(*c));
 	}
 }
 
@@ -2909,41 +2936,43 @@ void LoadFromConfig(bool startup)
 		const IniItem *old_item;
 
 		if (generic_version < IFV_GAME_TYPE && IsConversionNeeded(generic_ini, "network", "server_advertise", "server_game_type", &old_item)) {
-			auto old_value = BoolSettingDesc::ParseSingleValue(old_item->value->c_str());
+			auto old_value = BoolSettingDesc::ParseSingleValue(*old_item->value);
 			_settings_client.network.server_game_type = old_value.value_or(false) ? SERVER_GAME_TYPE_PUBLIC : SERVER_GAME_TYPE_LOCAL;
 		}
 
 		if (generic_version < IFV_AUTOSAVE_RENAME && IsConversionNeeded(generic_ini, "gui", "autosave", "autosave_interval", &old_item)) {
 			static std::vector<std::string> _old_autosave_interval{"off", "monthly", "quarterly", "half year", "yearly", "custom_days", "custom_realtime_minutes"};
-			auto old_value = OneOfManySettingDesc::ParseSingleValue(old_item->value->c_str(), old_item->value->size(), _old_autosave_interval);
+			auto old_value = OneOfManySettingDesc::ParseSingleValue(*old_item->value, _old_autosave_interval);
 
-			switch (old_value) {
-				case 0: _settings_client.gui.autosave_interval = 0; break;
-				case 1: _settings_client.gui.autosave_interval = 10; break;
-				case 2: _settings_client.gui.autosave_interval = 30; break;
-				case 3: _settings_client.gui.autosave_interval = 60; break;
-				case 4: _settings_client.gui.autosave_interval = 120; break;
-				case 5: {
-					const IniItem *old_autosave_custom_days;
-					if (IsConversionNeeded(generic_ini, "gui", "autosave_custom_days", "autosave_interval", &old_autosave_custom_days)) {
-						_settings_client.gui.autosave_interval = (std::strtoul(old_autosave_custom_days->value->c_str(), nullptr, 10) + 2) / 3;
+			if (old_value.has_value()) {
+				switch (*old_value) {
+					case 0: _settings_client.gui.autosave_interval = 0; break;
+					case 1: _settings_client.gui.autosave_interval = 10; break;
+					case 2: _settings_client.gui.autosave_interval = 30; break;
+					case 3: _settings_client.gui.autosave_interval = 60; break;
+					case 4: _settings_client.gui.autosave_interval = 120; break;
+					case 5: {
+						const IniItem *old_autosave_custom_days;
+						if (IsConversionNeeded(generic_ini, "gui", "autosave_custom_days", "autosave_interval", &old_autosave_custom_days)) {
+							_settings_client.gui.autosave_interval = (std::strtoul(old_autosave_custom_days->value->c_str(), nullptr, 10) + 2) / 3;
+						}
+						break;
 					}
-					break;
-				}
-				case 6: {
-					const IniItem *old_autosave_custom_minutes;
-					if (IsConversionNeeded(generic_ini, "gui", "autosave_custom_minutes", "autosave_interval", &old_autosave_custom_minutes)) {
-						_settings_client.gui.autosave_interval = std::strtoul(old_autosave_custom_minutes->value->c_str(), nullptr, 10);
+					case 6: {
+						const IniItem *old_autosave_custom_minutes;
+						if (IsConversionNeeded(generic_ini, "gui", "autosave_custom_minutes", "autosave_interval", &old_autosave_custom_minutes)) {
+							_settings_client.gui.autosave_interval = std::strtoul(old_autosave_custom_minutes->value->c_str(), nullptr, 10);
+						}
+						break;
 					}
-					break;
+					default: break;
 				}
-				default: break;
 			}
 		}
 
 		/* Persist the right click close option from older versions. */
 		if (generic_version < IFV_RIGHT_CLICK_CLOSE && IsConversionNeeded(generic_ini, "gui", "right_mouse_wnd_close", "right_click_wnd_close", &old_item)) {
-			auto old_value = BoolSettingDesc::ParseSingleValue(old_item->value->c_str());
+			auto old_value = BoolSettingDesc::ParseSingleValue(*old_item->value);
 			_settings_client.gui.right_click_wnd_close = old_value.value_or(false) ? RCC_YES : RCC_NO;
 		}
 
@@ -3089,13 +3118,13 @@ StringList GetGRFPresetList()
  * @return NewGRF configuration.
  * @see GetGRFPresetList
  */
-GRFConfig *LoadGRFPresetFromConfig(const char *config_name)
+GRFConfigList LoadGRFPresetFromConfig(std::string_view config_name)
 {
 	format_buffer section;
 	section.format("preset-{}", config_name);
 
 	ConfigIniFile ini(_config_file);
-	GRFConfig *config = GRFLoadConfig(ini, section.c_str(), false);
+	GRFConfigList config = GRFLoadConfig(ini, section.c_str(), false);
 
 	return config;
 }
@@ -3106,7 +3135,7 @@ GRFConfig *LoadGRFPresetFromConfig(const char *config_name)
  * @param config      NewGRF configuration to save.
  * @see GetGRFPresetList
  */
-void SaveGRFPresetToConfig(const char *config_name, GRFConfig *config)
+void SaveGRFPresetToConfig(std::string_view config_name, GRFConfigList &config)
 {
 	format_buffer section;
 	section.format("preset-{}", config_name);
@@ -3120,7 +3149,7 @@ void SaveGRFPresetToConfig(const char *config_name, GRFConfig *config)
  * Delete a NewGRF configuration by preset name.
  * @param config_name Name of the preset.
  */
-void DeleteGRFPresetFromConfig(const char *config_name)
+void DeleteGRFPresetFromConfig(std::string_view config_name)
 {
 	format_buffer section;
 	section.format("preset-{}", config_name);
@@ -3146,13 +3175,14 @@ void IntSettingDesc::ChangeValue(const void *object, int32_t newval, SaveToConfi
 	this->Write(object, newval);
 	if (this->post_callback != nullptr) this->post_callback(newval);
 
-	if (this->flags & SF_NO_NETWORK) {
+	if (this->flags.Test(SettingFlag::NoNetwork) || this->flags.Test(SettingFlag::Sandbox)) {
 		GamelogStartAction(GLAT_SETTING);
 		GamelogSetting(this->name, oldval, newval);
 		GamelogStopAction();
 	}
 
 	SetWindowClassesDirty(WC_GAME_OPTIONS);
+	if (this->flags.Test(SettingFlag::Sandbox)) SetWindowClassesDirty(WC_CHEATS);
 
 	if (_save_config) SaveToConfig(ini_save_flags);
 }
@@ -3223,8 +3253,8 @@ const SettingDesc *GetSettingFromName(std::string_view name)
 
 SaveToConfigFlags ConfigSaveFlagsFor(const SettingDesc *sd)
 {
-	if (sd->flags & SF_PRIVATE) return STCF_PRIVATE;
-	if (sd->flags & SF_SECRET) return STCF_SECRETS;
+	if (sd->flags.Test(SettingFlag::Private)) return STCF_PRIVATE;
+	if (sd->flags.Test(SettingFlag::Secret)) return STCF_SECRETS;
 	return STCF_GENERIC;
 }
 
@@ -3236,20 +3266,38 @@ SaveToConfigFlags ConfigSaveFlagsUsingGameSettingsFor(const SettingDesc *sd)
 }
 
 /**
+ * Get a collection of settings matching a custom filter.
+ * @param func Function to filter each setting.
+ * @returns Vector containing the list of collections.
+ */
+std::vector<const SettingDesc *> GetFilteredSettingCollection(std::function<bool(const SettingDesc &desc)> func)
+{
+	std::vector<const SettingDesc *> collection;
+
+	IterateSettingsTables([&](const SettingTable &table, void *object) {
+		for (const auto &sd : table) {
+			if (!func(*sd)) continue;
+
+			collection.push_back(sd.get());
+		}
+	});
+
+	return collection;
+}
+
+/**
  * Network-safe changing of settings (server-only).
- * @param tile unused
  * @param flags operation to perform
- * @param p1 unused
- * @param p2 the new value for the setting
+ * @param name the name of the setting to change
+ * @param value the new value for the setting
  * The new value is properly clamped to its minimum/maximum when setting
- * @param text the name of the setting to change
  * @return the cost of this operation or an error
  * @see _settings
  */
-CommandCost CmdChangeSetting(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint32_t p2, const char *text)
+CommandCost CmdChangeSetting(DoCommandFlags flags, const std::string &name, int32_t value)
 {
-	if (StrEmpty(text)) return CMD_ERROR;
-	const SettingDesc *sd = GetSettingFromName(text);
+	if (name.empty()) return CMD_ERROR;
+	const SettingDesc *sd = GetSettingFromName(name);
 
 	if (sd == nullptr) return CMD_ERROR;
 	if (!SlIsObjectCurrentlyValid(sd->save.version_from, sd->save.version_to, sd->save.ext_feature_test)) return CMD_ERROR;
@@ -3257,10 +3305,10 @@ CommandCost CmdChangeSetting(TileIndex tile, DoCommandFlag flags, uint32_t p1, u
 
 	if (!sd->IsEditable(true)) return CMD_ERROR;
 
-	if (flags & DC_EXEC) {
-		SCOPE_INFO_FMT([=], "CmdChangeSetting: {} -> {}", sd->name, p2);
+	if (flags.Test(DoCommandFlag::Execute)) {
+		SCOPE_INFO_FMT([=], "CmdChangeSetting: {} -> {}", sd->name, value);
 
-		sd->AsIntSetting()->ChangeValue(&GetGameSettings(), p2, ConfigSaveFlagsUsingGameSettingsFor(sd));
+		sd->AsIntSetting()->ChangeValue(&GetGameSettings(), value, ConfigSaveFlagsUsingGameSettingsFor(sd));
 	}
 
 	return CommandCost();
@@ -3268,26 +3316,24 @@ CommandCost CmdChangeSetting(TileIndex tile, DoCommandFlag flags, uint32_t p1, u
 
 /**
  * Change one of the per-company settings.
- * @param tile unused
  * @param flags operation to perform
- * @param p1 unused
- * @param p2 the new value for the setting
+ * @param name the name of the setting to change
+ * @param value the new value for the setting
  * The new value is properly clamped to its minimum/maximum when setting
- * @param text the name of the company setting to change
  * @return the cost of this operation or an error
  */
-CommandCost CmdChangeCompanySetting(TileIndex tile, DoCommandFlag flags, uint32_t p1, uint32_t p2, const char *text)
+CommandCost CmdChangeCompanySetting(DoCommandFlags flags, const std::string &name, int32_t value)
 {
-	if (StrEmpty(text)) return CMD_ERROR;
-	const SettingDesc *sd = GetCompanySettingFromName(text);
+	if (name.empty()) return CMD_ERROR;
+	const SettingDesc *sd = GetCompanySettingFromName(name);
 
 	if (sd == nullptr) return CMD_ERROR;
 	if (!sd->IsIntSetting()) return CMD_ERROR;
 
-	if (flags & DC_EXEC) {
-		SCOPE_INFO_FMT([=], "CmdChangeCompanySetting: {} -> {}", sd->name, p2);
+	if (flags.Test(DoCommandFlag::Execute)) {
+		SCOPE_INFO_FMT([=], "CmdChangeCompanySetting: {} -> {}", sd->name, value);
 
-		sd->AsIntSetting()->ChangeValue(&Company::Get(_current_company)->settings, p2, STCF_NONE);
+		sd->AsIntSetting()->ChangeValue(&Company::Get(_current_company)->settings, value, STCF_NONE);
 	}
 
 	return CommandCost();
@@ -3310,10 +3356,10 @@ const char *GetCompanySettingNameByIndex(uint32_t idx)
 bool SetSettingValue(const IntSettingDesc *sd, int32_t value, bool force_newgame)
 {
 	const IntSettingDesc *setting = sd->AsIntSetting();
-	if ((setting->flags & SF_PER_COMPANY) != 0) {
+	if (setting->flags.Test(SettingFlag::PerCompany)) {
 		if (Company::IsValidID(_local_company) && _game_mode != GM_MENU) {
-			return DoCommandP(0, 0, value, CMD_CHANGE_COMPANY_SETTING, nullptr, setting->name);
-		} else if (setting->flags & SF_NO_NEWGAME) {
+			return Command<CMD_CHANGE_COMPANY_SETTING>::Post(setting->name, value);
+		} else if (setting->flags.Test(SettingFlag::NoNewgame)) {
 			return false;
 		}
 
@@ -3325,9 +3371,9 @@ bool SetSettingValue(const IntSettingDesc *sd, int32_t value, bool force_newgame
 	 * (if any) to change. Also *hack*hack* we update the _newgame version
 	 * of settings because changing a company-based setting in a game also
 	 * changes its defaults. At least that is the convention we have chosen */
-	bool no_newgame = setting->flags & SF_NO_NEWGAME;
+	bool no_newgame = setting->flags.Test(SettingFlag::NoNewgame);
 	if (no_newgame && _game_mode == GM_MENU) return false;
-	if (setting->flags & SF_NO_NETWORK_SYNC) {
+	if (setting->flags.Test(SettingFlag::NoNetworkSync)) {
 		if (_game_mode != GM_MENU && !no_newgame) {
 			setting->ChangeValue(&_settings_newgame, value, ConfigSaveFlagsFor(setting));
 		}
@@ -3342,7 +3388,7 @@ bool SetSettingValue(const IntSettingDesc *sd, int32_t value, bool force_newgame
 
 	/* send non-company-based settings over the network */
 	if (!IsNonAdminNetworkClient()) {
-		return DoCommandP(0, 0, value, CMD_CHANGE_SETTING, nullptr, setting->name);
+		return Command<CMD_CHANGE_SETTING>::Post(setting->name, value);
 	}
 	return false;
 }
@@ -3353,10 +3399,11 @@ bool SetSettingValue(const IntSettingDesc *sd, int32_t value, bool force_newgame
 void SetDefaultCompanySettings(CompanyID cid)
 {
 	Company *c = Company::Get(cid);
+	AutoRestoreBackup backup(_current_company, cid);
 	for (auto &sd : _company_settings) {
 		if (sd->IsIntSetting()) {
 			const IntSettingDesc *int_setting = sd->AsIntSetting();
-			int_setting->MakeValueValidAndWrite(&c->settings, int_setting->def);
+			int_setting->MakeValueValidAndWrite(&c->settings, int_setting->GetDefaultValue());
 		}
 	}
 }
@@ -3373,7 +3420,9 @@ void SyncCompanySettings()
 		if (!SlIsObjectCurrentlyValid(sd->save.version_from, sd->save.version_to, sd->save.ext_feature_test)) continue;
 		uint32_t old_value = (uint32_t)sd->AsIntSetting()->Read(old_object);
 		uint32_t new_value = (uint32_t)sd->AsIntSetting()->Read(new_object);
-		if (old_value != new_value) NetworkSendCommand(0, 0, new_value, 0, CMD_CHANGE_COMPANY_SETTING, nullptr, sd->name, _local_company, nullptr);
+		if (old_value != new_value) {
+			NetworkSendCommand<CMD_CHANGE_COMPANY_SETTING>({}, ChangeSettingCmdData::Make(sd->name, new_value), (StringID)0, CommandCallback::None, 0, _local_company);
+		}
 	}
 }
 
@@ -3384,16 +3433,16 @@ void SyncCompanySettings()
  * @param force_newgame force the newgame settings
  * @note Strings WILL NOT be synced over the network
  */
-bool SetSettingValue(const StringSettingDesc *sd, std::string value, bool force_newgame)
+bool SetSettingValue(const StringSettingDesc *sd, std::string_view value, bool force_newgame)
 {
-	assert(sd->flags & SF_NO_NETWORK_SYNC);
+	assert(sd->flags.Test(SettingFlag::NoNetworkSync));
 
-	if (GetVarMemType(sd->save.conv) == SLE_VAR_STRQ && value.compare("(null)") == 0) {
-		value.clear();
+	if (GetVarMemType(sd->save.conv) == SLE_VAR_STRQ && value == "(null)") {
+		value = {};
 	}
 
 	const void *object = (_game_mode == GM_MENU || force_newgame) ? &_settings_newgame : &_settings_game;
-	sd->AsStringSetting()->ChangeValue(object, value, object == &_settings_newgame ? ConfigSaveFlagsFor(sd) : STCF_NONE);
+	sd->AsStringSetting()->ChangeValue(object, std::string{value}, object == &_settings_newgame ? ConfigSaveFlagsFor(sd) : STCF_NONE);
 	return true;
 }
 
@@ -3403,7 +3452,7 @@ bool SetSettingValue(const StringSettingDesc *sd, std::string value, bool force_
  * @param object The object the setting is in.
  * @param newval The new value for the setting.
  */
-void StringSettingDesc::ChangeValue(const void *object, std::string &newval, SaveToConfigFlags ini_save_flags) const
+void StringSettingDesc::ChangeValue(const void *object, std::string &&newval, SaveToConfigFlags ini_save_flags) const
 {
 	this->MakeValueValid(newval);
 	if (this->pre_check != nullptr && !this->pre_check(newval)) return;
@@ -3426,12 +3475,12 @@ uint GetSettingIndexByFullName(const SettingTable &table, const char *name)
 
 /* Those 2 functions need to be here, else we have to make some stuff non-static
  * and besides, it is also better to keep stuff like this at the same place */
-void IConsoleSetSetting(const char *name, const char *value, bool force_newgame)
+void IConsoleSetSetting(std::string_view name, std::string_view value, bool force_newgame)
 {
 	const SettingDesc *sd = GetSettingFromName(name);
-
-	if (sd == nullptr || ((sd->flags & SF_NO_NEWGAME) && (_game_mode == GM_MENU || force_newgame))) {
-		IConsolePrint(CC_WARNING, "'{}' is an unknown setting.", name);
+	/* Company settings are not in "list_settings", so don't try to modify them. */
+	if (sd == nullptr || sd->flags.Test(SettingFlag::PerCompany) || (sd->flags.Test(SettingFlag::NoNewgame) && (_game_mode == GM_MENU || force_newgame))) {
+		IConsolePrint(CC_ERROR, "'{}' is an unknown setting.", name);
 		return;
 	}
 
@@ -3464,7 +3513,7 @@ void IConsoleSetSetting(const char *name, const char *value, bool force_newgame)
 	}
 }
 
-void IConsoleSetSetting(const char *name, int value)
+void IConsoleSetSetting(std::string_view name, int value)
 {
 	const SettingDesc *sd = GetSettingFromName(name);
 	assert(sd != nullptr);
@@ -3476,12 +3525,12 @@ void IConsoleSetSetting(const char *name, int value)
  * @param name  Name of the setting to output its value
  * @param force_newgame force the newgame settings
  */
-void IConsoleGetSetting(const char *name, bool force_newgame)
+void IConsoleGetSetting(std::string_view name, bool force_newgame)
 {
 	const SettingDesc *sd = GetSettingFromName(name);
-
-	if (sd == nullptr || ((sd->flags & SF_NO_NEWGAME) && (_game_mode == GM_MENU || force_newgame))) {
-		IConsolePrint(CC_WARNING, "'{}' is an unknown setting.", name);
+	/* Company settings are not in "list_settings", so don't try to read them. */
+	if (sd == nullptr || sd->flags.Test(SettingFlag::PerCompany) || (sd->flags.Test(SettingFlag::NoNewgame) && (_game_mode == GM_MENU || force_newgame))) {
+		IConsolePrint(CC_ERROR, "'{}' is an unknown setting.", name);
 		return;
 	}
 
@@ -3493,11 +3542,10 @@ void IConsoleGetSetting(const char *name, bool force_newgame)
 		const IntSettingDesc *int_setting = sd->AsIntSetting();
 
 		bool show_min_max = true;
-		int64_t min_value = int_setting->min;
-		int64_t max_value = int_setting->max;
-		if (sd->flags & SF_ENUM) {
-			min_value = INT64_MAX;
-			max_value = INT64_MIN;
+		auto [min_val, max_val] = int_setting->GetRange();
+		if (sd->flags.Test(SettingFlag::Enum)) {
+			int64_t min_value = INT64_MAX;
+			int64_t max_value = INT64_MIN;
 			int count = 0;
 			for (const SettingDescEnumEntry *enumlist = int_setting->enumlist; enumlist != nullptr && enumlist->str != STR_NULL; enumlist++) {
 				if (enumlist->val < min_value) min_value = enumlist->val;
@@ -3507,6 +3555,9 @@ void IConsoleGetSetting(const char *name, bool force_newgame)
 			if (max_value - min_value != (int64_t)(count - 1)) {
 				/* Discontinuous range */
 				show_min_max = false;
+			} else {
+				min_val = min_value;
+				max_val = (uint64_t)max_value;
 			}
 		}
 
@@ -3514,28 +3565,29 @@ void IConsoleGetSetting(const char *name, bool force_newgame)
 		sd->FormatValue(value, object);
 
 		if (show_min_max) {
-			IConsolePrint(CC_WARNING, "Current value for '{}' is: '{}' (min: {}{}, max: {})",
-				name, value, (sd->flags & SF_GUI_0_IS_SPECIAL) ? "(0) " : "", min_value, max_value);
+			IConsolePrint(CC_WARNING, "Current value for '{}' is: '{}' (min: {}{}, max: {}, def: {})",
+				name, value, (sd->flags.Test(SettingFlag::GuiZeroIsSpecial)) ? "(0) " : "", min_val, max_val, int_setting->GetDefaultValue());
 		} else {
-			IConsolePrint(CC_WARNING, "Current value for '{}' is: '{}'",
-				name, value);
+			IConsolePrint(CC_WARNING, "Current value for '{}' is: '{}' (def: {})",
+				name, value, int_setting->GetDefaultValue());
 		}
 	}
 }
 
-static void IConsoleListSettingsTable(const SettingTable &table, const char *prefilter, bool show_defaults)
+static void IConsoleListSettingsTable(const SettingTable &table, std::string_view prefilter, bool show_defaults)
 {
 	for (auto &sd : table) {
 		if (!SlIsObjectCurrentlyValid(sd->save.version_from, sd->save.version_to, sd->save.ext_feature_test)) continue;
-		if (prefilter != nullptr && strstr(sd->name, prefilter) == nullptr) continue;
-		if ((sd->flags & SF_NO_NEWGAME) && _game_mode == GM_MENU) continue;
+		if (!prefilter.empty() && std::string_view(sd->name).find(prefilter) == std::string::npos) continue;
+		if (sd->flags.Test(SettingFlag::NoNewgame) && _game_mode == GM_MENU) continue;
 		format_buffer value;
 		sd->FormatValue(value, &GetGameSettings());
 		if (show_defaults && sd->IsIntSetting()) {
 			const IntSettingDesc *int_setting = sd->AsIntSetting();
+			auto def = int_setting->GetDefaultValue();
 			format_buffer defvalue;
-			int_setting->FormatIntValue(defvalue, int_setting->def);
-			TextColour colour = (int_setting->Read(&GetGameSettings()) != int_setting->def) ? CC_WARNING : CC_DEFAULT;
+			int_setting->FormatIntValue(defvalue, def);
+			TextColour colour = (int_setting->Read(&GetGameSettings()) != def) ? CC_WARNING : CC_DEFAULT;
 			IConsolePrint(colour, "{} = {} (default: {})", sd->name, value, defvalue);
 		} else {
 			IConsolePrint(CC_DEFAULT, "{} = {}", sd->name, value);
@@ -3548,7 +3600,7 @@ static void IConsoleListSettingsTable(const SettingTable &table, const char *pre
  *
  * @param prefilter  If not \c nullptr, only list settings with names that begin with \a prefilter prefix
  */
-void IConsoleListSettings(const char *prefilter, bool show_defaults)
+void IConsoleListSettings(std::string_view prefilter, bool show_defaults)
 {
 	IConsolePrint(CC_WARNING, "All settings with their current {}:", show_defaults ? "and default values" : "value");
 
@@ -3587,7 +3639,7 @@ static void LoadSettings(std::initializer_list<SettingTable> settings, std::init
 
 		btree::btree_multimap<std::string_view, const SettingDesc *> names;
 		for (auto &osd : IterateSettingTables(settings)) {
-			if (osd->flags & SF_NOT_IN_SAVE) continue;
+			if (osd->flags.Test(SettingFlag::NotInSave)) continue;
 			if (osd->name == nullptr) continue;
 			names.insert({osd->name, osd.get()});
 		}
@@ -3684,13 +3736,13 @@ static std::vector<const SettingDesc *> MakeSettingsPatxList(std::initializer_li
  */
 struct SettingsExtLoad {
 	uint32_t flags;
-	char name[256];
+	std::string name;
 	uint32_t setting_length;
 };
 
 static const SaveLoad _settings_ext_load_desc[] = {
 	SLE_VAR(SettingsExtLoad, flags,          SLE_UINT32),
-	SLE_STR(SettingsExtLoad, name,           SLE_STRB, 256),
+	SLE_SSTR(SettingsExtLoad, name,          SLE_STR),
 	SLE_VAR(SettingsExtLoad, setting_length, SLE_UINT32),
 };
 
@@ -3721,7 +3773,7 @@ static void LoadSettingsPatx(void *object)
 
 		// now try to find corresponding setting
 		bool exact_match = false;
-		auto iter = std::lower_bound(sorted_patx_settings.begin(), sorted_patx_settings.end(), current_setting.name, [&](const SettingDesc *a, const char *b) {
+		auto iter = std::lower_bound(sorted_patx_settings.begin(), sorted_patx_settings.end(), current_setting.name.c_str(), [&](const SettingDesc *a, const char *b) {
 			int result = strcmp(a->patx_name, b);
 			if (result == 0) exact_match = true;
 			return result < 0;
@@ -3790,7 +3842,7 @@ void LoadSettingsPlyx(bool skip)
 		const Company *c = nullptr;
 		if (!skip) {
 			c = Company::GetIfValid(company_id);
-			if (c == nullptr) SlErrorCorruptFmt("PLYX chunk: non-existant company ID: {}", company_id);
+			if (c == nullptr) SlErrorCorruptFmt("PLYX chunk: non-existent company ID: {}", company_id);
 		}
 
 		uint32_t company_flags = SlReadUint32();
@@ -3813,7 +3865,7 @@ void LoadSettingsPlyx(bool skip)
 
 			// not many company settings, so perform a linear scan
 			for (auto &sd : _company_settings) {
-				if (sd->patx_name != nullptr && strcmp(sd->patx_name, current_setting.name) == 0) {
+				if (sd->patx_name != nullptr && current_setting.name == sd->patx_name) {
 					setting = sd.get();
 					break;
 				}
@@ -3923,9 +3975,37 @@ const SettingTable &GetLinkGraphSettingTable()
 void ResetSettingsToDefaultForLoad()
 {
 	for (auto &sd : IterateSettingTables(GetSaveLoadSettingsTables())) {
-		if (sd->flags & SF_NOT_IN_SAVE) continue;
-		if ((sd->flags & SF_NO_NETWORK_SYNC) && _networking && !_network_server) continue;
+		if (sd->flags.Test(SettingFlag::NotInSave)) continue;
+		if (sd->flags.Test(SettingFlag::NoNetworkSync) && _networking && !_network_server) continue;
 
 		sd->ResetToDefault(&_settings_game);
 	}
+}
+
+ScriptConfigSettings::ScriptConfigSettings()
+{
+	/* Instantiate here, because unique_ptr needs a complete type. */
+}
+
+ScriptConfigSettings::~ScriptConfigSettings()
+{
+	/* Instantiate here, because unique_ptr needs a complete type. */
+}
+
+ScriptConfigSettings::ScriptConfigSettings(const ScriptConfigSettings &other)
+{
+	*this = other;
+}
+
+ScriptConfigSettings &ScriptConfigSettings::operator=(const ScriptConfigSettings &other)
+{
+	for (CompanyID c = CompanyID::Begin(); c < MAX_COMPANIES; ++c) {
+		if (other.ai[c] != nullptr) {
+			this->ai[c] = std::make_unique<AIConfig>(*other.ai[c]);
+		}
+	}
+	if (other.game != nullptr) {
+		this->game = std::make_unique<GameConfig>(*other.game);
+	}
+	return *this;
 }

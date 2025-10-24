@@ -29,9 +29,7 @@ enum Track : uint8_t {
 };
 
 /** Allow incrementing of Track variables */
-DECLARE_POSTFIX_INCREMENT(Track)
-/** Define basic enum properties */
-template <> struct EnumPropsT<Track> : MakeEnumPropsT<Track, uint8_t, TRACK_BEGIN, TRACK_END, INVALID_TRACK, 3> {};
+DECLARE_INCREMENT_DECREMENT_OPERATORS(Track)
 
 
 /** Bitfield corresponding to Track */
@@ -56,7 +54,6 @@ enum TrackBits : uint8_t {
 	TRACK_BIT_MASK    = 0x3FU,                                              ///< Bitmask for the first 6 bits
 	TRACK_BIT_WORMHOLE = 0x40U,                                             ///< Bitflag for a wormhole (used for tunnels)
 	TRACK_BIT_DEPOT   = 0x80U,                                              ///< Bitflag for a depot
-	INVALID_TRACK_BIT = 0xFF,                                               ///< Flag for an invalid trackbits value
 };
 DECLARE_ENUM_AS_BIT_SET(TrackBits)
 
@@ -92,9 +89,7 @@ enum Trackdir : uint8_t {
 };
 
 /** Allow incrementing of Trackdir variables */
-DECLARE_POSTFIX_INCREMENT(Trackdir)
-/** Define basic enum properties */
-template <> struct EnumPropsT<Trackdir> : MakeEnumPropsT<Trackdir, uint8_t, TRACKDIR_BEGIN, TRACKDIR_END, INVALID_TRACKDIR, 4> {};
+DECLARE_INCREMENT_DECREMENT_OPERATORS(Trackdir)
 
 /**
  * Enumeration of bitmasks for the TrackDirs

@@ -10,10 +10,11 @@
 #ifndef DEPOT_TYPE_H
 #define DEPOT_TYPE_H
 
-typedef uint16_t DepotID; ///< Type for the unique identifier of depots.
-struct Depot;
+#include "core/pool_id_type.hpp"
 
-static const DepotID INVALID_DEPOT = UINT16_MAX;
+struct DepotIDTag : public PoolIDTraits<uint16_t, 64000, 0xFFFF> {};
+using DepotID = PoolID<DepotIDTag>; ///< Type for the unique identifier of depots.
+struct Depot;
 
 static const uint MAX_LENGTH_DEPOT_NAME_CHARS = 128; ///< The maximum length of a depot name in characters including '\0'
 

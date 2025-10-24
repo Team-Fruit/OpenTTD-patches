@@ -29,11 +29,6 @@ class SignalInstruction;
 class SignalSpecial;
 typedef std::vector<SignalInstruction*> InstructionList;
 
-enum SignalProgramMgmtCode {
-	SPMC_REMOVE,      ///< Remove program
-	SPMC_CLONE,       ///< Clone program
-};
-
 /** The actual programmable pre-signal information */
 struct SignalProgram {
 	SignalProgram(TileIndex tile, Track track, bool raw = false);
@@ -65,7 +60,6 @@ enum SignalOpcode {
 	PSO_END,
 	PSO_INVALID   = 0xFF
 };
-template <> struct EnumPropsT<SignalOpcode> : MakeEnumPropsT<SignalOpcode, uint8_t, PSO_FIRST, PSO_END, PSO_INVALID, 8> {};
 
 /** Signal instruction base class. All instructions must derive from this. */
 class SignalInstruction {
@@ -177,13 +171,6 @@ enum SignalComparator {
 	SGC_LAST = SGC_IS_FALSE
 };
 
-/** Which field to modify in a condition. A parameter to CMD_MODIFY_SIGNAL_INSTRUCTION */
-enum SignalConditionField {
-	SCF_COMPARATOR = 0,       ///< the comparator (value from SignalComparator enum)
-	SCF_VALUE = 1,            ///< the value (integer value)
-	SCF_SLOT_COUNTER = 2,     ///< the slot or counter
-};
-
 class SignalConditionComparable: public SignalCondition {
 protected:
 	bool EvaluateComparable(uint32_t var_val);
@@ -194,15 +181,15 @@ public:
 	uint32_t value;
 };
 
-/** A conditon based upon comparing a variable and a value. This condition can be
- *  considered similar to the conditonal jumps in vehicle orders.
+/** A condition based upon comparing a variable and a value. This condition can be
+ *  considered similar to the conditional jumps in vehicle orders.
  *
- * The variable is specified by the conditon code, the comparison by @p comparator, and
+ * The variable is specified by the condition code, the comparison by @p comparator, and
  * the value to compare against by @p value. The condition returns the result of that value.
  */
 class SignalVariableCondition: public SignalConditionComparable {
 public:
-	/// Constructs a condition refering to the value @p code refers to. Sets the
+	/// Constructs a condition referring to the value @p code refers to. Sets the
 	/// comparator and value to sane defaults.
 	SignalVariableCondition(SignalConditionCode code);
 
@@ -378,7 +365,7 @@ public:
 	/** Removes the If and all of its children */
 	void Remove() override;
 
-	SignalCondition *condition;    ///< The if conditon
+	SignalCondition *condition;    ///< The if condition
 	SignalInstruction *if_true;    ///< The branch to take if true
 	SignalInstruction *if_false;   ///< The branch to take if false
 	SignalInstruction *after;      ///< The branch to take after the If

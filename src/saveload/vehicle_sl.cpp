@@ -39,8 +39,8 @@ static std::vector<TileIndex> _path_tile;
 namespace upstream_sl {
 
 static uint8_t  _cargo_periods;
-static uint16_t _cargo_source;
-static uint32_t _cargo_source_xy;
+static StationID _cargo_source;
+static TileIndex _cargo_source_xy;
 static uint16_t _cargo_count;
 static uint16_t _cargo_paid_for;
 static Money  _cargo_feeder_share;
@@ -163,7 +163,7 @@ public:
 
 		SLE_CONDVAR(Vehicle, random_bits,           SLE_FILE_U8 | SLE_VAR_U16,    SLV_2, SLV_EXTEND_VEHICLE_RANDOM),
 		SLE_CONDVAR(Vehicle, random_bits,           SLE_UINT16,                   SLV_EXTEND_VEHICLE_RANDOM, SL_MAX_VERSION),
-		SLE_CONDVAR(Vehicle, waiting_triggers,      SLE_UINT8,                    SLV_2, SL_MAX_VERSION),
+		SLE_CONDVARNAME(Vehicle, waiting_random_triggers, "waiting_triggers", SLE_UINT8, SLV_2, SL_MAX_VERSION),
 
 		SLE_CONDREF(Vehicle, next_shared,           REF_VEHICLE,                  SLV_2, SL_MAX_VERSION),
 		SLE_CONDVAR(Vehicle, group_id,              SLE_UINT16,                  SLV_60, SL_MAX_VERSION),
@@ -575,12 +575,12 @@ struct VEHSChunkHandler : ChunkHandler {
 			VehicleType vtype = (VehicleType)SlReadByte();
 
 			switch (vtype) {
-				case VEH_TRAIN:    v = new (index) Train();           break;
-				case VEH_ROAD:     v = new (index) RoadVehicle();     break;
-				case VEH_SHIP:     v = new (index) Ship();            break;
-				case VEH_AIRCRAFT: v = new (index) Aircraft();        break;
-				case VEH_EFFECT:   v = new (index) EffectVehicle();   break;
-				case VEH_DISASTER: v = new (index) DisasterVehicle(); break;
+				case VEH_TRAIN:    v = new (VehicleID(index)) Train();           break;
+				case VEH_ROAD:     v = new (VehicleID(index)) RoadVehicle();     break;
+				case VEH_SHIP:     v = new (VehicleID(index)) Ship();            break;
+				case VEH_AIRCRAFT: v = new (VehicleID(index)) Aircraft();        break;
+				case VEH_EFFECT:   v = new (VehicleID(index)) EffectVehicle();   break;
+				case VEH_DISASTER: v = new (VehicleID(index)) DisasterVehicle(); break;
 				case VEH_INVALID: // Savegame shouldn't contain invalid vehicles
 				default: SlErrorCorrupt("Invalid vehicle type");
 			}
@@ -601,10 +601,10 @@ struct VEHSChunkHandler : ChunkHandler {
 #if 0
 			/* Old savegames used 'last_station_visited = 0xFF' */
 			if (IsSavegameVersionBefore(SLV_5) && v->last_station_visited == 0xFF) {
-				v->last_station_visited = INVALID_STATION;
+				v->last_station_visited = StationID::Invalid();
 			}
 
-			if (IsSavegameVersionBefore(SLV_182)) v->last_loading_station = INVALID_STATION;
+			if (IsSavegameVersionBefore(SLV_182)) v->last_loading_station = StationID::Invalid();
 
 			if (IsSavegameVersionBefore(SLV_5)) {
 				/* Convert the current_order.type (which is a mix of type and flags, because

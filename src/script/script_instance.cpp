@@ -28,16 +28,18 @@
 #include "../company_func.h"
 #include "../fileio_func.h"
 #include "../league_type.h"
+#include "../goal_type.h"
+#include "../group_type.h"
+#include "../signs_type.h"
+#include "../story_type.h"
+#include "../vehicle_type.h"
 
 #include "../core/format.hpp"
 
 #include "../safeguards.h"
 
-ScriptStorage::~ScriptStorage()
-{
-	/* Free our pointers */
-	if (event_data != nullptr) ScriptEventController::FreeEventPointer();
-}
+ScriptStorage::ScriptStorage() = default;
+ScriptStorage::~ScriptStorage() = default;
 
 /**
  * Callback called by squirrel when a script uses "print" and for error messages.
@@ -50,21 +52,7 @@ static void PrintFunc(bool error_msg, const std::string &message)
 	ScriptController::Print(error_msg, message);
 }
 
-ScriptInstance::ScriptInstance(const char *APIName, ScriptType script_type) :
-	engine(nullptr),
-	controller(nullptr),
-	storage(nullptr),
-	instance(nullptr),
-	is_started(false),
-	is_dead(false),
-	is_save_data_on_stack(false),
-	suspend(0),
-	is_paused(false),
-	in_shutdown(false),
-	callback(nullptr),
-	APIName(APIName),
-	script_type(script_type),
-	allow_text_param_mismatch(false)
+ScriptInstance::ScriptInstance(const char *APIName, ScriptType script_type) : APIName(APIName), script_type(script_type)
 {
 	this->storage = new ScriptStorage();
 	this->engine  = new Squirrel(APIName);
@@ -98,7 +86,7 @@ void ScriptInstance::Initialize(const std::string &main_script, const std::strin
 
 		if (this->script_type == ScriptType::GS) {
 			if (instance_name == "BeeRewardClass") {
-				this->LoadCompatibilityScripts("brgs", GAME_DIR);
+				this->LoadCompatibilityScript("brgs", GAME_DIR);
 			}
 		}
 
@@ -126,19 +114,10 @@ void ScriptInstance::RegisterAPI()
 	squirrel_register_std(this->engine);
 }
 
-bool ScriptInstance::LoadCompatibilityScripts(const std::string &api_version, Subdirectory dir)
+bool ScriptInstance::LoadCompatibilityScript(std::string_view api_version, Subdirectory dir)
 {
-	const char *api_vers[] = { "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "12", "13", "14" };
-	uint api_idx = 0;
-	for (; api_idx < lengthof(api_vers) ; api_idx++) {
-		if (api_version == api_vers[api_idx]) break;
-	}
-	if (api_idx < 12) {
-		/* 13 and below */
-		this->allow_text_param_mismatch = true;
-	}
-
 	std::string script_name = fmt::format("compat_{}.nut", api_version);
+
 	for (Searchpath sp : _valid_searchpaths) {
 		std::string buf = FioGetDirectory(sp, dir);
 		buf += script_name;
@@ -146,27 +125,34 @@ bool ScriptInstance::LoadCompatibilityScripts(const std::string &api_version, Su
 
 		if (this->engine->LoadScript(buf)) return true;
 
-		ScriptLog::Error("Failed to load API compatibility script");
+		ScriptLog::Error(fmt::format("Failed to load API compatibility script for {}", api_version));
 		Debug(script, 0, "Error compiling / running API compatibility script: {}", buf);
 		return false;
 	}
 
-	const char *message_suffix;
-	switch (dir) {
-		case AI_DIR:
-			message_suffix = ", please check that the 'ai/' directory is properly installed";
-			break;
+	ScriptLog::Warning(fmt::format("API compatibility script for {} not found", api_version));
+	return true;
+}
 
-		case GAME_DIR:
-			message_suffix = ", please check that the 'game/' directory is properly installed";
-			break;
+bool ScriptInstance::LoadCompatibilityScripts(Subdirectory dir, std::span<const std::string_view> api_versions)
+{
+	/* Don't try to load compatibility scripts for the current version. */
+	if (this->api_version == api_versions.back()) return true;
 
-		default:
-			message_suffix = "";
-			break;
+	ScriptLog::Info(fmt::format("Downgrading API to be compatible with version {}", this->api_version));
+
+	/* Downgrade the API till we are the same version as the script. The last
+	 * entry in the list is always the current version, so skip that one. */
+	for (auto it = std::rbegin(api_versions) + 1; it != std::rend(api_versions); ++it) {
+		if (*it == "13") {
+			/* 13 and below */
+			this->allow_text_param_mismatch = true;
+		}
+		if (!this->LoadCompatibilityScript(*it, dir)) return false;
+
+		if (*it == this->api_version) break;
 	}
 
-	ScriptLog::Warning(fmt::format("API compatibility script not found: {}{}", script_name, message_suffix));
 	return true;
 }
 
@@ -203,7 +189,7 @@ void ScriptInstance::Died()
 	this->engine = nullptr;
 }
 
-void ScriptInstance::GameLoop()
+void ScriptInstance::GameLoop() noexcept
 {
 	ScriptObject::ActiveInstance active(this);
 
@@ -292,7 +278,7 @@ void ScriptInstance::GameLoop()
 	}
 }
 
-void ScriptInstance::CollectGarbage()
+void ScriptInstance::CollectGarbage() noexcept
 {
 	if (this->is_started && !this->IsDead()) {
 		ScriptObject::ActiveInstance active(this);
@@ -307,42 +293,42 @@ void ScriptInstance::CollectGarbage()
 
 /* static */ void ScriptInstance::DoCommandReturnVehicleID(ScriptInstance *instance)
 {
-	instance->engine->InsertResult(ScriptObject::GetNewVehicleID());
+	instance->engine->InsertResult(ScriptObject::GetLastCommandResultData<VehicleID>(::VehicleID::Invalid()));
 }
 
 /* static */ void ScriptInstance::DoCommandReturnSignID(ScriptInstance *instance)
 {
-	instance->engine->InsertResult(ScriptObject::GetNewSignID());
+	instance->engine->InsertResult(ScriptObject::GetLastCommandResultData<SignID>(::SignID::Invalid()));
 }
 
 /* static */ void ScriptInstance::DoCommandReturnGroupID(ScriptInstance *instance)
 {
-	instance->engine->InsertResult(ScriptObject::GetNewGroupID());
+	instance->engine->InsertResult(ScriptObject::GetLastCommandResultData<GroupID>(::GroupID::Invalid()));
 }
 
 /* static */ void ScriptInstance::DoCommandReturnGoalID(ScriptInstance *instance)
 {
-	instance->engine->InsertResult(ScriptObject::GetNewGoalID());
+	instance->engine->InsertResult(ScriptObject::GetLastCommandResultData<GoalID>(::GoalID::Invalid()));
 }
 
 /* static */ void ScriptInstance::DoCommandReturnStoryPageID(ScriptInstance *instance)
 {
-	instance->engine->InsertResult(ScriptObject::GetNewStoryPageID());
+	instance->engine->InsertResult(ScriptObject::GetLastCommandResultData<StoryPageID>(::StoryPageID::Invalid()));
 }
 
 /* static */ void ScriptInstance::DoCommandReturnStoryPageElementID(ScriptInstance *instance)
 {
-	instance->engine->InsertResult(ScriptObject::GetNewStoryPageElementID());
+	instance->engine->InsertResult(ScriptObject::GetLastCommandResultData<StoryPageElementID>(::StoryPageElementID::Invalid()));
 }
 
 /* static */ void ScriptInstance::DoCommandReturnLeagueTableElementID(ScriptInstance *instance)
 {
-	instance->engine->InsertResult(static_cast<LeagueTableElementID>(ScriptObject::GetLastCommandResultData()));
+	instance->engine->InsertResult(ScriptObject::GetLastCommandResultData<LeagueTableElementID>(::LeagueTableElementID::Invalid()));
 }
 
 /* static */ void ScriptInstance::DoCommandReturnLeagueTableID(ScriptInstance *instance)
 {
-	instance->engine->InsertResult(static_cast<LeagueTableID>(ScriptObject::GetLastCommandResultData()));
+	instance->engine->InsertResult(ScriptObject::GetLastCommandResultData<LeagueTableID>(::LeagueTableID::Invalid()));
 }
 
 
@@ -391,8 +377,7 @@ ScriptLogTypes::LogData &ScriptInstance::GetLogData()
 			SlWriteByte(SQSL_INT);
 			SQInteger res;
 			sq_getinteger(vm, index, &res);
-			int64_t value = (int64_t)res;
-			SlArray(&value, 1, SLE_INT64);
+			SlWriteUint64((int64_t)res);
 			return true;
 		}
 
@@ -406,7 +391,7 @@ ScriptLogTypes::LogData &ScriptInstance::GetLogData()
 				return false;
 			}
 			SlWriteByte((uint8_t)len);
-			SlArray(const_cast<char *>(buf), len, SLE_CHAR);
+			SlCopyBytesWrite(buf, len);
 			return true;
 		}
 
@@ -455,6 +440,23 @@ ScriptLogTypes::LogData &ScriptInstance::GetLogData()
 		case OT_NULL: {
 			SlWriteByte(SQSL_NULL);
 			return true;
+		}
+
+		case OT_INSTANCE:{
+			SQInteger top = sq_gettop(vm);
+			try {
+				ScriptObject *obj = static_cast<ScriptObject *>(Squirrel::GetRealInstance(vm, -1, "Object"));
+				if (!obj->SaveObject(vm)) throw std::exception();
+				if (sq_gettop(vm) != top + 2) throw std::exception();
+				if (sq_gettype(vm, -2) != OT_STRING || !SaveObject(vm, -2, max_depth - 1)) throw std::exception();
+				if (!SaveObject(vm, -1, max_depth - 1)) throw std::exception();
+				sq_settop(vm, top);
+				return true;
+			} catch (...) {
+				ScriptLog::Error("You tried to save an unsupported type. No data saved.");
+				sq_settop(vm, top);
+				return false;
+			}
 		}
 
 		default:
@@ -562,39 +564,48 @@ bool ScriptInstance::IsPaused()
 	switch (type) {
 		case SQSL_INT: {
 			int64_t value;
-			SlArray(&value, 1, (IsSavegameVersionBefore(SLV_SCRIPT_INT64) && SlXvIsFeatureMissing(XSLFI_SCRIPT_INT64)) ? SLE_FILE_I32 | SLE_VAR_I64 : SLE_INT64);
-			if (data != nullptr) data->push_back((SQInteger)value);
+			if (IsSavegameVersionBefore(SLV_SCRIPT_INT64) && SlXvIsFeatureMissing(XSLFI_SCRIPT_INT64)) {
+				value = (int32_t)SlReadUint32();
+			} else {
+				value = (int64_t)SlReadUint64();
+			}
+			if (data != nullptr) data->push_back(static_cast<SQInteger>(value));
 			return true;
 		}
 
 		case SQSL_STRING: {
 			uint8_t len = SlReadByte();
-			static char buf[std::numeric_limits<decltype(len)>::max()];
-			SlArray(buf, len, SLE_CHAR);
+			char buf[std::numeric_limits<decltype(len)>::max()];
+			SlCopyBytesRead(buf, len);
 			if (data != nullptr) data->push_back(StrMakeValid(std::string_view(buf, len)));
 			return true;
 		}
 
 		case SQSL_ARRAY:
 		case SQSL_TABLE: {
-			if (data != nullptr) data->push_back((SQSaveLoadType)type);
+			if (data != nullptr) data->push_back(static_cast<SQSaveLoadType>(type));
 			while (LoadObjects(data));
 			return true;
 		}
 
 		case SQSL_BOOL: {
 			uint8_t sl_byte = SlReadByte();
-			if (data != nullptr) data->push_back((SQBool)(sl_byte != 0));
+			if (data != nullptr) data->push_back(static_cast<SQBool>(sl_byte != 0));
 			return true;
 		}
 
 		case SQSL_NULL: {
-			if (data != nullptr) data->push_back((SQSaveLoadType)type);
+			if (data != nullptr) data->push_back(static_cast<SQSaveLoadType>(type));
+			return true;
+		}
+
+		case SQSL_INSTANCE: {
+			if (data != nullptr) data->push_back(static_cast<SQSaveLoadType>(type));
 			return true;
 		}
 
 		case SQSL_ARRAY_TABLE_END: {
-			if (data != nullptr) data->push_back((SQSaveLoadType)type);
+			if (data != nullptr) data->push_back(static_cast<SQSaveLoadType>(type));
 			return false;
 		}
 
@@ -637,6 +648,31 @@ bool ScriptInstance::IsPaused()
 				case SQSL_NULL:
 					sq_pushnull(this->vm);
 					return true;
+
+				case SQSL_INSTANCE: {
+					SQInteger top = sq_gettop(this->vm);
+					LoadObjects(this->vm, this->data);
+					const SQChar *buf;
+					sq_getstring(this->vm, -1, &buf);
+					Squirrel *engine = static_cast<Squirrel *>(sq_getforeignptr(this->vm));
+					std::string class_name = fmt::format("{}{}", engine->GetAPIName(), buf);
+					sq_pushroottable(this->vm);
+					sq_pushstring(this->vm, class_name);
+					if (SQ_FAILED(sq_get(this->vm, -2))) throw Script_FatalError(fmt::format("'{}' doesn't exist", class_name));
+					sq_pushroottable(vm);
+					if (SQ_FAILED(sq_call(this->vm, 1, SQTrue, SQFalse))) throw Script_FatalError(fmt::format("Failed to instantiate '{}'", class_name));
+					HSQOBJECT res;
+					sq_getstackobj(vm, -1, &res);
+					sq_addref(vm, &res);
+					sq_settop(this->vm, top);
+					sq_pushobject(vm, res);
+					sq_release(vm, &res);
+					ScriptObject *obj = static_cast<ScriptObject *>(Squirrel::GetRealInstance(vm, -1, "Object"));
+					LoadObjects(this->vm, this->data);
+					if (!obj->LoadObject(vm)) throw Script_FatalError(fmt::format("Failed to load '{}'", class_name));
+					sq_pop(this->vm, 1);
+					return true;
+				}
 
 				case SQSL_ARRAY_TABLE_END:
 					return false;
@@ -727,7 +763,7 @@ bool ScriptInstance::CallLoad()
 
 	/* Call the script load function. sq_call removes the arguments (but not the
 	 * function pointer) from the stack. */
-	if (SQ_FAILED(sq_call(vm, 3, SQFalse, SQFalse, MAX_SL_OPS))) return false;
+	if (SQ_FAILED(sq_call(vm, 3, SQFalse, SQTrue, MAX_SL_OPS))) return false;
 
 	/* Pop 1) The version, 2) the savegame data, 3) the object instance, 4) the function pointer. */
 	sq_pop(vm, 4);
@@ -751,18 +787,18 @@ void ScriptInstance::LimitOpsTillSuspend(SQInteger suspend)
 
 uint32_t ScriptInstance::GetMaxOpsTillSuspend() const
 {
-	if (this->script_type == ScriptType::GS && (_pause_mode & PM_PAUSED_GAME_SCRIPT) != PM_UNPAUSED) {
+	if (this->script_type == ScriptType::GS && _pause_mode.Test(PauseMode::GameScript)) {
 		/* Boost opcodes till suspend when paused due to game script */
 		return std::min<uint32_t>(250000, _settings_game.script.script_max_opcode_till_suspend * 10);
 	}
 	return _settings_game.script.script_max_opcode_till_suspend;
 }
 
-bool ScriptInstance::DoCommandCallback(const CommandCost &result, TileIndex tile, uint32_t p1, uint32_t p2, uint64_t p3, uint32_t cmd)
+bool ScriptInstance::DoCommandCallback(const CommandCost &result, Commands cmd, TileIndex tile, const CommandPayloadBase &payload, CallbackParameter param)
 {
 	ScriptObject::ActiveInstance active(this);
 
-	if (!ScriptObject::CheckLastCommand(tile, p1, p2, p3, cmd)) {
+	if (!ScriptObject::CheckLastCommand(cmd, tile, param)) {
 		Debug(script, 1, "DoCommandCallback terminating a script, last command does not match expected command");
 		return false;
 	}
@@ -774,10 +810,10 @@ bool ScriptInstance::DoCommandCallback(const CommandCost &result, TileIndex tile
 	} else {
 		ScriptObject::IncreaseDoCommandCosts(result.GetCost());
 		ScriptObject::SetLastCost(result.GetCost());
-		ScriptObject::SetLastCommandResultData(result.GetResultData());
+		ScriptObject::SetLastCommandResultData(result.GetResultDataWithType());
 	}
 
-	ScriptObject::SetLastCommand(INVALID_TILE, 0, 0, 0, CMD_END);
+	ScriptObject::SetLastCommand(CMD_END, INVALID_TILE, 0);
 
 	return true;
 }

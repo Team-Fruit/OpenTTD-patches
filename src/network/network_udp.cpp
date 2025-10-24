@@ -26,6 +26,7 @@
 #include "../rev.h"
 #include "../newgrf_text.h"
 #include "../strings_func.h"
+
 #include "table/strings.h"
 
 #include "core/udp.h"
@@ -40,14 +41,13 @@ static uint16_t _network_udp_broadcast;  ///< Timeout for the UDP broadcasts.
 /** Some information about a socket, which exists before the actual socket has been created to provide locking and the likes. */
 struct UDPSocket {
 	const std::string name;                     ///< The name of the socket.
-	NetworkUDPSocketHandler *socket;            ///< The actual socket, which may be nullptr when not initialized yet.
+	std::unique_ptr<NetworkUDPSocketHandler> socket = nullptr; ///< The actual socket, which may be nullptr when not initialized yet.
 
-	UDPSocket(const std::string &name) : name(name), socket(nullptr) {}
+	UDPSocket(const std::string &name) : name(name) {}
 
 	void CloseSocket()
 	{
 		this->socket->CloseSocket();
-		delete this->socket;
 		this->socket = nullptr;
 	}
 
@@ -60,16 +60,16 @@ struct UDPSocket {
 static UDPSocket _udp_client("Client"); ///< udp client socket
 static UDPSocket _udp_server("Server"); ///< udp server socket
 
-static Packet PrepareUdpClientFindServerPacket(NetworkUDPSocketHandler *socket)
+static Packet PrepareUdpClientFindServerPacket(NetworkUDPSocketHandler &socket)
 {
-	Packet p(socket, PACKET_UDP_CLIENT_FIND_SERVER);
+	Packet p(&socket, PACKET_UDP_CLIENT_FIND_SERVER);
 	p.Send_uint32(FIND_SERVER_EXTENDED_TOKEN);
 	p.Send_uint16(0); // flags
 	p.Send_uint16(0); // version
 	return p;
 }
 
-///*** Communication with clients (we are server) ***/
+/* Communication with clients (we are server) */
 
 /** Helper class for handling all server side communication. */
 class ServerNetworkUDPSocketHandler : public NetworkUDPSocketHandler {
@@ -109,7 +109,7 @@ void ServerNetworkUDPSocketHandler::Reply_CLIENT_FIND_SERVER_extended(Packet &p,
 	Debug(net, 7, "Queried (extended: {}) from {}", version, client_addr.GetHostname());
 }
 
-///*** Communication with servers (we are client) ***/
+/* Communication with servers (we are client) */
 
 /** Helper class for handling all client side communication. */
 class ClientNetworkUDPSocketHandler : public NetworkUDPSocketHandler {
@@ -135,13 +135,13 @@ void ClientNetworkUDPSocketHandler::Receive_EX_SERVER_RESPONSE(Packet &, Network
 }
 
 /** Broadcast to all ips */
-static void NetworkUDPBroadCast(NetworkUDPSocketHandler *socket)
+static void NetworkUDPBroadCast(NetworkUDPSocketHandler &socket)
 {
 	for (NetworkAddress &addr : _broadcast_list) {
 		Debug(net, 5, "Broadcasting to {}", addr.GetHostname());
 
 		Packet p = PrepareUdpClientFindServerPacket(socket);
-		socket->SendPacket(p, addr, true, true);
+		socket.SendPacket(p, addr, true, true);
 	}
 }
 
@@ -153,7 +153,7 @@ void NetworkUDPSearchGame()
 
 	Debug(net, 3, "Searching server");
 
-	NetworkUDPBroadCast(_udp_client.socket);
+	NetworkUDPBroadCast(*_udp_client.socket);
 	_network_udp_broadcast = 300; // Stay searching for 300 ticks
 }
 
@@ -166,11 +166,11 @@ void NetworkUDPInitialize()
 	Debug(net, 3, "Initializing UDP listeners");
 	assert(_udp_client.socket == nullptr && _udp_server.socket == nullptr);
 
-	_udp_client.socket = new ClientNetworkUDPSocketHandler();
+	_udp_client.socket = std::make_unique<ClientNetworkUDPSocketHandler>();
 
 	NetworkAddressList server;
 	GetBindAddresses(&server, _settings_client.network.server_port);
-	_udp_server.socket = new ServerNetworkUDPSocketHandler(&server);
+	_udp_server.socket = std::make_unique<ServerNetworkUDPSocketHandler>(&server);
 
 	_network_udp_server = false;
 	_network_udp_broadcast = 0;

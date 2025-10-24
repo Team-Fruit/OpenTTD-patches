@@ -23,6 +23,7 @@
 #include "rail_gui_type.h"
 #include "station_type.h"
 #include "signal_type.h"
+#include "core/typed_container.hpp"
 
 /* Used to validate sizes of "max" value in settings. */
 const size_t MAX_SLE_UINT8 = UINT8_MAX;
@@ -37,7 +38,7 @@ const size_t MAX_SLE_INT = INT_MAX;
 static constexpr uint MAX_SIGNAL_DRAG_DISTANCE = 40;
 
 /** Settings profiles and highscore tables. */
-enum SettingsProfile {
+enum SettingsProfile : uint8_t {
 	SP_BEGIN = 0,
 	SP_EASY = SP_BEGIN,                       ///< Easy difficulty.
 	SP_MEDIUM,                                ///< Medium difficulty.
@@ -53,7 +54,7 @@ enum SettingsProfile {
 };
 
 /** Available industry map generation densities. */
-enum IndustryDensity {
+enum IndustryDensity : uint8_t {
 	ID_FUND_ONLY, ///< The game does not build industries.
 	ID_MINIMAL,   ///< Start with just the industries that must be present.
 	ID_VERY_LOW,  ///< Very few industries at game start.
@@ -93,6 +94,13 @@ enum RightClickClose : uint8_t {
 	RCC_YES_EXCEPT_STICKY,
 };
 
+/** Possible values for "place_houses" setting. */
+enum PlaceHouses : uint8_t {
+	PH_FORBIDDEN = 0,
+	PH_ALLOWED,
+	PH_ALLOWED_CONSTRUCTED,
+};
+
 /** Settings related to the difficulty of the game */
 struct DifficultySettings {
 	uint8_t  competitor_start_time;                 ///< Unused value, used to load old savegames.
@@ -109,6 +117,8 @@ struct DifficultySettings {
 	uint8_t  vehicle_costs_when_stopped;            ///< amount of money spent on vehicle running cost when vehicle is stopped
 	uint8_t  competitor_speed;                      ///< the speed at which the AI builds
 	uint8_t  vehicle_breakdowns;                    ///< likelihood of vehicles breaking down
+	uint8_t  max_reliability_floor;                 ///< The minimum value (%) for maximum reliability randomizer
+	int8_t   reliability_decay_speed;               ///< reliability decay factor (higher means faster decay)
 	uint8_t  subsidy_multiplier;                    ///< payment multiplier for subsidized deliveries
 	uint16_t subsidy_duration;                      ///< duration of subsidies
 	uint8_t  construction_cost;                     ///< how expensive is building
@@ -125,7 +135,7 @@ struct DifficultySettings {
 };
 
 /** Settings relating to viewport/smallmap scrolling. */
-enum ViewportScrollMode {
+enum ViewportScrollMode : uint8_t {
 	VSM_VIEWPORT_RMB_FIXED, ///< Viewport moves with mouse movement on holding right mouse button, cursor position is fixed.
 	VSM_MAP_RMB_FIXED,      ///< Map moves with mouse movement on holding right mouse button, cursor position is fixed.
 	VSM_MAP_RMB,            ///< Map moves with mouse movement on holding right mouse button, cursor moves.
@@ -134,7 +144,7 @@ enum ViewportScrollMode {
 };
 
 /** Settings related to scroll wheel behavior. */
-enum ScrollWheelScrollingSetting {
+enum ScrollWheelScrollingSetting : uint8_t {
 	SWS_ZOOM_MAP = 0,       ///< Scroll wheel zooms the map.
 	SWS_SCROLL_MAP = 1,     ///< Scroll wheel scrolls the map.
 	SWS_OFF = 2             ///< Scroll wheel has no effect.
@@ -156,7 +166,17 @@ enum PublicRoadsConstruction : uint8_t {
 	PRC_END
 };
 
-/** Settings related to time display. This may be loaded from the savegame and/or overriden by the client. */
+/** Deaptures conditional jump result */
+enum DeparturesConditionalJumpResult : uint8_t {
+	DCJD_BEGIN = 0,
+	DCJD_GIVE_UP = DCJD_BEGIN,    ///< Give up
+	DCJD_TAKEN,                   ///< Handle as taken
+	DCJD_NOT_TAKEN,               ///< Handle as not taken
+
+	DCJD_LAST = DCJD_NOT_TAKEN
+};
+
+/** Settings related to time display. This may be loaded from the savegame and/or overridden by the client. */
 struct TimeSettings {
 	bool   time_in_minutes;                  ///< whether to use the hh:mm conversion when printing dates
 	uint16_t ticks_per_minute;               ///< how many ticks per minute
@@ -266,7 +286,7 @@ struct GUISettings : public TimeSettings {
 	bool        departure_larger_font;                           ///< whether to show the calling at list in a larger font
 	bool        departure_destination_type;                      ///< whether to show destination types for ports and airports
 	bool        departure_smart_terminus;                        ///< whether to only show passenger services
-	uint8_t     departure_conditionals;                          ///< how to handle conditional orders
+	DeparturesConditionalJumpResult departure_conditionals;      ///< how to handle conditional orders
 	bool        departure_merge_identical;                       ///< whether to merge identical departures
 	uint8_t     departure_default_mode;                          ///< default mode for non-waypoint departure board window
 	uint8_t     departure_default_source;                        ///< default source for departure board window
@@ -346,6 +366,7 @@ struct GUISettings : public TimeSettings {
 	bool        hide_default_stop_location;                      ///< Hide default stop location for orders
 	bool        show_rail_polyline_tool;                         ///< Show rail polyline tool
 	bool        show_running_costs_calendar_year;                ///< Show vehicle running costs in calendar years
+	bool        show_town_growth_status;                         ///< Show town growth status & sorting in town directory
 
 	uint16_t    console_backlog_timeout;                         ///< the minimum amount of time items should be in the console backlog before they will be removed in ~3 seconds granularity.
 	uint16_t    console_backlog_length;                          ///< the minimum amount of items in the console backlog before items will be removed.
@@ -517,8 +538,8 @@ struct GameCreationSettings {
 	uint8_t  heightmap_rotation;             ///< rotation director for the heightmap
 	uint8_t  se_flat_world_height;           ///< land height a flat world gets in SE
 	uint8_t  town_name;                      ///< the town name generator used for town names
-	uint8_t  landscape;                      ///< the landscape we're currently in
-	uint8_t  water_borders;                  ///< bitset of the borders that are water
+	LandscapeType landscape;                 ///< the landscape we're currently in
+	BorderFlags water_borders;               ///< bitset of the borders that are water
 	uint16_t custom_town_number;             ///< manually entered number of towns
 	uint16_t custom_industry_number;         ///< manually entered number of industries
 	uint8_t  variety;                        ///< variety level applied to TGP
@@ -564,9 +585,7 @@ struct ConstructionSettings {
 	uint16_t maximum_signal_evaluations;     ///< maximum number of programmable pre-signals which may be evaluated in one pass
 	bool     enable_build_river;             ///< enable building rivers in-game
 	bool     enable_remove_water;            ///< enable removing sea and rivers in-game
-	uint8_t  road_custom_bridge_heads;       ///< allow construction of road custom bridge heads
 	bool     chunnel;                        ///< allow construction of tunnels under water
-	uint8_t  rail_custom_bridge_heads;       ///< allow construction of rail custom bridge heads
 	bool     allow_grf_objects_under_bridges;///< allow all NewGRF objects under bridges
 	bool     allow_stations_under_bridges;   ///< allow NewGRF rail station/waypoint tiles that do not specify clearance under bridges
 	bool     allow_road_stops_under_bridges; ///< allow road/tram stops under bridges
@@ -718,7 +737,7 @@ struct VehicleSettings {
 	bool     ship_collision_avoidance;         ///< ships try to avoid colliding with each other
 	bool     no_train_crash_other_company;     ///< trains cannot crash with trains from other companies
 	bool     roadveh_articulated_overtaking;   ///< enable articulated road vehicles overtaking other vehicles
-	bool     roadveh_cant_quantum_tunnel;      ///< enable or disable vehicles quantum tunelling through over vehicles when blocked
+	bool     roadveh_cant_quantum_tunnel;      ///< enable or disable vehicles quantum tunnelling through other vehicles when blocked
 	bool     drive_through_train_depot;        ///< enable drive-through train depot emulation
 	uint16_t through_load_speed_limit;         ///< maximum speed for through load
 	uint16_t rail_depot_speed_limit;           ///< maximum speed entering/existing rail depots
@@ -766,6 +785,7 @@ struct EconomySettings {
 	uint16_t min_town_land_area;             ///< minimum contiguous lang area for towns.
 	uint16_t min_city_land_area;             ///< minimum contiguous lang area for cities.
 	TownFounding found_town;                 ///< town founding.
+	PlaceHouses place_houses;                ///< players are allowed to place town houses.
 	bool     station_noise_level;            ///< build new airports when the town noise level is still within accepted limits
 	uint16_t town_noise_population[3];       ///< population to base decision on noise evaluation (@see town_council_tolerance)
 	bool     infrastructure_sharing[4];      ///< enable infrastructure sharing for rail/road/water/air
@@ -787,7 +807,6 @@ struct EconomySettings {
 	uint16_t random_road_reconstruction;     ///< chance out of 1000 per tile loop for towns to start random road re-construction
 	bool     disable_inflation_newgrf_flag;  ///< Disable NewGRF inflation flag
 	CargoPaymentAlgorithm payment_algorithm; ///< Cargo payment algorithm
-	TickRateMode tick_rate;                  ///< Tick rate mode
 	uint8_t industry_event_rate;             ///< Rate of industry events
 };
 
@@ -811,12 +830,12 @@ struct LinkGraphSettings {
 	uint8_t short_path_saturation;                      ///< percentage up to which short paths are saturated before saturating most capacious paths
 	uint16_t aircraft_link_scale;                       ///< scale effective distance of aircraft links
 
-	inline DistributionType GetDistributionType(CargoID cargo) const
+	inline DistributionType GetDistributionType(CargoType cargo) const
 	{
 		if (this->distribution_per_cargo[cargo] != DT_PER_CARGO_DEFAULT) return this->distribution_per_cargo[cargo];
-		if (IsCargoInClass(cargo, CC_PASSENGERS)) return this->distribution_pax;
-		if (IsCargoInClass(cargo, CC_MAIL)) return this->distribution_mail;
-		if (IsCargoInClass(cargo, CC_ARMOURED)) return this->distribution_armoured;
+		if (IsCargoInClass(cargo, CargoClass::Passengers)) return this->distribution_pax;
+		if (IsCargoInClass(cargo, CargoClass::Mail)) return this->distribution_mail;
+		if (IsCargoInClass(cargo, CargoClass::Armoured)) return this->distribution_armoured;
 		return this->distribution_default;
 	}
 };
@@ -825,6 +844,7 @@ struct LinkGraphSettings {
 struct StationSettings {
 	bool     modified_catchment;               ///< different-size catchment areas
 	bool     serve_neutral_industries;         ///< company stations can serve industries with attached neutral stations
+	bool     truncate_cargo;                   ///< enable automatic truncation of station cargo
 	bool     distant_join_stations;            ///< allow to join non-adjacent stations
 	bool     never_expire_airports;            ///< never expire airports
 	uint8_t  station_spread;                   ///< amount a station may spread
@@ -836,42 +856,55 @@ struct StationSettings {
 
 /** Default settings for vehicles. */
 struct VehicleDefaultSettings {
-	bool   servint_ispercent;                ///< service intervals are in percents
-	uint16_t servint_trains;                 ///< service interval for trains
-	uint16_t servint_roadveh;                ///< service interval for road vehicles
-	uint16_t servint_aircraft;               ///< service interval for aircraft
-	uint16_t servint_ships;                  ///< service interval for ships
-	bool   auto_timetable_by_default;        ///< use automatic timetables by default
-	bool   auto_separation_by_default;       ///< use automatic timetable separation by default
+	bool servint_ispercent = false;          ///< service intervals are in percents
+	uint16_t servint_trains = 0;             ///< service interval for trains
+	uint16_t servint_roadveh = 0;            ///< service interval for road vehicles
+	uint16_t servint_aircraft = 0;           ///< service interval for aircraft
+	uint16_t servint_ships = 0;              ///< service interval for ships
+	bool auto_timetable_by_default = false;  ///< use automatic timetables by default
+	bool auto_separation_by_default = false; ///< use automatic timetable separation by default
 };
 
 /** Settings that can be set per company. */
 struct CompanySettings {
-	bool engine_renew;                       ///< is autorenew enabled
-	int16_t engine_renew_months;             ///< months before/after the maximum vehicle age a vehicle should be renewed
-	uint32_t engine_renew_money;             ///< minimum amount of money before autorenew is used
-	bool renew_keep_length;                  ///< sell some wagons if after autoreplace the train is longer than before
-	VehicleDefaultSettings vehicle;          ///< default settings for vehicles
-	uint8_t order_occupancy_smoothness;      ///< percentage smoothness of occupancy measurement changes
-	uint8_t  auto_timetable_separation_rate; ///< percentage of auto timetable separation change to apply
-	bool infra_others_buy_in_depot[4];       ///< other companies can buy/autorenew in this companies depots (where infra sharing enabled)
-	uint16_t timetable_autofill_rounding;    ///< round up timetable times to be a multiple of this number of ticks
-	bool advance_order_on_clone;             ///< when cloning a vehicle or copying/sharing an order list, advance the current order to a suitable point
-	bool copy_clone_add_to_group;            ///< whether to add cloned vehicles to the source vehicle's group, when cloning a vehicle without sharing orders
-	bool remain_if_next_order_same_station;  ///< if the next order is for the same station, start loading/unloading again instead of leaving.
-	uint16_t default_sched_dispatch_duration;///< default scheduled dispatch duration
+	bool engine_renew = false;                      ///< is autorenew enabled
+	int16_t engine_renew_months = 0;                ///< months before/after the maximum vehicle age a vehicle should be renewed
+	uint32_t engine_renew_money = 0;                ///< minimum amount of money before autorenew is used
+	bool renew_keep_length = false;                 ///< sell some wagons if after autoreplace the train is longer than before
+	VehicleDefaultSettings vehicle{};               ///< default settings for vehicles
+	uint8_t order_occupancy_smoothness = 0;         ///< percentage smoothness of occupancy measurement changes
+	uint8_t  auto_timetable_separation_rate = 0;    ///< percentage of auto timetable separation change to apply
+	bool infra_others_buy_in_depot[4]{};            ///< other companies can buy/autorenew in this companies depots (where infra sharing enabled)
+	uint16_t timetable_autofill_rounding = 0;       ///< round up timetable times to be a multiple of this number of ticks
+	bool advance_order_on_clone = false;            ///< when cloning a vehicle or copying/sharing an order list, advance the current order to a suitable point
+	bool copy_clone_add_to_group = false;           ///< whether to add cloned vehicles to the source vehicle's group, when cloning a vehicle without sharing orders
+	bool remain_if_next_order_same_station = false; ///< if the next order is for the same station, start loading/unloading again instead of leaving.
+	uint16_t default_sched_dispatch_duration = 0;   ///< default scheduled dispatch duration
 
-	uint8_t old_simulated_wormhole_signals;  ///< no longer needs a setting: tunnel/bridge signal simulation spacing
+	uint8_t old_simulated_wormhole_signals = 0;     ///< no longer needs a setting: tunnel/bridge signal simulation spacing
 };
 
 /** Debug settings. */
 struct DebugSettings {
-	uint32_t chicken_bits;                   ///< chicken bits
-	uint32_t newgrf_optimiser_flags;         ///< NewGRF optimiser flags
+	uint32_t chicken_bits = 0;               ///< chicken bits
+	uint32_t newgrf_optimiser_flags = 0;     ///< NewGRF optimiser flags
 };
 /** Settings related to currency/unit systems. */
 struct ClientLocaleSettings {
-	bool sync_locale_network_server;         ///< sync locale settings with network server
+	bool sync_locale_network_server = false; ///< sync locale settings with network server
+};
+
+/** Container for AI and Game script configuration. */
+struct ScriptConfigSettings
+{
+	TypedIndexContainer<std::array<std::unique_ptr<class AIConfig>, MAX_COMPANIES>, CompanyID> ai; ///< settings per company
+	std::unique_ptr<class GameConfig> game; ///< settings for gamescript
+
+	ScriptConfigSettings();
+	~ScriptConfigSettings();
+
+	ScriptConfigSettings(const ScriptConfigSettings &other);
+	ScriptConfigSettings &operator=(const ScriptConfigSettings &other);
 };
 
 /** All settings together for the game. */
@@ -881,8 +914,7 @@ struct GameSettings {
 	ConstructionSettings construction;       ///< construction of things in-game
 	AISettings           ai;                 ///< what may the AI do?
 	ScriptSettings       script;             ///< settings for scripts
-	class AIConfig      *ai_config[MAX_COMPANIES]; ///< settings per company
-	class GameConfig    *game_config;        ///< settings for gamescript
+	ScriptConfigSettings script_config;      ///< AI and Gamescript configuration.
 	PathfinderSettings   pf;                 ///< settings for all pathfinders
 	OrderSettings        order;              ///< settings related to orders
 	VehicleSettings      vehicle;            ///< options for vehicles

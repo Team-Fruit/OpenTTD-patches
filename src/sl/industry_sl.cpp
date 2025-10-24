@@ -302,14 +302,14 @@ static void Load_INDY()
 
 	int index;
 	while ((index = SlIterateArray()) != -1) {
-		Industry *i = new (index) Industry();
+		Industry *i = new (IndustryID(index)) Industry();
 		SlObjectLoadFiltered(i, slt);
 
 		/* Before savegame version 161, persistent storages were not stored in a pool. */
 		if (IsSavegameVersionBefore(SLV_161) && !IsSavegameVersionBefore(SLV_76)) {
 			/* Store the old persistent storage. The GRFID will be added later. */
 			assert(PersistentStorage::CanAllocateItem());
-			i->psa = new PersistentStorage(0, 0, 0);
+			i->psa = new PersistentStorage(0, 0, {});
 			std::copy(std::begin(_old_ind_persistent_storage.storage), std::end(_old_ind_persistent_storage.storage), std::begin(i->psa->storage));
 		}
 		if (SlXvIsFeatureMissing(XSLFI_INDUSTRY_CARGO_REORGANISE)) {

@@ -46,7 +46,7 @@ public:
 	typedef btree::safe_btree_set<std::pair<SQInteger, SQInteger>> ScriptListValueSet; ///< [Value, Key] set
 
 private:
-	ScriptListSorter *sorter;     ///< Sorting algorithm
+	std::unique_ptr<ScriptListSorter> sorter; ///< Sorting algorithm
 	SorterType sorter_type;       ///< Sorting type
 	bool sort_ascending;          ///< Whether to sort ascending or descending
 	bool initialized;             ///< Whether an iteration has been started
@@ -59,7 +59,7 @@ private:
 	ScriptListMap::iterator RemoveIter(ScriptListMap::iterator item_iter);
 	ScriptListValueSet::iterator RemoveValueIter(ScriptListValueSet::iterator value_iter);
 
-	template<typename T>
+	template <typename T>
 	struct FillListHelper {
 		using IterType = T;
 
@@ -75,13 +75,19 @@ private:
 	};
 
 protected:
-	template<typename T, typename... Targs>
+	/* Temporary helper functions to get the raw index from either strongly and non-strongly typed pool items. */
+	template <typename T>
+	static auto GetRawIndex(const T &index) { return index; }
+	template <typename T> requires std::is_base_of_v<struct PoolIDBase, T>
+	static auto GetRawIndex(const T &index) { return index.base(); }
+
+	template <typename T, typename... Targs>
 	static void FillList(Targs... args)
 	{
 		FillListT<FillListHelper<T>>(FillListHelper<T>{}, args...);
 	}
 
-	template<typename Thelper, class ItemValid, class ItemFilter>
+	template <typename Thelper, class ItemValid, class ItemFilter>
 	static void FillListT(Thelper helper, ScriptList *list, ItemValid item_valid, ItemFilter item_filter)
 	{
 		using IterType = typename Thelper::IterType;
@@ -92,13 +98,13 @@ protected:
 			item_count++;
 			if (!item_valid(item)) continue;
 			if (!item_filter(item)) continue;
-			list->AddItem(item->index);
+			list->AddItem(GetRawIndex(item->index));
 			opcode_charge += 3;
 		}
 		ScriptController::DecreaseOps(opcode_charge + helper.OpcodeCharge(item_count));
 	}
 
-	template<typename Thelper, class ItemValid>
+	template <typename Thelper, class ItemValid>
 	static void FillListT(Thelper helper, ScriptList *list, ItemValid item_valid)
 	{
 		using IterType = typename Thelper::IterType;
@@ -106,7 +112,7 @@ protected:
 		ScriptList::FillListT<Thelper>(helper, list, item_valid, [](const IterType *) { return true; });
 	}
 
-	template<typename Thelper>
+	template <typename Thelper>
 	static void FillListT(Thelper helper, ScriptList *list)
 	{
 		using IterType = typename Thelper::IterType;
@@ -114,7 +120,7 @@ protected:
 		ScriptList::FillListT<Thelper>(list, [](const IterType *) { return true; });
 	}
 
-	template<typename Thelper, class ItemValid>
+	template <typename Thelper, class ItemValid>
 	static void FillListT(Thelper helper, HSQUIRRELVM vm, ScriptList *list, ItemValid item_valid)
 	{
 		using IterType = typename Thelper::IterType;
@@ -150,7 +156,7 @@ protected:
 					/* Push the root table as instance object, this is what squirrel does for meta-functions. */
 					sq_pushroottable(vm);
 					/* Push all arguments for the valuator function. */
-					sq_pushinteger(vm, item->index);
+					sq_pushinteger(vm, GetRawIndex(item->index));
 					for (int i = 0; i < nparam - 1; i++) {
 						sq_push(vm, i + 3);
 					}
@@ -188,13 +194,21 @@ protected:
 		ScriptObject::SetAllowDoCommand(backup_allow);
 	}
 
-	template<typename Thelper>
+	template <typename Thelper>
 	static void FillListT(Thelper helper, HSQUIRRELVM vm, ScriptList *list)
 	{
 		using IterType = typename Thelper::IterType;
 
 		ScriptList::FillListT<Thelper>(helper, vm, list, [](const IterType *) { return true; });
 	}
+
+	inline size_t GetSize() const
+	{
+		return this->items.size();
+	}
+
+	virtual bool SaveObject(HSQUIRRELVM vm) override;
+	virtual bool LoadObject(HSQUIRRELVM vm) override;
 
 public:
 	ScriptListMap items;       ///< The items in the list

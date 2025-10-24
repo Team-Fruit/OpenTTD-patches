@@ -12,11 +12,11 @@
 #ifndef NETWORK_CORE_CONFIG_H
 #define NETWORK_CORE_CONFIG_H
 
-const char *NetworkCoordinatorConnectionString();
-const char *NetworkStunConnectionString();
-const char *NetworkContentServerConnectionString();
-const char *NetworkContentMirrorUriString();
-const char *NetworkSurveyUriString();
+std::string_view NetworkCoordinatorConnectionString();
+std::string_view NetworkStunConnectionString();
+std::string_view NetworkContentServerConnectionString();
+std::string_view NetworkContentMirrorUriString();
+std::string_view NetworkSurveyUriString();
 
 static const uint16_t NETWORK_COORDINATOR_SERVER_PORT = 3976;           ///< The default port of the Game Coordinator server (TCP)
 static const uint16_t NETWORK_STUN_SERVER_PORT        = 3975;           ///< The default port of the STUN server (TCP)
@@ -106,6 +106,6 @@ static const uint NETWORK_PUBLIC_KEY_LENGTH = 32 * 2 + 1;
 /**
  * Maximum version supported in PACKET_SERVER_GAME_INFO_EXTENDED
  */
-static const uint8_t SERVER_GAME_INFO_EXTENDED_MAX_VERSION = 1;
+static const uint8_t SERVER_GAME_INFO_EXTENDED_MAX_VERSION = 2;
 
 #endif /* NETWORK_CORE_CONFIG_H */

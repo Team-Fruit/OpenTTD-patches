@@ -17,19 +17,19 @@
 #include "../date_type.h"
 
 /** Type for the pool with client information. */
-typedef Pool<NetworkClientInfo, ClientIndex, 8, MAX_CLIENT_SLOTS, PT_NCLIENT> NetworkClientInfoPool;
+using NetworkClientInfoPool = Pool<NetworkClientInfo, ClientPoolID, 8, PoolType::NetworkClient>;
 extern NetworkClientInfoPool _networkclientinfo_pool;
 
 /** Container for all information known about a client. */
 struct NetworkClientInfo : NetworkClientInfoPool::PoolItem<&_networkclientinfo_pool> {
-	ClientID client_id;      ///< Client identifier (same as ClientState->client_id)
-	std::string client_name; ///< Name of the client
-	//std::string public_key; ///< The public key of the client.
-	CompanyID client_playas; ///< As which company is this client playing (CompanyID)
-	EconTime::Date join_date; ///< Gamedate the client has joined
-	EconTime::DateFract join_date_fract;
-	uint8_t join_tick_skip_counter;
-	uint32_t join_frame;
+	ClientID client_id = INVALID_CLIENT_ID;         ///< Client identifier (same as ClientState->client_id)
+	std::string client_name{};                      ///< Name of the client
+	std::string public_key{};                       ///< The public key of the client.
+	CompanyID client_playas = CompanyID::Invalid(); ///< As which company is this client playing (CompanyID)
+	EconTime::Date join_date{};                     ///< Gamedate the client has joined
+	EconTime::DateFract join_date_fract{};
+	uint8_t join_tick_skip_counter = 0;
+	uint32_t join_frame = 0;
 
 	/**
 	 * Create a new client.

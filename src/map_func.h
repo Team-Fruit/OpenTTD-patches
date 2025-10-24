@@ -17,13 +17,146 @@
 
 extern uint _map_tile_mask;
 
-/**
- * 'Wraps' the given tile to it is within the map. It does
- * this by masking the 'high' bits of.
- * @param x the tile to 'wrap'
- */
+struct Map {
+	/**
+	 * Logarithm of the map size along the X side.
+	 * @note try to avoid using this one
+	 * @return 2^"return value" == Map::SizeX()
+	 */
+	static inline uint LogX()
+	{
+		extern uint _map_log_x;
+		return _map_log_x;
+	}
 
-#define TILE_MASK(x) ((x) & _map_tile_mask)
+	/**
+	 * Logarithm of the map size along the y side.
+	 * @note try to avoid using this one
+	 * @return 2^"return value" == Map::SizeY()
+	 */
+	static inline uint LogY()
+	{
+		extern uint _map_log_y;
+		return _map_log_y;
+	}
+
+	/**
+	 * Get the size of the map along the X
+	 * @return the number of tiles along the X of the map
+	 */
+	static inline uint SizeX()
+	{
+		extern uint _map_size_x;
+		return _map_size_x;
+	}
+
+	/**
+	 * Get the size of the map along the Y
+	 * @return the number of tiles along the Y of the map
+	 */
+	static inline uint SizeY()
+	{
+		extern uint _map_size_y;
+		return _map_size_y;
+	}
+
+	/**
+	 * Get the size of the map
+	 * @return the number of tiles of the map
+	 */
+	static inline uint Size()
+	{
+		extern uint _map_size;
+		return _map_size;
+	}
+
+	/**
+	 * Gets the maximum X coordinate within the map, including MP_VOID
+	 * @return the maximum X coordinate
+	 */
+	static inline uint MaxX()
+	{
+		return Map::SizeX() - 1;
+	}
+
+	/**
+	 * Gets the maximum Y coordinate within the map, including MP_VOID
+	 * @return the maximum Y coordinate
+	 */
+	static inline uint MaxY()
+	{
+		return Map::SizeY() - 1;
+	}
+
+	/**
+	 * Get the number of base-10 digits required for the size of the map along the X
+	 * @return the number of digits required
+	 */
+	static inline uint DigitsX()
+	{
+		extern uint _map_digits_x;
+		return _map_digits_x;
+	}
+
+	/**
+	 * Get the number of base-10 digits required for the size of the map along the Y
+	 * @return the number of digits required
+	 */
+	static inline uint DigitsY()
+	{
+		extern uint _map_digits_y;
+		return _map_digits_y;
+	}
+
+	/**
+	 * 'Wraps' the given "tile" so it is within the map.
+	 * It does this by masking the 'high' bits of.
+	 * @param tile the tile to 'wrap'
+	 */
+	static inline TileIndex WrapToMap(TileIndex tile)
+	{
+		return TileIndex{tile.base() & _map_tile_mask};
+	}
+
+	/**
+	 * Scales the given value by the map size, where the given value is
+	 * for a 256 by 256 map.
+	 * @param n the value to scale
+	 * @return the scaled size
+	 */
+	static inline uint ScaleBySize(uint n)
+	{
+		/* Subtract 12 from shift in order to prevent integer overflow
+		 * for large values of n. It's safe since the min mapsize is 64x64. */
+		return CeilDiv(n << (Map::LogX() + Map::LogY() - 12), 1 << 4);
+	}
+
+	/**
+	 * Scales the given value by the maps circumference, where the given
+	 * value is for a 256 by 256 map
+	 * @param n the value to scale
+	 * @return the scaled size
+	 */
+	static inline uint ScaleBySize1D(uint n)
+	{
+		/* Normal circumference for the X+Y is 256+256 = 1<<9
+		 * Note, not actually taking the full circumference into account,
+		 * just half of it. */
+		return CeilDiv((n << Map::LogX()) + (n << Map::LogY()), 1 << 9);
+	}
+};
+
+template <typename T>
+struct MapTilePtr {
+	T *tile_data;
+
+	/**
+	 * Get a node abstraction with the specified id.
+	 * @param num ID of the node.
+	 * @return the Requested node.
+	 */
+	debug_inline T &operator[](TileIndex tile) { return this->tile_data[tile.base()]; }
+};
 
 /**
  * Pointer to the tile-array.
@@ -31,7 +164,7 @@ extern uint _map_tile_mask;
  * This variable points to the tile-array which contains the tiles of
  * the map.
  */
-extern Tile *_m;
+extern MapTilePtr<Tile> _m;
 
 /**
  * Pointer to the extended tile-array.
@@ -39,128 +172,11 @@ extern Tile *_m;
  * This variable points to the extended tile-array which contains the tiles
  * of the map.
  */
-extern TileExtended *_me;
+extern MapTilePtr<TileExtended> _me;
 
 bool ValidateMapSize(uint size_x, uint size_y);
 void AllocateMap(uint size_x, uint size_y);
-
-/**
- * Logarithm of the map size along the X side.
- * @note try to avoid using this one
- * @return 2^"return value" == MapSizeX()
- */
-inline uint MapLogX()
-{
-	extern uint _map_log_x;
-	return _map_log_x;
-}
-
-/**
- * Logarithm of the map size along the y side.
- * @note try to avoid using this one
- * @return 2^"return value" == MapSizeY()
- */
-inline uint MapLogY()
-{
-	extern uint _map_log_y;
-	return _map_log_y;
-}
-
-/**
- * Get the size of the map along the X
- * @return the number of tiles along the X of the map
- */
-inline uint MapSizeX()
-{
-	extern uint _map_size_x;
-	return _map_size_x;
-}
-
-/**
- * Get the size of the map along the Y
- * @return the number of tiles along the Y of the map
- */
-inline uint MapSizeY()
-{
-	extern uint _map_size_y;
-	return _map_size_y;
-}
-
-/**
- * Get the size of the map
- * @return the number of tiles of the map
- */
-inline uint MapSize()
-{
-	extern uint _map_size;
-	return _map_size;
-}
-
-/**
- * Gets the maximum X coordinate within the map, including MP_VOID
- * @return the maximum X coordinate
- */
-inline uint MapMaxX()
-{
-	return MapSizeX() - 1;
-}
-
-/**
- * Gets the maximum Y coordinate within the map, including MP_VOID
- * @return the maximum Y coordinate
- */
-inline uint MapMaxY()
-{
-	return MapSizeY() - 1;
-}
-
-/**
- * Get the number of base-10 digits required for the size of the map along the X
- * @return the number of digits required
- */
-inline uint MapDigitsX()
-{
-	extern uint _map_digits_x;
-	return _map_digits_x;
-}
-
-/**
- * Get the number of base-10 digits required for the size of the map along the Y
- * @return the number of digits required
- */
-inline uint MapDigitsY()
-{
-	extern uint _map_digits_y;
-	return _map_digits_y;
-}
-
-/**
- * Scales the given value by the map size, where the given value is
- * for a 256 by 256 map.
- * @param n the value to scale
- * @return the scaled size
- */
-inline uint ScaleByMapSize(uint n)
-{
-	/* Subtract 12 from shift in order to prevent integer overflow
-	 * for large values of n. It's safe since the min mapsize is 64x64. */
-	return CeilDiv(n << (MapLogX() + MapLogY() - 12), 1 << 4);
-}
-
-
-/**
- * Scales the given value by the maps circumference, where the given
- * value is for a 256 by 256 map
- * @param n the value to scale
- * @return the scaled size
- */
-inline uint ScaleByMapSize1D(uint n)
-{
-	/* Normal circumference for the X+Y is 256+256 = 1<<9
-	 * Note, not actually taking the full circumference into account,
-	 * just half of it. */
-	return CeilDiv((n << MapLogX()) + (n << MapLogY()), 1 << 9);
-}
+void DeallocateMap();
 
 /**
  * Returns the TileIndex of a coordinate.
@@ -171,7 +187,7 @@ inline uint ScaleByMapSize1D(uint n)
  */
 debug_inline static TileIndex TileXY(uint x, uint y)
 {
-	return (y << MapLogX()) + x;
+	return TileIndex{(y << Map::LogX()) + x};
 }
 
 /**
@@ -191,7 +207,7 @@ inline TileIndexDiff TileDiffXY(int x, int y)
 	 * 0 << shift isn't optimized to 0 properly.
 	 * Typically x and y are constants, and then this doesn't result
 	 * in any actual multiplication in the assembly code.. */
-	return (y * MapSizeX()) + x;
+	return (y * Map::SizeX()) + x;
 }
 
 /**
@@ -202,7 +218,7 @@ inline TileIndexDiff TileDiffXY(int x, int y)
  */
 debug_inline static TileIndex TileVirtXY(uint x, uint y)
 {
-	return (y >> 4 << MapLogX()) + (x >> 4);
+	return TileIndex{(y >> 4 << Map::LogX()) + (x >> 4)};
 }
 
 /**
@@ -214,8 +230,8 @@ debug_inline static TileIndex TileVirtXY(uint x, uint y)
  */
 inline TileIndex TileVirtXYClampedToMap(int x, int y)
 {
-	int safe_x = Clamp<int>(x, 0, MapMaxX() * TILE_SIZE);
-	int safe_y = Clamp<int>(y, 0, MapMaxY() * TILE_SIZE);
+	int safe_x = Clamp<int>(x, 0, Map::MaxX() * TILE_SIZE);
+	int safe_y = Clamp<int>(y, 0, Map::MaxY() * TILE_SIZE);
 	return TileVirtXY((uint) safe_x, (uint) safe_y);
 }
 
@@ -226,7 +242,7 @@ inline TileIndex TileVirtXYClampedToMap(int x, int y)
  */
 debug_inline static uint TileX(TileIndex tile)
 {
-	return tile & MapMaxX();
+	return tile.base() & Map::MaxX();
 }
 
 /**
@@ -236,7 +252,7 @@ debug_inline static uint TileX(TileIndex tile)
  */
 debug_inline static uint TileY(TileIndex tile)
 {
-	return tile >> MapLogX();
+	return tile.base() >> Map::LogX();
 }
 
 /**
@@ -253,7 +269,6 @@ inline TileIndexDiff ToTileIndexDiff(TileIndexDiffC tidc)
 {
 	return TileDiffXY(tidc.x, tidc.y);
 }
-
 
 /**
  * Adds a given offset to a tile.
@@ -327,7 +342,7 @@ inline TileIndex AddTileIndexDiffCWrap(TileIndex tile, TileIndexDiffC diff)
 	int x = TileX(tile) + diff.x;
 	int y = TileY(tile) + diff.y;
 	/* Negative value will become big positive value after cast */
-	if ((uint)x >= MapSizeX() || (uint)y >= MapSizeY()) return INVALID_TILE;
+	if ((uint)x >= Map::SizeX() || (uint)y >= Map::SizeY()) return INVALID_TILE;
 	return TileXY(x, y);
 }
 
@@ -348,9 +363,23 @@ inline TileIndexDiffC TileIndexToTileIndexDiffC(TileIndex tile_a, TileIndex tile
 	return difference;
 }
 
+/**
+ * Returns the diff between two tiles, as in tile_a - tile_b
+ *
+ * @param tile_a from tile
+ * @param tile_b to tile
+ * @return the difference between tila_a and tile_b
+ * @pre tile_a >= tile_b
+ */
+inline TileIndexDiffCUnsigned TileIndexToTileIndexDiffCUnsigned(TileIndex tile_a, TileIndex tile_b)
+{
+	TileIndex difference{tile_a.base() - tile_b.base()};
+	return { TileX(difference), TileY(difference) };
+}
+
 /* Functions to calculate distances */
 uint DistanceManhattan(TileIndex, TileIndex); ///< also known as L1-Norm. Is the shortest distance one could go over diagonal tracks (or roads)
-uint64_t DistanceSquare64(TileIndex, TileIndex); ///< euclidian- or L2-Norm squared
+uint64_t DistanceSquare64(TileIndex, TileIndex); ///< Euclidean- or L2-Norm squared
 inline uint DistanceSquare(TileIndex t0, TileIndex t1) { return ClampTo<uint>(DistanceSquare64(t0, t1)); }
 uint DistanceMax(TileIndex, TileIndex); ///< also known as L-Infinity-Norm
 uint DistanceMaxPlusManhattan(TileIndex, TileIndex); ///< Max + Manhattan
@@ -460,9 +489,6 @@ inline DiagDirection DiagdirBetweenTiles(TileIndex tile_from, TileIndex tile_to)
  */
 typedef bool TestTileOnSearchProc(TileIndex tile, void *user_data);
 
-bool CircularTileSearch(TileIndex *tile, uint size, TestTileOnSearchProc proc, void *user_data);
-bool CircularTileSearch(TileIndex *tile, uint radius, uint w, uint h, TestTileOnSearchProc proc, void *user_data);
-
 bool EnoughContiguousTilesMatchingCondition(TileIndex tile, uint threshold, TestTileOnSearchProc proc, void *user_data);
 
 /**
@@ -482,7 +508,7 @@ void IterateCurvedCircularTileArea(TileIndex centre_tile, uint diameter, TileIte
  */
 inline TileIndex RandomTileSeed(uint32_t r)
 {
-	return TILE_MASK(r);
+	return Map::WrapToMap(TileIndex(r));
 }
 
 /**
@@ -496,5 +522,6 @@ inline TileIndex RandomTileSeed(uint32_t r)
 uint GetClosestWaterDistance(TileIndex tile, bool water);
 
 void DumpTileInfo(struct format_target &buffer, TileIndex tile);
+void DumpTileFields(struct format_target &buffer, TileIndex tile);
 
 #endif /* MAP_FUNC_H */

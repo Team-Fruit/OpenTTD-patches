@@ -107,12 +107,12 @@ void SetFont(FontSize fontsize, const std::string &font, uint size)
 			GetFontCacheSubSetting(fs)->font = fc->HasParent() ? fc->GetFontName() : "";
 		}
 		CheckForMissingGlyphs();
-		_fcsettings = backup;
+		_fcsettings = std::move(backup);
 	} else {
 		InitFontCache(true);
 	}
 
-	LoadStringWidthTable();
+	LoadStringWidthTable(fontsize == FS_MONO);
 	UpdateAllVirtCoords();
 	ReInitAllWindows(true);
 
@@ -235,5 +235,5 @@ void UninitFontCache()
 
 #if !defined(_WIN32) && !defined(__APPLE__) && !defined(WITH_FONTCONFIG) && !defined(WITH_COCOA)
 
-bool SetFallbackFont(FontCacheSettings *, const std::string &, int, MissingGlyphSearcher *) { return false; }
+bool SetFallbackFont(FontCacheSettings *, const std::string &, MissingGlyphSearcher *) { return false; }
 #endif /* !defined(_WIN32) && !defined(__APPLE__) && !defined(WITH_FONTCONFIG) && !defined(WITH_COCOA) */

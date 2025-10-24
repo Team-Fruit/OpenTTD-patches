@@ -68,15 +68,15 @@ struct ENGNChunkHandler : ChunkHandler {
 		 * engine pool after processing NewGRFs by CopyTempEngineData(). */
 		int index;
 		while ((index = SlIterateArray()) != -1) {
-			Engine *e = GetTempDataEngine(index);
+			Engine *e = GetTempDataEngine(static_cast<EngineID>(index));
 			SlObject(e, slt);
 
 			if (IsSavegameVersionBefore(SLV_179)) {
 				/* preview_company_rank was replaced with preview_company and preview_asked.
 				 * Just cancel any previews. */
-				e->flags &= ~4; // ENGINE_OFFER_WINDOW_OPEN
-				e->preview_company = INVALID_COMPANY;
-				e->preview_asked = MAX_UVALUE(CompanyMask);
+				e->flags.Reset(EngineFlag{2}); // ENGINE_OFFER_WINDOW_OPEN
+				e->preview_company = CompanyID::Invalid();
+				e->preview_asked.Set();
 			}
 		}
 	}

@@ -20,16 +20,14 @@
 #include <vector>
 
 /** Unique identifier for an order backup. */
-typedef uint8_t OrderBackupID;
+struct OrderBackupIDTag : public PoolIDTraits<uint8_t, 255, 0xFF> {};
+using OrderBackupID = PoolID<OrderBackupIDTag>;
 struct OrderBackup;
 
 /** The pool type for order backups. */
-typedef Pool<OrderBackup, OrderBackupID, 1, 256> OrderBackupPool;
+using OrderBackupPool = Pool<OrderBackup, OrderBackupID, 1>;
 /** The pool with order backups. */
 extern OrderBackupPool _order_backup_pool;
-
-/** Flag to pass to the vehicle construction command when an order should be preserved. */
-static const uint32_t MAKE_ORDER_BACKUP_FLAG = 1U << 31;
 
 namespace upstream_sl {
 	SaveLoadTable GetOrderBackupDescription();
@@ -46,15 +44,17 @@ private:
 	friend struct OrderBackupDispatchScheduleStructHandler; ///< Saving and loading of order backups.
 	friend struct OrderBackupOrderVectorStructHandler; ///< Saving and loading of order backups.
 	friend upstream_sl::SaveLoadTable upstream_sl::GetOrderBackupDescription(); ///< Saving and loading of order backups.
-	friend void Load_BKOR();   ///< Creating empty orders upon savegame loading.
-	friend void Save_BKOR();   ///< Saving orders upon savegame saving.
+	template <typename T>
+	friend class upstream_sl::SlOrders;
+	friend void Load_BKOR();              ///< Creating empty orders upon savegame loading.
+	friend void Save_BKOR();              ///< Saving orders upon savegame saving.
 	friend upstream_sl::BKORChunkHandler;
-	uint32_t user;             ///< The user that requested the backup.
-	TileIndex tile;            ///< Tile of the depot where the order was changed.
-	GroupID group;             ///< The group the vehicle was part of.
+	uint32_t user = 0;                    ///< The user that requested the backup.
+	TileIndex tile = INVALID_TILE;        ///< Tile of the depot where the order was changed.
+	GroupID group = GroupID::Invalid();   ///< The group the vehicle was part of.
 
-	const Vehicle *clone;      ///< Vehicle this vehicle was a clone of.
-	std::vector<Order> orders; ///< The actual orders if the vehicle was not a clone.
+	const Vehicle *clone = nullptr;       ///< Vehicle this vehicle was a clone of.
+	std::vector<Order> orders;            ///< The actual orders if the vehicle was not a clone.
 
 	std::vector<DispatchSchedule> dispatch_schedules; ///< Scheduled dispatch schedules
 

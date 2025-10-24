@@ -80,7 +80,7 @@ DECLARE_ENUM_AS_ADDABLE(SmallMapType)
 class SmallMapWindow : public Window {
 protected:
 	/** Available kinds of zoomlevel changes. */
-	enum ZoomLevelChange {
+	enum ZoomLevelChange : uint8_t {
 		ZLC_INITIALIZE, ///< Initialize zoom level.
 		ZLC_ZOOM_OUT,   ///< Zoom out.
 		ZLC_ZOOM_IN,    ///< Zoom in.
@@ -97,19 +97,19 @@ protected:
 	static const uint FORCE_REFRESH_PERIOD_LINK_GRAPH = 2850; ///< map is redrawn after that many milliseconds (link graph mode).
 	static const uint BLINK_PERIOD         = 450;             ///< highlight blinking interval in milliseconds.
 
-	uint min_number_of_columns;    ///< Minimal number of columns in legends.
-	uint min_number_of_fixed_rows; ///< Minimal number of rows in the legends for the fixed layouts only (all except #SMT_INDUSTRY).
-	uint column_width;             ///< Width of a column in the #WID_SM_LEGEND widget.
-	uint legend_width;             ///< Width of legend 'blob'.
+	uint min_number_of_columns = 0;    ///< Minimal number of columns in legends.
+	uint min_number_of_fixed_rows = 0; ///< Minimal number of rows in the legends for the fixed layouts only (all except #SMT_INDUSTRY).
+	uint column_width = 0;             ///< Width of a column in the #WID_SM_LEGEND widget.
+	uint legend_width = 0;             ///< Width of legend 'blob'.
 
-	int32_t scroll_x;  ///< Horizontal world coordinate of the base tile left of the top-left corner of the smallmap display.
-	int32_t scroll_y;  ///< Vertical world coordinate of the base tile left of the top-left corner of the smallmap display.
-	int tile_zoom;     ///< Tile zoom level. Bigger number means more zoom-out (further away).
-	int ui_zoom;       ///< UI (pixel doubling) Zoom level. Bigger number means more zoom-in (closer).
-	int zoom = 1;      ///< Zoom level. Bigger number means more zoom-out (further away).
+	int32_t scroll_x = 0;  ///< Horizontal world coordinate of the base tile left of the top-left corner of the smallmap display.
+	int32_t scroll_y = 0;  ///< Vertical world coordinate of the base tile left of the top-left corner of the smallmap display.
+	int tile_zoom = 0;     ///< Tile zoom level. Bigger number means more zoom-out (further away).
+	int ui_zoom = 0;       ///< UI (pixel doubling) Zoom level. Bigger number means more zoom-in (closer).
+	int zoom = 1;          ///< Zoom level. Bigger number means more zoom-out (further away).
 
-	GUITimer refresh; ///< Refresh timer.
-	std::unique_ptr<LinkGraphOverlay> overlay;
+	GUITimer refresh{}; ///< Refresh timer.
+	std::unique_ptr<LinkGraphOverlay> overlay{};
 
 	static void BreakIndustryChainLink();
 
@@ -173,7 +173,13 @@ protected:
 	 */
 	inline CompanyMask GetOverlayCompanyMask() const
 	{
-		return Company::IsValidID(_local_company) ? 1U << _local_company : MAX_UVALUE(CompanyMask);
+		CompanyMask mask{};
+		if (Company::IsValidID(_local_company)) {
+			mask.Set(_local_company);
+		} else {
+			mask.Set();
+		}
+		return mask;
 	}
 
 	uint GetNumberRowsLegend(uint columns) const;
@@ -209,7 +215,7 @@ public:
 	Point GetStationMiddle(const Station *st) const;
 
 	void Close([[maybe_unused]] int data = 0) override;
-	void SetStringParameters(WidgetID widget) const override;
+	std::string GetWidgetString(WidgetID widget, StringID stringid) const override;
 	void OnInit() override;
 	void OnPaint() override;
 	void DrawWidget(const Rect &r, WidgetID widget) const override;

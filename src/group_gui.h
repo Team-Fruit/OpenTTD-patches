@@ -11,11 +11,13 @@
 #define GROUP_GUI_H
 
 #include "company_type.h"
+#include "group_type.h"
+#include "sortlist_type.h"
 #include "vehicle_type.h"
 #include "group.h"
 #include "sortlist_type.h"
 
-void ShowCompanyGroup(CompanyID company, VehicleType veh, GroupID group = INVALID_GROUP, bool need_existing_window = false);
+void ShowCompanyGroup(CompanyID company, VehicleType veh, GroupID group = GroupID::Invalid());
 void ShowCompanyGroupForVehicle(const Vehicle *v);
 void DeleteGroupHighlightOfVehicle(const Vehicle *v);
 
@@ -29,7 +31,7 @@ struct GUIGroupListItem {
 
 using GUIGroupList = GUIList<GUIGroupListItem>;
 
-void BuildGuiGroupList(GUIGroupList &dst, bool fold, Owner owner, VehicleType veh_type);
+void BuildGuiGroupList(GUIGroupList &dst, GroupFoldBits fold, Owner owner, VehicleType veh_type);
 void SortGUIGroupList(GUIGroupList &list);
 
 #endif /* GROUP_GUI_H */

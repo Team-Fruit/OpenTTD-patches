@@ -14,6 +14,16 @@
 
 #include "safeguards.h"
 
+static const SpriteGroup *GetSwitchTargetForValue(const DeterministicSpriteGroup *dsg, uint32_t value)
+{
+	for (const auto &range : dsg->ranges) {
+		if (range.low <= value && value <= range.high) {
+			return range.group;
+		}
+	}
+	return dsg->default_group;
+};
+
 /* Returns true if group already seen before */
 bool BaseSpriteChainAnalyser::RegisterSeenDeterministicSpriteGroup(const DeterministicSpriteGroup *dsg)
 {
@@ -25,22 +35,12 @@ bool BaseSpriteChainAnalyser::RegisterSeenDeterministicSpriteGroup(const Determi
 	return false;
 }
 
-const SpriteGroup *GetSwitchTargetForValue(const DeterministicSpriteGroup *dsg, uint32_t value)
-{
-	for (const auto &range : dsg->ranges) {
-		if (range.low <= value && value <= range.high) {
-			return range.group;
-		}
-	}
-	return dsg->default_group;
-}
-
 std::pair<bool, const SpriteGroup *> BaseSpriteChainAnalyser::HandleGroupBypassing(const DeterministicSpriteGroup *dsg)
 {
 	if (dsg->GroupMayBeBypassed()) {
 		/* Not clear why some GRFs do this, perhaps a way of commenting out a branch */
 		uint32_t value = (dsg->adjusts.size() == 1) ? EvaluateDeterministicSpriteGroupAdjust(dsg->size, dsg->adjusts[0], nullptr, 0, UINT_MAX) : 0;
-		return { true, GetSwitchTargetForValue(dsg, value) };
+		return { true, dsg->GetBypassGroupForValue(value) };
 	}
 	return { false, nullptr };
 }
@@ -86,6 +86,11 @@ void SpriteChainAnalyser<T>::AnalyseGroup(const SpriteGroup *sg)
 		case SGT_CALLBACK: {
 			const CallbackResultSpriteGroup *crsg = static_cast<const CallbackResultSpriteGroup *>(sg);
 			self->AnalyseCallbackResultSpriteGroup(crsg);
+			break;
+		}
+
+		case SGT_CALCULATED_RESULT: {
+			self->AnalyseCalculatedResultSpriteGroup();
 			break;
 		}
 
@@ -190,11 +195,11 @@ void IndustryTileDataAnalyser::AnalyseDeterministicSpriteGroup(const Determinist
 		const auto &adjust = dsg->adjusts[0];
 
 		if (IsSingleVariableLoadAdjustOfSpecificVariable(adjust, 0xC, 0xFF)) {
-			/* Check for CBID_INDTILE_ANIM_NEXT_FRAME, mark layout subset as animated if found */
+			/* Check for CBID_INDTILE_ANIMATION_NEXT_FRAME, mark layout subset as animated if found */
 			if (this->cfg.check_anim_next_frame_cb) {
 				for (const auto &range : dsg->ranges) {
-					if (range.low <= CBID_INDTILE_ANIM_NEXT_FRAME && CBID_INDTILE_ANIM_NEXT_FRAME <= range.high) {
-						/* Found a CBID_INDTILE_ANIM_NEXT_FRAME */
+					if (range.low <= CBID_INDTILE_ANIMATION_NEXT_FRAME && CBID_INDTILE_ANIMATION_NEXT_FRAME <= range.high) {
+						/* Found a CBID_INDTILE_ANIMATION_NEXT_FRAME */
 						*(this->cfg.result_mask) &= ~this->check_mask;
 					}
 				}

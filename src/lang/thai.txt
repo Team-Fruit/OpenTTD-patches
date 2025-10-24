@@ -388,9 +388,7 @@ STR_SCENEDIT_FILE_MENU_QUIT                                     :ออก
 
 
 # Settings menu
-###length 16
 STR_SETTINGS_MENU_GAME_OPTIONS                                  :ตัวเลือกเกม
-STR_SETTINGS_MENU_CONFIG_SETTINGS_TREE                          :การตั้งค่า
 STR_SETTINGS_MENU_NEWGRF_SETTINGS                               :กำหนดค่า NewGRF
 STR_SETTINGS_MENU_TRANSPARENCY_OPTIONS                          :แถบเมนูตั้งค่าวัตถุโปร่งใส
 STR_SETTINGS_MENU_TOWN_NAMES_DISPLAYED                          :แสดงชื่อเมือง
@@ -754,7 +752,6 @@ STR_MESSAGE_HISTORY_TOOLTIP                                     :{BLACK}รา�
 STR_MESSAGE_NEWS_FORMAT                                         :{STRING}  -  {STRING}
 
 STR_NEWS_MESSAGE_CAPTION                                        :{WHITE}ข้อความ
-STR_NEWS_CUSTOM_ITEM                                            :{BIG_FONT}{BLACK}{STRING}
 
 STR_NEWS_FIRST_TRAIN_ARRIVAL                                    :{BIG_FONT}{BLACK}ผู้คนต่างยินดีปรีดา. . .{}ที่รถไฟขบวนปฐมฤกษ์เทียบชานชาลาที่ {STATION}!
 STR_NEWS_FIRST_BUS_ARRIVAL                                      :{BIG_FONT}{BLACK}ผู้คนต่างยินดีปรีดา. . .{}ที่รถโดยสารเที่ยวปฐมฤกษ์ได้มาถึง {STATION}!
@@ -866,7 +863,7 @@ STR_GAME_OPTIONS_CURRENCY_UNITS_FRAME                           :{BLACK}หน�
 STR_GAME_OPTIONS_CURRENCY_UNITS_DROPDOWN_TOOLTIP                :{BLACK}การเลือกสกุลเงิน
 
 
-###length 44
+###length 45
 STR_GAME_OPTIONS_CURRENCY_GBP                                   :ปอนด์สเตอร์ลิง
 STR_GAME_OPTIONS_CURRENCY_USD                                   :ดอลลาร์สหรัฐ
 STR_GAME_OPTIONS_CURRENCY_EUR                                   :ยูโร
@@ -1047,7 +1044,6 @@ STR_CITY_APPROVAL_PERMISSIVE                                    :อนุญา
 STR_WARNING_NO_SUITABLE_AI                                      :{WHITE}ไม่มี AI ที่เหมาะสมปรากฎ...{}คุณสามารถดาวน์โหลด AI จากระบบ 'Online Content'
 
 # Settings tree window
-STR_CONFIG_SETTING_TREE_CAPTION                                 :{WHITE}การตั้งค่าในเกม
 STR_CONFIG_SETTING_FILTER_TITLE                                 :{BLACK}เติม string:
 STR_CONFIG_SETTING_EXPAND_ALL                                   :{BLACK}ขยายทั้งหมด
 STR_CONFIG_SETTING_COLLAPSE_ALL                                 :{BLACK}ยุบลงทั้งหมด
@@ -1150,6 +1146,7 @@ STR_CONFIG_SETTING_AUTOSLOPE_HELPTEXT                           :อนุญา
 
 STR_CONFIG_SETTING_CATCHMENT                                    :อนุญาตให้มีขนาดของพื้นที่บริการของสถานีที่สมเหตุสมผลมากขึ้น: {STRING}
 STR_CONFIG_SETTING_CATCHMENT_HELPTEXT                           :สร้างความแตกต่างของพื้นที่บริการสำหรับสถานีในประเภทที่แตกต่างกัน
+
 
 
 STR_CONFIG_SETTING_EXTRADYNAMITE                                :อนุญาตให้ทำลายถนน, สะพาน, สิ่งก่อสร้างของเมืองได้มากขึ้น: {STRING}
@@ -1656,7 +1653,9 @@ STR_CONFIG_SETTING_ENDING_YEAR                                  :คะแนน
 STR_CONFIG_SETTING_ENDING_YEAR_ZERO                             :ไม่เลย
 
 STR_CONFIG_SETTING_ECONOMY_TYPE                                 :ประเภทของเศรษฐกิจ: {STRING}
+###length 2
 STR_CONFIG_SETTING_ECONOMY_TYPE_HELPTEXT                        :หากเศรษฐกิจราบรื่นจะทำให้การผลิตสินค้ามีการเปลี่ยนแปลงตลอด ในทางกลับกัน หากเศรษฐกิจไม่กระเตื้องเลย อุตสาหกรรมต่างๆจะไม่มีการเปลี่ยนแปลงผลผลิตและอาจจะปิดไปในที่สุดได้ ซึ่งการตั้งค่านี้อาจไม่ส่งผลหากใช้ NewGRF ประเภทอุตสาหกรรมบางอัน
+
 ###length 3
 
 STR_CONFIG_SETTING_FEEDER_PAYMENT_SHARE                         :เปอเซนต์ของผลกำไรที่จะส่งเข้าสู่ระบบกระจายรายได้: {STRING}
@@ -1703,6 +1702,8 @@ STR_CONFIG_SETTING_TOWN_FOUNDING_HELPTEXT                       :เปิดก
 STR_CONFIG_SETTING_TOWN_FOUNDING_FORBIDDEN                      :ห้าม
 STR_CONFIG_SETTING_TOWN_FOUNDING_ALLOWED                        :ยอม
 STR_CONFIG_SETTING_TOWN_FOUNDING_ALLOWED_CUSTOM_LAYOUT          :ยอม, รูปแบบเมืองกำหนดเอง
+
+###length 3
 
 ###length 2
 STR_CONFIG_SETTING_TOWN_CARGOGENMODE_ORIGINAL                   :กำลังสอง (แบบดั้งเดิม)
@@ -1884,7 +1885,6 @@ STR_INTRO_MULTIPLAYER                                           :{BLACK}เล�
 
 STR_INTRO_GAME_OPTIONS                                          :{BLACK}ตัวเลือกเกม
 STR_INTRO_HIGHSCORE                                             :{BLACK}ตารางคะแนนสูงสุด
-STR_INTRO_CONFIG_SETTINGS_TREE                                  :{BLACK}ตั้งค่า
 STR_INTRO_NEWGRF_SETTINGS                                       :{BLACK}การตั้งค่า NewGRF
 STR_INTRO_ONLINE_CONTENT                                        :{BLACK}ตรวจสอบเนื้อหาออนไลน์
 STR_INTRO_QUIT                                                  :{BLACK}ออก
@@ -1903,7 +1903,6 @@ STR_INTRO_TOOLTIP_TOYLAND_LANDSCAPE                             :{BLACK}เล�
 
 STR_INTRO_TOOLTIP_GAME_OPTIONS                                  :{BLACK}แสดงตัวเลือกเกม
 STR_INTRO_TOOLTIP_HIGHSCORE                                     :{BLACK}แสดงตารางคะแนนสูงสุด
-STR_INTRO_TOOLTIP_CONFIG_SETTINGS_TREE                          :{BLACK}การตั้งค่า หน้าจอ
 STR_INTRO_TOOLTIP_NEWGRF_SETTINGS                               :{BLACK}แสดงการกำหนดค่า NewGRF
 STR_INTRO_TOOLTIP_ONLINE_CONTENT                                :{BLACK}ตรวจสอบเนื้อหาใหม่และการปรับปรุงสำหรับดาวโหลด
 STR_INTRO_TOOLTIP_QUIT                                          :{BLACK}ออกจากเกม OpenTTD
@@ -1974,12 +1973,7 @@ STR_LIVERY_FREIGHT_TRAM                                         :รถราง
 STR_FACE_CAPTION                                                :{WHITE}เลือกใบหน้า
 STR_FACE_CANCEL_TOOLTIP                                         :{BLACK}ยกเลิการเลือกใบหน้าใหม่
 STR_FACE_OK_TOOLTIP                                             :{BLACK}ยอมรับการเลือกใบหน้าใหม่
-STR_FACE_RANDOM                                                 :{BLACK}สุ่ม
 
-STR_FACE_MALE_BUTTON                                            :{BLACK}ผู้ชาย
-STR_FACE_MALE_TOOLTIP                                           :{BLACK}เลือกใบหน้าผู้ชาย
-STR_FACE_FEMALE_BUTTON                                          :{BLACK}ผู้หญิง
-STR_FACE_FEMALE_TOOLTIP                                         :{BLACK}เลือกใบหน้าผู้หญิง
 STR_FACE_NEW_FACE_BUTTON                                        :{BLACK}ใบหน้าใหม่
 STR_FACE_NEW_FACE_TOOLTIP                                       :{BLACK}ทำใบหน้าสุ่มใหม่
 STR_FACE_ADVANCED                                               :{BLACK}ขั้นสูง
@@ -1997,36 +1991,20 @@ STR_FACE_FACECODE_ERR                                           :{WHITE}ไม�
 STR_FACE_SAVE                                                   :{BLACK}บันทึก
 STR_FACE_SAVE_TOOLTIP                                           :{BLACK}บันทึกใบหน้าโปรด
 STR_FACE_SAVE_DONE                                              :{WHITE}ใบหน้านี้จะถูกบันทึกเป็นใบหน้าโปรดในไฟล์การตั้งค่าของ OpenTTD
-STR_FACE_EUROPEAN                                               :{BLACK}ยุโรป
-STR_FACE_EUROPEAN_TOOLTIP                                       :{BLACK}เลือกใบหน้ายุโรป
-STR_FACE_AFRICAN                                                :{BLACK}แอฟริกัน
-STR_FACE_AFRICAN_TOOLTIP                                        :{BLACK}เลือกใบหน้าแอฟริกัน
 STR_FACE_YES                                                    :ใช่
 STR_FACE_NO                                                     :ไม่
-STR_FACE_MOUSTACHE_EARRING_TOOLTIP                              :{BLACK}เปิดใช้งานหนวด
 STR_FACE_HAIR                                                   :ผม:
-STR_FACE_HAIR_TOOLTIP                                           :{BLACK}เปลี่ยนผม
 STR_FACE_EYEBROWS                                               :คิ้ว:
-STR_FACE_EYEBROWS_TOOLTIP                                       :{BLACK}เปลี่ยนคิ้ว
 STR_FACE_EYECOLOUR                                              :สีตา:
-STR_FACE_EYECOLOUR_TOOLTIP                                      :{BLACK}เปลี่ยนสีตา
 STR_FACE_GLASSES                                                :แว่น:
-STR_FACE_GLASSES_TOOLTIP                                        :{BLACK}เปิดใช้งานแว่นตา
-STR_FACE_GLASSES_TOOLTIP_2                                      :{BLACK}เปลี่ยนแว่นตา
 STR_FACE_NOSE                                                   :จมูก:
-STR_FACE_NOSE_TOOLTIP                                           :{BLACK}เปลี่ยนจมูก
 STR_FACE_LIPS                                                   :ปาก:
 STR_FACE_MOUSTACHE                                              :หนวด:
-STR_FACE_LIPS_MOUSTACHE_TOOLTIP                                 :{BLACK}เปลี่ยนปากหรือหนวด
 STR_FACE_CHIN                                                   :คาง:
-STR_FACE_CHIN_TOOLTIP                                           :{BLACK}เปลี่ยนคาง
 STR_FACE_JACKET                                                 :เสื้อ:
-STR_FACE_JACKET_TOOLTIP                                         :{BLACK}เปลี่ยนเสื้อ
 STR_FACE_COLLAR                                                 :คอเสื้อ:
-STR_FACE_COLLAR_TOOLTIP                                         :{BLACK}เปลี่ยนคอเสื้อ
 STR_FACE_TIE                                                    :เนคไท:
 STR_FACE_EARRING                                                :ต่างหู:
-STR_FACE_TIE_EARRING_TOOLTIP                                    :{BLACK}เปลี่ยนเนคไทหรือต่างหู
 
 # Matches ServerGameType
 ###length 3
@@ -2225,7 +2203,7 @@ STR_NETWORK_ERROR_CLIENT_TIMEOUT_MAP                            :ใช้เว
 STR_NETWORK_ERROR_CLIENT_TIMEOUT_JOIN                           :ใช้เวลามากไปในการประมวลผลแผนที่
 
 # Network related errors
-STR_NETWORK_SERVER_MESSAGE                                      :*** {1:STRING}
+STR_NETWORK_SERVER_MESSAGE                                      :*** {STRING}
 
 ###length 12
 STR_NETWORK_SERVER_MESSAGE_GAME_PAUSED                          :เกมหยุด ({STRING})
@@ -2242,13 +2220,12 @@ STR_NETWORK_SERVER_MESSAGE_GAME_REASON_LINK_GRAPH               :กำลัง
 
 STR_NETWORK_MESSAGE_CLIENT_LEAVING                              :กำลังออก
 STR_NETWORK_MESSAGE_CLIENT_JOINED                               :*** {STRING} ได้เข้าร่วมเกม
-STR_NETWORK_MESSAGE_CLIENT_JOINED_ID                            :*** {STRING} ได้เข้าร่วมเกม (Client #{2:NUM})
-STR_NETWORK_MESSAGE_CLIENT_COMPANY_JOIN                         :*** {STRING} ได้เข้าร่วมบริษัท #{2:NUM}
+STR_NETWORK_MESSAGE_CLIENT_JOINED_ID                            :*** {STRING} ได้เข้าร่วมเกม (Client #{NUM})
 STR_NETWORK_MESSAGE_CLIENT_COMPANY_SPECTATE                     :*** {STRING} ได้เข้าเป็นผู้ชม
-STR_NETWORK_MESSAGE_CLIENT_COMPANY_NEW                          :*** {STRING} ได้ทำการสร้างบริษัทใหม่ (#{2:NUM})
-STR_NETWORK_MESSAGE_CLIENT_LEFT                                 :*** {STRING} ได้ออกจากเกม ({2:STRING})
+STR_NETWORK_MESSAGE_CLIENT_COMPANY_NEW                          :*** {STRING} ได้ทำการสร้างบริษัทใหม่ (#{NUM})
+STR_NETWORK_MESSAGE_CLIENT_LEFT                                 :*** {STRING} ได้ออกจากเกม ({STRING})
 STR_NETWORK_MESSAGE_NAME_CHANGE                                 :*** {STRING} ได้ทำการเปลี่ยนชื่อเป็น {STRING}
-STR_NETWORK_MESSAGE_GIVE_MONEY                                  :***บริษัท {STRING} ได้ให้เงินจำนวน {2:CURRENCY_LONG} ให้กับบริษัท {1:STRING}
+STR_NETWORK_MESSAGE_GIVE_MONEY                                  :***บริษัท {STRING} ได้ให้เงินจำนวน {CURRENCY_LONG} ให้กับบริษัท {STRING}
 STR_NETWORK_MESSAGE_SERVER_SHUTDOWN                             :{WHITE}เซิฟเวอร์ปืดเซสซั่นนี้
 STR_NETWORK_MESSAGE_SERVER_REBOOT                               :{WHITE}เซิฟเวอร์กำลังทำการเริ่มต้นใหม่...{}กรุณารอซักครู่...
 
@@ -2413,6 +2390,7 @@ STR_STATION_BUILD_PLATFORM_LENGTH                               :{BLACK}คว�
 STR_STATION_BUILD_PLATFORM_LENGTH_TOOLTIP                       :{BLACK}เลือกความยาวของชานชาลา
 STR_STATION_BUILD_DRAG_DROP                                     :{BLACK}ลากและวาง
 STR_STATION_BUILD_DRAG_DROP_TOOLTIP                             :{BLACK}สร้างสถานีโดยใช้การลากและวาง
+
 
 
 
@@ -2602,6 +2580,7 @@ STR_FOUND_TOWN_INITIAL_SIZE_TOOLTIP                             :{BLACK}เล�
 STR_FOUND_TOWN_CITY                                             :{BLACK}เมืองใหญ่
 STR_FOUND_TOWN_CITY_TOOLTIP                                     :{BLACK}เมืองใหญ่ขยายตัวเร็วกว่าเมืองเล็ก{}เลือกค่านี้ เมืองที่สร้างจะใหญ่ขึ้นเมื่อสร้างใหม่
 
+
 STR_FOUND_TOWN_ROAD_LAYOUT                                      :{YELLOW}รูปแบบถนนของเมือง:
 STR_FOUND_TOWN_SELECT_LAYOUT_TOOLTIP                            :{BLACK}เลือกรูปแบบถนนสำหรับเมืองนี้
 STR_FOUND_TOWN_SELECT_LAYOUT_ORIGINAL                           :{BLACK}ดั้งเดิม
@@ -2672,7 +2651,6 @@ STR_LAI_CLEAR_DESCRIPTION_ROUGH_LAND                            :พื้นท
 STR_LAI_CLEAR_DESCRIPTION_BARE_LAND                             :พื้นที่เปล่า
 STR_LAI_CLEAR_DESCRIPTION_GRASS                                 :หญ้า
 STR_LAI_CLEAR_DESCRIPTION_FIELDS                                :ทุ่งหญ้า
-STR_LAI_CLEAR_DESCRIPTION_SNOW_COVERED_LAND                     :พื้นที่หิมะปกคลุม
 STR_LAI_CLEAR_DESCRIPTION_DESERT                                :ทะเลทราย
 
 STR_LAI_RAIL_DESCRIPTION_TRACK                                  :รางรถไฟ ราง
@@ -3088,7 +3066,6 @@ STR_INVALID_VEHICLE                                             :<ตัวย�
 STR_NEWGRF_SCAN_CAPTION                                         :{WHITE}ตรวจสอบ NewGRFs
 STR_NEWGRF_SCAN_MESSAGE                                         :{BLACK}ตรวจสอบ NewGRFs. ขึ้นอยู่กับจำนวนที่มี อาจใช้เวลาสักครู่...
 STR_NEWGRF_SCAN_STATUS                                          :{BLACK}{NUM} NewGRF ค้นหาเสร็จสิ้น อยู่นอกเหนือการประเมิน {NUM} NewGRF
-STR_NEWGRF_SCAN_ARCHIVES                                        :ตรวจหาแฟ้มข้อมูล
 
 # Sign list window
 STR_SIGN_LIST_CAPTION                                           :{WHITE}รายชื่อป้าย - {COMMA} ป้าย
@@ -3404,7 +3381,6 @@ STR_INDUSTRY_VIEW_INDUSTRY_ANNOUNCED_CLOSURE                    :{YELLOW}อุ�
 
 STR_INDUSTRY_VIEW_REQUIRES_N_CARGO                              :{BLACK}ต้องการ: {YELLOW}{STRING}{STRING}
 
-STR_INDUSTRY_VIEW_ACCEPT_CARGO_AMOUNT                           :{YELLOW}{STRING}{BLACK}: {CARGO_SHORT} กำลังรอ{STRING}
 
 STR_CONFIG_GAME_PRODUCTION                                      :{WHITE}ปรับเปลี่ยนปริมาณผลผลิต (ระหว่าง 8 ถึง 2040)
 STR_CONFIG_GAME_PRODUCTION_LEVEL                                :{WHITE}เปลี่ยนระดับการผลิต (เปอร์เซ็นต์เพิ่มมากสุดถึง 800%)
@@ -3815,8 +3791,8 @@ STR_VEHICLE_INFO_RELIABILITY_BREAKDOWNS                         :{BLACK}ปร�
 
 STR_VEHICLE_INFO_BUILT_VALUE                                    :{LTBLUE}{ENGINE} {BLACK}สร้างเมื่อ: {LTBLUE}{NUM}{BLACK} มูลค่า: {LTBLUE}{CURRENCY_LONG}
 STR_VEHICLE_INFO_NO_CAPACITY                                    :{BLACK}บรรทุก: {LTBLUE}ไม่มี{STRING}
-STR_VEHICLE_INFO_CAPACITY                                       :{BLACK}บรรทุก: {LTBLUE}{CARGO_LONG}{3:STRING}
-STR_VEHICLE_INFO_CAPACITY_MULT                                  :{BLACK}บรรทุก: {LTBLUE}{CARGO_LONG}{3:STRING} (x{4:NUM})
+STR_VEHICLE_INFO_CAPACITY                                       :{BLACK}บรรทุก: {LTBLUE}{CARGO_LONG}{STRING}
+STR_VEHICLE_INFO_CAPACITY_MULT                                  :{BLACK}บรรทุก: {LTBLUE}{CARGO_LONG}{STRING} (x{NUM})
 STR_VEHICLE_INFO_CAPACITY_CAPACITY                              :{BLACK}บรรทุก: {LTBLUE}{CARGO_LONG}, {CARGO_LONG}{STRING}
 
 STR_VEHICLE_INFO_FEEDER_CARGO_VALUE                             :{BLACK}รายได้จากการส่งต่อ: {LTBLUE}{CURRENCY_LONG}
@@ -3982,15 +3958,12 @@ STR_ORDER_GO_NON_STOP_TO_WAYPOINT                               :ไม่หย
 STR_ORDER_SERVICE_AT                                            :ซ่อมบำรุงที่
 STR_ORDER_SERVICE_NON_STOP_AT                                   :ไม่หยุดจนไปซ่อมบำรุงที่
 
-STR_ORDER_NEAREST_DEPOT                                         :ใกล้ที่สุด
-STR_ORDER_NEAREST_HANGAR                                        :โรงซ่อมที่ใกล้ที่สุด
 ###length 3
 STR_ORDER_TRAIN_DEPOT                                           :โรงซ่อมบำรุง
 STR_ORDER_ROAD_VEHICLE_DEPOT                                    :โรงซ่อมบำรุงรถ
 STR_ORDER_SHIP_DEPOT                                            :อู่เรือ
 ###next-name-looks-similar
 
-STR_ORDER_GO_TO_NEAREST_DEPOT_FORMAT                            :{STRING} {STRING} {STRING}
 STR_ORDER_GO_TO_DEPOT_FORMAT                                    :{STRING} {DEPOT}
 
 STR_ORDER_REFIT_ORDER                                           :(ดัดแปลงเป็น {STRING})
@@ -3998,7 +3971,7 @@ STR_ORDER_REFIT_STOP_ORDER                                      :(ดัดแ�
 STR_ORDER_STOP_ORDER                                            :(หยุด)
 
 
-STR_ORDER_GO_TO_STATION                                         :{STRING} {STATION} {STRING}
+STR_ORDER_GO_TO_STATION                                         :{STRING} {STATION}
 
 STR_ORDER_IMPLICIT                                              :(อัตโนมัติ)
 
@@ -4056,7 +4029,7 @@ STR_TIMETABLE_TOOLTIP                                           :{BLACK}ตา�
 STR_TIMETABLE_NO_TRAVEL                                         :ไม่มีการเดินทาง
 STR_TIMETABLE_NOT_TIMETABLEABLE                                 :เดินทาง (อัตโนมัติ; ตามตารางเวลาต่อไปที่ตั้งไว้)
 STR_TIMETABLE_TRAVEL_NOT_TIMETABLED                             :>>>ไปยังที่หมายถัดไป(ไม่ได้กำหนดเวลา)<<<
-STR_TIMETABLE_TRAVEL_NOT_TIMETABLED_SPEED                       :>>>ความเร็วไม่เกิน {2:VELOCITY} (ไม่มีกำหนดเวลา)<<<
+STR_TIMETABLE_TRAVEL_NOT_TIMETABLED_SPEED                       :>>>ความเร็วไม่เกิน {VELOCITY} (ไม่มีกำหนดเวลา)<<<
 STR_TIMETABLE_TRAVEL_FOR                                        :เวลาในการเดินทางคือ {STRING}
 STR_TIMETABLE_TRAVEL_FOR_SPEED                                  :เวลาในการเดินทางคือ {STRING} ความเร็วสูงสุดไม่เกิน {VELOCITY}
 STR_TIMETABLE_TRAVEL_FOR_ESTIMATED                              :ตารางการเดินทาง (ของ {STRING}, ไม่ได้ถูกกำหนดเวลาไว้)
@@ -4072,7 +4045,6 @@ STR_TIMETABLE_STATUS_ON_TIME                                    :{BLACK}ยา�
 STR_TIMETABLE_STATUS_LATE                                       :{BLACK}ยานพาหนะนี้เดินทางช้ากว่าเวลาปกติอยู่ {STRING}
 STR_TIMETABLE_STATUS_EARLY                                      :{BLACK}ยานพาหนะนี้เดินทางเร็วกว่าเวลาปกติอยู่ {STRING}
 STR_TIMETABLE_STATUS_NOT_STARTED                                :{BLACK}ตารางเวลายังไม่เริ่มต้น
-
 
 
 STR_TIMETABLE_CHANGE_TIME                                       :{BLACK}ปรับเปลี่ยนเวลา
@@ -4250,7 +4222,6 @@ STR_ERROR_SCREENSHOT_FAILED                                     :{WHITE}กา�
 
 # Error message titles
 STR_ERROR_MESSAGE_CAPTION                                       :{YELLOW}ข้อความ
-STR_ERROR_MESSAGE_CAPTION_OTHER_COMPANY                         :{YELLOW}ข้อความจาก {STRING}
 
 # Generic construction errors
 STR_ERROR_OFF_EDGE_OF_MAP                                       :{WHITE}อยู่นอกขอบแผนที่
@@ -4269,7 +4240,6 @@ STR_ERROR_TERRAFORM_LIMIT_REACHED                               :{WHITE}... ก�
 STR_ERROR_CLEARING_LIMIT_REACHED                                :{WHITE}... การเคลียพื้่นที่ถึงขีดจำักัด
 STR_ERROR_TREE_PLANT_LIMIT_REACHED                              :{WHITE}... การปลูกต้นไม้ถึงขีดจำกัด
 STR_ERROR_NAME_MUST_BE_UNIQUE                                   :{WHITE}ชื่อนี้มีอยู่แล้ว!!
-STR_ERROR_GENERIC_OBJECT_IN_THE_WAY                             :{WHITE}{1:STRING} ในเส้นทาง
 STR_ERROR_NOT_ALLOWED_WHILE_PAUSED                              :{WHITE}ไม่อนุญาตให้ สร้าง/รื้อถอน ขณะหยุดเกม
 
 # Local authority errors
@@ -4558,6 +4528,10 @@ STR_ERROR_CAN_T_SELL_TRAIN                                      :{WHITE}ไม�
 STR_ERROR_CAN_T_SELL_ROAD_VEHICLE                               :{WHITE}ไม่สามารถขายรถ...
 STR_ERROR_CAN_T_SELL_SHIP                                       :{WHITE}ไม่สามารถขายเรือ...
 STR_ERROR_CAN_T_SELL_AIRCRAFT                                   :{WHITE}ไม่สามารถขายอากาศยาน...
+
+###length VEHICLE_TYPES
+
+###length VEHICLE_TYPES
 
 STR_ERROR_TOO_MANY_VEHICLES_IN_GAME                             :{WHITE}ขณะนี้มียานยนต์มากเกินไปแล้วในเกม
 STR_ERROR_CAN_T_CHANGE_SERVICING                                :{WHITE}ไม่สามารถเปลี่ยนระยะเวลาการซ่อมบำรุงได้...
@@ -5054,18 +5028,7 @@ STR_SAVEGAME_NAME_SPECTATOR                                     :ผู้ชม
 
 # Viewport strings
 STR_VIEWPORT_TOWN_POP                                           :{WHITE}{TOWN} ({COMMA})
-STR_VIEWPORT_TOWN                                               :{WHITE}{TOWN}
-STR_VIEWPORT_TOWN_TINY_BLACK                                    :{TINY_FONT}{BLACK}{TOWN}
-STR_VIEWPORT_TOWN_TINY_WHITE                                    :{TINY_FONT}{WHITE}{TOWN}
-
-STR_VIEWPORT_SIGN_SMALL_BLACK                                   :{TINY_FONT}{BLACK}{SIGN}
-STR_VIEWPORT_SIGN_SMALL_WHITE                                   :{TINY_FONT}{WHITE}{SIGN}
-
 STR_VIEWPORT_STATION                                            :{STATION} {STATION_FEATURES}
-STR_VIEWPORT_STATION_TINY                                       :{TINY_FONT}{STATION}
-
-STR_VIEWPORT_WAYPOINT                                           :{WAYPOINT}
-STR_VIEWPORT_WAYPOINT_TINY                                      :{TINY_FONT}{WAYPOINT}
 
 # Simple strings to get specific types of data
 STR_COMPANY_NAME                                                :{COMPANY}
@@ -5117,3 +5080,4 @@ STR_PLANE                                                       :{BLACK}{PLANE}
 STR_SHIP                                                        :{BLACK}{SHIP}
 
 STR_TOOLBAR_RAILTYPE_VELOCITY                                   :{STRING} ({VELOCITY})
+

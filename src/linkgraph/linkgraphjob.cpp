@@ -53,9 +53,9 @@ LinkGraphJob::LinkGraphJob(const LinkGraph &orig, uint duration_multiplier) :
 
 /**
  * Erase all flows originating at a specific node.
- * @param from Node to erase flows for.
+ * @param from StationID to erase flows for.
  */
-void LinkGraphJob::EraseFlows(NodeID from)
+void LinkGraphJob::EraseFlows(StationID from)
 {
 	for (NodeID node_id = 0; node_id < this->Size(); ++node_id) {
 		(*this)[node_id].Flows().erase(from);
@@ -108,7 +108,7 @@ void LinkGraphJob::FinaliseJob()
 		/* The station can have been deleted. Remove all flows originating from it then. */
 		Station *st = Station::GetIfValid(from.Station());
 		if (st == nullptr) {
-			this->EraseFlows(node_id);
+			this->EraseFlows(from.Station());
 			continue;
 		}
 
@@ -116,7 +116,7 @@ void LinkGraphJob::FinaliseJob()
 		 * sure that everything is still consistent or ignore it otherwise. */
 		GoodsEntry &ge = st->goods[this->Cargo()];
 		if (ge.link_graph != this->link_graph.index || ge.node != node_id) {
-			this->EraseFlows(node_id);
+			this->EraseFlows(from.Station());
 			continue;
 		}
 
@@ -153,8 +153,8 @@ void LinkGraphJob::FinaliseJob()
 			if (new_it == flows.end()) {
 				if (_settings_game.linkgraph.GetDistributionType(this->Cargo()) != DT_MANUAL) {
 					if (it->Invalidate()) {
-						NodeID origin = it->GetOrigin();
-						FlowStat shares(INVALID_STATION, INVALID_STATION, 1);
+						StationID origin = it->GetOrigin();
+						FlowStat shares(StationID::Invalid(), StationID::Invalid(), 1);
 						it->SwapShares(shares);
 						it = geflows.erase(it);
 						for (FlowStat::const_iterator shares_it(shares.begin());
@@ -165,7 +165,7 @@ void LinkGraphJob::FinaliseJob()
 						++it;
 					}
 				} else {
-					FlowStat shares(INVALID_STATION, INVALID_STATION, 1);
+					FlowStat shares(StationID::Invalid(), StationID::Invalid(), 1);
 					it->SwapShares(shares);
 					it = geflows.erase(it);
 					for (FlowStat::const_iterator shares_it(shares.begin());

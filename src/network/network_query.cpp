@@ -26,7 +26,7 @@ NetworkRecvStatus QueryNetworkGameSocketHandler::CloseConnection(NetworkRecvStat
 	assert(this->sock != INVALID_SOCKET);
 
 	/* Connection is closed, but we never received a packet. Must be offline. */
-	NetworkGameList *item = NetworkGameListAddItem(this->connection_string);
+	NetworkGame *item = NetworkGameListAddItem(this->connection_string);
 	if (item->refreshing) {
 		item->status = NGLS_OFFLINE;
 		item->refreshing = false;
@@ -85,8 +85,9 @@ NetworkRecvStatus QueryNetworkGameSocketHandler::SendGameInfo()
 	auto p = std::make_unique<Packet>(this, PACKET_CLIENT_GAME_INFO);
 	p->Send_uint32(FIND_SERVER_EXTENDED_TOKEN);
 	p->Send_uint8(PACKET_SERVER_GAME_INFO_EXTENDED);       // reply type
-	p->Send_uint16(0);                                     // flags
-	p->Send_uint16(SERVER_GAME_INFO_EXTENDED_MAX_VERSION); // version
+	p->Send_uint16(1);                                     // flags
+	p->Send_uint16(1);                                     // version (original field, bug workaround)
+	p->Send_uint16(SERVER_GAME_INFO_EXTENDED_MAX_VERSION); // version (enabled by flag bit 0)
 	this->SendPacket(std::move(p));
 
 	return NETWORK_RECV_STATUS_OKAY;
@@ -94,7 +95,7 @@ NetworkRecvStatus QueryNetworkGameSocketHandler::SendGameInfo()
 
 NetworkRecvStatus QueryNetworkGameSocketHandler::Receive_SERVER_FULL(Packet &)
 {
-	NetworkGameList *item = NetworkGameListAddItem(this->connection_string);
+	NetworkGame *item = NetworkGameListAddItem(this->connection_string);
 	item->status = NGLS_FULL;
 	item->refreshing = false;
 
@@ -105,7 +106,7 @@ NetworkRecvStatus QueryNetworkGameSocketHandler::Receive_SERVER_FULL(Packet &)
 
 NetworkRecvStatus QueryNetworkGameSocketHandler::Receive_SERVER_BANNED(Packet &)
 {
-	NetworkGameList *item = NetworkGameListAddItem(this->connection_string);
+	NetworkGame *item = NetworkGameListAddItem(this->connection_string);
 	item->status = NGLS_BANNED;
 	item->refreshing = false;
 
@@ -116,13 +117,13 @@ NetworkRecvStatus QueryNetworkGameSocketHandler::Receive_SERVER_BANNED(Packet &)
 
 NetworkRecvStatus QueryNetworkGameSocketHandler::Receive_SERVER_GAME_INFO(Packet &p)
 {
-	NetworkGameList *item = NetworkGameListAddItem(this->connection_string);
+	NetworkGame *item = NetworkGameListAddItem(this->connection_string);
 
 	/* Clear any existing GRFConfig chain. */
-	ClearGRFConfigList(&item->info.grfconfig);
+	ClearGRFConfigList(item->info.grfconfig);
 	/* Retrieve the NetworkGameInfo from the packet. */
 	DeserializeNetworkGameInfo(p, item->info);
-	/* Check for compatability with the client. */
+	/* Check for compatibility with the client. */
 	CheckGameCompatibility(item->info);
 	/* Ensure we consider the server online. */
 	item->status = NGLS_ONLINE;
@@ -135,13 +136,13 @@ NetworkRecvStatus QueryNetworkGameSocketHandler::Receive_SERVER_GAME_INFO(Packet
 
 NetworkRecvStatus QueryNetworkGameSocketHandler::Receive_SERVER_GAME_INFO_EXTENDED(Packet &p)
 {
-	NetworkGameList *item = NetworkGameListAddItem(this->connection_string);
+	NetworkGame *item = NetworkGameListAddItem(this->connection_string);
 
 	/* Clear any existing GRFConfig chain. */
-	ClearGRFConfigList(&item->info.grfconfig);
+	ClearGRFConfigList(item->info.grfconfig);
 	/* Retrieve the NetworkGameInfo from the packet. */
 	DeserializeNetworkGameInfoExtended(p, item->info);
-	/* Check for compatability with the client. */
+	/* Check for compatibility with the client. */
 	CheckGameCompatibility(item->info, true);
 	/* Ensure we consider the server online. */
 	item->status = NGLS_ONLINE;
@@ -156,7 +157,7 @@ NetworkRecvStatus QueryNetworkGameSocketHandler::Receive_SERVER_ERROR(Packet &p)
 {
 	NetworkErrorCode error = (NetworkErrorCode)p.Recv_uint8();
 
-	NetworkGameList *item = NetworkGameListAddItem(this->connection_string);
+	NetworkGame *item = NetworkGameListAddItem(this->connection_string);
 
 	if (error == NETWORK_ERROR_NOT_EXPECTED) {
 		/* If we query a server that is 1.11.1 or older, we get an

@@ -35,12 +35,10 @@
 
 #include "safeguards.h"
 
-static bool DrawScrollingStatusText(const NewsItem *ni, int scroll_pos, int left, int right, int top, int bottom)
+static bool DrawScrollingStatusText(const NewsItem &ni, int scroll_pos, int left, int right, int top, int bottom)
 {
-	CopyInDParam(ni->params);
-
 	/* Replace newlines and the likes with spaces. */
-	std::string message = StrMakeValid(GetString(ni->string_id), SVS_REPLACE_TAB_CR_NL_WITH_SPACE);
+	std::string message = StrMakeValid(ni.GetStatusText(), StringValidationSetting::ReplaceTabCrNlWithSpace);
 
 	DrawPixelInfo tmp_dpi;
 	if (!FillDrawPixelInfo(&tmp_dpi, left, top, right - left, bottom)) return true;
@@ -55,10 +53,10 @@ static bool DrawScrollingStatusText(const NewsItem *ni, int scroll_pos, int left
 }
 
 struct StatusBarWindow : Window {
-	bool saving;
-	int ticker_scroll;
-	GUITimer ticker_timer;
-	GUITimer reminder_timeout;
+	bool saving = false;
+	int ticker_scroll = TICKER_STOP;
+	GUITimer ticker_timer{};
+	GUITimer reminder_timeout{};
 	TickMinutes last_minute{0};
 
 	static const int TICKER_STOP    = 1640; ///< scrolling is finished when counter reaches this value
@@ -68,12 +66,11 @@ struct StatusBarWindow : Window {
 
 	StatusBarWindow(WindowDesc &desc) : Window(desc)
 	{
-		this->ticker_scroll = TICKER_STOP;
 		this->ticker_timer.SetInterval(15);
 		this->reminder_timeout.SetInterval(REMINDER_STOP);
 
 		this->InitNested();
-		CLRBITS(this->flags, WF_WHITE_BORDER);
+		this->flags.Reset(WindowFlag::WhiteBorder);
 		PositionStatusbar(this);
 	}
 
@@ -83,29 +80,25 @@ struct StatusBarWindow : Window {
 		return pt;
 	}
 
-	void FindWindowPlacementAndResize([[maybe_unused]] int def_width, [[maybe_unused]] int def_height) override
+	void FindWindowPlacementAndResize(int, int def_height, bool allow_resize) override
 	{
-		Window::FindWindowPlacementAndResize(_toolbar_width, def_height);
+		Window::FindWindowPlacementAndResize(_toolbar_width, def_height, allow_resize);
 	}
 
-	StringID PrepareHHMMDateString(int hhmm, CalTime::Date date, CalTime::Year year) const
+	std::string PrepareHHMMDateString(int hhmm, CalTime::Date date, CalTime::Year year) const
 	{
-		SetDParam(0, hhmm);
 		switch (_settings_client.gui.date_with_time) {
 			case 0:
-				return STR_JUST_TIME_HHMM;
+				return GetString(STR_JUST_TIME_HHMM, hhmm);
 
 			case 1:
-				SetDParam(1, year);
-				return STR_HHMM_WITH_DATE_Y;
+				return GetString(STR_HHMM_WITH_DATE_Y, hhmm, year);
 
 			case 2:
-				SetDParam(1, date);
-				return STR_HHMM_WITH_DATE_YM;
+				return GetString(STR_HHMM_WITH_DATE_YM, hhmm, date);
 
 			case 3:
-				SetDParam(1, date);
-				return STR_HHMM_WITH_DATE_YMD;
+				return GetString(STR_HHMM_WITH_DATE_YMD, hhmm, date);
 
 			default:
 				NOT_REACHED();
@@ -118,19 +111,16 @@ struct StatusBarWindow : Window {
 		switch (widget) {
 			case WID_S_LEFT:
 				if (_settings_time.time_in_minutes) {
-					StringID str = PrepareHHMMDateString(GetBroadestDigitsValue(4), CalTime::MAX_DATE, CalTime::MAX_YEAR);
-					d = GetStringBoundingBox(str);
+					d = GetStringBoundingBox(PrepareHHMMDateString(GetParamMaxDigits(4), CalTime::MAX_DATE, CalTime::MAX_YEAR));
 				} else {
-					SetDParam(0, CalTime::MAX_DATE);
-					d = GetStringBoundingBox(STR_JUST_DATE_LONG);
+					d = GetStringBoundingBox(GetString(STR_JUST_DATE_LONG, CalTime::MAX_DATE));
 				}
 				break;
 
 			case WID_S_RIGHT: {
 				int64_t max_money = UINT32_MAX;
 				for (const Company *c : Company::Iterate()) max_money = std::max<int64_t>(c->money, max_money);
-				SetDParam(0, 100LL * max_money);
-				d = GetStringBoundingBox(STR_JUST_CURRENCY_LONG);
+				d = GetStringBoundingBox(GetString(STR_JUST_CURRENCY_LONG, 100LL * max_money));
 				break;
 			}
 
@@ -146,16 +136,15 @@ struct StatusBarWindow : Window {
 	void DrawWidget(const Rect &r, WidgetID widget) const override
 	{
 		Rect tr = r.Shrink(WidgetDimensions::scaled.framerect, RectPadding::zero);
-		tr.top = CenterBounds(r.top, r.bottom, GetCharacterHeight(FS_NORMAL));
+		tr.top = CentreBounds(r.top, r.bottom, GetCharacterHeight(FS_NORMAL));
 		switch (widget) {
 			case WID_S_LEFT:
 				/* Draw the date */
 				if (_settings_time.time_in_minutes) {
-					StringID str = PrepareHHMMDateString(_settings_time.ToTickMinutes(_state_ticks).ClockHHMM(), CalTime::CurDate(), CalTime::CurYear());
+					std::string str = PrepareHHMMDateString(_settings_time.ToTickMinutes(_state_ticks).ClockHHMM(), CalTime::CurDate(), CalTime::CurYear());
 					DrawString(tr, str, TC_WHITE, SA_HOR_CENTER);
 				} else {
-					SetDParam(0, CalTime::CurDate());
-					DrawString(tr, STR_JUST_DATE_LONG, TC_WHITE, SA_HOR_CENTER);
+					DrawString(tr, GetString(STR_JUST_DATE_LONG, CalTime::CurDate()), TC_WHITE, SA_HOR_CENTER);
 				}
 				break;
 
@@ -168,8 +157,7 @@ struct StatusBarWindow : Window {
 					/* Draw company money, if any */
 					const Company *c = Company::GetIfValid(_local_company);
 					if (c != nullptr) {
-						SetDParam(0, c->money);
-						DrawString(tr, STR_JUST_CURRENCY_LONG, TC_WHITE, SA_HOR_CENTER);
+						DrawString(tr, GetString(STR_JUST_CURRENCY_LONG, c->money), TC_WHITE, SA_HOR_CENTER);
 					}
 				}
 				break;
@@ -181,30 +169,28 @@ struct StatusBarWindow : Window {
 					DrawString(tr, STR_STATUSBAR_SAVING_GAME, TC_FROMSTRING, SA_HOR_CENTER | SA_VERT_CENTER);
 				} else if (_do_autosave) {
 					DrawString(tr, STR_STATUSBAR_AUTOSAVE, TC_FROMSTRING, SA_HOR_CENTER);
-				} else if (_pause_mode != PM_UNPAUSED) {
-					StringID msg = (_pause_mode & PM_PAUSED_LINK_GRAPH) ? STR_STATUSBAR_PAUSED_LINK_GRAPH : STR_STATUSBAR_PAUSED;
+				} else if (_pause_mode.Any()) {
+					StringID msg = _pause_mode.Test(PauseMode::LinkGraph) ? STR_STATUSBAR_PAUSED_LINK_GRAPH : STR_STATUSBAR_PAUSED;
 					DrawString(tr, msg, TC_FROMSTRING, SA_HOR_CENTER);
-				} else if (this->ticker_scroll < TICKER_STOP && GetStatusbarNews() != nullptr && GetStatusbarNews()->string_id != 0) {
+				} else if (this->ticker_scroll < TICKER_STOP && GetStatusbarNews() != nullptr && !GetStatusbarNews()->headline.empty()) {
 					/* Draw the scrolling news text */
-					if (!DrawScrollingStatusText(GetStatusbarNews(), ScaleGUITrad(this->ticker_scroll), tr.left, tr.right, tr.top, tr.bottom)) {
+					if (!DrawScrollingStatusText(*GetStatusbarNews(), ScaleGUITrad(this->ticker_scroll), tr.left, tr.right, tr.top, tr.bottom)) {
 						InvalidateWindowData(WC_STATUS_BAR, 0, SBI_NEWS_DELETED);
 						if (Company::IsValidID(_local_company)) {
 							/* This is the default text */
-							SetDParam(0, _local_company);
-							DrawString(tr, STR_STATUSBAR_COMPANY_NAME, TC_FROMSTRING, SA_HOR_CENTER);
+							DrawString(tr, GetString(STR_STATUSBAR_COMPANY_NAME, _local_company), TC_FROMSTRING, SA_HOR_CENTER);
 						}
 					}
 				} else {
 					if (Company::IsValidID(_local_company)) {
 						/* This is the default text */
-						SetDParam(0, _local_company);
-						DrawString(tr, STR_STATUSBAR_COMPANY_NAME, TC_FROMSTRING, SA_HOR_CENTER);
+						DrawString(tr, GetString(STR_STATUSBAR_COMPANY_NAME, _local_company), TC_FROMSTRING, SA_HOR_CENTER);
 					}
 				}
 
 				if (!this->reminder_timeout.HasElapsed()) {
 					Dimension icon_size = GetSpriteSize(SPR_UNREAD_NEWS);
-					DrawSprite(SPR_UNREAD_NEWS, PAL_NONE, tr.right - icon_size.width, CenterBounds(r.top, r.bottom, icon_size.height));
+					DrawSprite(SPR_UNREAD_NEWS, PAL_NONE, tr.right - icon_size.width, CentreBounds(r.top, r.bottom, icon_size.height));
 				}
 				break;
 		}
@@ -245,7 +231,7 @@ struct StatusBarWindow : Window {
 
 	void OnRealtimeTick(uint delta_ms) override
 	{
-		if (_pause_mode != PM_UNPAUSED) return;
+		if (_pause_mode.Any()) return;
 
 		if (_settings_time.time_in_minutes) {
 			const TickMinutes now = _settings_time.NowInTickMinutes();
@@ -273,7 +259,7 @@ struct StatusBarWindow : Window {
 static constexpr NWidgetPart _nested_main_status_widgets[] = {
 	NWidget(NWID_HORIZONTAL),
 		NWidget(WWT_PANEL, COLOUR_GREY, WID_S_LEFT), SetMinimalSize(160, 12), EndContainer(),
-		NWidget(WWT_PUSHBTN, COLOUR_GREY, WID_S_MIDDLE), SetMinimalSize(40, 12), SetDataTip(0x0, STR_STATUSBAR_TOOLTIP_SHOW_LAST_NEWS), SetResize(1, 0),
+		NWidget(WWT_PUSHBTN, COLOUR_GREY, WID_S_MIDDLE), SetMinimalSize(40, 12), SetToolTip(STR_STATUSBAR_TOOLTIP_SHOW_LAST_NEWS), SetResize(1, 0),
 		NWidget(WWT_PUSHBTN, COLOUR_GREY, WID_S_RIGHT), SetMinimalSize(140, 12),
 	EndContainer(),
 };
@@ -281,7 +267,7 @@ static constexpr NWidgetPart _nested_main_status_widgets[] = {
 static WindowDesc _main_status_desc(__FILE__, __LINE__,
 	WDP_MANUAL, nullptr, 0, 0,
 	WC_STATUS_BAR, WC_NONE,
-	WDF_NO_FOCUS | WDF_NO_CLOSE,
+	{WindowDefaultFlag::NoFocus, WindowDefaultFlag::NoClose},
 	_nested_main_status_widgets
 );
 

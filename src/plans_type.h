@@ -10,15 +10,15 @@
 #ifndef PLANS_TYPE_H
 #define PLANS_TYPE_H
 
-#include "stdafx.h"
-#include "tile_type.h"
+#include "core/pool_id_type.hpp"
 
-typedef uint16_t PlanID;
+struct PlanIDTag : public PoolIDTraits<uint16_t, 64000, 0xFFFF> {};
+using PlanID = PoolID<PlanIDTag>;
+static constexpr PlanID INVALID_PLAN = PlanID::Invalid(); ///< Sentinel for an invalid plan.
+
 struct PlanLine;
 struct Plan;
 
 static const uint MAX_LENGTH_PLAN_NAME_CHARS = 128; ///< The maximum length of a plan name in characters including '\0'
-
-static const PlanID INVALID_PLAN = 0xFFFF; ///< Sentinel for an invalid plan.
 
 #endif /* PLANS_TYPE_H */

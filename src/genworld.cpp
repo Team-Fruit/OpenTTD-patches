@@ -43,6 +43,10 @@
 #include "signal_func.h"
 #include "newgrf_industrytiles.h"
 #include "station_func.h"
+#include "town_cmd.h"
+#include "signs_cmd.h"
+
+#include "table/strings.h"
 
 #include "safeguards.h"
 
@@ -59,13 +63,16 @@ void StartupDisasters();
 
 void InitializeGame(uint size_x, uint size_y, bool reset_date, bool reset_settings);
 
-/**
- * Please only use this variable in genworld.h and genworld.cpp and
- *  nowhere else. For speed improvements we need it to be global, but
- *  in no way the meaning of it is to use it anywhere else besides
- *  in the genworld.h and genworld.cpp!
- */
-GenWorldInfo _gw;
+/** Properties of current genworld process */
+struct GenWorldInfo {
+	static inline bool abort;            ///< Whether to abort the thread ASAP
+	static inline GenWorldMode mode;     ///< What mode are we making a world in
+	static inline CompanyID lc;          ///< The local_company before generating
+	static inline uint size_x;           ///< X-size of the map
+	static inline uint size_y;           ///< Y-size of the map
+	static inline GWDoneProc *proc;      ///< Proc that is called when done (can be nullptr)
+	static inline GWAbortProc *abortp;   ///< Proc that is called when aborting (can be nullptr)
+};
 
 /** Whether we are generating the map or not. */
 bool _generating_world;
@@ -86,8 +93,8 @@ static void CleanupGeneration()
 
 	SetMouseCursorBusy(false);
 	SetModalProgress(false);
-	_gw.proc     = nullptr;
-	_gw.abortp   = nullptr;
+	GenWorldInfo::proc     = nullptr;
+	GenWorldInfo::abortp   = nullptr;
 
 	CloseWindowByClass(WC_MODAL_PROGRESS);
 	ShowFirstError();
@@ -130,8 +137,8 @@ static void _GenerateWorld()
 		bool landscape_generated = false;
 
 		/* Don't generate landscape items when in the scenario editor. */
-		if (_gw.mode != GWM_EMPTY) {
-			landscape_generated = GenerateLandscape(_gw.mode);
+		if (GenWorldInfo::mode != GWM_EMPTY) {
+			landscape_generated = GenerateLandscape(GenWorldInfo::mode);
 		}
 
 		if (!landscape_generated) {
@@ -139,8 +146,8 @@ static void _GenerateWorld()
 
 			/* Make sure the tiles at the north border are void tiles if needed. */
 			if (_settings_game.construction.freeform_edges) {
-				for (uint x = 0; x < MapSizeX(); x++) MakeVoid(TileXY(x, 0));
-				for (uint y = 0; y < MapSizeY(); y++) MakeVoid(TileXY(0, y));
+				for (uint x = 0; x < Map::SizeX(); x++) MakeVoid(TileXY(x, 0));
+				for (uint y = 0; y < Map::SizeY(); y++) MakeVoid(TileXY(0, y));
 			}
 
 			/* Make the map the height of the setting */
@@ -179,8 +186,10 @@ static void _GenerateWorld()
 		_town_noise_no_update = false;
 		UpdateAirportsNoise();
 
+		Game::StartNew();
+
 		/* No need to run the tile loop in the scenario editor. */
-		if (_gw.mode != GWM_EMPTY) {
+		if (GenWorldInfo::mode != GWM_EMPTY) {
 			uint i;
 
 			SetGeneratingWorldProgress(GWP_RUNTILELOOP, 0x500);
@@ -191,8 +200,6 @@ static void _GenerateWorld()
 			}
 
 			if (_game_mode != GM_EDITOR) {
-				Game::StartNew();
-
 				if (Game::GetInstance() != nullptr) {
 					SetGeneratingWorldProgress(GWP_RUNSCRIPT, 2500);
 					_generating_world = true;
@@ -210,13 +217,13 @@ static void _GenerateWorld()
 
 		ResetObjectToPlace();
 		_cur_company.Trash();
-		_current_company = _local_company = _gw.lc;
+		_current_company = _local_company = GenWorldInfo::lc;
 		/* Show all vital windows again, because we have hidden them. */
 		if (_game_mode != GM_MENU) ShowVitalWindows();
 
 		SetGeneratingWorldProgress(GWP_GAME_START, 1);
 		/* Call any callback */
-		if (_gw.proc != nullptr) _gw.proc();
+		if (GenWorldInfo::proc != nullptr) GenWorldInfo::proc();
 		IncreaseGeneratingWorldProgress(GWP_GAME_START);
 
 		CleanupGeneration();
@@ -253,7 +260,7 @@ static void _GenerateWorld()
  */
 void GenerateWorldSetCallback(GWDoneProc *proc)
 {
-	_gw.proc = proc;
+	GenWorldInfo::proc = proc;
 }
 
 /**
@@ -263,7 +270,7 @@ void GenerateWorldSetCallback(GWDoneProc *proc)
  */
 void GenerateWorldSetAbortCallback(GWAbortProc *proc)
 {
-	_gw.abortp = proc;
+	GenWorldInfo::abortp = proc;
 }
 
 /**
@@ -271,7 +278,7 @@ void GenerateWorldSetAbortCallback(GWAbortProc *proc)
  */
 void AbortGeneratingWorld()
 {
-	_gw.abort = true;
+	GenWorldInfo::abort = true;
 }
 
 /**
@@ -280,7 +287,7 @@ void AbortGeneratingWorld()
  */
 bool IsGeneratingWorldAborted()
 {
-	return _gw.abort || _exit_game;
+	return GenWorldInfo::abort || _exit_game;
 }
 
 /**
@@ -291,7 +298,7 @@ void HandleGeneratingWorldAbortion()
 	/* Clean up - in SE create an empty map, otherwise, go to intro menu */
 	_switch_mode = (_game_mode == GM_EDITOR) ? SM_EDITOR : SM_MENU;
 
-	if (_gw.abortp != nullptr) _gw.abortp();
+	if (GenWorldInfo::abortp != nullptr) GenWorldInfo::abortp();
 
 	throw AbortGenerateWorldSignal();
 }
@@ -306,26 +313,26 @@ void HandleGeneratingWorldAbortion()
 void GenerateWorld(GenWorldMode mode, uint size_x, uint size_y, bool reset_settings)
 {
 	if (HasModalProgress()) return;
-	_gw.mode   = mode;
-	_gw.size_x = size_x;
-	_gw.size_y = size_y;
+	GenWorldInfo::mode   = mode;
+	GenWorldInfo::size_x = size_x;
+	GenWorldInfo::size_y = size_y;
 	SetModalProgress(true);
-	_gw.abort  = false;
-	_gw.abortp = nullptr;
-	_gw.lc     = _local_company;
+	GenWorldInfo::abort  = false;
+	GenWorldInfo::abortp = nullptr;
+	GenWorldInfo::lc     = _local_company;
 
 	/* This disables some commands and stuff */
 	SetLocalCompany(COMPANY_SPECTATOR);
 
-	InitializeGame(_gw.size_x, _gw.size_y, true, reset_settings);
+	InitializeGame(GenWorldInfo::size_x, GenWorldInfo::size_y, true, reset_settings);
 	PrepareGenerateWorldProgress();
 
 	if (_settings_game.construction.map_height_limit == 0) {
 		uint estimated_height = 0;
 
-		if (_gw.mode == GWM_EMPTY && _game_mode != GM_MENU) {
+		if (GenWorldInfo::mode == GWM_EMPTY && _game_mode != GM_MENU) {
 			estimated_height = _settings_game.game_creation.se_flat_world_height;
-		} else if (_gw.mode == GWM_HEIGHTMAP) {
+		} else if (GenWorldInfo::mode == GWM_HEIGHTMAP) {
 			estimated_height = _settings_game.game_creation.heightmap_height;
 		} else if (_settings_game.game_creation.land_generator == LG_TERRAGENESIS) {
 			estimated_height = GetEstimationTGPMapHeight();
@@ -365,7 +372,7 @@ void GenerateWorld(GenWorldMode mode, uint size_x, uint size_y, bool reset_setti
 
 	/* Centre the view on the map */
 	if (FindWindowById(WC_MAIN_WINDOW, 0) != nullptr) {
-		ScrollMainWindowToTile(TileXY(MapSizeX() / 2, MapSizeY() / 2), true);
+		ScrollMainWindowToTile(TileXY(Map::SizeX() / 2, Map::SizeY() / 2), true);
 	}
 
 	_GenerateWorld();
@@ -376,8 +383,8 @@ void ExecuteWithGenerateWorld(std::function<void()> func)
 	if (HasModalProgress()) return;
 	SetModalProgress(true);
 	MarkWholeScreenDirty();
-	_gw.abort  = false;
-	_gw.abortp = []() {
+	GenWorldInfo::abort  = false;
+	GenWorldInfo::abortp = []() {
 		_switch_mode = SM_NONE; // Don't switch mode on abort
 	};
 
@@ -392,8 +399,8 @@ void ExecuteWithGenerateWorld(std::function<void()> func)
 
 	SetMouseCursorBusy(false);
 	SetModalProgress(false);
-	_gw.proc     = nullptr;
-	_gw.abortp   = nullptr;
+	GenWorldInfo::proc     = nullptr;
+	GenWorldInfo::abortp   = nullptr;
 
 	CloseWindowByClass(WC_MODAL_PROGRESS);
 	MarkWholeScreenDirty();
@@ -403,35 +410,6 @@ void ScheduleExecuteWithGenerateWorld(std::function<void()> func)
 {
 	_exec_with_generate_world = std::move(func);
 	_check_special_modes = true;
-}
-
-/** Town data imported from JSON files and used to place towns. */
-struct ExternalTownData {
-	TownID town_id; ///< The TownID of the town in OpenTTD. Not imported, but set during the founding proceess and stored here for convenience.
-	std::string name; ///< The name of the town.
-	uint population; ///< The target population of the town when created in OpenTTD. If input is blank, defaults to 0.
-	bool is_city; ///< Should it be created as a city in OpenTTD? If input is blank, defaults to false.
-	float x_proportion; ///< The X coordinate of the town, as a proportion 0..1 of the maximum X coordinate.
-	float y_proportion; ///< The Y coordinate of the town, as a proportion 0..1 of the maximum Y coordinate.
-};
-
-/**
- * Helper for CircularTileSearch to found a town on or near a given tile.
- * @param tile The tile to try founding the town upon.
- * @param user_data The ExternalTownData to attempt to found.
- * @return True if the town was founded successfully.
- */
-static bool TryFoundTownNearby(TileIndex tile, void *user_data)
-{
-	ExternalTownData &town = *static_cast<ExternalTownData *>(user_data);
-	CommandCost result = DoCommand(tile, TSZ_SMALL | town.is_city << 2 | _settings_game.economy.town_layout << 3, 0, DC_EXEC, CMD_FOUND_TOWN, town.name.c_str());
-	if (result.HasResultData()) {
-		/* The command succeeded, send the ID back through user_data. */
-		town.town_id = result.GetResultData();
-		return true;
-	} else {
-		return false;
-	}
 }
 
 /**
@@ -444,7 +422,8 @@ void LoadTownData()
 	auto f = FioFOpenFile(_file_to_saveload.name, "rb", HEIGHTMAP_DIR, &filesize);
 
 	if (!f.has_value()) {
-		ShowErrorMessage(STR_TOWN_DATA_ERROR_LOAD_FAILED, STR_TOWN_DATA_ERROR_JSON_FORMATTED_INCORRECTLY, WL_ERROR);
+		ShowErrorMessage(GetEncodedString(STR_TOWN_DATA_ERROR_LOAD_FAILED),
+			GetEncodedString(STR_TOWN_DATA_ERROR_JSON_FORMATTED_INCORRECTLY), WL_ERROR);
 		return;
 	}
 
@@ -452,7 +431,8 @@ void LoadTownData()
 	size_t len = fread(text.data(), filesize, 1, *f);
 	f.reset();
 	if (len != 1) {
-		ShowErrorMessage(STR_TOWN_DATA_ERROR_LOAD_FAILED, STR_TOWN_DATA_ERROR_JSON_FORMATTED_INCORRECTLY, WL_ERROR);
+		ShowErrorMessage(GetEncodedString(STR_TOWN_DATA_ERROR_LOAD_FAILED),
+			GetEncodedString(STR_TOWN_DATA_ERROR_JSON_FORMATTED_INCORRECTLY), WL_ERROR);
 		return;
 	}
 
@@ -461,13 +441,13 @@ void LoadTownData()
 	try {
 		town_data = nlohmann::json::parse(text);
 	} catch (nlohmann::json::exception &) {
-		ShowErrorMessage(STR_TOWN_DATA_ERROR_LOAD_FAILED, STR_TOWN_DATA_ERROR_JSON_FORMATTED_INCORRECTLY, WL_ERROR);
+		ShowErrorMessage(GetEncodedString(STR_TOWN_DATA_ERROR_LOAD_FAILED), GetEncodedString(STR_TOWN_DATA_ERROR_JSON_FORMATTED_INCORRECTLY), WL_ERROR);
 		return;
 	}
 
 	/* Check for JSON formatting errors with the array of towns. */
 	if (!town_data.is_array()) {
-		ShowErrorMessage(STR_TOWN_DATA_ERROR_LOAD_FAILED, STR_TOWN_DATA_ERROR_JSON_FORMATTED_INCORRECTLY, WL_ERROR);
+		ShowErrorMessage(GetEncodedString(STR_TOWN_DATA_ERROR_LOAD_FAILED), GetEncodedString(STR_TOWN_DATA_ERROR_JSON_FORMATTED_INCORRECTLY), WL_ERROR);
 		return;
 	}
 
@@ -476,18 +456,22 @@ void LoadTownData()
 
 	/* Iterate through towns and attempt to found them. */
 	for (auto &feature : town_data) {
-		ExternalTownData town;
+		std::string name; // The name of the town.
+		uint population; // The target population of the town when created in OpenTTD. If input is blank, defaults to 0.
+		bool is_city; // Should it be created as a city in OpenTTD? If input is blank, defaults to false.
+		float x_proportion; // The X coordinate of the town, as a proportion 0..1 of the maximum X coordinate.
+		float y_proportion; // The Y coordinate of the town, as a proportion 0..1 of the maximum Y coordinate.
 
 		/* Ensure JSON is formatted properly. */
 		if (!feature.is_object()) {
-			ShowErrorMessage(STR_TOWN_DATA_ERROR_LOAD_FAILED, STR_TOWN_DATA_ERROR_JSON_FORMATTED_INCORRECTLY, WL_ERROR);
+			ShowErrorMessage(GetEncodedString(STR_TOWN_DATA_ERROR_LOAD_FAILED), GetEncodedString(STR_TOWN_DATA_ERROR_JSON_FORMATTED_INCORRECTLY), WL_ERROR);
 			return;
 		}
 
 		/* Check to ensure all fields exist and are of the correct type.
 		 * If the town name is formatted wrong, all we can do is give a general warning. */
 		if (!feature.contains("name") || !feature.at("name").is_string()) {
-			ShowErrorMessage(STR_TOWN_DATA_ERROR_LOAD_FAILED, STR_TOWN_DATA_ERROR_JSON_FORMATTED_INCORRECTLY, WL_ERROR);
+			ShowErrorMessage(GetEncodedString(STR_TOWN_DATA_ERROR_LOAD_FAILED), GetEncodedString(STR_TOWN_DATA_ERROR_JSON_FORMATTED_INCORRECTLY), WL_ERROR);
 			return;
 		}
 
@@ -496,62 +480,68 @@ void LoadTownData()
 				!feature.contains("city") || !feature.at("city").is_boolean() ||
 				!feature.contains("x") || !feature.at("x").is_number() ||
 				!feature.contains("y") || !feature.at("y").is_number()) {
-			feature.at("name").get_to(town.name);
-			SetDParamStr(0, town.name);
-			ShowErrorMessage(STR_TOWN_DATA_ERROR_LOAD_FAILED, STR_TOWN_DATA_ERROR_TOWN_FORMATTED_INCORRECTLY, WL_ERROR);
+			feature.at("name").get_to(name);
+			ShowErrorMessage(GetEncodedString(STR_TOWN_DATA_ERROR_LOAD_FAILED),
+				GetEncodedString(STR_TOWN_DATA_ERROR_TOWN_FORMATTED_INCORRECTLY, name), WL_ERROR);
 			return;
 		}
 
 		/* Set town properties. */
-		feature.at("name").get_to(town.name);
-		feature.at("population").get_to(town.population);
-		feature.at("city").get_to(town.is_city);
+		feature.at("name").get_to(name);
+		feature.at("population").get_to(population);
+		feature.at("city").get_to(is_city);
 
 		/* Set town coordinates. */
-		feature.at("x").get_to(town.x_proportion);
-		feature.at("y").get_to(town.y_proportion);
+		feature.at("x").get_to(x_proportion);
+		feature.at("y").get_to(y_proportion);
 
 		/* Check for improper coordinates and warn the player. */
-		if (town.x_proportion <= 0.0f || town.y_proportion <= 0.0f || town.x_proportion >= 1.0f || town.y_proportion >= 1.0f) {
-			SetDParamStr(0, town.name);
-			ShowErrorMessage(STR_TOWN_DATA_ERROR_LOAD_FAILED, STR_TOWN_DATA_ERROR_BAD_COORDINATE, WL_ERROR);
+		if (x_proportion <= 0.0f || y_proportion <= 0.0f || x_proportion >= 1.0f || y_proportion >= 1.0f) {
+			ShowErrorMessage(GetEncodedString(STR_TOWN_DATA_ERROR_LOAD_FAILED),
+				GetEncodedString(STR_TOWN_DATA_ERROR_BAD_COORDINATE, name), WL_ERROR);
 			return;
 		}
 
 		/* Find the target tile for the town. */
-		TileIndex tile;
+		TileIndex target_tile;
 		switch (_settings_game.game_creation.heightmap_rotation) {
 			case HM_CLOCKWISE:
 				/* Tile coordinates align with what we expect. */
-				tile = TileXY(town.x_proportion * MapMaxX(), town.y_proportion * MapMaxY());
+				target_tile = TileXY(x_proportion * Map::MaxX(), y_proportion * Map::MaxY());
 				break;
 			case HM_COUNTER_CLOCKWISE:
 				/* Tile coordinates are rotated and must be adjusted. */
-				tile = TileXY((1 - town.y_proportion * MapMaxX()), town.x_proportion * MapMaxY());
+				target_tile = TileXY((1 - y_proportion * Map::MaxX()), x_proportion * Map::MaxY());
 				break;
 			default: NOT_REACHED();
 		}
 
+		TownID town_id = TownID::Invalid(); // The TownID of the town in OpenTTD. Not imported, but set during the founding proceess and stored here for convenience.
 		/* Try founding on the target tile, and if that doesn't work, find the nearest suitable tile up to 16 tiles away.
 		 * The target might be on water, blocked somehow, or on a steep slope that can't be terraformed by the founding command. */
-		TileIndex search_tile = tile;
-		bool success = CircularTileSearch(&search_tile, 16, 0, 0, TryFoundTownNearby, &town);
+		for (auto tile : SpiralTileSequence(target_tile, 16, 0, 0)) {
+			CommandCost result = Command<CMD_FOUND_TOWN>::Do(DoCommandFlag::Execute, tile, TSZ_SMALL, is_city, _settings_game.economy.town_layout, false, 0, name);
+			auto town_result = result.GetResultData<TownID>();
+			if (town_result.has_value()) {
+				town_id = *town_result;
+				break;
+			}
+		}
 
 		/* If we still fail to found the town, we'll create a sign at the intended location and tell the player how many towns we failed to create in an error message.
 		 * This allows the player to diagnose a heightmap misalignment, if towns end up in the sea, or place towns manually, if in rough terrain. */
-		if (!success) {
-			DoCommandP(tile, 0, 0, CMD_PLACE_SIGN, nullptr, town.name.c_str());
+		if (town_id == TownID::Invalid()) {
+			Command<CMD_PLACE_SIGN>::Post(target_tile, name);
 			failed_towns++;
 			continue;
 		}
 
-		towns.emplace_back(std::make_pair(Town::Get(town.town_id), town.population));
+		towns.emplace_back(std::make_pair(Town::Get(town_id), population));
 	}
 
 	/* If we couldn't found a town (or multiple), display a message to the player with the number of failed towns. */
 	if (failed_towns > 0) {
-		SetDParam(0, failed_towns);
-		ShowErrorMessage(STR_TOWN_DATA_ERROR_FAILED_TO_FOUND_TOWN, INVALID_STRING_ID, WL_WARNING);
+		ShowErrorMessage(GetEncodedString(STR_TOWN_DATA_ERROR_FAILED_TO_FOUND_TOWN, failed_towns), {}, WL_WARNING);
 	}
 
 	/* Now that we've created the towns, let's grow them to their target populations. */
@@ -572,7 +562,7 @@ void LoadTownData()
 
 		do {
 			uint before = t->cache.num_houses;
-			DoCommandP(0, t->index, HOUSES_TO_GROW, CMD_EXPAND_TOWN);
+			Command<CMD_EXPAND_TOWN>::Post(t->index, HOUSES_TO_GROW, {TownExpandMode::Buildings, TownExpandMode::Roads});
 			if (t->cache.num_houses <= before) fail_limit--;
 		} while (fail_limit > 0 && try_limit-- > 0 && t->cache.population < population);
 	}

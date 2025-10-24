@@ -33,7 +33,10 @@ enum AboutWidgets : WidgetID {
 /** Widgets of the #QueryStringWindow class. */
 enum QueryStringWidgets : WidgetID {
 	WID_QS_CAPTION, ///< Caption of the window.
+	WID_QS_LABEL1,  ///< Label of text1.
+	WID_QS_LABEL2,  ///< Label of text2.
 	WID_QS_TEXT,    ///< Text of the query.
+	WID_QS_TEXT2,   ///< Second text, if present.
 	WID_QS_WARNING, ///< Warning label about password security
 	WID_QS_DEFAULT, ///< Default button.
 	WID_QS_CANCEL,  ///< Cancel button.
@@ -62,7 +65,7 @@ enum TextfileWidgets : WidgetID {
 };
 
 /** Widgets of the #TextfileWindow class. */
-enum ModifierKeyToggleWidgets {
+enum ModifierKeyToggleWidgets : WidgetID {
 	WID_MKT_SHIFT,
 	WID_MKT_CTRL,
 };

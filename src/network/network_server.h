@@ -12,12 +12,13 @@
 
 #include "network_internal.h"
 #include "core/tcp_listen.h"
+#include "../core/pool_type.hpp"
 
 class ServerNetworkGameSocketHandler;
 /** Make the code look slightly nicer/simpler. */
 typedef ServerNetworkGameSocketHandler NetworkClientSocket;
 /** Pool with all client sockets. */
-typedef Pool<NetworkClientSocket, ClientIndex, 8, MAX_CLIENT_SLOTS, PT_NCLIENT> NetworkClientSocketPool;
+using NetworkClientSocketPool = Pool<NetworkClientSocket, ClientPoolID, 8, PoolType::NetworkClient>;
 extern NetworkClientSocketPool _networkclientsocket_pool;
 
 /** Class for handling the server side of the game connection. */
@@ -27,8 +28,8 @@ class ServerNetworkGameSocketHandler : public NetworkClientSocketPool::PoolItem<
 	uint8_t *rcon_reply_key = nullptr;
 
 protected:
-	std::unique_ptr<class NetworkAuthenticationServerHandler> authentication_handler; ///< The handler for the authentication.
-	std::string peer_public_key; ///< The public key of our client.
+	std::unique_ptr<class NetworkAuthenticationServerHandler> authentication_handler = nullptr; ///< The handler for the authentication.
+	std::string peer_public_key{}; ///< The public key of our client.
 
 	NetworkRecvStatus Receive_CLIENT_JOIN(Packet &p) override;
 	NetworkRecvStatus Receive_CLIENT_IDENTIFY(Packet &p) override;
@@ -64,7 +65,7 @@ protected:
 
 public:
 	/** Status of a client */
-	enum ClientStatus {
+	enum ClientStatus : uint8_t {
 		STATUS_INACTIVE,      ///< The client is not connected nor active.
 		STATUS_AUTH_GAME,     ///< The client is authorizing with game (server) password.
 		STATUS_IDENTIFY,      ///< The client is identifying itself.
@@ -82,17 +83,17 @@ public:
 
 	static const char *GetClientStatusName(ClientStatus status);
 
-	uint8_t lag_test;            ///< Byte used for lag-testing the client
-	uint8_t last_token;          ///< The last random token we did send to verify the client is listening
-	uint32_t last_token_frame;   ///< The last frame we received the right token
-	ClientStatus status;         ///< Status of this client
-	CommandQueue outgoing_queue; ///< The command-queue awaiting delivery; conceptually more a bucket to gather commands in, after which the whole bucket is sent to the client.
-	size_t receive_limit;        ///< Amount of bytes that we can receive at this moment
-	bool settings_authed = false;///< Authorised to control all game settings
-	bool supports_zstd = false;  ///< Client supports zstd compression
+	uint8_t lag_test = 0;                  ///< Byte used for lag-testing the client
+	uint8_t last_token = 0;                ///< The last random token we did send to verify the client is listening
+	uint32_t last_token_frame = 0;         ///< The last frame we received the right token
+	ClientStatus status = STATUS_INACTIVE; ///< Status of this client
+	OutgoingCommandQueue outgoing_queue{}; ///< The command-queue awaiting delivery; conceptually more a bucket to gather commands in, after which the whole bucket is sent to the client.
+	size_t receive_limit = 0;              ///< Amount of bytes that we can receive at this moment
+	bool settings_authed = false;          ///< Authorised to control all game settings
+	bool supports_zstd = false;            ///< Client supports zstd compression
 
-	std::shared_ptr<struct PacketWriter> savegame; ///< Writer used to write the savegame.
-	NetworkAddress client_address; ///< IP-address of the client (so they can be banned)
+	std::shared_ptr<struct PacketWriter> savegame = nullptr; ///< Writer used to write the savegame.
+	NetworkAddress client_address{}; ///< IP-address of the client (so they can be banned)
 
 	std::string desync_log;
 	std::string desync_frame_info;
@@ -115,19 +116,19 @@ public:
 	NetworkRecvStatus SendQuit(ClientID client_id);
 	NetworkRecvStatus SendShutdown();
 	NetworkRecvStatus SendNewGame();
-	NetworkRecvStatus SendRConResult(uint16_t colour, const std::string &command);
+	NetworkRecvStatus SendRConResult(uint16_t colour, std::string_view command);
 	NetworkRecvStatus SendRConDenied();
 	NetworkRecvStatus SendMove(ClientID client_id, CompanyID company_id);
 
 	NetworkRecvStatus SendClientInfo(NetworkClientInfo *ci);
-	NetworkRecvStatus SendError(NetworkErrorCode error, const std::string &reason = {});
-	NetworkRecvStatus SendDesyncLog(const std::string &log);
-	NetworkRecvStatus SendChat(NetworkAction action, ClientID client_id, bool self_send, const std::string &msg, NetworkTextMessageData data);
-	NetworkRecvStatus SendExternalChat(const std::string &source, TextColour colour, const std::string &user, const std::string &msg);
+	NetworkRecvStatus SendError(NetworkErrorCode error, std::string_view reason = {});
+	NetworkRecvStatus SendDesyncLog(std::string_view log);
+	NetworkRecvStatus SendChat(NetworkAction action, ClientID client_id, bool self_send, std::string_view msg, NetworkTextMessageData data);
+	NetworkRecvStatus SendExternalChat(std::string_view source, TextColour colour, std::string_view user, std::string_view msg);
 	NetworkRecvStatus SendJoin(ClientID client_id);
 	NetworkRecvStatus SendFrame();
 	NetworkRecvStatus SendSync();
-	NetworkRecvStatus SendCommand(const CommandPacket &cp);
+	NetworkRecvStatus SendCommand(const OutgoingCommandPacket &cp);
 	NetworkRecvStatus SendCompanyUpdate();
 	NetworkRecvStatus SendConfigUpdate();
 	NetworkRecvStatus SendSettingsAccessUpdate(bool ok);
@@ -155,7 +156,7 @@ public:
 		return "server";
 	}
 
-	const char *GetClientIP();
+	std::string_view GetClientIP();
 	std::string_view GetPeerPublicKey() const { return this->peer_public_key; }
 
 	static ServerNetworkGameSocketHandler *GetByClientID(ClientID client_id);
@@ -163,7 +164,7 @@ public:
 
 void NetworkServer_Tick(bool send_frame);
 void ChangeNetworkRestartTime(bool reset);
-void NetworkServerSetCompanyPassword(CompanyID company_id, const std::string &password, bool already_hashed = true);
+void NetworkServerSetCompanyPassword(CompanyID company_id, std::string_view password, bool already_hashed = true);
 void NetworkServerUpdateCompanyPassworded(CompanyID company_id, bool passworded);
 
 #endif /* NETWORK_SERVER_H */

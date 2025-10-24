@@ -15,8 +15,7 @@
 #include "os_abstraction.h"
 #include "tcp.h"
 #include "../network_type.h"
-#include "../../core/pool_type.hpp"
-#include "../../core/ring_buffer.hpp"
+#include "../../3rdparty/cpp-ring-buffer/ring_buffer.hpp"
 #include <memory>
 #include <chrono>
 
@@ -147,19 +146,21 @@ const char *GetPacketGameTypeName(PacketGameType type);
 
 /** Packet that wraps a command */
 struct CommandPacket;
+struct OutgoingCommandPacket;
 
 /**
  * A "queue" of CommandPackets.
  * Not a std::queue because, when paused, some commands remain on the queue.
  * In other words, you do not always pop the first element from this queue.
  */
-using CommandQueue = ring_buffer<CommandPacket>;
+using CommandQueue = jgr::ring_buffer<CommandPacket>;
+using OutgoingCommandQueue = jgr::ring_buffer<OutgoingCommandPacket>;
 
 /** Base socket handler for all TCP sockets */
 class NetworkGameSocketHandler : public NetworkTCPSocketHandler {
 /* TODO: rewrite into a proper class */
 private:
-	NetworkClientInfo *info;          ///< Client info related to this socket
+	NetworkClientInfo *info = nullptr; ///< Client info related to this socket
 	bool is_pending_deletion = false; ///< Whether this socket is pending deletion
 
 protected:
@@ -431,7 +432,7 @@ protected:
 	 * Sends a chat-packet for external source to the client:
 	 * string    Name of the source this message came from.
 	 * uint16_t  TextColour to use for the message.
-	 * string    Name of the user who sent the messsage.
+	 * string    Name of the user who sent the message.
 	 * string    Message (max NETWORK_CHAT_LENGTH).
 	 * @param p The packet that was just received.
 	 */
@@ -561,12 +562,12 @@ protected:
 
 	NetworkGameSocketHandler(SOCKET s);
 public:
-	ClientID client_id;            ///< Client identifier
-	uint32_t last_frame;           ///< Last frame we have executed
-	uint32_t last_frame_server;    ///< Last frame the server has executed
-	CommandQueue incoming_queue;   ///< The command-queue awaiting handling
-	std::chrono::steady_clock::time_point last_packet; ///< Time we received the last frame.
-	PacketGameType last_pkt_type;  ///< Last received packet type
+	ClientID client_id = INVALID_CLIENT_ID;              ///< Client identifier
+	uint32_t last_frame = 0;                             ///< Last frame we have executed
+	uint32_t last_frame_server = 0;                      ///< Last frame the server has executed
+	CommandQueue incoming_queue;                         ///< The command-queue awaiting handling
+	std::chrono::steady_clock::time_point last_packet{}; ///< Time we received the last frame.
+	PacketGameType last_pkt_type = PACKET_END;           ///< Last received packet type
 
 	NetworkRecvStatus CloseConnection(bool error = true) override;
 
@@ -599,7 +600,7 @@ public:
 	NetworkRecvStatus ReceivePackets();
 
 	const char *ReceiveCommand(Packet &p, CommandPacket &cp);
-	void SendCommand(Packet &p, const CommandPacket &cp);
+	void SendCommand(Packet &p, const OutgoingCommandPacket &cp);
 
 	virtual std::string GetDebugInfo() const;
 	virtual void LogSentPacket(const Packet &pkt) override;

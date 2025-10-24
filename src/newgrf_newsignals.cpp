@@ -16,6 +16,8 @@
 #include "string_func.h"
 #include "newgrf_dump.h"
 
+#include <array>
+
 #include "safeguards.h"
 
 std::vector<const GRFFile *> _new_signals_grfs;
@@ -27,7 +29,7 @@ uint16_t _enabled_new_signal_styles_mask = 0;
 
 /* virtual */ uint32_t NewSignalsScopeResolver::GetRandomBits() const
 {
-	uint tmp = CountBits(this->tile + (TileX(this->tile) + TileY(this->tile)) * TILE_SIZE);
+	uint tmp = CountBits(this->tile.base() + (TileX(this->tile) + TileY(this->tile)) * TILE_SIZE);
 	return GB(tmp, 0, 2);
 }
 
@@ -134,7 +136,7 @@ void DumpNewSignalsSpriteGroups(SpriteGroupDumper &dumper)
 	bool first = true;
 	for (const GRFFile *grf : _new_signals_grfs) {
 		if (!first) dumper.Print("");
-		dumper.Print(fmt::format("GRF: {:08X}", BSWAP32(grf->grfid)));
+		dumper.Print(fmt::format("GRF: {:08X}", std::byteswap(grf->grfid)));
 		first = false;
 		dumper.DumpSpriteGroup(grf->new_signals_group, 0);
 	}

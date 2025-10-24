@@ -14,7 +14,6 @@
 #define NEWGRF_COMMONS_H
 
 #include "sprite.h"
-#include "core/alloc_type.hpp"
 #include "command_type.h"
 #include "direction_type.h"
 #include "company_type.h"
@@ -30,7 +29,7 @@ enum TileContext : uint8_t {
 /**
  * Flags to enable register usage in sprite layouts.
  */
-enum TileLayoutFlags : uint16_t {
+enum TileLayoutFlags : uint8_t {
 	TLF_NOTHING           = 0x00,
 
 	TLF_DODRAW            = 0x01,   ///< Only draw sprite if value of register TileLayoutRegisters::dodraw is non-zero.
@@ -50,7 +49,7 @@ enum TileLayoutFlags : uint16_t {
 	TLF_KNOWN_FLAGS       = 0xFF,   ///< Known flags. Any unknown set flag will disable the GRF.
 
 	/** Flags which are still required after loading the GRF. */
-	TLF_DRAWING_FLAGS     = (uint16_t)~TLF_CUSTOM_PALETTE,
+	TLF_DRAWING_FLAGS     = TLF_KNOWN_FLAGS & ~TLF_CUSTOM_PALETTE,
 
 	/** Flags which do not work for the (first) ground sprite. */
 	TLF_NON_GROUND_FLAGS  = TLF_BB_XY_OFFSET | TLF_BB_Z_OFFSET | TLF_CHILD_X_OFFSET | TLF_CHILD_Y_OFFSET,
@@ -110,36 +109,18 @@ static const uint TLR_MAX_VAR10 = 7; ///< Maximum value for var 10.
  * In contrast to #DrawTileSprites this struct is for allocated
  * layouts on the heap. It allocates data and frees them on destruction.
  */
-struct NewGRFSpriteLayout : ZeroedMemoryAllocator, DrawTileSprites {
-	const TileLayoutRegisters *registers;
+struct NewGRFSpriteLayout : DrawTileSprites {
+	std::vector<DrawTileSeqStruct> seq{};
+	std::vector<TileLayoutRegisters> registers{};
 
 	/**
 	 * Number of sprites in all referenced spritesets.
 	 * If these numbers are inconsistent, then this is 0 and the real values are in \c registers.
 	 */
-	uint consistent_max_offset;
+	uint consistent_max_offset = 0;
 
 	void Allocate(uint num_sprites);
 	void AllocateRegisters();
-	void Clone(const DrawTileSeqStruct *source);
-	void Clone(const NewGRFSpriteLayout *source);
-
-	/**
-	 * Clone a spritelayout.
-	 * @param source The spritelayout to copy.
-	 */
-	void Clone(const DrawTileSprites *source)
-	{
-		assert(source != nullptr && this != source);
-		this->ground = source->ground;
-		this->Clone(source->seq);
-	}
-
-	virtual ~NewGRFSpriteLayout()
-	{
-		free(this->seq);
-		free(this->registers);
-	}
 
 	/**
 	 * Tests whether this spritelayout needs preprocessing by
@@ -149,7 +130,7 @@ struct NewGRFSpriteLayout : ZeroedMemoryAllocator, DrawTileSprites {
 	 */
 	bool NeedsPreprocessing() const
 	{
-		return this->registers != nullptr;
+		return !this->registers.empty();
 	}
 
 	uint32_t PrepareLayout(uint32_t orig_offset, uint32_t newgrf_ground_offset, uint32_t newgrf_offset, uint constr_stage, bool separate_ground) const;
@@ -160,12 +141,14 @@ struct NewGRFSpriteLayout : ZeroedMemoryAllocator, DrawTileSprites {
 	 * @pre #PrepareLayout() and #ProcessRegisters() need calling first.
 	 * @return result spritelayout
 	 */
-	const DrawTileSeqStruct *GetLayout(PalSpriteID *ground) const
+	std::span<DrawTileSeqStruct> GetLayout(PalSpriteID *ground) const
 	{
-		DrawTileSeqStruct *front = result_seq.data();
-		*ground = front->image;
-		return front + 1;
+		*ground = result_seq[0].image;
+		return {++result_seq.begin(), result_seq.end()};
 	}
+
+	std::span<const DrawTileSeqStruct> GetSequence() const override { return {this->seq.begin(), this->seq.end()}; }
+
 
 private:
 	static std::vector<DrawTileSeqStruct> result_seq; ///< Temporary storage when preprocessing spritelayouts.
@@ -227,7 +210,7 @@ public:
 	HouseOverrideManager(uint16_t offset, uint16_t maximum, uint16_t invalid) :
 			OverrideManagerBase(offset, maximum, invalid) {}
 
-	void SetEntitySpec(const HouseSpec *hs);
+	void SetEntitySpec(HouseSpec &&hs);
 };
 
 
@@ -240,7 +223,7 @@ public:
 	uint16_t AddEntityID(uint16_t grf_local_id, uint32_t grfid, uint16_t substitute_id) override;
 	uint16_t GetID(uint16_t grf_local_id, uint32_t grfid) const override;
 
-	void SetEntitySpec(IndustrySpec *inds);
+	void SetEntitySpec(IndustrySpec &&inds);
 };
 
 
@@ -252,7 +235,7 @@ public:
 	IndustryTileOverrideManager(uint16_t offset, uint16_t maximum, uint16_t invalid) :
 			OverrideManagerBase(offset, maximum, invalid) {}
 
-	void SetEntitySpec(const IndustryTileSpec *indts);
+	void SetEntitySpec(IndustryTileSpec &&indts);
 };
 
 struct AirportSpec;
@@ -261,7 +244,7 @@ public:
 	AirportOverrideManager(uint16_t offset, uint16_t maximum, uint16_t invalid) :
 			OverrideManagerBase(offset, maximum, invalid) {}
 
-	void SetEntitySpec(AirportSpec *inds);
+	void SetEntitySpec(AirportSpec &&inds);
 };
 
 struct AirportTileSpec;
@@ -272,7 +255,7 @@ public:
 	AirportTileOverrideManager(uint16_t offset, uint16_t maximum, uint16_t invalid) :
 			OverrideManagerBase(offset, maximum, invalid) {}
 
-	void SetEntitySpec(const AirportTileSpec *ats);
+	void SetEntitySpec(AirportTileSpec &&ats);
 };
 
 struct ObjectSpec;
@@ -283,7 +266,7 @@ public:
 	ObjectOverrideManager(uint16_t offset, uint16_t maximum, uint16_t invalid) :
 			OverrideManagerBase(offset, maximum, invalid) {}
 
-	void SetEntitySpec(ObjectSpec *spec);
+	void SetEntitySpec(ObjectSpec &&spec);
 };
 
 extern HouseOverrideManager _house_mngr;
@@ -304,15 +287,16 @@ bool ConvertBooleanCallback(const struct GRFFile *grffile, uint16_t cbid, uint16
 bool Convert8bitBooleanCallback(const struct GRFFile *grffile, uint16_t cbid, uint16_t cb_res);
 
 /**
- * Data related to the handling of grf files.
- * @tparam Tcnt Number of spritegroups
+ * Base data related to the handling of grf files.
  */
-template <size_t Tcnt>
 struct GRFFilePropsBase {
 	uint16_t local_id = 0;                       ///< id defined by the grf file for this entity
 	uint32_t grfid = 0;                          ///< grfid that introduced this entity.
 	const struct GRFFile *grffile = nullptr;     ///< grf file that introduced this entity
-	std::array<const struct SpriteGroup *, Tcnt> spritegroup{}; ///< pointers to the different sprites of the entity
+
+	using IndexType = uint8_t;
+
+	void SetGRFFile(const struct GRFFile *grffile);
 
 	/**
 	 * Test if this entity was introduced by NewGRF.
@@ -321,13 +305,103 @@ struct GRFFilePropsBase {
 	inline bool HasGrfFile() const { return this->grffile != nullptr; }
 };
 
+/**
+ * Fixed-length list of sprite groups for an entity.
+ * @tparam Tcount Number of spritegroups
+ */
+template <size_t Tcount>
+struct FixedGRFFileProps : GRFFilePropsBase {
+	std::array<const struct SpriteGroup *, Tcount> spritegroups{}; ///< pointers to the different sprite groups of the entity
+
+	/**
+	 * Get the SpriteGroup at the specified index.
+	 * @param index Index to get.
+	 * @returns SpriteGroup at index, or nullptr if not present.
+	 */
+	const struct SpriteGroup *GetSpriteGroup(IndexType index = 0) const { return this->spritegroups[index]; }
+
+	/**
+	 * Set the SpriteGroup at the specified index.
+	 * @param index Index to set.
+	 * @param spritegroup SpriteGroup to set.
+	 */
+	void SetSpriteGroup(size_t index, const struct SpriteGroup *spritegroup) { this->spritegroups[index] = spritegroup; }
+};
+
+/**
+ * Variable-length list of sprite groups for an entity.
+ */
+struct VariableGRFFileProps : GRFFilePropsBase {
+private:
+	using GroupType = const struct SpriteGroup *;
+
+	IndexType capacity = 2;
+	IndexType size = 0;
+	IndexType inline_keys[2];
+
+	union {
+		GroupType inline_groups[2];
+
+		struct {
+			IndexType *allocated_keys;
+			const struct SpriteGroup **allocated_groups;
+		};
+	} data;
+
+	inline bool inline_mode() const { return this->capacity == 2; }
+	inline const IndexType *get_keys() const { return this->inline_mode() ? this->inline_keys : this->data.allocated_keys; }
+	inline const GroupType *get_groups() const { return this->inline_mode() ? this->data.inline_groups : this->data.allocated_groups; }
+
+	void move_from(VariableGRFFileProps &&other)
+	{
+		this->capacity = other.capacity;
+		this->size = other.size;
+		this->inline_keys[0] = other.inline_keys[0];
+		this->inline_keys[1] = other.inline_keys[1];
+		this->data = other.data;
+		other.capacity = 2;
+		other.size = 0;
+	}
+
+public:
+	const struct SpriteGroup *GetSpriteGroup(IndexType index) const;
+	const struct SpriteGroup **GetSpriteGroupPtr(IndexType index);
+	void SetSpriteGroup(IndexType index, const struct SpriteGroup *spritegroup);
+
+	struct VariableGRFFilePropsIterator {
+		VariableGRFFilePropsIterator(const IndexType *keys, const GroupType *groups) : keys(keys), groups(groups) {}
+
+		bool operator==(const VariableGRFFilePropsIterator &other) const { return this->keys == other.keys; }
+		std::pair<const IndexType, const GroupType> operator*() const { return { *this->keys, *this->groups }; }
+		VariableGRFFilePropsIterator &operator++() { ++this->keys; ++this->groups; return *this; }
+
+	private:
+		const IndexType *keys;
+		const GroupType *groups;
+	};
+
+	VariableGRFFilePropsIterator begin() const { return { this->get_keys(), this->get_groups() }; }
+	VariableGRFFilePropsIterator end() const { return { this->get_keys() + this->size, nullptr }; }
+
+	VariableGRFFileProps() = default;
+	VariableGRFFileProps(const VariableGRFFileProps &) = delete;
+	VariableGRFFileProps(VariableGRFFileProps &&other) noexcept { this->move_from(std::move(other)); }
+	VariableGRFFileProps& operator=(const VariableGRFFileProps &) = delete;
+	VariableGRFFileProps& operator=(VariableGRFFileProps &&other) noexcept { this->move_from(std::move(other)); return *this; }
+
+	~VariableGRFFileProps()
+	{
+		if (!this->inline_mode()) free(this->data.allocated_groups);
+	}
+};
+
 /** Data related to the handling of grf files. */
-struct GRFFileProps : GRFFilePropsBase<1> {
+struct GRFFileProps : FixedGRFFileProps<1> {
 	/** Set all default data constructor for the props. */
-	constexpr GRFFileProps(uint16_t subst_id = 0) : subst_id(subst_id), override(subst_id) {}
+	constexpr GRFFileProps(uint16_t subst_id = 0) : subst_id(subst_id), override_id(subst_id) {}
 
 	uint16_t subst_id;
-	uint16_t override;                      ///< id of the entity been replaced by
+	uint16_t override_id; ///< id of the entity been replaced by
 };
 
 /** Container for a label for rail or road type conversion. */

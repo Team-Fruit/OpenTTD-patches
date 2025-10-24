@@ -97,25 +97,25 @@ static void Save_NGRF()
 	SaveLoadTableData sld = SlTableHeader(_grfconfig_desc);
 	int index = 0;
 
-	for (GRFConfig *c = _grfconfig; c != nullptr; c = c->next) {
-		if (HasBit(c->flags, GCF_STATIC) || HasBit(c->flags, GCF_INIT_ONLY)) continue;
+	for (const auto &c : _grfconfig) {
+		if (c->flags.Any({GRFConfigFlag::Static, GRFConfigFlag::InitOnly})) continue;
 		SlSetArrayIndex(index++);
 		_grf_name = str_strip_all_scc(GetDefaultLangGRFStringFromGRFText(c->name));
-		SlObjectSaveFiltered(c, sld);
+		SlObjectSaveFiltered(c.get(), sld);
 	}
 }
 
 
-static void Load_NGRF_common(GRFConfig *&grfconfig)
+static void Load_NGRF_common(GRFConfigList &grfconfig)
 {
 	if (SlXvIsFeaturePresent(XSLFI_TABLE_NEWGRF_SL, 1, 1)) {
 		SlLoadTableWithArrayLengthPrefixesMissing();
 	}
 	SaveLoadTableData sld = SlTableHeaderOrRiff(_grfconfig_desc);
-	ClearGRFConfigList(&grfconfig);
+	ClearGRFConfigList(grfconfig);
 	while (SlIterateArray() != -1) {
-		GRFConfig *c = new GRFConfig();
-		SlObjectLoadFiltered(c, sld);
+		auto c = std::make_unique<GRFConfig>();
+		SlObjectLoadFiltered(c.get(), sld);
 		if (SlXvIsFeaturePresent(XSLFI_NEWGRF_INFO_EXTRA)) {
 			AddGRFTextToList(c->name, 0x7F, c->ident.grfid, false, _grf_name.c_str());
 		}
@@ -124,7 +124,7 @@ static void Load_NGRF_common(GRFConfig *&grfconfig)
 			c->param.assign(std::begin(_grf_param), last);
 		}
 		if (IsSavegameVersionBefore(SLV_101)) c->SetSuitablePalette();
-		AppendToGRFConfigList(&grfconfig, c);
+		AppendToGRFConfigList(grfconfig, std::move(c));
 	}
 	Debug(sl, 2, "Loaded {} NewGRFs", GetGRFConfigListNonStaticCount(grfconfig));
 }
@@ -135,13 +135,13 @@ static void Load_NGRF()
 
 	if (_game_mode == GM_MENU) {
 		/* Intro game must not have NewGRF. */
-		if (_grfconfig != nullptr) SlErrorCorrupt("The intro game must not use NewGRF");
+		if (!_grfconfig.empty()) SlErrorCorrupt("The intro game must not use NewGRF");
 
 		/* Activate intro NewGRFs (townnames) */
 		ResetGRFConfig(false);
 	} else {
 		/* Append static NewGRF configuration */
-		AppendStaticGRFConfigs(&_grfconfig);
+		AppendStaticGRFConfigs(_grfconfig);
 	}
 }
 

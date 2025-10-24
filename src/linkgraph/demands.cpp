@@ -259,7 +259,7 @@ inline void Scaler::SetDemands(LinkGraphJob &job, NodeID from_id, NodeID to_id, 
  * @param reachable_nodes Bitmap of reachable nodes.
  * @tparam Tscaler Scaler to be used for scaling demands.
  */
-template<class Tscaler>
+template <class Tscaler>
 void DemandCalculator::CalcDemand(LinkGraphJob &job, const std::vector<bool> &reachable_nodes, Tscaler scaler)
 {
 	NodeList supplies;
@@ -361,7 +361,7 @@ void DemandCalculator::CalcDemand(LinkGraphJob &job, const std::vector<bool> &re
  * @param reachable_nodes Bitmap of reachable nodes.
  * @tparam Tscaler Scaler to be used for scaling demands.
  */
-template<class Tscaler>
+template <class Tscaler>
 void DemandCalculator::CalcMinimisedDistanceDemand(LinkGraphJob &job, const std::vector<bool> &reachable_nodes, Tscaler scaler)
 {
 	std::vector<NodeID> supplies;
@@ -413,10 +413,10 @@ void DemandCalculator::CalcMinimisedDistanceDemand(LinkGraphJob &job, const std:
  * @param job Job to calculate the demands for.
  */
 DemandCalculator::DemandCalculator(LinkGraphJob &job) :
-	base_distance(IntSqrt(DistanceMaxPlusManhattan(TileXY(0,0), TileXY(MapMaxX(), MapMaxY()))))
+	base_distance(IntSqrt(DistanceMaxPlusManhattan(TileXY(0,0), TileXY(Map::MaxX(), Map::MaxY()))))
 {
 	const LinkGraphSettings &settings = job.Settings();
-	CargoID cargo = job.Cargo();
+	CargoType cargo = job.Cargo();
 
 	this->accuracy = settings.accuracy;
 	this->mod_dist = settings.demand_distance;

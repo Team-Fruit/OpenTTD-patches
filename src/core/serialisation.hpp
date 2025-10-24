@@ -16,13 +16,19 @@
 
 #include <vector>
 #include <string>
+#include <tuple>
+#include <variant>
 #include <limits>
+
+template <typename T>
+concept SerialisationAsBase = T::serialisation_as_base || false;
 
 void   BufferSend_bool  (std::vector<uint8_t> &buffer, size_t limit, bool     data);
 void   BufferSend_uint8 (std::vector<uint8_t> &buffer, size_t limit, uint8_t  data);
 void   BufferSend_uint16(std::vector<uint8_t> &buffer, size_t limit, uint16_t data);
 void   BufferSend_uint32(std::vector<uint8_t> &buffer, size_t limit, uint32_t data);
 void   BufferSend_uint64(std::vector<uint8_t> &buffer, size_t limit, uint64_t data);
+void   BufferSend_varuint(std::vector<uint8_t> &buffer, size_t limit, uint64_t data);
 void   BufferSend_string(std::vector<uint8_t> &buffer, size_t limit, const std::string_view data);
 size_t BufferSend_binary_until_full(std::vector<uint8_t> &buffer, size_t limit, const uint8_t *begin, const uint8_t *end);
 void   BufferSend_binary(std::vector<uint8_t> &buffer, size_t limit, const uint8_t *data, const size_t size);
@@ -43,10 +49,22 @@ struct BufferSerialisationHelper {
 		BufferSend_uint8(self->GetSerialisationBuffer(), self->GetSerialisationLimit(), data);
 	}
 
+	void Send_uint8(const SerialisationAsBase auto &data)
+	{
+		static_assert(sizeof(data.base()) == 1);
+		this->Send_uint8((uint8_t)data.base());
+	}
+
 	void Send_uint16(uint16_t data)
 	{
 		T *self = static_cast<T *>(this);
 		BufferSend_uint16(self->GetSerialisationBuffer(), self->GetSerialisationLimit(), data);
+	}
+
+	void Send_uint16(const SerialisationAsBase auto &data)
+	{
+		static_assert(sizeof(data.base()) <= 2);
+		this->Send_uint16((uint16_t)data.base());
 	}
 
 	void Send_uint32(uint32_t data)
@@ -55,10 +73,22 @@ struct BufferSerialisationHelper {
 		BufferSend_uint32(self->GetSerialisationBuffer(), self->GetSerialisationLimit(), data);
 	}
 
+	void Send_uint32(const SerialisationAsBase auto &data)
+	{
+		static_assert(sizeof(data.base()) <= 4);
+		this->Send_uint32((uint32_t)data.base());
+	}
+
 	void Send_uint64(uint64_t data)
 	{
 		T *self = static_cast<T *>(this);
 		BufferSend_uint64(self->GetSerialisationBuffer(), self->GetSerialisationLimit(), data);
+	}
+
+	void Send_varuint(uint64_t data)
+	{
+		T *self = static_cast<T *>(this);
+		BufferSend_varuint(self->GetSerialisationBuffer(), self->GetSerialisationLimit(), data);
 	}
 
 	void Send_string(const std::string_view data)
@@ -99,6 +129,77 @@ struct BufferSerialisationHelper {
 	{
 		T *self = static_cast<T *>(this);
 		BufferSendAtOffset_uint16(self->GetSerialisationBuffer(), offset, data);
+	}
+
+	template <typename V>
+	void Send_generic_integer(const V &data)
+	{
+		static_assert(sizeof(V) <= 8);
+		if constexpr (sizeof(V) <= 1) {
+			this->Send_uint8(static_cast<uint8_t>(data));
+		} else if constexpr (sizeof(V) == 2) {
+			this->Send_uint16(static_cast<uint16_t>(data));
+		} else {
+			if constexpr (std::is_signed<V>::value) {
+				/* Zig-zag encode */
+				using U = typename std::make_unsigned<V>::type;
+				U zigzag = (static_cast<U>(data) << 1);
+				if (data < 0) zigzag = ~zigzag;
+				this->Send_varuint(zigzag);
+			} else {
+				this->Send_varuint(static_cast<uint64_t>(data));
+			}
+		}
+	}
+
+	template <typename V>
+	void Send_generic(const V &data)
+	{
+		if constexpr (std::is_same_v<V, std::string> || std::is_same_v<V, std::string_view>) {
+			this->Send_string(data);
+		} else if constexpr (SerialisationAsBase<V>) {
+			this->Send_generic_integer(data.base());
+		} else if constexpr (requires { data.Serialise(*this); }) {
+			data.Serialise(*this);
+		} else {
+			this->Send_generic_integer(data);
+		}
+	}
+
+	template <typename... V>
+	void Send_generic(const std::tuple<V...> &data)
+	{
+		auto handler = [&]<size_t... Tindices>(std::index_sequence<Tindices...>) {
+			((this->Send_generic(std::get<Tindices>(data))), ...);
+		};
+		handler(std::index_sequence_for<V...>{});
+	}
+
+	template <typename... V>
+	void Send_generic(const std::variant<V...> &data)
+	{
+		static_assert(sizeof...(V) < 256);
+		this->Send_uint8(static_cast<uint8_t>(data.index()));
+
+		const size_t idx = data.index();
+		auto subhandler = [&]<size_t Tidx>() {
+			if (idx == Tidx) this->Send_generic(std::get<Tidx>(data));
+		};
+		auto handler = [&]<size_t... Tindices>(std::index_sequence<Tindices...>) {
+			((subhandler.template operator()<Tindices>()), ...);
+		};
+		handler(std::index_sequence_for<V...>{});
+	}
+
+	void Send_generic(const std::monostate &data)
+	{
+		/* Do nothing */
+	}
+
+	template <typename... V>
+	void Send_generic_seq(const V&... data)
+	{
+		(this->Send_generic(data), ...);
 	}
 
 	size_t GetSendOffset() const
@@ -221,6 +322,28 @@ public:
 	}
 
 	/**
+	 * Read a variable-size encoded bits integer from the packet.
+	 * @return The read data.
+	 */
+	uint64_t Recv_varuint()
+	{
+		uint8_t first_byte = this->Recv_uint8();
+		uint extra_bytes = std::countl_one<uint8_t>(first_byte);
+		if (extra_bytes == 0) return first_byte;
+
+		if (!this->CanRecvBytes(extra_bytes, true)) return 0;
+
+		uint64_t result = first_byte & (0x7F >> extra_bytes);
+
+		auto &pos = static_cast<T *>(this)->GetDeserialisationPosition();
+		for (uint i = 0; i < extra_bytes; i++) {
+			result <<= 8;
+			result |= this->GetBuffer()[pos++];
+		}
+		return result;
+	}
+
+	/**
 	 * Reads characters (bytes) from the packet until it finds a '\0', or reaches a
 	 * maximum of \c length characters.
 	 * When the '\0' has not been reached in the first \c length read characters,
@@ -231,7 +354,7 @@ public:
 	 * @param settings The string validation settings.
 	 * @return The validated string.
 	 */
-	std::string Recv_string(size_t length, StringValidationSettings settings = SVS_REPLACE_WITH_QUESTION_MARK)
+	std::string Recv_string(size_t length, StringValidationSettings settings = StringValidationSetting::ReplaceWithQuestionMark)
 	{
 		assert(length > 1);
 
@@ -255,7 +378,7 @@ public:
 	 * @param buffer The buffer to put the data into.
 	 * @param settings The string validation settings.
 	 */
-	void Recv_string(std::string &buffer, StringValidationSettings settings = SVS_REPLACE_WITH_QUESTION_MARK)
+	void Recv_string(std::string &buffer, StringValidationSettings settings = StringValidationSetting::ReplaceWithQuestionMark)
 	{
 		/* Don't allow reading from a closed socket */
 		if (!this->CanRecvBytes(0, false)) return;
@@ -349,6 +472,81 @@ public:
 		return { view.begin(), view.end() };
 	}
 
+	template <typename V>
+	void Recv_generic_integer(V &data)
+	{
+		static_assert(sizeof(V) <= 8);
+		if constexpr (std::is_same_v<V, bool>) {
+			data = this->Recv_bool();
+		} else if constexpr (sizeof(V) <= 1) {
+			data = static_cast<V>(this->Recv_uint8());
+		} else if constexpr (sizeof(V) == 2) {
+			data = static_cast<V>(this->Recv_uint16());
+		} else {
+			uint64_t val = this->Recv_varuint();
+			if (unlikely((val & GetBitMaskSC<uint64_t>(0, sizeof(V) * 8)) != val)) this->RaiseRecvError();
+			if constexpr (std::is_signed<V>::value) {
+				/* Zig-zag decode */
+				using U = typename std::make_unsigned<V>::type;
+				data = static_cast<V>((static_cast<U>(val) >> 1) ^ static_cast<U>(-(static_cast<V>(val) & 1)));
+			} else {
+				data = static_cast<V>(val);
+			}
+		}
+	}
+
+	template <typename V>
+	void Recv_generic(V &data, StringValidationSettings settings = StringValidationSetting::ReplaceWithQuestionMark)
+	{
+		if constexpr (std::is_same_v<V, std::string>) {
+			this->Recv_string(data, settings);
+		} else if constexpr (SerialisationAsBase<V>) {
+			this->Recv_generic_integer(data.edit_base());
+		} else if constexpr (requires { data.Deserialise(*this, settings); }) {
+			data.Deserialise(*this, settings);
+		} else {
+			this->Recv_generic_integer(data);
+		}
+	}
+
+	template <typename... V>
+	void Recv_generic(std::tuple<V...> &data, StringValidationSettings settings = StringValidationSetting::ReplaceWithQuestionMark)
+	{
+		auto handler = [&]<size_t... Tindices>(std::index_sequence<Tindices...>) {
+			((this->Recv_generic(std::get<Tindices>(data), settings)), ...);
+		};
+		handler(std::index_sequence_for<V...>{});
+	}
+
+	template <typename... V>
+	void Recv_generic(std::variant<V...> &data, StringValidationSettings settings = StringValidationSetting::ReplaceWithQuestionMark)
+	{
+		static_assert(sizeof...(V) < 256);
+		const size_t idx = Recv_uint8();
+		auto subhandler = [&]<size_t Tidx>() {
+			if (idx == Tidx) {
+				std::variant_alternative_t<Tidx, std::variant<V...>> value;
+				this->Recv_generic(value, settings);
+				data = value;
+			}
+		};
+		auto handler = [&]<size_t... Tindices>(std::index_sequence<Tindices...>) {
+			((subhandler.template operator()<Tindices>()), ...);
+		};
+		handler(std::index_sequence_for<V...>{});
+	}
+
+	void Recv_generic(std::monostate &data, StringValidationSettings settings = StringValidationSetting::ReplaceWithQuestionMark)
+	{
+		/* Do nothing */
+	}
+
+	template <typename... V>
+	void Recv_generic_seq(StringValidationSettings settings, V&... data)
+	{
+		(this->Recv_generic(data, settings), ...);
+	}
+
 	struct DeserialisationBuffer BorrowAsDeserialisationBuffer();
 	void ReturnDeserialisationBuffer(struct DeserialisationBuffer &&);
 };
@@ -425,6 +623,77 @@ void BufferDeserialisationHelper<T>::ReturnDeserialisationBuffer(Deserialisation
 	this->CanRecvBytes(b.pos);
 	pos += static_cast<std::remove_reference_t<decltype(pos)>>(b.pos);
 	b.buffer = nullptr;
+}
+
+template <typename T>
+struct TupleTypeAdapter {
+private:
+	template <typename H> struct TupleHelper;
+
+	template <typename... Targs>
+	struct TupleHelper<std::tuple<Targs...>> {
+		using Value = std::tuple<std::remove_cvref_t<Targs>...>;
+		using Reference = std::tuple<std::remove_cvref_t<Targs> &...>;
+		using ConstReference = std::tuple<const std::remove_cvref_t<Targs> &...>;
+	};
+	using Helper = TupleHelper<T>;
+
+public:
+	using Value = typename Helper::Value;
+	using Reference = typename Helper::Reference;
+	using ConstReference = typename Helper::ConstReference;
+};
+
+namespace TupleDetail {
+	template <typename TFind, typename... T>
+	constexpr size_t GetTypePackIndexIgnoreCvRefOrSize()
+	{
+		constexpr size_t count = sizeof...(T);
+		constexpr bool found[count] = { std::is_same_v<std::remove_cvref_t<T>, TFind> ... };
+		size_t n = count;
+		for (size_t i = 0; i < count; ++i) {
+			if (found[i]) {
+				if (n < count) return count; // more than one TFind found
+				n = i;
+			}
+		}
+		return n;
+	}
+}
+
+/**
+ * Returns the index of type TFind in typename pack T..., ignoring all cvref qualifiers.
+ * static_asserts unless exactly one instance of TFind is found.
+ */
+template <typename TFind, typename... T>
+constexpr size_t GetTypePackIndexIgnoreCvRef()
+{
+	constexpr size_t result = TupleDetail::GetTypePackIndexIgnoreCvRefOrSize<TFind, T...>();
+	static_assert(result < sizeof...(T));
+	return result;
+}
+
+namespace TupleDetail {
+	template <typename TFind, typename H> struct GetTupleIndexIgnoreCvRefHelper;
+
+	template <typename TFind, typename... Targs>
+	struct GetTupleIndexIgnoreCvRefHelper<TFind, std::tuple<Targs...>> {
+		static constexpr size_t Get()
+		{
+			return GetTypePackIndexIgnoreCvRef<TFind, Targs...>();
+		}
+	};
+}
+
+/**
+ * Returns the index of type TFind in std::tuple type T, ignoring all cvref qualifiers.
+ * static_asserts unless exactly one instance of TFind is found.
+ */
+template <typename TFind, typename T>
+constexpr size_t GetTupleIndexIgnoreCvRef()
+{
+	using Helper = typename TupleDetail::GetTupleIndexIgnoreCvRefHelper<TFind, std::remove_cvref_t<T>>;
+	return Helper::Get();
 }
 
 #endif /* SERIALISATION_HPP */

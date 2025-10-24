@@ -14,15 +14,20 @@
  * List of string control codes used for string formatting, displaying, and
  * by strgen to generate the language files.
  */
-enum StringControlCode {
+enum StringControlCode : uint16_t {
+	SCC_RECORD_SEPARATOR = 0x1E,
+
 	SCC_CONTROL_START = 0xE000,
 	SCC_CONTROL_END   = 0xE1FF,
 
 	SCC_SPRITE_START  = 0xE200,
 	SCC_SPRITE_END    = SCC_SPRITE_START + 0xFF,
 
-	/* This must be the first entry. It's encoded in strings that are saved. */
-	SCC_ENCODED = SCC_CONTROL_START,
+	/* All SCC_ENCODED* control codes must have stable ids are they are stored in strings that are saved in savegames. */
+	SCC_ENCODED = SCC_CONTROL_START, ///< Encoded string marker and sub-string parameter.
+	SCC_ENCODED_INTERNAL, ///< Encoded text from OpenTTD.
+	SCC_ENCODED_NUMERIC, ///< Encoded numeric parameter.
+	SCC_ENCODED_STRING, ///< Encoded string parameter.
 
 	/* Font selection codes, must be in same order as FontSize enum */
 	SCC_FIRST_FONT,
@@ -98,7 +103,6 @@ enum StringControlCode {
 	SCC_STRING5,
 	SCC_STRING6,
 	SCC_STRING7,
-	SCC_STRING8,
 
 
 	SCC_STRING,
@@ -176,7 +180,6 @@ enum StringControlCode {
 	SCC_NEWGRF_PRINT_WORD_CARGO_NAME,                 ///< 9A 1E: Read 2 bytes from the stack as cargo name
 	SCC_NEWGRF_PRINT_DWORD_FORCE,                     ///< 9A 21: Read 4 bytes from the stack as unsigned force
 	SCC_NEWGRF_PUSH_WORD,                             ///< 9A 03: Pushes 2 bytes onto the stack
-	SCC_NEWGRF_UNPRINT,                               ///< 9A 04: "Unprints" the given number of bytes from the string
 	SCC_NEWGRF_DISCARD_WORD,                          ///< 85: Discard the next two bytes
 	SCC_NEWGRF_ROTATE_TOP_4_WORDS,                    ///< 86: Rotate the top 4 words of the stack (W4 W1 W2 W3)
 	SCC_NEWGRF_LAST = SCC_NEWGRF_ROTATE_TOP_4_WORDS,
@@ -187,6 +190,7 @@ enum StringControlCode {
 	 * These are mapped to the original glyphs */
 	SCC_LESS_THAN        = SCC_SPRITE_START + 0x3C,
 	SCC_GREATER_THAN     = SCC_SPRITE_START + 0x3E,
+	SCC_LEFT_ARROW       = SCC_SPRITE_START + 0x9D,
 	SCC_UP_ARROW         = SCC_SPRITE_START + 0xA0,
 	SCC_DOWN_ARROW       = SCC_SPRITE_START + 0xAA,
 	SCC_CHECKMARK        = SCC_SPRITE_START + 0xAC,

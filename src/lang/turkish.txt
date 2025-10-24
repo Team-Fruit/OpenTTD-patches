@@ -267,6 +267,7 @@ STR_UNITS_MINUTES                                               :{NUM}{NBSP}daki
 STR_UNITS_YEARS                                                 :{NUM}{NBSP}yıl
 STR_UNITS_PERIODS                                               :{NUM}{NBSP}dönem{P "ler"}
 
+STR_LIST_SEPARATOR                                              :,{SPACE}
 
 # Common window strings
 STR_LIST_FILTER_TITLE                                           :{BLACK}Filtre:
@@ -439,11 +440,11 @@ STR_SCENEDIT_FILE_MENU_QUIT_EDITOR                              :Editörden çı
 STR_SCENEDIT_FILE_MENU_SEPARATOR                                :
 STR_SCENEDIT_FILE_MENU_QUIT                                     :Oyundan Çık
 
+STR_SCENEDIT_TOWN_MENU_BUILD_TOWN                               :Kasabalar Oluştur
+STR_SCENEDIT_TOWN_MENU_PACE_HOUSE                               :Ev Yerleştir
 
 # Settings menu
-###length 16
 STR_SETTINGS_MENU_GAME_OPTIONS                                  :Seçenekler
-STR_SETTINGS_MENU_CONFIG_SETTINGS_TREE                          :Ayarlar
 STR_SETTINGS_MENU_AI_SETTINGS                                   :YZ ayarları
 STR_SETTINGS_MENU_GAMESCRIPT_SETTINGS                           :Oyun betiği ayarları
 STR_SETTINGS_MENU_NEWGRF_SETTINGS                               :NewGRF ayarları
@@ -829,7 +830,6 @@ STR_MESSAGE_HISTORY_TOOLTIP                                     :{BLACK}En son h
 STR_MESSAGE_NEWS_FORMAT                                         :{STRING}  -  {STRING}
 
 STR_NEWS_MESSAGE_CAPTION                                        :{WHITE}Mesaj
-STR_NEWS_CUSTOM_ITEM                                            :{BIG_FONT}{BLACK}{STRING}
 
 STR_NEWS_FIRST_TRAIN_ARRIVAL                                    :{BIG_FONT}{BLACK}{} Halk {STATION} istasyonuna ilk gelen treni kutladı!
 STR_NEWS_FIRST_BUS_ARRIVAL                                      :{BIG_FONT}{BLACK}{} Halk {STATION} durağına ilk gelen otobüsü kutladı!
@@ -966,7 +966,7 @@ STR_GAME_OPTIONS_CURRENCY_UNITS_DROPDOWN_TOOLTIP                :{BLACK}Para bir
 
 STR_GAME_OPTIONS_CURRENCY_CODE                                  :{STRING} ({STRING})
 
-###length 44
+###length 45
 STR_GAME_OPTIONS_CURRENCY_GBP                                   :Sterlin
 STR_GAME_OPTIONS_CURRENCY_USD                                   :Amerikan Doları
 STR_GAME_OPTIONS_CURRENCY_EUR                                   :Avro
@@ -1066,7 +1066,6 @@ STR_GAME_OPTIONS_PARTICIPATE_SURVEY_LINK_TOOLTIP                :{BLACK}Bu, otom
 STR_GAME_OPTIONS_PARTICIPATE_SURVEY_PREVIEW                     :{BLACK}Anket sonucunu önizleyin
 STR_GAME_OPTIONS_PARTICIPATE_SURVEY_PREVIEW_TOOLTIP             :{BLACK}Mevcut çalışan oyunun anket sonucunu göster
 
-STR_GAME_OPTIONS_GRAPHICS                                       :{BLACK}Grafikler
 
 STR_GAME_OPTIONS_REFRESH_RATE                                   :{BLACK}Tazeleme oranını görüntüle
 STR_GAME_OPTIONS_REFRESH_RATE_TOOLTIP                           :{BLACK}Kullanılacak tazeleme oranını seç
@@ -1204,7 +1203,6 @@ STR_CITY_APPROVAL_PERMISSIVE                                    :İzin verici (�
 STR_WARNING_NO_SUITABLE_AI                                      :{WHITE}Uygun YZ'ler yok...{}'Çevrimiçi içerik' sistemiyle pek çok YZ indirebilirsiniz
 
 # Settings tree window
-STR_CONFIG_SETTING_TREE_CAPTION                                 :{WHITE}Ayarlar
 STR_CONFIG_SETTING_FILTER_TITLE                                 :{BLACK}Filtre:
 STR_CONFIG_SETTING_EXPAND_ALL                                   :{BLACK}Tümünü genişlet
 STR_CONFIG_SETTING_COLLAPSE_ALL                                 :{BLACK}Tümünü kısalt
@@ -1329,6 +1327,7 @@ STR_CONFIG_SETTING_CATCHMENT_HELPTEXT                           :Farklı istasyo
 
 STR_CONFIG_SETTING_SERVE_NEUTRAL_INDUSTRIES                     :Şirket istasyonları, bağlı nötr istasyonları olan endüstrilere hizmet edebilir: {STRING}
 STR_CONFIG_SETTING_SERVE_NEUTRAL_INDUSTRIES_HELPTEXT            :Etkinleştirildiğinde, bağlı istasyonlara (Petrol Kuleleri gibi) sahip endüstrilere, yakınlarda inşa edilen şirkete ait istasyonlar tarafından da hizmet verilebilir. Devre dışı bırakıldığında, bu sektörlere yalnızca bağlı oldukları istasyonlar tarafından hizmet verilebilir. Yakındaki herhangi bir şirket istasyonu onlara hizmet veremeyecektir ve bağlı istasyon endüstri dışında başka bir şeye hizmet etmeyecektir.
+
 
 STR_CONFIG_SETTING_EXTRADYNAMITE                                :Şehirlere ait köprülerin, yolların ve tünellerin yıkılmasına izin vermeleri için, şehir yetkililerinin toleransını arttır: {STRING}
 STR_CONFIG_SETTING_EXTRADYNAMITE_HELPTEXT                       :Belediyelerin sahip olduğu altyapı ve binaların yıkımını kolaylaştır
@@ -1908,7 +1907,9 @@ STR_CONFIG_SETTING_ENDING_YEAR_VALUE                            :{NUM}
 STR_CONFIG_SETTING_ENDING_YEAR_ZERO                             :Asla
 
 STR_CONFIG_SETTING_ECONOMY_TYPE                                 :Ekonomi türü: {STRING}
+###length 2
 STR_CONFIG_SETTING_ECONOMY_TYPE_HELPTEXT                        :Sorunsuz ekonomi, üretim değişikliklerini daha sık ve daha küçük adımlarla yapar. Donuk ekonomi, üretim değişikliklerini ve endüstri kapanışlarını durdurur. Sektör türleri bir NewGRF tarafından sağlanırsa bu ayarın hiçbir etkisi olmayabilir.
+
 ###length 3
 STR_CONFIG_SETTING_ECONOMY_TYPE_ORIGINAL                        :Orijinal
 STR_CONFIG_SETTING_ECONOMY_TYPE_SMOOTH                          :Pürüzsüz
@@ -1961,6 +1962,8 @@ STR_CONFIG_SETTING_TOWN_FOUNDING_HELPTEXT                       :Bu seçeneği e
 STR_CONFIG_SETTING_TOWN_FOUNDING_FORBIDDEN                      :Yasak
 STR_CONFIG_SETTING_TOWN_FOUNDING_ALLOWED                        :İzin verildi
 STR_CONFIG_SETTING_TOWN_FOUNDING_ALLOWED_CUSTOM_LAYOUT          :İzin verildi, özel kasaba yerleşimi
+
+###length 3
 
 STR_CONFIG_SETTING_TOWN_CARGOGENMODE                            :Şehrin kargo üretimi: {STRING}
 STR_CONFIG_SETTING_TOWN_CARGOGENMODE_HELPTEXT                   :Şehrin genel nüfusuna oranla, şehirlerdeki evler tarafından ne kadar kargo üretiliyor.{}Üstel büyüme: İki katı büyüklükteki bir şehir dört katı büyüklükte yolcuya sahip olur.{}Lineer büyüme: İki katı büyüklükteki bir şehir iki katı büyüklükte yolcuya sahip olur.
@@ -2172,7 +2175,6 @@ STR_INTRO_MULTIPLAYER                                           :{BLACK}Çok Oyu
 STR_INTRO_GAME_OPTIONS                                          :{BLACK}Seçenekler
 STR_INTRO_HIGHSCORE                                             :{BLACK}Puan Tablosu
 STR_INTRO_HELP                                                  :{BLACK}Yardım ve Kılavuzlar
-STR_INTRO_CONFIG_SETTINGS_TREE                                  :{BLACK}Ayarlar
 STR_INTRO_NEWGRF_SETTINGS                                       :{BLACK}NewGRF Ayarları
 STR_INTRO_ONLINE_CONTENT                                        :{BLACK}Çevrimiçi İçeriği Kontrol Et
 STR_INTRO_AI_SETTINGS                                           :{BLACK}YZ Ayarları
@@ -2194,7 +2196,6 @@ STR_INTRO_TOOLTIP_TOYLAND_LANDSCAPE                             :{BLACK}'Oyuncak
 STR_INTRO_TOOLTIP_GAME_OPTIONS                                  :{BLACK}Oyun ayarlarını aç
 STR_INTRO_TOOLTIP_HIGHSCORE                                     :{BLACK}Puan tablosunu aç
 STR_INTRO_TOOLTIP_HELP                                          :{BLACK}Belgelere ve çevrimiçi kaynaklara erişin
-STR_INTRO_TOOLTIP_CONFIG_SETTINGS_TREE                          :{BLACK}Ayarları aç
 STR_INTRO_TOOLTIP_NEWGRF_SETTINGS                               :{BLACK}NewGRF ayarlarını aç
 STR_INTRO_TOOLTIP_ONLINE_CONTENT                                :{BLACK}İndirilecek yeni ve güncellenmiş içeriği kontrol et
 STR_INTRO_TOOLTIP_AI_SETTINGS                                   :{BLACK}Yapay Zeka ayarlarını göster
@@ -2291,12 +2292,7 @@ STR_LIVERY_FREIGHT_TRAM                                         :Yük Tramvayı
 STR_FACE_CAPTION                                                :{WHITE}Surat Seçimi
 STR_FACE_CANCEL_TOOLTIP                                         :{BLACK}Seçimi iptal et
 STR_FACE_OK_TOOLTIP                                             :{BLACK}Seçimi Kabul et
-STR_FACE_RANDOM                                                 :{BLACK}Rastgele
 
-STR_FACE_MALE_BUTTON                                            :{BLACK}Erkek
-STR_FACE_MALE_TOOLTIP                                           :{BLACK}Erkek suratlarıni seç
-STR_FACE_FEMALE_BUTTON                                          :{BLACK}Bayan
-STR_FACE_FEMALE_TOOLTIP                                         :{BLACK}Bayan suratlarını seç
 STR_FACE_NEW_FACE_BUTTON                                        :{BLACK}Yeni Surat
 STR_FACE_NEW_FACE_TOOLTIP                                       :{BLACK}Rastgele surat yap
 STR_FACE_ADVANCED                                               :{BLACK}Gelişmiş
@@ -2314,36 +2310,20 @@ STR_FACE_FACECODE_ERR                                           :{WHITE}Şirket 
 STR_FACE_SAVE                                                   :{BLACK}Kaydet
 STR_FACE_SAVE_TOOLTIP                                           :{BLACK}Tercih edilen yüzü kaydet
 STR_FACE_SAVE_DONE                                              :{WHITE}Bu yüz OpenTTD ayar dosyasına favoriniz olarak kaydedilecek
-STR_FACE_EUROPEAN                                               :{BLACK}Avrupalı
-STR_FACE_EUROPEAN_TOOLTIP                                       :{BLACK}Avrupalı yüz seç
-STR_FACE_AFRICAN                                                :{BLACK}Afrikalı
-STR_FACE_AFRICAN_TOOLTIP                                        :{BLACK}Siyah yüz seç
 STR_FACE_YES                                                    :Evet
 STR_FACE_NO                                                     :Hayır
-STR_FACE_MOUSTACHE_EARRING_TOOLTIP                              :{BLACK}Bıyık veya küpeyi etkinleştir
 STR_FACE_HAIR                                                   :Saç:
-STR_FACE_HAIR_TOOLTIP                                           :{BLACK}Saçı değiştir
 STR_FACE_EYEBROWS                                               :Kaşlar:
-STR_FACE_EYEBROWS_TOOLTIP                                       :{BLACK}Kaşları değiştir
 STR_FACE_EYECOLOUR                                              :Göz rengi:
-STR_FACE_EYECOLOUR_TOOLTIP                                      :{BLACK}Göz rengini değiştir
 STR_FACE_GLASSES                                                :Gözlük:
-STR_FACE_GLASSES_TOOLTIP                                        :{BLACK}Gözlüğü etkinleştir
-STR_FACE_GLASSES_TOOLTIP_2                                      :{BLACK}Gözlüğü değiştir
 STR_FACE_NOSE                                                   :Burun:
-STR_FACE_NOSE_TOOLTIP                                           :{BLACK}Burnu değiştir
 STR_FACE_LIPS                                                   :Dudak:
 STR_FACE_MOUSTACHE                                              :Bıyık:
-STR_FACE_LIPS_MOUSTACHE_TOOLTIP                                 :{BLACK}Dudakları veya bıyığı değiştir
 STR_FACE_CHIN                                                   :Çene:
-STR_FACE_CHIN_TOOLTIP                                           :{BLACK}Çeneyi değiştir
 STR_FACE_JACKET                                                 :Ceket:
-STR_FACE_JACKET_TOOLTIP                                         :{BLACK}Ceketi değiştir
 STR_FACE_COLLAR                                                 :Yaka:
-STR_FACE_COLLAR_TOOLTIP                                         :{BLACK}Yakayı değiştir
 STR_FACE_TIE                                                    :Kravat:
 STR_FACE_EARRING                                                :Küpe:
-STR_FACE_TIE_EARRING_TOOLTIP                                    :{BLACK}Kravatı veya küpeyi değiştir
 
 # Matches ServerGameType
 ###length 3
@@ -2533,7 +2513,7 @@ STR_NETWORK_CHAT_TO_COMPANY                                     :[Takım] -> {ST
 STR_NETWORK_CHAT_CLIENT                                         :[Özel] {STRING}: {WHITE}{STRING}
 STR_NETWORK_CHAT_TO_CLIENT                                      :[Özel] -> {STRING}: {WHITE}{STRING}
 STR_NETWORK_CHAT_ALL                                            :[Herkes] {STRING}: {WHITE}{STRING}
-STR_NETWORK_CHAT_EXTERNAL                                       :[{3:STRING}] {0:STRING}: {WHITE}{1:STRING}
+STR_NETWORK_CHAT_EXTERNAL                                       :[{STRING}] {STRING}: {WHITE}{STRING}
 STR_NETWORK_CHAT_OSKTITLE                                       :{BLACK}Ağ sohbeti için yazı girin
 
 # Network messages
@@ -2590,7 +2570,7 @@ STR_NETWORK_ERROR_CLIENT_TIMEOUT_JOIN                           :haritayı işle
 STR_NETWORK_ERROR_CLIENT_INVALID_CLIENT_NAME                    :Geçersiz ev sahibi ismi
 
 # Network related errors
-STR_NETWORK_SERVER_MESSAGE                                      :*** {1:STRING}
+STR_NETWORK_SERVER_MESSAGE                                      :*** {STRING}
 
 ###length 12
 STR_NETWORK_SERVER_MESSAGE_GAME_PAUSED                          :Oyun duraklatıldı ({STRING})
@@ -2608,13 +2588,12 @@ STR_NETWORK_SERVER_MESSAGE_GAME_REASON_LINK_GRAPH               :bağlantı graf
 
 STR_NETWORK_MESSAGE_CLIENT_LEAVING                              :ayrılıyor
 STR_NETWORK_MESSAGE_CLIENT_JOINED                               :*** {STRING} oyuna katıldı
-STR_NETWORK_MESSAGE_CLIENT_JOINED_ID                            :*** {0:STRING} oyuna katıldı (İstemci #{2:NUM})
-STR_NETWORK_MESSAGE_CLIENT_COMPANY_JOIN                         :*** {0:STRING} #{2:NUM} numaralı şirkete katıldı
+STR_NETWORK_MESSAGE_CLIENT_JOINED_ID                            :*** {STRING} oyuna katıldı (İstemci #{NUM})
 STR_NETWORK_MESSAGE_CLIENT_COMPANY_SPECTATE                     :*** {STRING} izleyicilere katıldı
-STR_NETWORK_MESSAGE_CLIENT_COMPANY_NEW                          :*** {0:STRING} yeni bir şirket kurdu (#{2:NUM})
-STR_NETWORK_MESSAGE_CLIENT_LEFT                                 :*** {0:STRING} oyunu terketti ({2:STRING})
+STR_NETWORK_MESSAGE_CLIENT_COMPANY_NEW                          :*** {STRING} yeni bir şirket kurdu (#{NUM})
+STR_NETWORK_MESSAGE_CLIENT_LEFT                                 :*** {STRING} oyunu terketti ({STRING})
 STR_NETWORK_MESSAGE_NAME_CHANGE                                 :*** {STRING} adını {STRING} olarak değiştirdi
-STR_NETWORK_MESSAGE_GIVE_MONEY                                  :*** {0:STRING} {1:STRING} adlı şirkete {2:CURRENCY_LONG} verdi
+STR_NETWORK_MESSAGE_GIVE_MONEY                                  :*** {0:STRING} {2:STRING} adlı şirkete {1:CURRENCY_LONG} verdi
 STR_NETWORK_MESSAGE_SERVER_SHUTDOWN                             :{WHITE}Sunucu kapandı
 STR_NETWORK_MESSAGE_SERVER_REBOOT                               :{WHITE}Sunucu baştan başlatılıyor...{}Lütfen bekleyin...
 STR_NETWORK_MESSAGE_KICKED                                      :*** {STRING} atıldı. Sebep: ({STRING})
@@ -2799,12 +2778,14 @@ STR_PICKER_MODE_ALL                                             :Tümü
 STR_PICKER_MODE_ALL_TOOLTIP                                     :Tüm kategorilerdeki öğelerin görüntülenmesini aç/kapat
 STR_PICKER_MODE_USED                                            :Kullanılmış
 STR_PICKER_MODE_USED_TOOLTIP                                    :Yalnızca mevcut öğeleri göstermeyi aç/kapat
-STR_PICKER_MODE_SAVED                                           :Kaydedildi
+STR_PICKER_MODE_SAVED                                           :Kaydedilen
 STR_PICKER_MODE_SAVED_TOOLTIP                                   :Yalnızca kaydedilen öğeleri göstermeyi aç/kapat
 
 STR_PICKER_WAYPOINT_CLASS_TOOLTIP                               :Görüntülenecek bir yol noktası türünü seçin
 STR_PICKER_ROADSTOP_TRUCK_CLASS_TOOLTIP                         :Görüntülenecek bir kamyon istasyonu türünü seçin
 STR_PICKER_ROADSTOP_TRUCK_TYPE_TOOLTIP                          :İnşa edilecek bir tür kamyon istasyonu seçin. Kaydedilen öğelerde eklemek veya kaldırmak istiyorsanız Ctrl+Tık ile yapabilirsiniz.
+STR_PICKER_HOUSE_CLASS_TOOLTIP                                  :Görüntülemek için bir şehir bölgesi seçin
+STR_PICKER_HOUSE_TYPE_TOOLTIP                                   :Bir konut türü seçin. Kaydedilmiş öğelere eklemek veya kaldırmak için Ctrl+Tıklayın
 
 STR_HOUSE_PICKER_CAPTION                                        :Ev Seçimi
 STR_HOUSE_PICKER_NAME                                           :{BLACK}İsim: {ORANGE}{STRING}
@@ -2821,6 +2802,7 @@ STR_HOUSE_PICKER_CLASS_ZONE2                                    :Banliyöler
 STR_HOUSE_PICKER_CLASS_ZONE3                                    :Dış banliyöler
 STR_HOUSE_PICKER_CLASS_ZONE4                                    :İç banliyöler
 STR_HOUSE_PICKER_CLASS_ZONE5                                    :Şehir merkezi
+
 
 STR_STATION_CLASS_DFLT                                          :Varsayılan
 STR_STATION_CLASS_DFLT_STATION                                  :Varsayılan istasyon
@@ -2854,7 +2836,6 @@ STR_SELECT_ROAD_BRIDGE_CAPTION                                  :{WHITE}Köprü 
 STR_SELECT_BRIDGE_SELECTION_TOOLTIP                             :{BLACK}Köprü seçimi - tercih ettiğiniz köprüyü yapmak için tıklayın
 STR_SELECT_BRIDGE_INFO_NAME                                     :{GOLD}{STRING}
 STR_SELECT_BRIDGE_INFO_NAME_MAX_SPEED                           :{GOLD}{STRING},{} {VELOCITY}
-STR_SELECT_BRIDGE_INFO_NAME_COST                                :{GOLD}{0:STRING},{} {WHITE}{2:CURRENCY_LONG}
 STR_SELECT_BRIDGE_INFO_NAME_MAX_SPEED_COST                      :{GOLD}{STRING},{} {VELOCITY} {WHITE}{CURRENCY_LONG}
 STR_BRIDGE_NAME_SUSPENSION_STEEL                                :Çelik, Asma
 STR_BRIDGE_NAME_GIRDER_STEEL                                    :Çelik, Kirişli
@@ -3025,6 +3006,7 @@ STR_FOUND_TOWN_INITIAL_SIZE_TOOLTIP                             :{BLACK}Şehir b
 STR_FOUND_TOWN_CITY                                             :{BLACK}Şehir
 STR_FOUND_TOWN_CITY_TOOLTIP                                     :{BLACK}Şehirler normal kasabalardan daha hızlı büyürler{}Ayarlara göre değişmekle birlikte, ilk kurulduklarında daha büyük olurlar.
 
+
 STR_FOUND_TOWN_ROAD_LAYOUT                                      :{YELLOW}Kasaba yol yerleşimi:
 STR_FOUND_TOWN_SELECT_LAYOUT_TOOLTIP                            :{BLACK}Bu kasaba için kullanılacak yol yerleşimini seç
 STR_FOUND_TOWN_SELECT_LAYOUT_ORIGINAL                           :{BLACK}Özgün
@@ -3096,6 +3078,8 @@ STR_LANG_AREA_INFORMATION_TRAM_TYPE                             :{BLACK}Tramvay 
 STR_LANG_AREA_INFORMATION_RAIL_SPEED_LIMIT                      :{BLACK}Ray hız sınırı: {LTBLUE}{VELOCITY}
 STR_LANG_AREA_INFORMATION_ROAD_SPEED_LIMIT                      :{BLACK}Yol hız sınırı: {LTBLUE}{VELOCITY}
 STR_LANG_AREA_INFORMATION_TRAM_SPEED_LIMIT                      :{BLACK}Tramvay hız limiti: {LTBLUE}{VELOCITY}
+STR_LAND_AREA_INFORMATION_TOWN_CAN_UPGRADE                      :{BLACK}Kasaba yükseltilebilir: {LTBLUE}Evet
+STR_LAND_AREA_INFORMATION_TOWN_CANNOT_UPGRADE                   :{BLACK}Kasaba yükseltilebilir: {LTBLUE}Hayır
 
 # Description of land area of different tiles
 STR_LAI_CLEAR_DESCRIPTION_ROCKS                                 :Kayalar
@@ -3103,7 +3087,6 @@ STR_LAI_CLEAR_DESCRIPTION_ROUGH_LAND                            :Engebeli arazi
 STR_LAI_CLEAR_DESCRIPTION_BARE_LAND                             :Çıplak arazi
 STR_LAI_CLEAR_DESCRIPTION_GRASS                                 :Çim
 STR_LAI_CLEAR_DESCRIPTION_FIELDS                                :Mera
-STR_LAI_CLEAR_DESCRIPTION_SNOW_COVERED_LAND                     :Karlı arazi
 STR_LAI_CLEAR_DESCRIPTION_DESERT                                :Çöl
 
 STR_LAI_RAIL_DESCRIPTION_TRACK                                  :Ray
@@ -3597,7 +3580,6 @@ STR_INVALID_VEHICLE                                             :<geçersiz ara�
 STR_NEWGRF_SCAN_CAPTION                                         :{WHITE}NewGRF'ler taranıyor
 STR_NEWGRF_SCAN_MESSAGE                                         :{BLACK}NewGRF'ler taranıyor. Sayıya bağlı olarak bu işlem biraz zaman alabilir...
 STR_NEWGRF_SCAN_STATUS                                          :{BLACK}{1:NUM} NewGRF'den tahminen {0:NUM} NewGRF tarandı
-STR_NEWGRF_SCAN_ARCHIVES                                        :Arşivler taranıyor
 
 # Sign list window
 STR_SIGN_LIST_CAPTION                                           :{WHITE}Tabela Listesi - {COMMA} Tabela
@@ -3974,8 +3956,6 @@ STR_INDUSTRY_VIEW_PRODUCES_N_CARGO                              :{BLACK}Üretile
 STR_INDUSTRY_VIEW_CARGO_LIST_EXTENSION                          :, {STRING}{STRING}
 
 STR_INDUSTRY_VIEW_REQUIRES                                      :{BLACK}Gereken:
-STR_INDUSTRY_VIEW_ACCEPT_CARGO                                  :{YELLOW}{0:STRING}{BLACK}{3:STRING}
-STR_INDUSTRY_VIEW_ACCEPT_CARGO_AMOUNT                           :{YELLOW}{STRING}{BLACK}: {CARGO_SHORT} bekliyor{STRING}
 
 STR_CONFIG_GAME_PRODUCTION                                      :{WHITE}Üretimi değiştir (8'in katı, 2040'a kadar)
 STR_CONFIG_GAME_PRODUCTION_LEVEL                                :{WHITE}Üretim seviyesini değiştir (yüzde olarak, %800'e kadar)
@@ -4274,8 +4254,6 @@ STR_ENGINE_PREVIEW_TRAM_VEHICLE                                 :Tramvay aracı
 STR_ENGINE_PREVIEW_AIRCRAFT                                     :uçak
 STR_ENGINE_PREVIEW_SHIP                                         :gemi
 
-STR_ENGINE_PREVIEW_TEXT3                                        :{BLACK}{STRING}{}{5:STRING}{}{STRING}
-STR_ENGINE_PREVIEW_TEXT4                                        :{BLACK}{STRING}{}{STRING}{}{STRING}{}{STRING}
 STR_ENGINE_PREVIEW_COST_WEIGHT                                  :Maliyet: {CURRENCY_LONG}  Ağırlık: {WEIGHT_SHORT}
 STR_ENGINE_PREVIEW_COST_MAX_SPEED                               :Maliyet: {CURRENCY_LONG}  Maksimum Hız: {VELOCITY}
 STR_ENGINE_PREVIEW_SPEED_POWER                                  :Hız: {VELOCITY}  Güç: {POWER}
@@ -4444,8 +4422,8 @@ STR_VEHICLE_INFO_RELIABILITY_BREAKDOWNS                         :{BLACK}Güvenil
 
 STR_VEHICLE_INFO_BUILT_VALUE                                    :{LTBLUE}{ENGINE} {BLACK}Üretim: {LTBLUE}{NUM}{BLACK} Değer: {LTBLUE}{CURRENCY_LONG}
 STR_VEHICLE_INFO_NO_CAPACITY                                    :{BLACK}Kapasite: {LTBLUE}Yok{STRING}
-STR_VEHICLE_INFO_CAPACITY                                       :{BLACK}Kapasite: {LTBLUE}{0:CARGO_LONG}{3:STRING}
-STR_VEHICLE_INFO_CAPACITY_MULT                                  :{BLACK}Kapasite: {LTBLUE}{0:CARGO_LONG}{3:STRING} (x{4:NUM})
+STR_VEHICLE_INFO_CAPACITY                                       :{BLACK}Kapasite: {LTBLUE}{CARGO_LONG}{STRING}
+STR_VEHICLE_INFO_CAPACITY_MULT                                  :{BLACK}Kapasite: {LTBLUE}{CARGO_LONG}{STRING} (x{NUM})
 STR_VEHICLE_INFO_CAPACITY_CAPACITY                              :{BLACK}Kapasite: {LTBLUE}{CARGO_LONG}, {CARGO_LONG}{STRING}
 
 STR_VEHICLE_INFO_FEEDER_CARGO_VALUE                             :{BLACK}Aktarma Maliyeti: {LTBLUE}{CURRENCY_LONG}
@@ -4531,7 +4509,6 @@ STR_ORDERS_TIMETABLE_VIEW_TOOLTIP                               :{BLACK}Zaman ta
 
 STR_ORDERS_LIST_TOOLTIP                                         :{BLACK}Talimat listesi - seçmek için komutu tıklayın. CTRL + Sol tıklama istasyona kaydırır
 STR_ORDER_INDEX                                                 :{COMMA}:{NBSP}
-STR_ORDER_TEXT                                                  :{STRING} {STRING} {STRING} {STRING}
 
 STR_ORDERS_END_OF_ORDERS                                        :- - Talimatların Sonu - -
 STR_ORDERS_END_OF_SHARED_ORDERS                                 :- - Paylaşılmış talimat sonu - -
@@ -4630,15 +4607,12 @@ STR_ORDER_GO_NON_STOP_TO_WAYPOINT                               :{WAYPOINT} üze
 STR_ORDER_SERVICE_AT                                            :Burada bakıma gir
 STR_ORDER_SERVICE_NON_STOP_AT                                   :Durmaksızın bakıma gir
 
-STR_ORDER_NEAREST_DEPOT                                         :en yakın
-STR_ORDER_NEAREST_HANGAR                                        :en yakın Hangar
 ###length 3
 STR_ORDER_TRAIN_DEPOT                                           :Tren Garajı
 STR_ORDER_ROAD_VEHICLE_DEPOT                                    :Karayolu Garajı
 STR_ORDER_SHIP_DEPOT                                            :Tersane
 ###next-name-looks-similar
 
-STR_ORDER_GO_TO_NEAREST_DEPOT_FORMAT                            :{STRING} {STRING} {STRING}
 STR_ORDER_GO_TO_DEPOT_FORMAT                                    :{STRING} {DEPOT}
 
 STR_ORDER_REFIT_ORDER                                           :(Moifiye ile > {STRING})
@@ -4647,8 +4621,8 @@ STR_ORDER_STOP_ORDER                                            :(Dur)
 
 STR_ORDER_WAIT_TO_UNBUNCH                                       :(gruptan ayrılmayı bekle)
 
-STR_ORDER_GO_TO_STATION                                         :{STRING} {STATION} {STRING}
-STR_ORDER_GO_TO_STATION_CAN_T_USE_STATION                       :{PUSH_COLOUR}{RED}(İstasyon kullanılamıyor){POP_COLOUR} {STRING} {STATION} {STRING}
+STR_ORDER_GO_TO_STATION                                         :{STRING} {STATION}
+STR_ORDER_GO_TO_STATION_CAN_T_USE_STATION                       :{PUSH_COLOUR}{RED}(İstasyon kullanılamıyor){POP_COLOUR} {STRING} {STATION}
 
 STR_ORDER_IMPLICIT                                              :(Otomatik)
 
@@ -4706,7 +4680,7 @@ STR_TIMETABLE_TOOLTIP                                           :{BLACK}Zaman ç
 STR_TIMETABLE_NO_TRAVEL                                         :Sefer yok
 STR_TIMETABLE_NOT_TIMETABLEABLE                                 :Yolculuk (otomatik; bir sonraki elle verilmiş talimat tarafından zamanlanır)
 STR_TIMETABLE_TRAVEL_NOT_TIMETABLED                             :Gezi (zamanlı değil)
-STR_TIMETABLE_TRAVEL_NOT_TIMETABLED_SPEED                       :En çok {2:VELOCITY} hız ile git (zaman tablosu yok)
+STR_TIMETABLE_TRAVEL_NOT_TIMETABLED_SPEED                       :En çok {VELOCITY} hız ile git (zaman tablosu yok)
 STR_TIMETABLE_TRAVEL_FOR                                        :{STRING} boyunca yol al
 STR_TIMETABLE_TRAVEL_FOR_SPEED                                  :{STRING} boyunca en çok {VELOCITY} hız ile git
 STR_TIMETABLE_TRAVEL_FOR_ESTIMATED                              :Seyahat et ({STRING} için, hareket planı yok)
@@ -4728,7 +4702,6 @@ STR_TIMETABLE_STATUS_START_IN_SECONDS                           :{BLACK}Bu zaman
 
 STR_TIMETABLE_START                                             :{BLACK}Zaman Çizelgesini Başlat
 STR_TIMETABLE_START_TOOLTIP                                     :{BLACK}Bu zaman çizelgesinin ne zaman başlayacağını seçin. Verilen emir tamamen zaman çizelgesine uygunsa, Ctrl + Sol Tıkladığınızda zaman çizelgesinin başlangıç saatini bütün araçlar arasında eşit olarak dağıtır.
-
 STR_TIMETABLE_START_SECONDS_QUERY                               :Zaman çizelgesinin başlamasına saniyeler kaldı
 
 STR_TIMETABLE_CHANGE_TIME                                       :{BLACK}Zamanı değiştir
@@ -4843,7 +4816,6 @@ STR_SCREENSHOT_HEIGHTMAP_SCREENSHOT                             :{BLACK}Yüksekl
 STR_SCREENSHOT_MINIMAP_SCREENSHOT                               :{BLACK}Küçük harita ekran görüntüsü
 
 # Script Parameters
-STR_AI_SETTINGS_CAPTION                                         :{WHITE}{STRING} Parametreler
 STR_AI_SETTINGS_CAPTION_AI                                      :YZ
 STR_AI_SETTINGS_CAPTION_GAMESCRIPT                              :Oyun Betiği
 STR_AI_SETTINGS_CLOSE                                           :{BLACK}Kapat
@@ -4933,7 +4905,6 @@ STR_ERROR_SCREENSHOT_FAILED                                     :{WHITE}Ekran g�
 
 # Error message titles
 STR_ERROR_MESSAGE_CAPTION                                       :{YELLOW}Mesaj
-STR_ERROR_MESSAGE_CAPTION_OTHER_COMPANY                         :{YELLOW}Mesaj (gönderen {STRING})
 
 # Generic construction errors
 STR_ERROR_OFF_EDGE_OF_MAP                                       :{WHITE}Harita kenarında
@@ -4952,7 +4923,6 @@ STR_ERROR_TERRAFORM_LIMIT_REACHED                               :{WHITE}... yery
 STR_ERROR_CLEARING_LIMIT_REACHED                                :{WHITE}... kare temizleme sınırına ulaştınız
 STR_ERROR_TREE_PLANT_LIMIT_REACHED                              :{WHITE}... ağaç dikme sınırına ulaştınız
 STR_ERROR_NAME_MUST_BE_UNIQUE                                   :{WHITE}İsim daha önce kullanılmamış olmalı
-STR_ERROR_GENERIC_OBJECT_IN_THE_WAY                             :{WHITE}yolda {1:STRING} var
 STR_ERROR_NOT_ALLOWED_WHILE_PAUSED                              :{WHITE}Oyun duraklatılmışken izin verilmiyor
 
 # Local authority errors
@@ -4997,6 +4967,7 @@ STR_ERROR_NO_SPACE_FOR_TOWN                                     :{WHITE}... hari
 STR_ERROR_ROAD_WORKS_IN_PROGRESS                                :{WHITE}Yol çalışmaları
 STR_ERROR_TOWN_CAN_T_DELETE                                     :{WHITE}Bu kasaba silinemiyor...{}Bir istasyon veya garaj kasabaya atıfta bulunuyor ya da bir kasaba karesi kaldırılamıyor
 STR_ERROR_STATUE_NO_SUITABLE_PLACE                              :{WHITE}... bu şehrin merkezinde heykel için uygun bir yer yok
+STR_ERROR_CAN_T_BUILD_HOUSE                                     :{WHITE}Bina inşa edilemez...
 
 # Industry related errors
 STR_ERROR_TOO_MANY_INDUSTRIES                                   :{WHITE}... çok fazla fabrika var
@@ -5073,6 +5044,7 @@ STR_ERROR_CAN_T_POSITION_BUOY_HERE                              :{WHITE}Buraya �
 STR_ERROR_CAN_T_CHANGE_WAYPOINT_NAME                            :{WHITE}Yerimi adı değiştirilemedi...
 
 STR_ERROR_CAN_T_REMOVE_TRAIN_WAYPOINT                           :{WHITE}Tren yerimi kaldırılamaz...
+STR_ERROR_CAN_T_REMOVE_ROAD_WAYPOINT                            :{WHITE}yol yerimi kaldırılamaz....
 STR_ERROR_MUST_REMOVE_RAILWAYPOINT_FIRST                        :{WHITE}Önce demiryolu yerimi kaldırılmalı
 STR_ERROR_BUOY_IN_THE_WAY                                       :{WHITE}... yolda şamandıra var
 STR_ERROR_BUOY_IS_IN_USE                                        :{WHITE}... şamandıra başka bir şirket tarafından kullanılıyor!
@@ -5262,6 +5234,18 @@ STR_ERROR_CAN_T_SELL_ROAD_VEHICLE                               :{WHITE}Karayolu
 STR_ERROR_CAN_T_SELL_SHIP                                       :{WHITE}Gemi satılamaz...
 STR_ERROR_CAN_T_SELL_AIRCRAFT                                   :{WHITE}Uçak satılamıyor...
 
+###length VEHICLE_TYPES
+STR_ERROR_CAN_T_SELL_ALL_TRAIN                                  :{WHITE}Tüm demiryolu araçları satılamaz...
+STR_ERROR_CAN_T_SELL_ALL_ROAD_VEHICLE                           :{WHITE}Tüm Karayolu Araçları satılamaz...
+STR_ERROR_CAN_T_SELL_ALL_SHIP                                   :{WHITE}Tüm gemiler satılamaz...
+STR_ERROR_CAN_T_SELL_ALL_AIRCRAFT                               :Tüm uçaklar satılamıyor...
+
+###length VEHICLE_TYPES
+STR_ERROR_CAN_T_AUTOREPLACE_TRAIN                               :{WHITE}Demiryolu araçları otomatik olarak değiştirilemiyor...
+STR_ERROR_CAN_T_AUTOREPLACE_ROAD_VEHICLE                        :{WHITE}Karayolu araçları otomatik olarak değiştirilemiyor...
+STR_ERROR_CAN_T_AUTOREPLACE_SHIP                                :{WHITE}Gemiler otomatik olarak değiştirilemiyor...
+STR_ERROR_CAN_T_AUTOREPLACE_AIRCRAFT                            :{WHITE}Uçaklar otomatik değiştirılemiyor...
+
 STR_ERROR_TOO_MANY_VEHICLES_IN_GAME                             :{WHITE}Oyunda çok fazla araç var
 STR_ERROR_CAN_T_CHANGE_SERVICING                                :{WHITE}Servis aralığı değiştirilemiyor...
 
@@ -5276,6 +5260,8 @@ STR_ERROR_NO_VEHICLES_AVAILABLE_YET_EXPLANATION                 :{WHITE}{DATE_SH
 
 STR_ERROR_NO_TOWN_ROADTYPES_AVAILABLE_AT_ALL                    :{WHITE}Kasabada inşa edilebilir yol türleri mevcut değil
 STR_ERROR_NO_TOWN_ROADTYPES_AVAILABLE_AT_ALL_EXPLANATION        :{WHITE}NewGRF Yapılandırma Ayarlarını Değiştir
+STR_ERROR_NO_TOWN_ROADTYPES_AVAILABLE_YET                       :{WHITE}Henüz inşa edilebilir şehir yol türü mevcut değil
+STR_ERROR_NO_TOWN_ROADTYPES_AVAILABLE_YET_EXPLANATION           :{WHITE}Yeni oyuna başladıktan sonra {DATE_SHORT} veya önceden şehir inşa edilebilir yol türleri sağlayan bir NewGRF kullanın
 
 # Specific vehicle errors
 STR_ERROR_CAN_T_MAKE_TRAIN_PASS_SIGNAL                          :{WHITE}Tehlikedeki tren sinyali geçemez...
@@ -5788,18 +5774,7 @@ STR_SAVEGAME_NAME_SPECTATOR                                     :İzleyici, {1:S
 
 # Viewport strings
 STR_VIEWPORT_TOWN_POP                                           :{WHITE}{TOWN} ({COMMA})
-STR_VIEWPORT_TOWN                                               :{WHITE}{TOWN}
-STR_VIEWPORT_TOWN_TINY_BLACK                                    :{TINY_FONT}{BLACK}{TOWN}
-STR_VIEWPORT_TOWN_TINY_WHITE                                    :{TINY_FONT}{WHITE}{TOWN}
-
-STR_VIEWPORT_SIGN_SMALL_BLACK                                   :{TINY_FONT}{BLACK}{SIGN}
-STR_VIEWPORT_SIGN_SMALL_WHITE                                   :{TINY_FONT}{WHITE}{SIGN}
-
 STR_VIEWPORT_STATION                                            :{STATION} {STATION_FEATURES}
-STR_VIEWPORT_STATION_TINY                                       :{TINY_FONT}{STATION}
-
-STR_VIEWPORT_WAYPOINT                                           :{WAYPOINT}
-STR_VIEWPORT_WAYPOINT_TINY                                      :{TINY_FONT}{WAYPOINT}
 
 # Simple strings to get specific types of data
 STR_COMPANY_NAME                                                :{COMPANY}
@@ -5836,7 +5811,6 @@ STR_JUST_DATE_LONG                                              :{DATE_LONG}
 STR_JUST_DATE_ISO                                               :{DATE_ISO}
 STR_JUST_STRING                                                 :{STRING}
 STR_JUST_STRING1                                                :{STRING}
-STR_JUST_STRING2                                                :{STRING}
 STR_JUST_STRING_STRING                                          :{STRING}{STRING}
 STR_JUST_RAW_STRING                                             :{STRING}
 STR_JUST_BIG_RAW_STRING                                         :{BIG_FONT}{STRING}
@@ -5860,3 +5834,4 @@ STR_PLANE                                                       :{BLACK}{PLANE}
 STR_SHIP                                                        :{BLACK}{SHIP}
 
 STR_TOOLBAR_RAILTYPE_VELOCITY                                   :{STRING} ({VELOCITY})
+

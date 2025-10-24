@@ -389,9 +389,7 @@ STR_SCENEDIT_FILE_MENU_QUIT                                     :Avslutt
 
 
 # Settings menu
-###length 16
 STR_SETTINGS_MENU_GAME_OPTIONS                                  :Spelinstillingar
-STR_SETTINGS_MENU_CONFIG_SETTINGS_TREE                          :Innstillinger
 STR_SETTINGS_MENU_NEWGRF_SETTINGS                               :NewGRF-innstillingar
 STR_SETTINGS_MENU_TRANSPARENCY_OPTIONS                          :Gjennomsiktigheitsinnstillingar
 STR_SETTINGS_MENU_TOWN_NAMES_DISPLAYED                          :Syne bynamn
@@ -754,7 +752,6 @@ STR_MESSAGE_HISTORY_TOOLTIP                                     :{BLACK}Ei liste
 STR_MESSAGE_NEWS_FORMAT                                         :{STRING}  -  {STRING}
 
 STR_NEWS_MESSAGE_CAPTION                                        :{WHITE}Melding
-STR_NEWS_CUSTOM_ITEM                                            :{BIG_FONT}{BLACK}{STRING}
 
 STR_NEWS_FIRST_TRAIN_ARRIVAL                                    :{BIG_FONT}{BLACK}Innbyggjarane jublar . . .{}Første tog kjem til {STATION}!
 STR_NEWS_FIRST_BUS_ARRIVAL                                      :{BIG_FONT}{BLACK}Innbyggjarane jublar . . .{}Første buss kjem til {STATION}!
@@ -864,7 +861,7 @@ STR_GAME_OPTIONS_CURRENCY_UNITS_FRAME                           :{BLACK}Valutaei
 STR_GAME_OPTIONS_CURRENCY_UNITS_DROPDOWN_TOOLTIP                :{BLACK}Vel valutaeining
 
 
-###length 44
+###length 45
 STR_GAME_OPTIONS_CURRENCY_GBP                                   :Pund
 STR_GAME_OPTIONS_CURRENCY_USD                                   :Dollar
 STR_GAME_OPTIONS_CURRENCY_EUR                                   :Euro
@@ -1041,7 +1038,6 @@ STR_CITY_APPROVAL_PERMISSIVE                                    :Tillatande
 STR_WARNING_NO_SUITABLE_AI                                      :{WHITE}Inga passande AIer tilgjengeleg...{}Du kan lasta ned fleire AI'ar frå nettet med spelets nedlastingssystem.
 
 # Settings tree window
-STR_CONFIG_SETTING_TREE_CAPTION                                 :{WHITE}Innstillingar
 STR_CONFIG_SETTING_FILTER_TITLE                                 :{BLACK}Søkefilter:
 STR_CONFIG_SETTING_EXPAND_ALL                                   :{BLACK}Utvid alle
 STR_CONFIG_SETTING_COLLAPSE_ALL                                 :{BLACK}Skjul alle
@@ -1144,6 +1140,7 @@ STR_CONFIG_SETTING_AUTOSLOPE                                    :Tillet landskap
 STR_CONFIG_SETTING_AUTOSLOPE_HELPTEXT                           :Tillet å endre landskapet under bygningar, vegar og jernbanespor, utan å måtte fjerne dei fyrst.
 
 STR_CONFIG_SETTING_CATCHMENT                                    :Meir realistisk storleik på oppfangingsområde: {STRING}
+
 
 
 STR_CONFIG_SETTING_EXTRADYNAMITE                                :Tillet fjerning av fleire vegar, bruar osb. egd av byane.: {STRING}
@@ -1596,6 +1593,8 @@ STR_CONFIG_SETTING_STARTING_YEAR                                :Start spelet i 
 
 ###setting-zero-is-special
 
+###length 2
+
 ###length 3
 
 
@@ -1633,6 +1632,8 @@ STR_CONFIG_SETTING_TOWN_FOUNDING_HELPTEXT                       :Let spelare gru
 STR_CONFIG_SETTING_TOWN_FOUNDING_FORBIDDEN                      :ikkje tillete
 STR_CONFIG_SETTING_TOWN_FOUNDING_ALLOWED                        :tillete
 STR_CONFIG_SETTING_TOWN_FOUNDING_ALLOWED_CUSTOM_LAYOUT          :tillete, eigendefinert oppsett av by
+
+###length 3
 
 ###length 2
 
@@ -1806,7 +1807,6 @@ STR_INTRO_MULTIPLAYER                                           :{BLACK}Fleirspe
 
 STR_INTRO_GAME_OPTIONS                                          :{BLACK}Spelinnstillingar
 STR_INTRO_HIGHSCORE                                             :{BLACK}Poengtavle
-STR_INTRO_CONFIG_SETTINGS_TREE                                  :{BLACK}Innstillingar
 STR_INTRO_NEWGRF_SETTINGS                                       :{BLACK}NewGRF-innstillingar
 STR_INTRO_ONLINE_CONTENT                                        :{BLACK}Sjå etter innhald på nett
 STR_INTRO_AI_SETTINGS                                           :{BLACK}AI-innstillingar
@@ -1827,7 +1827,6 @@ STR_INTRO_TOOLTIP_TOYLAND_LANDSCAPE                             :{BLACK}Vel leik
 
 STR_INTRO_TOOLTIP_GAME_OPTIONS                                  :{BLACK}Syne spelinstillingar
 STR_INTRO_TOOLTIP_HIGHSCORE                                     :{BLACK}Syn poengtavla
-STR_INTRO_TOOLTIP_CONFIG_SETTINGS_TREE                          :{BLACK}Skjerminnstillingar
 STR_INTRO_TOOLTIP_NEWGRF_SETTINGS                               :{BLACK}Syne NewGRF-instillingar
 STR_INTRO_TOOLTIP_ONLINE_CONTENT                                :{BLACK}Sjå etter nytt og oppdatert innhald som kan lastas ned
 STR_INTRO_TOOLTIP_QUIT                                          :{BLACK}Avslutt 'OpenTTD'
@@ -1899,12 +1898,7 @@ STR_LIVERY_FREIGHT_TRAM                                         :Varetrikk
 STR_FACE_CAPTION                                                :{WHITE}Vel utsjånad
 STR_FACE_CANCEL_TOOLTIP                                         :{BLACK}Avbryt val av utsjånad
 STR_FACE_OK_TOOLTIP                                             :{BLACK}Godta ny utsjånad
-STR_FACE_RANDOM                                                 :{BLACK}Tilferdiggjer
 
-STR_FACE_MALE_BUTTON                                            :{BLACK}Mann
-STR_FACE_MALE_TOOLTIP                                           :{BLACK}Vel mannsandlet
-STR_FACE_FEMALE_BUTTON                                          :{BLACK}Kvinne
-STR_FACE_FEMALE_TOOLTIP                                         :{BLACK}Vel kvinneandlet
 STR_FACE_NEW_FACE_BUTTON                                        :{BLACK}Nytt andlet
 STR_FACE_NEW_FACE_TOOLTIP                                       :{BLACK}Lag eit tilfeldig andlet
 STR_FACE_ADVANCED                                               :{BLACK}Avansert
@@ -1922,36 +1916,20 @@ STR_FACE_FACECODE_ERR                                           :{WHITE}Kunne ik
 STR_FACE_SAVE                                                   :{BLACK}Lagre
 STR_FACE_SAVE_TOOLTIP                                           :{BLACK}Lagre favoritandlete
 STR_FACE_SAVE_DONE                                              :{WHITE}Dette andletet vil verte lagra som favoriten din i OpenTTDs konfigurasjonfil
-STR_FACE_EUROPEAN                                               :{BLACK}Europeisk
-STR_FACE_EUROPEAN_TOOLTIP                                       :{BLACK}Velg europeiske andlet
-STR_FACE_AFRICAN                                                :{BLACK}Afrikans
-STR_FACE_AFRICAN_TOOLTIP                                        :{BLACK}Velg afrikanske andlet
 STR_FACE_YES                                                    :Ja
 STR_FACE_NO                                                     :Nei
-STR_FACE_MOUSTACHE_EARRING_TOOLTIP                              :{BLACK}Slå på bart eller øyrering
 STR_FACE_HAIR                                                   :Hår:
-STR_FACE_HAIR_TOOLTIP                                           :{BLACK}Byt hår
 STR_FACE_EYEBROWS                                               :Augebryn:
-STR_FACE_EYEBROWS_TOOLTIP                                       :{BLACK}Byt augebryn
 STR_FACE_EYECOLOUR                                              :Augefarge:
-STR_FACE_EYECOLOUR_TOOLTIP                                      :{BLACK}Byt augefarge:
 STR_FACE_GLASSES                                                :Briller:
-STR_FACE_GLASSES_TOOLTIP                                        :{BLACK}Slå på briller
-STR_FACE_GLASSES_TOOLTIP_2                                      :{BLACK}Byt briller
 STR_FACE_NOSE                                                   :Nase:
-STR_FACE_NOSE_TOOLTIP                                           :{BLACK}Byt nase
 STR_FACE_LIPS                                                   :Lepper:
 STR_FACE_MOUSTACHE                                              :Bart:
-STR_FACE_LIPS_MOUSTACHE_TOOLTIP                                 :{BLACK}Byt lepper eller bart
 STR_FACE_CHIN                                                   :Hake:
-STR_FACE_CHIN_TOOLTIP                                           :{BLACK}Byt hake
 STR_FACE_JACKET                                                 :Jakke:
-STR_FACE_JACKET_TOOLTIP                                         :{BLACK}Byt jakke
 STR_FACE_COLLAR                                                 :Krage:
-STR_FACE_COLLAR_TOOLTIP                                         :{BLACK}Byt krage
 STR_FACE_TIE                                                    :Slips:
 STR_FACE_EARRING                                                :Øyrering:
-STR_FACE_TIE_EARRING_TOOLTIP                                    :{BLACK}Byt slips eller øyrering
 
 # Matches ServerGameType
 ###length 3
@@ -2118,7 +2096,7 @@ STR_NETWORK_ERROR_CLIENT_TIMEOUT_MAP                            :nedlasting av k
 STR_NETWORK_ERROR_CLIENT_TIMEOUT_JOIN                           :prosessering av kartet tok for lang tid
 
 # Network related errors
-STR_NETWORK_SERVER_MESSAGE                                      :*** {1:STRING}
+STR_NETWORK_SERVER_MESSAGE                                      :*** {STRING}
 
 ###length 12
 STR_NETWORK_SERVER_MESSAGE_GAME_PAUSED                          :Spelet er pausa ({STRING})
@@ -2134,11 +2112,10 @@ STR_NETWORK_SERVER_MESSAGE_GAME_REASON_GAME_SCRIPT              :spelscript
 
 STR_NETWORK_MESSAGE_CLIENT_LEAVING                              :forlet
 STR_NETWORK_MESSAGE_CLIENT_JOINED                               :*** {STRING} har blitt med i spelet
-STR_NETWORK_MESSAGE_CLIENT_JOINED_ID                            :*** {STRING} har blitt med i spelet (Client #{2:NUM})
-STR_NETWORK_MESSAGE_CLIENT_COMPANY_JOIN                         :*** {STRING} har slutta seg til firma #{2:NUM}
+STR_NETWORK_MESSAGE_CLIENT_JOINED_ID                            :*** {STRING} har blitt med i spelet (Client #{NUM})
 STR_NETWORK_MESSAGE_CLIENT_COMPANY_SPECTATE                     :*** {STRING} har slutta seg til tilskodarane
-STR_NETWORK_MESSAGE_CLIENT_COMPANY_NEW                          :*** {STRING} har starta eit nytt firma (#{2:NUM})
-STR_NETWORK_MESSAGE_CLIENT_LEFT                                 :*** {STRING} har forlatt spelet ({2:STRING})
+STR_NETWORK_MESSAGE_CLIENT_COMPANY_NEW                          :*** {STRING} har starta eit nytt firma (#{NUM})
+STR_NETWORK_MESSAGE_CLIENT_LEFT                                 :*** {STRING} har forlatt spelet ({STRING})
 STR_NETWORK_MESSAGE_NAME_CHANGE                                 :*** {STRING} har endra namnet sitt til {STRING}
 STR_NETWORK_MESSAGE_SERVER_SHUTDOWN                             :{WHITE}Tenaren avslutta spelet
 STR_NETWORK_MESSAGE_SERVER_REBOOT                               :{WHITE}Tenaren startar om att...{}Vær venleg og vent...
@@ -2302,6 +2279,7 @@ STR_STATION_BUILD_PLATFORM_LENGTH                               :{BLACK}Plattfor
 STR_STATION_BUILD_PLATFORM_LENGTH_TOOLTIP                       :{BLACK}Vel kor lang stasjonen skal vere
 STR_STATION_BUILD_DRAG_DROP                                     :{BLACK}Dra og slipp
 STR_STATION_BUILD_DRAG_DROP_TOOLTIP                             :{BLACK}Bygg stasjon med dra og slipp
+
 
 
 
@@ -2488,6 +2466,7 @@ STR_FOUND_TOWN_INITIAL_SIZE_TOOLTIP                             :{BLACK}Vel stor
 STR_FOUND_TOWN_CITY                                             :{BLACK}By
 STR_FOUND_TOWN_CITY_TOOLTIP                                     :{BLACK}Storbyar veks raskare enn vanlege byar{}Instillingane avgjer om dei er større når dei vert grunnlagt
 
+
 STR_FOUND_TOWN_ROAD_LAYOUT                                      :{YELLOW}Byars vegløysing:
 STR_FOUND_TOWN_SELECT_LAYOUT_TOOLTIP                            :{BLACK}Vel vegløysing nytta for denne byen
 STR_FOUND_TOWN_SELECT_LAYOUT_ORIGINAL                           :{BLACK}Orginal
@@ -2557,7 +2536,6 @@ STR_LAI_CLEAR_DESCRIPTION_ROUGH_LAND                            :Ulendt terreng
 STR_LAI_CLEAR_DESCRIPTION_BARE_LAND                             :Bart land
 STR_LAI_CLEAR_DESCRIPTION_GRASS                                 :Gras
 STR_LAI_CLEAR_DESCRIPTION_FIELDS                                :Jorde
-STR_LAI_CLEAR_DESCRIPTION_SNOW_COVERED_LAND                     :Snødekt land
 STR_LAI_CLEAR_DESCRIPTION_DESERT                                :Ørken
 
 STR_LAI_RAIL_DESCRIPTION_TRACK                                  :Jernbane spor
@@ -2938,7 +2916,6 @@ STR_INVALID_VEHICLE                                             :<ugyldig køyre
 STR_NEWGRF_SCAN_CAPTION                                         :{WHITE}Skannar NewGRF-er
 STR_NEWGRF_SCAN_MESSAGE                                         :{BLACK}Skannar NewGRF-er. Avhengig av antalet kan dette ta ei stund...
 STR_NEWGRF_SCAN_STATUS                                          :{BLACK}{NUM} NewGRF{P "" -er} skanna, ut av {NUM} NewGRF{P "" -er} totalt
-STR_NEWGRF_SCAN_ARCHIVES                                        :Skannar arkiv
 
 # Sign list window
 STR_SIGN_LIST_CAPTION                                           :{WHITE}Skiltliste - {COMMA} Skilt{P "" er}
@@ -3644,8 +3621,8 @@ STR_VEHICLE_INFO_RELIABILITY_BREAKDOWNS                         :{BLACK}Pålitel
 
 STR_VEHICLE_INFO_BUILT_VALUE                                    :{LTBLUE}{ENGINE} {BLACK}Bygd: {LTBLUE}{NUM}{BLACK} Verdi: {LTBLUE}{CURRENCY_LONG}
 STR_VEHICLE_INFO_NO_CAPACITY                                    :{BLACK}Kapasitet: {LTBLUE}Ingen{STRING}
-STR_VEHICLE_INFO_CAPACITY                                       :{BLACK}Kapasitet: {LTBLUE}{CARGO_LONG}{3:STRING}
-STR_VEHICLE_INFO_CAPACITY_MULT                                  :{BLACK}Kapasitet: {LTBLUE}{CARGO_LONG}{3:STRING} (x{4:NUM})
+STR_VEHICLE_INFO_CAPACITY                                       :{BLACK}Kapasitet: {LTBLUE}{CARGO_LONG}{STRING}
+STR_VEHICLE_INFO_CAPACITY_MULT                                  :{BLACK}Kapasitet: {LTBLUE}{CARGO_LONG}{STRING} (x{NUM})
 STR_VEHICLE_INFO_CAPACITY_CAPACITY                              :{BLACK}Kapasitet:{LTBLUE}{CARGO_LONG}, {CARGO_LONG}{STRING}
 
 STR_VEHICLE_INFO_FEEDER_CARGO_VALUE                             :{BLACK}Overfør kreditt: {LTBLUE}{CURRENCY_LONG}
@@ -3810,15 +3787,12 @@ STR_ORDER_GO_NON_STOP_TO_WAYPOINT                               :Køyr utan stop
 STR_ORDER_SERVICE_AT                                            :Vedlikehald ved
 STR_ORDER_SERVICE_NON_STOP_AT                                   :Vedlikehald direkte ved
 
-STR_ORDER_NEAREST_DEPOT                                         :næraste
-STR_ORDER_NEAREST_HANGAR                                        :den næraste hangaren
 ###length 3
 STR_ORDER_TRAIN_DEPOT                                           :Togstall
 STR_ORDER_ROAD_VEHICLE_DEPOT                                    :Garasje
 STR_ORDER_SHIP_DEPOT                                            :Skipsdokk
 ###next-name-looks-similar
 
-STR_ORDER_GO_TO_NEAREST_DEPOT_FORMAT                            :{STRING} {STRING} {STRING}
 STR_ORDER_GO_TO_DEPOT_FORMAT                                    :{STRING} {DEPOT}
 
 STR_ORDER_REFIT_ORDER                                           :(Bygg om til {STRING})
@@ -3826,7 +3800,7 @@ STR_ORDER_REFIT_STOP_ORDER                                      :(Bygg om til {S
 STR_ORDER_STOP_ORDER                                            :(Stopp)
 
 
-STR_ORDER_GO_TO_STATION                                         :{STRING} {STATION} {STRING}
+STR_ORDER_GO_TO_STATION                                         :{STRING} {STATION}
 
 STR_ORDER_IMPLICIT                                              :(implisitt)
 
@@ -3884,7 +3858,7 @@ STR_TIMETABLE_TOOLTIP                                           :{BLACK}Rutetabe
 STR_TIMETABLE_NO_TRAVEL                                         :Ingen reise
 STR_TIMETABLE_NOT_TIMETABLEABLE                                 :Reis (automatisk; blir sett på ruteplan med neste manuelle ordre)
 STR_TIMETABLE_TRAVEL_NOT_TIMETABLED                             :Reis (ikkje på rutetabell)
-STR_TIMETABLE_TRAVEL_NOT_TIMETABLED_SPEED                       :Reis med maks {2:VELOCITY} (utan rutetabell)
+STR_TIMETABLE_TRAVEL_NOT_TIMETABLED_SPEED                       :Reis med maks {VELOCITY} (utan rutetabell)
 STR_TIMETABLE_TRAVEL_FOR                                        :Reis i {STRING}
 STR_TIMETABLE_TRAVEL_FOR_SPEED                                  :Reis i {STRING} med maks {VELOCITY}
 STR_TIMETABLE_AND_TRAVEL_FOR_ESTIMATED                          :(reis {STRING}, ikkje på rutetabell)
@@ -3898,7 +3872,6 @@ STR_TIMETABLE_STATUS_ON_TIME                                    :{BLACK}Dette k�
 STR_TIMETABLE_STATUS_LATE                                       :{BLACK}Dette køyretøyet er {STRING} for seint
 STR_TIMETABLE_STATUS_EARLY                                      :{BLACK}Dette køyretøyet er {STRING} for tidleg
 STR_TIMETABLE_STATUS_NOT_STARTED                                :{BLACK}Denne rutetabellen har ikkje starta enda
-
 
 
 STR_TIMETABLE_CHANGE_TIME                                       :{BLACK}Byt Tid
@@ -4075,7 +4048,6 @@ STR_ERROR_SCREENSHOT_FAILED                                     :{WHITE}Skjermdu
 
 # Error message titles
 STR_ERROR_MESSAGE_CAPTION                                       :{YELLOW}Melding
-STR_ERROR_MESSAGE_CAPTION_OTHER_COMPANY                         :{YELLOW}Melding frå {STRING}
 
 # Generic construction errors
 STR_ERROR_OFF_EDGE_OF_MAP                                       :{WHITE}Utanfor kartet
@@ -4094,7 +4066,6 @@ STR_ERROR_TERRAFORM_LIMIT_REACHED                               :{WHITE}... land
 STR_ERROR_CLEARING_LIMIT_REACHED                                :{WHITE}... rutetømminga si grense er nådd
 STR_ERROR_TREE_PLANT_LIMIT_REACHED                              :{WHITE}... øvre grense for antal tre er nådd
 STR_ERROR_NAME_MUST_BE_UNIQUE                                   :{WHITE}Namnet må vera unikt
-STR_ERROR_GENERIC_OBJECT_IN_THE_WAY                             :{WHITE}{1:STRING} er i vegen
 STR_ERROR_NOT_ALLOWED_WHILE_PAUSED                              :{WHITE}Ikkje tillet når spelet er pausa
 
 # Local authority errors
@@ -4385,6 +4356,10 @@ STR_ERROR_CAN_T_SELL_TRAIN                                      :{WHITE}Kan ikkj
 STR_ERROR_CAN_T_SELL_ROAD_VEHICLE                               :{WHITE}Kan ikkje selje køyretøy...
 STR_ERROR_CAN_T_SELL_SHIP                                       :{WHITE}Kan ikkje selje skip...
 STR_ERROR_CAN_T_SELL_AIRCRAFT                                   :{WHITE}Kan ikkje selje luftfartøy...
+
+###length VEHICLE_TYPES
+
+###length VEHICLE_TYPES
 
 STR_ERROR_TOO_MANY_VEHICLES_IN_GAME                             :{WHITE}For mange køyretøy i spelet
 STR_ERROR_CAN_T_CHANGE_SERVICING                                :{WHITE}Kan ikkje endre vedlikehaldsintervall...
@@ -4881,18 +4856,7 @@ STR_SAVEGAME_NAME_SPECTATOR                                     :Tilskuar, {1:ST
 
 # Viewport strings
 STR_VIEWPORT_TOWN_POP                                           :{WHITE}{TOWN} ({COMMA})
-STR_VIEWPORT_TOWN                                               :{WHITE}{TOWN}
-STR_VIEWPORT_TOWN_TINY_BLACK                                    :{TINY_FONT}{BLACK}{TOWN}
-STR_VIEWPORT_TOWN_TINY_WHITE                                    :{TINY_FONT}{WHITE}{TOWN}
-
-STR_VIEWPORT_SIGN_SMALL_BLACK                                   :{TINY_FONT}{BLACK}{SIGN}
-STR_VIEWPORT_SIGN_SMALL_WHITE                                   :{TINY_FONT}{WHITE}{SIGN}
-
 STR_VIEWPORT_STATION                                            :{STATION} {STATION_FEATURES}
-STR_VIEWPORT_STATION_TINY                                       :{TINY_FONT}{STATION}
-
-STR_VIEWPORT_WAYPOINT                                           :{WAYPOINT}
-STR_VIEWPORT_WAYPOINT_TINY                                      :{TINY_FONT}{WAYPOINT}
 
 # Simple strings to get specific types of data
 STR_COMPANY_NAME                                                :{COMPANY}
@@ -4945,3 +4909,4 @@ STR_PLANE                                                       :{BLACK}{PLANE}
 STR_SHIP                                                        :{BLACK}{SHIP}
 
 STR_TOOLBAR_RAILTYPE_VELOCITY                                   :{STRING} ({VELOCITY})
+

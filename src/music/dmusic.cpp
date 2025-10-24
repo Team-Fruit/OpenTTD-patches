@@ -18,6 +18,7 @@
 #include "../thread.h"
 #include "../fileio_func.h"
 #include "../base_media_base.h"
+#include "../base_media_music.h"
 #include "dmusic.h"
 #include "midifile.hpp"
 #include "midi.h"
@@ -33,8 +34,8 @@
 #	pragma comment(lib, "ole32.lib")
 #endif /* defined(_MSC_VER) */
 
-static const int MS_TO_REFTIME = 1000 * 10; ///< DirectMusic time base is 100 ns.
-static const int MIDITIME_TO_REFTIME = 10;  ///< Time base of the midi file reader is 1 us.
+static constexpr REFERENCE_TIME MS_TO_REFTIME = 1000 * 10; ///< DirectMusic time base is 100 ns.
+static constexpr REFERENCE_TIME MIDITIME_TO_REFTIME = 10;  ///< Time base of the midi file reader is 1 us.
 
 
 #define FOURCC_INFO  mmioFOURCC('I', 'N', 'F', 'O')
@@ -679,14 +680,14 @@ static void MidiThreadProc()
 					preload_bytes += block.data.size();
 					if (block.ticktime >= current_segment.start) {
 						if (current_segment.loop) {
-							Debug(driver, 2, "DMusic: timer: loop from block {} (ticktime {}, realtime {:.3f}, bytes {})", bl, block.ticktime, ((int)block.realtime) / 1000.0, (int)preload_bytes);
+							Debug(driver, 2, "DMusic: timer: loop from block {} (ticktime {}, realtime {:.3f}, bytes {})", bl, block.ticktime, block.realtime / 1000.0, preload_bytes);
 							current_segment.start_block = bl;
 							break;
 						} else {
 							/* Skip the transmission delay compensation performed in the Win32 MIDI driver.
 							 * The DMusic driver will most likely be used with the MS softsynth, which is not subject to transmission delays.
 							 */
-							Debug(driver, 2, "DMusic: timer: start from block {} (ticktime {}, realtime {:.3f}, bytes {})", bl, block.ticktime, ((int)block.realtime) / 1000.0, (int)preload_bytes);
+							Debug(driver, 2, "DMusic: timer: start from block {} (ticktime {}, realtime {:.3f}, bytes {})", bl, block.ticktime, block.realtime / 1000.0, preload_bytes);
 							playback_start_time -= block.realtime * MIDITIME_TO_REFTIME;
 							break;
 						}
@@ -732,14 +733,14 @@ static void MidiThreadProc()
 				REFERENCE_TIME playback_time = current_time - playback_start_time;
 				if (block.realtime * MIDITIME_TO_REFTIME > playback_time +  3 *_playback.preload_time * MS_TO_REFTIME) {
 					/* Stop the thread loop until we are at the preload time of the next block. */
-					next_timeout = Clamp(((int64_t)block.realtime * MIDITIME_TO_REFTIME - playback_time) / MS_TO_REFTIME - _playback.preload_time, 0, 1000);
+					next_timeout = Clamp((block.realtime * MIDITIME_TO_REFTIME - playback_time) / MS_TO_REFTIME - _playback.preload_time, 0, 1000);
 					Debug(driver, 9, "DMusic thread: Next event in {} ms (music {}, ref {})", next_timeout, block.realtime * MIDITIME_TO_REFTIME, playback_time);
 					break;
 				}
 
 				/* Timestamp of the current block. */
 				block_time = playback_start_time + block.realtime * MIDITIME_TO_REFTIME;
-				Debug(driver, 9, "DMusic thread: Streaming block {} (cur={}, block={})", current_block, (long long)(current_time / MS_TO_REFTIME), (long long)(block_time / MS_TO_REFTIME));
+				Debug(driver, 9, "DMusic thread: Streaming block {} (cur={}, block={})", current_block, current_time / MS_TO_REFTIME, block_time / MS_TO_REFTIME);
 
 				const uint8_t *data = block.data.data();
 				size_t remaining = block.data.size();
@@ -1205,7 +1206,10 @@ void MusicDriver_DMusic::Stop()
 		_music = nullptr;
 	}
 
-	CloseHandle(_playback.thread_event);
+	if (_playback.thread_event != nullptr) {
+		CloseHandle(_playback.thread_event);
+		_playback.thread_event = nullptr;
+	}
 
 	CoUninitialize();
 }

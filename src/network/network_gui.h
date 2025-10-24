@@ -24,7 +24,7 @@ void ShowJoinStatusWindow();
 void ShowNetworkGameWindow();
 void ShowClientList();
 void ShowNetworkCompanyPasswordWindow(Window *parent);
-void ShowNetworkAskRelay(const std::string &server_connection_string, const std::string &relay_connection_string, const std::string &token);
+void ShowNetworkAskRelay(std::string_view server_connection_string, std::string &&relay_connection_string, std::string &&token);
 void ShowNetworkAskSurvey();
 void ShowSurveyResultTextfileWindow();
 
@@ -40,7 +40,7 @@ struct NetworkCompanyInfo : NetworkCompanyStats {
 	std::string clients;      ///< The clients that control this company (Name1, name2, ..)
 };
 
-enum NetworkRelayWindowCloseData {
+enum NetworkRelayWindowCloseData : uint8_t {
 	NRWCD_UNHANDLED = 0, ///< Relay request is unhandled.
 	NRWCD_HANDLED = 1, ///< Relay request is handled, either by user or by timeout.
 };

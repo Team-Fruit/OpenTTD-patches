@@ -17,6 +17,10 @@ function Regression::TestInit()
 	print(" IsValid(vehicle.plane_speed): " + AIGameSettings.IsValid("vehicle.plane_speed"));
 	print(" vehicle.plane_speed: " + AIGameSettings.GetValue("vehicle.plane_speed"));
 	require("require.nut");
+	print(" TestEnum.value1: " + ::TestEnum.value1);
+	print(" test_constant: " + ::test_constant);
+	print(" TestEnum.value2: " + TestEnum.value2);
+	print(" test_constant: " + test_constant);
 	print(" min(6, 3): " + min(6, 3));
 	print(" min(3, 6): " + min(3, 6));
 	print(" max(6, 3): " + max(6, 3));
@@ -265,15 +269,15 @@ function Regression::Bridge()
 	print("  Valid Bridges:        " + j);
 
 	print("  IsBridgeTile():       " + AIBridge.IsBridgeTile(33160));
-	print("  GetBridgeID():        " + AIBridge.GetBridgeID(33160));
+	print("  GetBridgeType():      " + AIBridge.GetBridgeType(33160));
 	print("  RemoveBridge():       " + AIBridge.RemoveBridge(33155));
 	print("  GetLastErrorString(): " + AIError.GetLastErrorString());
 	print("  GetOtherBridgeEnd():  " + AIBridge.GetOtherBridgeEnd(33160));
 	print("  BuildBridge():        " + AIBridge.BuildBridge(AIVehicle.VT_ROAD, 5, 33160, 33155));
 	print("  IsBridgeTile():       " + AIBridge.IsBridgeTile(33160));
-	print("  GetBridgeID():        " + AIBridge.GetBridgeID(33160));
+	print("  GetBridgeType():      " + AIBridge.GetBridgeType(33160));
 	print("  IsBridgeTile():       " + AIBridge.IsBridgeTile(33155));
-	print("  GetBridgeID():        " + AIBridge.GetBridgeID(33155));
+	print("  GetBridgeType():      " + AIBridge.GetBridgeType(33155));
 	print("  GetOtherBridgeEnd():  " + AIBridge.GetOtherBridgeEnd(33160));
 	print("  BuildBridge():        " + AIBridge.BuildBridge(AIVehicle.VT_ROAD, 5, 33160, 33155));
 	print("  GetLastErrorString(): " + AIError.GetLastErrorString());
@@ -2033,6 +2037,20 @@ function Regression::Start()
 				local c = AIEventVehicleWaitingInDepot.Convert(e);
 				print("      EventName:         VehicleWaitingInDepot");
 				print("      VehicleID:         " + c.GetVehicleID());
+			} break;
+
+			case AIEvent.ET_COMPANY_RENAMED: {
+				local c = AIEventCompanyRenamed.Convert(e);
+				print("      EventName:         CompanyRenamed");
+				print("      CompanyID:         " + c.GetCompanyID());
+				print("      CompanyName:       " + c.GetNewName());
+			} break;
+
+			case AIEvent.ET_PRESIDENT_RENAMED: {
+				local c = AIEventPresidentRenamed.Convert(e);
+				print("      EventName:         PresidentRenamed");
+				print("      CompanyID:         " + c.GetCompanyID());
+				print("      PresidentName:     " + c.GetNewName());
 			} break;
 
 			default:

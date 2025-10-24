@@ -71,7 +71,7 @@ void DebugIntl(DebugLevelID dbg, int8_t level, fmt::format_string<T...> msg, T&&
 }
 
 /**
- * Ouptut a line of debugging information.
+ * Output a line of debugging information.
  * @param name The category of debug information.
  * @param level The maximum debug level this message should be shown at. When the debug level for this category is set lower, then the message will not be shown.
  * @param format_string The formatting string of the message.
@@ -83,11 +83,11 @@ extern std::string _loadgame_DBGL_data;
 extern bool _save_DBGC_data;
 extern std::string _loadgame_DBGC_data;
 
-void CDECL debug(DebugLevelID dbg, int8_t level, const char *format, ...) WARN_FORMAT(3, 4);
 void debug_print(DebugLevelID dbg, int8_t level, std::string_view msg);
 
 void DumpDebugFacilityNames(struct format_target &output);
-void SetDebugString(const char *s, void (*error_func)(std::string));
+using SetDebugStringErrorFunc = void(std::string_view);
+void SetDebugString(std::string_view s, SetDebugStringErrorFunc error_func);
 std::string GetDebugString();
 
 /* Shorter form for passing filename and linenumber */
@@ -103,7 +103,7 @@ void ShowInfo(fmt::format_string<T...> msg, T&&... args)
 }
 
 struct log_prefix {
-	const char *GetLogPrefix(bool force = false);
+	std::string_view GetLogPrefix(bool force = false);
 
 private:
 	char buffer[24];
@@ -131,7 +131,7 @@ template <typename... T>
 
 #if !defined(NDEBUG) || defined(WITH_ASSERT)
 #	define assert_msg(expression, ...) do { if (unlikely(!(expression))) AssertMsgError(__LINE__, __FILE__, #expression, __VA_ARGS__); } while (false)
-#	define assert_msg_tile(expression, tile, ...) do { if (unlikely(!(expression))) AssertMsgTileError(__LINE__, __FILE__, #expression, tile, __VA_ARGS__); } while (false)
+#	define assert_msg_tile(expression, tile, ...) do { if (unlikely(!(expression))) AssertMsgTileError(__LINE__, __FILE__, #expression, debug_tile_index_type_erasure(tile), __VA_ARGS__); } while (false)
 #else
 #	define assert_msg(expression, ...)
 #	define assert_msg_tile(expression, tile, ...)

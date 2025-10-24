@@ -37,8 +37,6 @@ enum SignalType : uint8_t {
 	SIGTYPE_LAST       = SIGTYPE_NO_ENTRY,
 	SIGTYPE_FIRST_PBS_SPRITE = SIGTYPE_PBS,
 };
-/** Helper information for extract tool. */
-template <> struct EnumPropsT<SignalType> : MakeEnumPropsT<SignalType, uint8_t, SIGTYPE_BLOCK, SIGTYPE_END, SIGTYPE_END, 3> {};
 DECLARE_ENUM_AS_ADDABLE(SignalType)
 
 /** Reference to a signal
@@ -60,7 +58,7 @@ struct SignalReference {
  * simple boolean logic will do. But do try to compare to this enum instead of
  * normal boolean evaluation, since that will make future additions easier.
  */
-enum SignalState {
+enum SignalState : uint8_t {
 	SIGNAL_STATE_RED   = 0, ///< The signal is red
 	SIGNAL_STATE_GREEN = 1, ///< The signal is green
 	SIGNAL_STATE_MAX = SIGNAL_STATE_GREEN,

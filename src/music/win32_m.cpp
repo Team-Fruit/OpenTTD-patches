@@ -17,6 +17,7 @@
 #include "midifile.hpp"
 #include "midi.h"
 #include "../base_media_base.h"
+#include "../base_media_music.h"
 #include "../core/mem_func.hpp"
 #include <mutex>
 
@@ -64,7 +65,7 @@ void CALLBACK MidiOutProc(HMIDIOUT hmo, UINT wMsg, DWORD_PTR, DWORD_PTR dwParam1
 	if (wMsg == MOM_DONE) {
 		MIDIHDR *hdr = (LPMIDIHDR)dwParam1;
 		midiOutUnprepareHeader(hmo, hdr, sizeof(*hdr));
-		free(hdr);
+		delete hdr;
 	}
 }
 
@@ -81,15 +82,13 @@ static void TransmitSysex(const uint8_t *&msg_start, size_t &remaining)
 	msg_end++; /* also include sysex end byte */
 
 	/* prepare header */
-	MIDIHDR *hdr = CallocT<MIDIHDR>(1);
+	auto hdr = std::make_unique<MIDIHDR>();
 	hdr->lpData = reinterpret_cast<LPSTR>(const_cast<uint8_t *>(msg_start));
-	hdr->dwBufferLength = msg_end - msg_start;
-	if (midiOutPrepareHeader(_midi.midi_out, hdr, sizeof(*hdr)) == MMSYSERR_NOERROR) {
+	hdr->dwBufferLength = static_cast<DWORD>(msg_end - msg_start);
+	if (midiOutPrepareHeader(_midi.midi_out, hdr.get(), sizeof(MIDIHDR)) == MMSYSERR_NOERROR) {
 		/* transmit - just point directly into the data buffer */
 		hdr->dwBytesRecorded = hdr->dwBufferLength;
-		midiOutLongMsg(_midi.midi_out, hdr, sizeof(*hdr));
-	} else {
-		free(hdr);
+		midiOutLongMsg(_midi.midi_out, hdr.release(), sizeof(MIDIHDR));
 	}
 
 	/* update position in buffer */
@@ -203,7 +202,7 @@ void CALLBACK TimerCallback(UINT uTimerID, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR
 			preload_bytes += block.data.size();
 			if (block.ticktime >= _midi.current_segment.start) {
 				if (_midi.current_segment.loop) {
-					Debug(driver, 2, "Win32-MIDI: timer: loop from block {} (ticktime {}, realtime {:.3f}, bytes {})", bl, block.ticktime, ((int)block.realtime)/1000.0, preload_bytes);
+					Debug(driver, 2, "Win32-MIDI: timer: loop from block {} (ticktime {}, realtime {:.3f}, bytes {})", bl, block.ticktime, block.realtime / 1000.0, preload_bytes);
 					_midi.current_segment.start_block = bl;
 					break;
 				} else {
@@ -212,7 +211,7 @@ void CALLBACK TimerCallback(UINT uTimerID, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR
 					 * which have a bitrate of 31,250 bits/sec, and transmit 1+8+1 start/data/stop bits per byte.
 					 * The delay compensation is needed to avoid time-compression of following messages.
 					 */
-					Debug(driver, 2, "Win32-MIDI: timer: start from block {} (ticktime {}, realtime {:.3f}, bytes {})", bl, block.ticktime, ((int)block.realtime) / 1000.0, preload_bytes);
+					Debug(driver, 2, "Win32-MIDI: timer: start from block {} (ticktime {}, realtime {:.3f}, bytes {})", bl, block.ticktime, block.realtime / 1000.0, preload_bytes);
 					_midi.playback_start_time -= block.realtime / 1000 - (DWORD)(preload_bytes * 1000 / 3125);
 					break;
 				}

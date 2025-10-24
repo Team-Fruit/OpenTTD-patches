@@ -11,32 +11,26 @@
 #define COMPANY_TYPE_H
 
 #include "core/enum_type.hpp"
+#include "core/pool_type.hpp"
 
-/**
- * Enum for all companies/owners.
- */
-enum Owner : uint8_t {
-	/* All companies below MAX_COMPANIES are playable
-	 * companies, above, they are special, computer controlled 'companies' */
-	OWNER_BEGIN     = 0x00, ///< First owner
-	COMPANY_FIRST   = 0x00, ///< First company, same as owner
-	MAX_COMPANIES   = 0x0F, ///< Maximum number of companies
-	OWNER_TOWN      = 0x0F, ///< A town owns the tile, or a town is expanding
-	OWNER_NONE      = 0x10, ///< The tile has no ownership
-	OWNER_WATER     = 0x11, ///< The tile/execution is done by "water"
-	OWNER_DEITY     = 0x12, ///< The object is owned by a superuser / goal script
-	OWNER_END,              ///< Last + 1 owner
-	INVALID_OWNER   = 0xFF, ///< An invalid owner
-	INVALID_COMPANY = 0xFF, ///< An invalid company
+struct CompanyIDTag : public PoolIDTraits<uint8_t, 0xF, 0xFF> {};
+using CompanyID = PoolID<CompanyIDTag>;
 
-	/* 'Fake' companies used for networks */
-	COMPANY_INACTIVE_CLIENT = 253, ///< The client is joining
-	COMPANY_NEW_COMPANY     = 254, ///< The client wants a new company
-	COMPANY_SPECTATOR       = 255, ///< The client is spectating
-};
-DECLARE_POSTFIX_INCREMENT(Owner)
-DECLARE_ENUM_AS_ADDABLE(Owner)
+/* 'Fake' companies used for networks */
+static constexpr CompanyID COMPANY_INACTIVE_CLIENT{253}; ///< The client is joining
+static constexpr CompanyID COMPANY_NEW_COMPANY{254}; ///< The client wants a new company
+static constexpr CompanyID COMPANY_SPECTATOR{255}; ///< The client is spectating
 
+using Owner = CompanyID;
+static constexpr Owner OWNER_BEGIN = Owner::Begin(); ///< First owner
+static constexpr Owner OWNER_TOWN{0x0F}; ///< A town owns the tile, or a town is expanding
+static constexpr Owner OWNER_NONE{0x10}; ///< The tile has no ownership
+static constexpr Owner OWNER_WATER{0x11}; ///< The tile/execution is done by "water"
+static constexpr Owner OWNER_DEITY{0x12}; ///< The object is owned by a superuser / goal script
+static constexpr Owner OWNER_END{0x13}; ///< Last + 1 owner
+static constexpr Owner INVALID_OWNER = Owner::Invalid(); ///< An invalid owner
+
+static const uint8_t MAX_COMPANIES = CompanyID::End().base();
 static const uint MAX_LENGTH_PRESIDENT_NAME_CHARS = 32; ///< The maximum length of a president name in characters including '\0'
 static const uint MAX_LENGTH_COMPANY_NAME_CHARS   = 32; ///< The maximum length of a company name in characters including '\0'
 
@@ -46,27 +40,37 @@ static const uint MAX_COMPANY_SHARE_OWNERS        =  4; ///< The maximum number 
 static const uint MIN_COMPETITORS_INTERVAL = 0;   ///< The minimum interval (in minutes) between competitors.
 static const uint MAX_COMPETITORS_INTERVAL = 500; ///< The maximum interval (in minutes) between competitors.
 
-/** Define basic enum properties */
-template <> struct EnumPropsT<Owner> : MakeEnumPropsT<Owner, uint8_t, OWNER_BEGIN, OWNER_END, INVALID_OWNER> {};
-
 typedef Owner CompanyID;
 
-typedef uint16_t CompanyMask;
+class CompanyMask : public BaseBitSet<CompanyMask, CompanyID, uint16_t> {
+public:
+	constexpr CompanyMask() : BaseBitSet<CompanyMask, CompanyID, uint16_t>() {}
+	static constexpr size_t DecayValueType(CompanyID value) { return value.base(); }
+
+	constexpr auto operator <=>(const CompanyMask &) const noexcept = default;
+};
 
 struct Company;
-typedef uint32_t CompanyManagerFace; ///< Company manager face bits, info see in company_manager_face.h
+
+struct CompanyManagerFace {
+	uint style = 0; ///< Company manager face style.
+	uint32_t bits = 0; ///< Company manager face bits, meaning is dependent on style.
+	std::string style_label; ///< Face style label.
+};
 
 /** The reason why the company was removed. */
-enum CompanyRemoveReason {
+enum CompanyRemoveReason : uint8_t {
 	CRR_MANUAL,    ///< The company is manually removed.
 	CRR_AUTOCLEAN, ///< The company is removed due to autoclean.
 	CRR_BANKRUPT,  ///< The company went belly-up.
 
 	CRR_END,       ///< Sentinel for end.
+
+	CRR_NONE = CRR_MANUAL, ///< Dummy reason for actions that don't need one.
 };
 
 /** The action to do with CMD_COMPANY_CTRL. */
-enum CompanyCtrlAction {
+enum CompanyCtrlAction : uint8_t {
 	CCA_NEW,    ///< Create a new company.
 	CCA_NEW_AI, ///< Create a new AI company.
 	CCA_DELETE, ///< Delete a company.
@@ -82,6 +86,13 @@ enum CompanyAllowListCtrlAction : uint8_t {
 	CALCA_REMOVE, ///< Remove a public key.
 
 	CALCA_END,    ///< Sentinel for end.
+};
+
+struct CompanyInfoDumper {
+	CompanyID value;
+	CompanyInfoDumper(CompanyID value) : value(value) {}
+
+	void fmt_format_value(struct format_target &output) const;
 };
 
 #endif /* COMPANY_TYPE_H */

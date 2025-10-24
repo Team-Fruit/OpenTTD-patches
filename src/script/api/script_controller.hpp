@@ -12,6 +12,8 @@
 
 #include "script_types.hpp"
 #include "../../string_func.h"
+#include "../../company_type.h"
+#include "../../string_func.h"
 #include <map>
 
 /**
@@ -53,7 +55,7 @@ public:
 	 * Initializer of the ScriptController.
 	 * @param company The company this Script is normally serving.
 	 */
-	ScriptController(CompanyID company);
+	ScriptController(::CompanyID company);
 
 #else
 	/**
@@ -78,9 +80,8 @@ public:
 	 *   - booleans, and
 	 *   - nulls.
 	 *
-	 * In particular, instances of classes can't be saved including
-	 *   ScriptList. Such a list should be converted to an array or table on
-	 *   save and converted back on load.
+	 * In particular, instances of classes can't be saved with the exception of
+	 *   ScriptList.
 	 *
 	 * The function is called as soon as the user saves the game,
 	 *   independently of other activities of the script. The script is not
@@ -215,11 +216,6 @@ private:
 	uint ticks;                       ///< The amount of ticks we're sleeping.
 	LoadedLibraryList loaded_library; ///< The libraries we loaded.
 	int loaded_library_count;         ///< The amount of libraries.
-
-	/**
-	 * Register all classes that are known inside the script API.
-	 */
-	void RegisterClasses();
 };
 
 #endif /* SCRIPT_CONTROLLER_HPP */

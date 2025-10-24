@@ -8,8 +8,10 @@
 /** @file spritecache.cpp Caching of sprites. */
 
 #include "stdafx.h"
+#include "core/alloc_func.hpp"
 #include "random_access_file_type.h"
 #include "spriteloader/grf.hpp"
+#include "spriteloader/makeindexed.h"
 #include "gfx_func.h"
 #include "error.h"
 #include "error_func.h"
@@ -33,6 +35,7 @@
 
 #include <vector>
 #include <algorithm>
+#include <optional>
 
 #include "safeguards.h"
 
@@ -302,23 +305,23 @@ static bool PadSingleSprite(SpriteLoader::Sprite *sprite, ZoomLevel zoom, uint p
 		for (uint y = 0; y < height; y++) {
 			if (y < pad_top || pad_bottom + y >= height) {
 				/* Top/bottom padding. */
-				MemSetT(data, 0, width);
+				std::fill_n(data, width, SpriteLoader::CommonPixel{});
 				data += width;
 			} else {
 				if (pad_left > 0) {
 					/* Pad left. */
-					MemSetT(data, 0, pad_left);
+					std::fill_n(data, pad_left, SpriteLoader::CommonPixel{});
 					data += pad_left;
 				}
 
 				/* Copy pixels. */
-				MemCpyT(data, src, sprite->width);
+				std::copy_n(src, sprite->width, data);
 				src += sprite->width;
 				data += sprite->width;
 
 				if (pad_right > 0) {
 					/* Pad right. */
-					MemSetT(data, 0, pad_right);
+					std::fill_n(data, pad_right, SpriteLoader::CommonPixel{});
 					data += pad_right;
 				}
 			}
@@ -535,19 +538,24 @@ static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_ty
 	Debug(sprite, 9, "Load sprite {}", id);
 
 	SpriteLoader::SpriteCollection sprite;
-	uint8_t sprite_avail = 0;
+	SpriteLoaderResult load_result{};
 	sprite[ZOOM_LVL_MIN].type = sprite_type;
 
 	SpriteLoaderGrf sprite_loader(file.GetContainerVersion());
 	if (sprite_type != SpriteType::MapGen && sc->GetHasNonPalette() && encoder->Is32BppSupported()) {
 		/* Try for 32bpp sprites first. */
-		sprite_avail = sprite_loader.LoadSprite(sprite, file, file_pos, sprite_type, true, sc->count, sc->flags, zoom_levels);
+		load_result = sprite_loader.LoadSprite(sprite, file, file_pos, sprite_type, true, sc->count, sc->flags, zoom_levels);
 	}
-	if (sprite_avail == 0) {
-		sprite_avail = sprite_loader.LoadSprite(sprite, file, file_pos, sprite_type, false, sc->count, sc->flags, zoom_levels);
+	if (load_result.loaded_sprites == 0) {
+		load_result.Apply(sprite_loader.LoadSprite(sprite, file, file_pos, sprite_type, false, sc->count, sc->flags, zoom_levels));
+		if (sprite_type == SpriteType::Normal && load_result.avail_32bpp != 0 && !encoder->Is32BppSupported() && load_result.loaded_sprites == 0) {
+			/* No 8bpp available, try converting from 32bpp. */
+			SpriteLoaderMakeIndexed make_indexed(sprite_loader);
+			load_result = make_indexed.LoadSprite(sprite, file, file_pos, sprite_type, true, sc->count, sc->flags, zoom_levels);
+		}
 	}
 
-	if (sprite_avail == 0) {
+	if (load_result.loaded_sprites == 0) {
 		if (sprite_type == SpriteType::MapGen) return nullptr;
 		if (id == SPR_IMG_QUERY) UserError("Okay... something went horribly wrong. I couldn't load the fallback sprite. What should I do?");
 		return (void*)GetRawSprite(SPR_IMG_QUERY, SpriteType::Normal, UINT8_MAX, &allocator, encoder);
@@ -583,7 +591,7 @@ static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_ty
 		return s;
 	}
 
-	if (!ResizeSprites(sprite, sprite_avail, encoder, zoom_levels)) {
+	if (!ResizeSprites(sprite, load_result.loaded_sprites, encoder, zoom_levels)) {
 		if (id == SPR_IMG_QUERY) UserError("Okay... something went horribly wrong. I couldn't resize the fallback sprite. What should I do?");
 		return (void*)GetRawSprite(SPR_IMG_QUERY, SpriteType::Normal, UINT8_MAX, &allocator, encoder);
 	}
@@ -658,14 +666,14 @@ void ReadGRFSpriteOffsets(SpriteFile &file)
 			prev_id = id;
 			uint length = file.ReadDword();
 			if (length > 0) {
-				uint8_t colour = file.ReadByte() & SCC_MASK;
+				SpriteComponents colour{file.ReadByte()};
 				length--;
 				if (length > 0) {
 					uint8_t zoom = file.ReadByte();
 					length--;
-					if (colour != 0) {
+					if (colour.Any()) {
 						static const ZoomLevel zoom_lvl_map[6] = {ZOOM_LVL_NORMAL, ZOOM_LVL_IN_4X, ZOOM_LVL_IN_2X, ZOOM_LVL_OUT_2X, ZOOM_LVL_OUT_4X, ZOOM_LVL_OUT_8X};
-						if (zoom < 6) SetBit(offset.control_flags, static_cast<uint>(zoom_lvl_map[zoom]) + static_cast<uint>((colour != SCC_PAL) ? SCC_32BPP_ZOOM_START : SCC_PAL_ZOOM_START));
+						if (zoom < 6) SetBit(offset.control_flags, static_cast<uint>(zoom_lvl_map[zoom]) + static_cast<uint>((colour != SpriteComponent::Palette) ? SCC_32BPP_ZOOM_START : SCC_PAL_ZOOM_START));
 					}
 				}
 			}
@@ -920,14 +928,6 @@ void *CacheSpriteAllocator::AllocatePtr(size_t mem_req)
 	return this->last_sprite_allocation.GetPtr();
 }
 
-/**
- * Sprite allocator simply using malloc.
- */
-void *SimpleSpriteAllocator::AllocatePtr(size_t size)
-{
-	return MallocT<uint8_t>(size);
-}
-
 void *UniquePtrSpriteAllocator::AllocatePtr(size_t size)
 {
 	this->data = std::make_unique<uint8_t[]>(size);
@@ -1057,16 +1057,14 @@ uint32_t GetSpriteMainColour(SpriteID sprite_id, PaletteID palette_id)
 	SpriteLoader::SpriteCollection sprites;
 	sprites[ZOOM_LVL_MIN].type = SpriteType::Normal;
 	SpriteLoaderGrf sprite_loader(file.GetContainerVersion());
-	uint8_t sprite_avail;
 	const uint8_t screen_depth = BlitterFactory::GetCurrentBlitter()->GetScreenDepth();
 
 	auto zoom_mask = [&](bool is32bpp) -> uint8_t {
 		return 1 << FindFirstBit(GB(sc->flags, is32bpp ? SCC_32BPP_ZOOM_START : SCC_PAL_ZOOM_START, 6));
 	};
 
-	/* Try to read the 32bpp sprite first. */
-	if (screen_depth == 32 && sc->GetHasNonPalette()) {
-		sprite_avail = sprite_loader.LoadSprite(sprites, file, file_pos, SpriteType::Normal, true, sc->count, sc->flags, zoom_mask(true));
+	auto check_32bpp = [&]() -> std::optional<uint32_t> {
+		uint8_t sprite_avail = sprite_loader.LoadSprite(sprites, file, file_pos, SpriteType::Normal, true, sc->count, sc->flags, zoom_mask(true)).loaded_sprites;
 		if (sprite_avail != 0) {
 			SpriteLoader::Sprite *sprite = &sprites[FindFirstBit(sprite_avail)];
 			/* Return the average colour. */
@@ -1082,10 +1080,10 @@ uint32_t GetSpriteMainColour(SpriteID sprite_id, PaletteID palette_id)
 						uint8_t rgb_max = std::max({pixel->r, pixel->g, pixel->b});
 
 						/* Black pixel (8bpp or old 32bpp image), so use default value */
-						if (rgb_max == 0) rgb_max = Blitter_32bppBase::DEFAULT_BRIGHTNESS;
+						if (rgb_max == 0) rgb_max = DEFAULT_BRIGHTNESS;
 
 						/* Convert the mapping channel to a RGB value */
-						const Colour c = Blitter_32bppBase::AdjustBrightness(_cur_palette.palette[m], rgb_max);
+						const Colour c = AdjustBrightness(_cur_palette.palette[m], rgb_max);
 
 						if (c.a != 0) {
 							r += c.r;
@@ -1104,10 +1102,17 @@ uint32_t GetSpriteMainColour(SpriteID sprite_id, PaletteID palette_id)
 			}
 			return cnt ? Colour(r / cnt, g / cnt, b / cnt).data : 0;
 		}
+		return std::nullopt;
+	};
+
+	/* 32bpp screen: Try to read the 32bpp sprite first. */
+	if (screen_depth == 32 && sc->GetHasNonPalette()) {
+		auto result = check_32bpp();
+		if (result.has_value()) return *result;
 	}
 
 	/* No 32bpp, try 8bpp. */
-	sprite_avail = sprite_loader.LoadSprite(sprites, file, file_pos, SpriteType::Normal, false, sc->count, sc->flags, zoom_mask(false));
+	uint8_t sprite_avail = sprite_loader.LoadSprite(sprites, file, file_pos, SpriteType::Normal, false, sc->count, sc->flags, zoom_mask(false)).loaded_sprites;
 	if (sprite_avail != 0) {
 		SpriteLoader::Sprite *sprite = &sprites[FindFirstBit(sprite_avail)];
 		SpriteLoader::CommonPixel *pixel = sprite->data;
@@ -1137,6 +1142,12 @@ uint32_t GetSpriteMainColour(SpriteID sprite_id, PaletteID palette_id)
 			}
 			return std::max_element(counts.begin(), counts.end()) - counts.begin();
 		}
+	}
+
+	/* 8bpp screen: As a fallback, try to read the 32bpp sprite, and then convert the average colour to an 8bpp index. */
+	if (screen_depth != 32 && sc->GetHasNonPalette()) {
+		auto result = check_32bpp();
+		if (result.has_value()) return GetNearestColourIndex(Colour(*result));
 	}
 
 	return 0;

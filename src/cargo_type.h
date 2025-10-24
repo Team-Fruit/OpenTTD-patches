@@ -14,7 +14,8 @@
 #include "core/strong_typedef_type.hpp"
 
 /** Globally unique label of a cargo type. */
-using CargoLabel = StrongType::Typedef<uint32_t, struct CargoLabelTag, StrongType::Compare>;
+struct CargoLabelTag : public StrongType::TypedefTraits<uint32_t, StrongType::Compare> {};
+using CargoLabel = StrongType::Typedef<CargoLabelTag>;
 
 #include <algorithm>
 #include <array>
@@ -22,7 +23,7 @@ using CargoLabel = StrongType::Typedef<uint32_t, struct CargoLabelTag, StrongTyp
 /**
  * Cargo slots to indicate a cargo type within a game.
  */
-using CargoID = uint8_t;
+using CargoType = uint8_t;
 
 /**
  * Available types of cargo
@@ -73,17 +74,17 @@ static constexpr CargoLabel CT_NONE = CT_PASSENGERS;
 
 static constexpr CargoLabel CT_INVALID{UINT32_MAX}; ///< Invalid cargo type.
 
-static const CargoID NUM_ORIGINAL_CARGO = 12; ///< Original number of cargo types.
-static const CargoID NUM_CARGO = 64; ///< Maximum number of cargo types in a game.
+static const CargoType NUM_ORIGINAL_CARGO = 12; ///< Original number of cargo types.
+static const CargoType NUM_CARGO = 64; ///< Maximum number of cargo types in a game.
 
 /* CARGO_AUTO_REFIT and CARGO_NO_REFIT are stored in save-games for refit-orders, so should not be changed. */
-static const CargoID CARGO_AUTO_REFIT = 0xFD; ///< Automatically choose cargo type when doing auto refitting.
-static const CargoID CARGO_NO_REFIT = 0xFE; ///< Do not refit cargo of a vehicle (used in vehicle orders and auto-replace/auto-renew).
+static const CargoType CARGO_AUTO_REFIT = 0xFD; ///< Automatically choose cargo type when doing auto refitting.
+static const CargoType CARGO_NO_REFIT = 0xFE; ///< Do not refit cargo of a vehicle (used in vehicle orders and auto-replace/auto-renew).
 
-static const CargoID INVALID_CARGO = UINT8_MAX;
+static const CargoType INVALID_CARGO = UINT8_MAX;
 
 /** Mixed cargo types for definitions with cargo that can vary depending on climate. */
-enum MixedCargoType {
+enum MixedCargoType : uint8_t {
 	MCT_LIVESTOCK_FRUIT, ///< Cargo can be livestock or fruit.
 	MCT_GRAIN_WHEAT_MAIZE, ///< Cargo can be grain, wheat or maize.
 	MCT_VALUABLES_GOLD_DIAMONDS, ///< Cargo can be valuables, gold or diamonds.
@@ -94,20 +95,18 @@ enum MixedCargoType {
  * These are used by user interface code only and must not be assigned to any entity. Not all values are valid for every UI filter.
  */
 namespace CargoFilterCriteria {
-	static constexpr CargoID CF_ANY     = NUM_CARGO;     ///< Show all items independent of carried cargo (i.e. no filtering)
-	static constexpr CargoID CF_NONE    = NUM_CARGO + 1; ///< Show only items which do not carry cargo (e.g. train engines)
-	static constexpr CargoID CF_ENGINES = NUM_CARGO + 2; ///< Show only engines (for rail vehicles only)
-	static constexpr CargoID CF_FREIGHT = NUM_CARGO + 3; ///< Show only vehicles which carry any freight (non-passenger) cargo
+	static constexpr CargoType CF_ANY     = NUM_CARGO;     ///< Show all items independent of carried cargo (i.e. no filtering)
+	static constexpr CargoType CF_NONE    = NUM_CARGO + 1; ///< Show only items which do not carry cargo (e.g. train engines)
+	static constexpr CargoType CF_ENGINES = NUM_CARGO + 2; ///< Show only engines (for rail vehicles only)
+	static constexpr CargoType CF_FREIGHT = NUM_CARGO + 3; ///< Show only vehicles which carry any freight (non-passenger) cargo
 
-	static constexpr CargoID CF_NO_RATING   = NUM_CARGO + 4; ///< Show items with no rating (station list)
-	static constexpr CargoID CF_SELECT_ALL  = NUM_CARGO + 5; ///< Select all items (station list)
-	static constexpr CargoID CF_EXPAND_LIST = NUM_CARGO + 6; ///< Expand list to show all items (station list)
+	static constexpr CargoType CF_NO_RATING   = NUM_CARGO + 4; ///< Show items with no rating (station list)
+	static constexpr CargoType CF_SELECT_ALL  = NUM_CARGO + 5; ///< Select all items (station list)
+	static constexpr CargoType CF_EXPAND_LIST = NUM_CARGO + 6; ///< Expand list to show all items (station list)
 };
 
-/** Test whether cargo type is not CT_INVALID */
-inline bool IsValidCargoType(CargoLabel t) { return t != CT_INVALID; }
 /** Test whether cargo type is not INVALID_CARGO */
-inline bool IsValidCargoID(CargoID t) { return t != INVALID_CARGO; }
+inline bool IsValidCargoType(CargoType cargo) { return cargo != INVALID_CARGO; }
 
 typedef uint64_t CargoTypes;
 
@@ -146,16 +145,5 @@ struct CargoArray : std::array<uint, NUM_CARGO> {
 		return std::ranges::count_if(*this, [](uint amount) { return amount != 0; });
 	}
 };
-
-
-/** Types of cargo source and destination */
-enum class SourceType : uint8_t {
-	Industry,     ///< Source/destination is an industry
-	Town,         ///< Source/destination is a town
-	Headquarters, ///< Source/destination are company headquarters
-};
-
-typedef uint16_t SourceID; ///< Contains either industry ID, town ID or company ID (or INVALID_SOURCE)
-static const SourceID INVALID_SOURCE = 0xFFFF; ///< Invalid/unknown index of source
 
 #endif /* CARGO_TYPE_H */

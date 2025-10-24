@@ -17,27 +17,13 @@
 #include "track_func.h"
 #include "tile_map.h"
 
-/** The returned bits of VehicleEnterTile. */
-enum VehicleEnterTileStatus {
-	VETS_ENTERED_STATION  = 1, ///< The vehicle entered a station
-	VETS_ENTERED_WORMHOLE = 2, ///< The vehicle either entered a bridge, tunnel or depot tile (this includes the last tile of the bridge/tunnel)
-	VETS_CANNOT_ENTER     = 3, ///< The vehicle cannot enter the tile
-
-	/**
-	 * Shift the VehicleEnterTileStatus this many bits
-	 * to the right to get the station ID when
-	 * VETS_ENTERED_STATION is set
-	 */
-	VETS_STATION_ID_OFFSET = 8,
-	VETS_STATION_MASK      = 0xFFFF << VETS_STATION_ID_OFFSET,
-
-	/** Bit sets of the above specified bits */
-	VETSB_CONTINUE         = 0,                          ///< The vehicle can continue normally
-	VETSB_ENTERED_STATION  = 1 << VETS_ENTERED_STATION,  ///< The vehicle entered a station
-	VETSB_ENTERED_WORMHOLE = 1 << VETS_ENTERED_WORMHOLE, ///< The vehicle either entered a bridge, tunnel or depot tile (this includes the last tile of the bridge/tunnel)
-	VETSB_CANNOT_ENTER     = 1 << VETS_CANNOT_ENTER,     ///< The vehicle cannot enter the tile
+enum class VehicleEnterTileState : uint8_t {
+	EnteredStation, ///< The vehicle entered a station
+	EnteredWormhole, ///< The vehicle either entered a bridge, tunnel or depot tile (this includes the last tile of the bridge/tunnel)
+	CannotEnter, ///< The vehicle cannot enter the tile
 };
-DECLARE_ENUM_AS_BIT_SET(VehicleEnterTileStatus)
+
+using VehicleEnterTileStates = EnumBitSet<VehicleEnterTileState, uint8_t>;
 
 /** Tile information, used while rendering the tile */
 struct TileInfo {
@@ -50,25 +36,26 @@ struct TileInfo {
 
 /** Tile description for the 'land area information' tool */
 struct TileDesc {
-	StringID str;               ///< Description of the tile
-	Owner owner[4];             ///< Name of the owner(s)
-	StringID owner_type[4];     ///< Type of each owner
-	CalTime::Date build_date;   ///< Date of construction of tile contents
-	StringID station_class;     ///< Class of station
-	StringID station_name;      ///< Type of station within the class
-	StringID airport_class;     ///< Name of the airport class
-	StringID airport_name;      ///< Name of the airport
-	StringID airport_tile_name; ///< Name of the airport tile
-	const char *grf;            ///< newGRF used for the tile contents
-	uint64_t dparam[4];         ///< Parameters of the \a str string
-	StringID railtype;          ///< Type of rail on the tile.
-	StringID railtype2;         ///< Type of second rail on the tile.
-	uint16_t rail_speed;        ///< Speed limit of rail (bridges and track)
-	uint16_t rail_speed2;       ///< Speed limit of second rail (bridges and track)
-	StringID roadtype;          ///< Type of road on the tile.
-	uint16_t road_speed;        ///< Speed limit of road (bridges and track)
-	StringID tramtype;          ///< Type of tram on the tile.
-	uint16_t tram_speed;        ///< Speed limit of tram (bridges and track)
+	StringID str{};                                   ///< Description of the tile
+	std::array<uint64_t, 4> dparam{};                 ///< Parameters of the \a str string
+	std::array<Owner, 4> owner{};                     ///< Name of the owner(s)
+	std::array<StringID, 4> owner_type{};             ///< Type of each owner
+	CalTime::Date build_date = CalTime::INVALID_DATE; ///< Date of construction of tile contents
+	StringID station_class{};                         ///< Class of station
+	StringID station_name{};                          ///< Type of station within the class
+	StringID airport_class{};                         ///< Name of the airport class
+	StringID airport_name{};                          ///< Name of the airport
+	StringID airport_tile_name{};                     ///< Name of the airport tile
+	std::optional<std::string> grf = std::nullopt;    ///< NewGRF used for the tile contents
+	StringID railtype{};                              ///< Type of rail on the tile.
+	StringID railtype2{};                             ///< Type of second rail on the tile.
+	uint16_t rail_speed = 0;                          ///< Speed limit of rail (bridges and track)
+	uint16_t rail_speed2 = 0;                         ///< Speed limit of second rail (bridges and track)
+	StringID roadtype{};                              ///< Type of road on the tile.
+	uint16_t road_speed = 0;                          ///< Speed limit of road (bridges and track)
+	StringID tramtype{};                              ///< Type of tram on the tile.
+	uint16_t tram_speed = 0;                          ///< Speed limit of tram (bridges and track)
+	std::optional<bool> town_can_upgrade = std::nullopt; ///< Whether the town can upgrade this house during town growth.
 };
 
 struct DrawTileProcParams {
@@ -95,7 +82,7 @@ typedef void DrawTileProc(TileInfo *ti, DrawTileProcParams params);
  */
 typedef int GetSlopeZProc(TileIndex tile, uint x, uint y, bool ground_vehicle);
 
-typedef CommandCost ClearTileProc(TileIndex tile, DoCommandFlag flags);
+typedef CommandCost ClearTileProc(TileIndex tile, DoCommandFlags flags);
 
 /**
  * Tile callback function signature for obtaining cargo acceptance of a tile
@@ -110,7 +97,7 @@ typedef void AddAcceptedCargoProc(TileIndex tile, CargoArray &acceptance, CargoT
  * @param tile Tile being queried
  * @param td   Storage pointer for returned tile description
  */
-typedef void GetTileDescProc(TileIndex tile, TileDesc *td);
+typedef void GetTileDescProc(TileIndex tile, TileDesc &td);
 
 /**
  * Tile callback function signature for getting the possible tracks
@@ -138,8 +125,7 @@ typedef void AnimateTileProc(TileIndex tile);
 typedef void TileLoopProc(TileIndex tile);
 typedef void ChangeTileOwnerProc(TileIndex tile, Owner old_owner, Owner new_owner);
 
-/** @see VehicleEnterTileStatus to see what the return values mean */
-typedef VehicleEnterTileStatus VehicleEnterTileProc(Vehicle *v, TileIndex tile, int x, int y);
+typedef VehicleEnterTileStates VehicleEnterTileProc(Vehicle *v, TileIndex tile, int x, int y);
 typedef Foundation GetFoundationProc(TileIndex tile, Slope tileh);
 
 /**
@@ -147,17 +133,17 @@ typedef Foundation GetFoundationProc(TileIndex tile, Slope tileh);
  *
  * The function is called when a tile is affected by a terraforming operation.
  * It has to check if terraforming of the tile is allowed and return extra terraform-cost that depend on the tiletype.
- * With DC_EXEC in \a flags it has to perform tiletype-specific actions (like clearing land etc., but not the terraforming itself).
+ * With DoCommandFlag::Execute in \a flags it has to perform tiletype-specific actions (like clearing land etc., but not the terraforming itself).
  *
  * @note The terraforming has not yet taken place. So GetTileZ() and GetTileSlope() refer to the landscape before the terraforming operation.
  *
  * @param tile      The involved tile.
- * @param flags     Command flags passed to the terraform command (DC_EXEC, DC_QUERY_COST, etc.).
+ * @param flags     Command flags passed to the terraform command (DoCommandFlag::Execute, DoCommandFlag::QueryCost, etc.).
  * @param z_new     TileZ after terraforming.
  * @param tileh_new Slope after terraforming.
  * @return Error code or extra cost for terraforming (like clearing land, building foundations, etc., but not the terraforming itself.)
  */
-typedef CommandCost TerraformTileProc(TileIndex tile, DoCommandFlag flags, int z_new, Slope tileh_new);
+typedef CommandCost TerraformTileProc(TileIndex tile, DoCommandFlags flags, int z_new, Slope tileh_new);
 
 /**
  * Set of callback functions for performing tile operations of a given tile type.
@@ -195,9 +181,9 @@ inline TrackdirBits GetTileTrackdirBits(TileIndex tile, TransportType mode, uint
 	return TrackStatusToTrackdirBits(GetTileTrackStatus(tile, mode, sub_mode | TTSSM_NO_RED_SIGNALS, side));
 }
 
-VehicleEnterTileStatus VehicleEnterTile(Vehicle *v, TileIndex tile, int x, int y);
+VehicleEnterTileStates VehicleEnterTile(Vehicle *v, TileIndex tile, int x, int y);
 void ChangeTileOwner(TileIndex tile, Owner old_owner, Owner new_owner);
-void GetTileDesc(TileIndex tile, TileDesc *td);
+void GetTileDesc(TileIndex tile, TileDesc &td);
 
 inline void AddAcceptedCargo(TileIndex tile, CargoArray &acceptance, CargoTypes *always_accepted)
 {

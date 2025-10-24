@@ -16,13 +16,13 @@
 class ClientNetworkGameSocketHandler : public NetworkGameSocketHandler {
 private:
 	std::unique_ptr<class NetworkAuthenticationClientHandler> authentication_handler; ///< The handler for the authentication.
-	std::string connection_string;                 ///< Address we are connected to.
-	std::shared_ptr<struct PacketReader> savegame; ///< Packet reader for reading the savegame.
-	uint8_t token;                                 ///< The token we need to send back to the server to prove we're the right client.
-	NetworkSharedSecrets last_rcon_shared_secrets; ///< Keys for last rcon (and incoming replies)
+	std::string connection_string;                   ///< Address we are connected to.
+	std::shared_ptr<struct PacketReader> savegame;   ///< Packet reader for reading the savegame.
+	uint8_t token = 0;                               ///< The token we need to send back to the server to prove we're the right client.
+	NetworkSharedSecrets last_rcon_shared_secrets{}; ///< Keys for last rcon (and incoming replies)
 
 	/** Status of the connection with the server. */
-	enum ServerStatus {
+	enum ServerStatus : uint8_t {
 		STATUS_INACTIVE,      ///< The client is not connected nor active.
 		STATUS_JOIN,          ///< We are trying to join a server.
 		STATUS_AUTH_GAME,     ///< Last action was requesting game (server) password.
@@ -37,7 +37,7 @@ private:
 		STATUS_END,           ///< Must ALWAYS be on the end of this list!! (period)
 	};
 
-	ServerStatus status; ///< Status of the connection with the server.
+	ServerStatus status = STATUS_INACTIVE; ///< Status of the connection with the server.
 
 	std::optional<FileHandle> desync_log_file;
 	std::string server_desync_log;
@@ -89,7 +89,7 @@ protected:
 	static NetworkRecvStatus SendIdentify();
 	void CheckConnection();
 
-	NetworkRecvStatus SendKeyPasswordPacket(PacketType packet_type, NetworkSharedSecrets &ss, const std::string &password, const std::string *payload);
+	NetworkRecvStatus SendKeyPasswordPacket(PacketType packet_type, NetworkSharedSecrets &ss, std::string_view password, std::optional<std::string_view> payload);
 
 public:
 	ClientNetworkGameSocketHandler(SOCKET s, std::string connection_string);
@@ -107,23 +107,23 @@ public:
 	}
 
 	static NetworkRecvStatus SendJoin();
-	static NetworkRecvStatus SendCommand(const CommandPacket &cp);
+	static NetworkRecvStatus SendCommand(const OutgoingCommandPacket &cp);
 	static NetworkRecvStatus SendError(NetworkErrorCode errorno, NetworkRecvStatus recvstatus = NETWORK_RECV_STATUS_OKAY);
-	static NetworkRecvStatus SendDesyncLog(const std::string &log);
-	static NetworkRecvStatus SendDesyncMessage(const char *msg);
+	static NetworkRecvStatus SendDesyncLog(std::string_view log);
+	static NetworkRecvStatus SendDesyncMessage(std::string_view msg);
 	static NetworkRecvStatus SendDesyncSyncData();
 	static NetworkRecvStatus SendQuit();
 	static NetworkRecvStatus SendAck();
 
 	static NetworkRecvStatus SendAuthResponse();
-	static NetworkRecvStatus SendCompanyPassword(const std::string &password);
-	static NetworkRecvStatus SendSettingsPassword(const std::string &password);
+	static NetworkRecvStatus SendCompanyPassword(std::string_view password);
+	static NetworkRecvStatus SendSettingsPassword(std::string_view password);
 
-	static NetworkRecvStatus SendChat(NetworkAction action, DestType type, int dest, const std::string &msg, NetworkTextMessageData data);
-	static NetworkRecvStatus SendSetPassword(const std::string &password);
-	static NetworkRecvStatus SendSetName(const std::string &name);
-	static NetworkRecvStatus SendRCon(const std::string &password, const std::string &command);
-	static NetworkRecvStatus SendMove(CompanyID company, const std::string &password);
+	static NetworkRecvStatus SendChat(NetworkAction action, DestType type, int dest, std::string_view msg, NetworkTextMessageData data);
+	static NetworkRecvStatus SendSetPassword(std::string_view password);
+	static NetworkRecvStatus SendSetName(std::string_view name);
+	static NetworkRecvStatus SendRCon(std::string_view password, std::string_view command);
+	static NetworkRecvStatus SendMove(CompanyID company, std::string_view password);
 
 	static bool IsConnected();
 

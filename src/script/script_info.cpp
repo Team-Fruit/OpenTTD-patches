@@ -62,6 +62,7 @@ bool ScriptInfo::CheckMethod(const char *name) const
 	if (!info->engine->CallStringMethod(info->SQ_instance, "GetDescription", &info->description, MAX_GET_OPS)) return SQ_ERROR;
 	if (!info->engine->CallStringMethod(info->SQ_instance, "GetDate", &info->date, MAX_GET_OPS)) return SQ_ERROR;
 	if (!info->engine->CallIntegerMethod(info->SQ_instance, "GetVersion", &info->version, MAX_GET_OPS)) return SQ_ERROR;
+	if (info->version < 0) return SQ_ERROR;
 	if (!info->engine->CallStringMethod(info->SQ_instance, "CreateInstance", &info->instance_name, MAX_CREATEINSTANCE_OPS)) return SQ_ERROR;
 
 	/* The GetURL function is optional. */
@@ -122,7 +123,7 @@ SQInteger ScriptInfo::AddSetting(HSQUIRRELVM vm)
 			config.max_value = ClampTo<int32_t>(res);
 			items |= 0x008;
 		} else if (key == "easy_value") {
-			// No longer parsed.
+			/* No longer parsed. */
 			items |= 0x010;
 		} else if (key == "medium_value") {
 			SQInteger res;
@@ -130,17 +131,17 @@ SQInteger ScriptInfo::AddSetting(HSQUIRRELVM vm)
 			medium_value = ClampTo<int32_t>(res);
 			items |= 0x020;
 		} else if (key == "hard_value") {
-			// No longer parsed.
+			/* No longer parsed. */
 			items |= 0x040;
 		} else if (key == "custom_value") {
-			// No longer parsed.
+			/* No longer parsed. */
 		} else if (key == "default_value") {
 			SQInteger res;
 			if (SQ_FAILED(sq_getinteger(vm, -1, &res))) return SQ_ERROR;
 			config.default_value = ClampTo<int32_t>(res);
 			items |= 0x080;
 		} else if (key == "random_deviation") {
-			// No longer parsed.
+			/* No longer parsed. */
 		} else if (key == "step_size") {
 			SQInteger res;
 			if (SQ_FAILED(sq_getinteger(vm, -1, &res))) return SQ_ERROR;
@@ -177,7 +178,7 @@ SQInteger ScriptInfo::AddSetting(HSQUIRRELVM vm)
 	}
 
 	/* Make sure all properties are defined */
-	uint mask = (config.flags & SCRIPTCONFIG_BOOLEAN) ? 0x1F3 : 0x1FF;
+	uint mask = config.flags.Test(ScriptConfigFlag::Boolean) ? 0x1F3 : 0x1FF;
 	if (items != mask) {
 		this->engine->ThrowError("please define all properties of a setting (min/max not allowed for booleans)");
 		return SQ_ERROR;

@@ -48,6 +48,13 @@ extern const TrackdirBits _exitdir_reaches_trackdirs[] = {
 	TRACKDIR_BIT_Y_NW | TRACKDIR_BIT_RIGHT_N | TRACKDIR_BIT_LOWER_W  // DIAGDIR_NW
 };
 
+extern const TrackBits _exitdir_reaches_tracks[] = {
+	TRACK_BIT_X | TRACK_BIT_LOWER | TRACK_BIT_LEFT,  // DIAGDIR_NE
+	TRACK_BIT_Y | TRACK_BIT_LEFT  | TRACK_BIT_UPPER, // DIAGDIR_SE
+	TRACK_BIT_X | TRACK_BIT_UPPER | TRACK_BIT_RIGHT, // DIAGDIR_SW
+	TRACK_BIT_Y | TRACK_BIT_RIGHT | TRACK_BIT_LOWER  // DIAGDIR_NW
+};
+
 extern const Trackdir _next_trackdir[TRACKDIR_END] = {
 	TRACKDIR_X_NE,  TRACKDIR_Y_SE,  TRACKDIR_LOWER_E, TRACKDIR_UPPER_E, TRACKDIR_RIGHT_S, TRACKDIR_LEFT_S, INVALID_TRACKDIR, INVALID_TRACKDIR,
 	TRACKDIR_X_SW,  TRACKDIR_Y_NW,  TRACKDIR_LOWER_W, TRACKDIR_UPPER_W, TRACKDIR_RIGHT_N, TRACKDIR_LEFT_N
@@ -281,7 +288,7 @@ RailType GetTileSecondaryRailTypeIfValid(TileIndex t)
  */
 bool HasRailTypeAvail(const CompanyID company, const RailType railtype)
 {
-	return !HasBit(_railtypes_hidden_mask, railtype) && HasBit(Company::Get(company)->avail_railtypes, railtype);
+	return !_railtypes_hidden_mask.Test(railtype) && Company::Get(company)->avail_railtypes.Test(railtype);
 }
 
 /**
@@ -291,7 +298,9 @@ bool HasRailTypeAvail(const CompanyID company, const RailType railtype)
  */
 bool HasAnyRailTypesAvail(const CompanyID company)
 {
-	return (Company::Get(company)->avail_railtypes & ~_railtypes_hidden_mask) != 0;
+	RailTypes avail = Company::Get(company)->avail_railtypes;
+	avail.Reset(_railtypes_hidden_mask);
+	return avail.Any();
 }
 
 /**
@@ -334,7 +343,7 @@ RailTypes AddDateIntroducedRailTypes(RailTypes current, CalTime::Date date)
 		RailTypes required = rti->introduction_required_railtypes;
 		if ((rts & required) != required) continue;
 
-		rts |= rti->introduces_railtypes;
+		rts.Set(rti->introduces_railtypes);
 	}
 
 	/* When we added railtypes we need to run this method again; the added
@@ -350,7 +359,7 @@ RailTypes AddDateIntroducedRailTypes(RailTypes current, CalTime::Date date)
  */
 RailTypes GetCompanyRailTypes(CompanyID company, bool introduces)
 {
-	RailTypes rts = RAILTYPES_NONE;
+	RailTypes rts{};
 
 	CalTime::Date date = CalTime::CurDate();
 	if (_settings_game.vehicle.no_introduce_vehicles_after > 0) {
@@ -360,16 +369,16 @@ RailTypes GetCompanyRailTypes(CompanyID company, bool introduces)
 	for (const Engine *e : Engine::IterateType(VEH_TRAIN)) {
 		const EngineInfo *ei = &e->info;
 
-		if (HasBit(ei->climates, _settings_game.game_creation.landscape) &&
-				(HasBit(e->company_avail, company) || date >= e->intro_date + DAYS_IN_YEAR)) {
+		if (ei->climates.Test(_settings_game.game_creation.landscape) &&
+				(e->company_avail.Test(company) || date >= e->intro_date + DAYS_IN_YEAR)) {
 			const RailVehicleInfo *rvi = &e->u.rail;
 
 			if (rvi->railveh_type != RAILVEH_WAGON) {
 				assert(rvi->railtype < RAILTYPE_END);
 				if (introduces) {
-					rts |= GetRailTypeInfo(rvi->railtype)->introduces_railtypes;
+					rts.Set(GetRailTypeInfo(rvi->railtype)->introduces_railtypes);
 				} else {
-					SetBit(rts, rvi->railtype);
+					rts.Set(rvi->railtype);
 				}
 			}
 		}
@@ -386,19 +395,19 @@ RailTypes GetCompanyRailTypes(CompanyID company, bool introduces)
  */
 RailTypes GetRailTypes(bool introduces)
 {
-	RailTypes rts = RAILTYPES_NONE;
+	RailTypes rts{};
 
 	for (const Engine *e : Engine::IterateType(VEH_TRAIN)) {
 		const EngineInfo *ei = &e->info;
-		if (!HasBit(ei->climates, _settings_game.game_creation.landscape)) continue;
+		if (!ei->climates.Test(_settings_game.game_creation.landscape)) continue;
 
 		const RailVehicleInfo *rvi = &e->u.rail;
 		if (rvi->railveh_type != RAILVEH_WAGON) {
 			assert(rvi->railtype < RAILTYPE_END);
 			if (introduces) {
-				rts |= GetRailTypeInfo(rvi->railtype)->introduces_railtypes;
+				rts.Set(GetRailTypeInfo(rvi->railtype)->introduces_railtypes);
 			} else {
-				SetBit(rts, rvi->railtype);
+				rts.Set(rvi->railtype);
 			}
 		}
 	}

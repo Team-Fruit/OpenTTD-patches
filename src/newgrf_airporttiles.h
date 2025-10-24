@@ -13,6 +13,8 @@
 #include "airport.h"
 #include "station_map.h"
 #include "newgrf_animation_type.h"
+#include "newgrf_badge_type.h"
+#include "newgrf_callbacks.h"
 #include "newgrf_commons.h"
 #include "newgrf_spritegroup.h"
 #include "station_base.h"
@@ -66,12 +68,13 @@ struct AirportTileResolverObject : public ResolverObject {
  * Defines the data structure of each individual tile of an airport.
  */
 struct AirportTileSpec {
-	AnimationInfo animation;              ///< Information about the animation.
+	AnimationInfo<AirportAnimationTriggers> animation; ///< Information about the animation.
 	StringID name;                        ///< Tile Subname string, land information on this tile will give you "AirportName (TileSubname)"
-	uint8_t callback_mask;                ///< Bitmask telling which grf callback is set
+	AirportTileCallbackMasks callback_mask; ///< Bitmask telling which grf callback is set
 	uint8_t animation_special_flags;      ///< Extra flags to influence the animation
 	bool enabled;                         ///< entity still available (by default true). newgrf can disable it, though
 	GRFFileProps grf_prop;                ///< properties related the the grf file
+	std::vector<BadgeID> badges;
 
 	static const AirportTileSpec *Get(StationGfx gfx);
 	static const AirportTileSpec *GetByTile(TileIndex tile);
@@ -81,12 +84,12 @@ struct AirportTileSpec {
 private:
 	static AirportTileSpec tiles[NUM_AIRPORTTILES];
 
-	friend void AirportTileOverrideManager::SetEntitySpec(const AirportTileSpec *airpts);
+	friend void AirportTileOverrideManager::SetEntitySpec(AirportTileSpec &&airpts);
 };
 
 void AnimateAirportTile(TileIndex tile);
-void AirportTileAnimationTrigger(Station *st, TileIndex tile, AirpAnimationTrigger trigger, CargoID cargo_type = INVALID_CARGO);
-void AirportAnimationTrigger(Station *st, AirpAnimationTrigger trigger, CargoID cargo_type = INVALID_CARGO);
+bool TriggerAirportTileAnimation(Station *st, TileIndex tile, AirportAnimationTrigger trigger);
+bool TriggerAirportAnimation(Station *st, AirportAnimationTrigger trigger, CargoType cargo_type = INVALID_CARGO);
 uint8_t GetAirportTileAnimationSpeed(TileIndex tile);
 bool DrawNewAirportTile(TileInfo *ti, Station *st, const AirportTileSpec *airts);
 

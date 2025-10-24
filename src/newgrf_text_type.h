@@ -10,8 +10,16 @@
 #ifndef NEWGRF_TEXT_TYPE_H
 #define NEWGRF_TEXT_TYPE_H
 
+#include "core/strong_typedef_type.hpp"
+
 #include <utility>
 #include <vector>
+
+/** Type for GRF-internal string IDs. */
+struct GRFStringIDTag : public StrongType::TypedefTraits<uint32_t, StrongType::Compare, StrongType::Integer> {};
+using GRFStringID = StrongType::Typedef<GRFStringIDTag>;
+
+static constexpr GRFStringID GRFSTR_MISC_GRF_TEXT{0xD000}; ///< Miscellaneous GRF text range.
 
 /** This character (thorn) indicates a unicode string to NFO. */
 static const char32_t NFO_UTF8_IDENTIFIER = 0x00DE;

@@ -12,6 +12,7 @@
 #include "address.h"
 #include "../network_internal.h"
 #include "../../debug.h"
+#include "../../core/string_consumer.hpp"
 
 #include "../../safeguards.h"
 
@@ -159,31 +160,24 @@ bool NetworkAddress::IsFamily(int family)
  * @note netmask without /n assumes all bits need to match.
  * @return true if this IP is within the netmask.
  */
-bool NetworkAddress::IsInNetmask(const char *netmask)
+bool NetworkAddress::IsInNetmask(std::string_view netmask)
 {
 	/* Resolve it if we didn't do it already */
 	if (!this->IsResolved()) this->GetAddress();
 
 	int cidr = this->address.ss_family == AF_INET ? 32 : 128;
 
-	NetworkAddress mask_address;
-
+	StringConsumer consumer{netmask};
 	/* Check for CIDR separator */
-	const char *chr_cidr = strchr(netmask, '/');
-	if (chr_cidr != nullptr) {
-		int tmp_cidr = atoi(chr_cidr + 1);
+	NetworkAddress mask_address(consumer.ReadUntilChar('/', StringConsumer::SKIP_ONE_SEPARATOR), 0, this->address.ss_family);
+	if (mask_address.GetAddressLength() == 0) return false;
+
+	if (consumer.AnyBytesLeft()) {
+		int tmp_cidr = consumer.ReadIntegerBase(10, cidr);
 
 		/* Invalid CIDR, treat as single host */
 		if (tmp_cidr > 0 && tmp_cidr < cidr) cidr = tmp_cidr;
-
-		/* Remove the / so that NetworkAddress works on the IP portion */
-		std::string ip_str(netmask, chr_cidr - netmask);
-		mask_address = NetworkAddress(ip_str.c_str(), 0, this->address.ss_family);
-	} else {
-		mask_address = NetworkAddress(netmask, 0, this->address.ss_family);
 	}
-
-	if (mask_address.GetAddressLength() == 0) return false;
 
 	uint32_t *ip;
 	uint32_t *mask;
@@ -299,7 +293,7 @@ SOCKET NetworkAddress::Resolve(int family, int socktype, int flags, SocketList *
 		}
 
 		NetworkAddress addr(runp->ai_addr, (int)runp->ai_addrlen);
-		(*sockets)[sock] = addr;
+		(*sockets)[sock] = std::move(addr);
 		sock = INVALID_SOCKET;
 	}
 	freeaddrinfo (ai);
@@ -318,8 +312,8 @@ static SOCKET ListenLoopProc(addrinfo *runp)
 
 	SOCKET sock = socket(runp->ai_family, runp->ai_socktype, runp->ai_protocol);
 	if (sock == INVALID_SOCKET) {
-		const char *type = NetworkAddress::SocketTypeAsString(runp->ai_socktype);
-		const char *family = NetworkAddress::AddressFamilyAsString(runp->ai_family);
+		std::string_view type = NetworkAddress::SocketTypeAsString(runp->ai_socktype);
+		std::string_view family = NetworkAddress::AddressFamilyAsString(runp->ai_family);
 		Debug(net, 0, "Could not create {} {} socket: {}", type, family, NetworkError::GetLast().AsString());
 		return INVALID_SOCKET;
 	}
@@ -387,7 +381,7 @@ void NetworkAddress::Listen(int socktype, SocketList *sockets)
  * @return the string representation
  * @note only works for SOCK_STREAM and SOCK_DGRAM
  */
-/* static */ const char *NetworkAddress::SocketTypeAsString(int socktype)
+/* static */ std::string_view NetworkAddress::SocketTypeAsString(int socktype)
 {
 	switch (socktype) {
 		case SOCK_STREAM: return "tcp";
@@ -402,7 +396,7 @@ void NetworkAddress::Listen(int socktype, SocketList *sockets)
  * @return the string representation
  * @note only works for AF_INET, AF_INET6 and AF_UNSPEC
  */
-/* static */ const char *NetworkAddress::AddressFamilyAsString(int family)
+/* static */ std::string_view NetworkAddress::AddressFamilyAsString(int family)
 {
 	switch (family) {
 		case AF_UNSPEC: return "either IPv4 or IPv6";
@@ -464,7 +458,7 @@ void NetworkAddress::Listen(int socktype, SocketList *sockets)
  * @param company Pointer to the company variable to set iff indicated.
  * @return A valid ServerAddress of the parsed information.
  */
-/* static */ ServerAddress ServerAddress::Parse(const std::string &connection_string, uint16_t default_port, CompanyID *company_id)
+/* static */ ServerAddress ServerAddress::Parse(std::string_view connection_string, uint16_t default_port, CompanyID *company_id)
 {
 	if (connection_string.starts_with("+")) {
 		std::string_view invite_code = ParseCompanyFromConnectionString(connection_string, company_id);
@@ -473,5 +467,5 @@ void NetworkAddress::Listen(int socktype, SocketList *sockets)
 
 	uint16_t port = default_port;
 	std::string_view ip = ParseFullConnectionString(connection_string, port, company_id);
-	return ServerAddress(SERVER_ADDRESS_DIRECT, std::string(ip) + ":" + std::to_string(port));
+	return ServerAddress(SERVER_ADDRESS_DIRECT, fmt::format("{}:{}", ip, port));
 }

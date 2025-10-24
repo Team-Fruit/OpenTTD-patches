@@ -15,17 +15,16 @@
 /**
  * Enum to handle waypoint flags.
  */
-enum WaypointFlags {
+enum WaypointFlags : uint8_t {
 	WPF_HIDE_LABEL              = 0, ///< Hide waypoint label
 	WPF_ROAD                    = 1, ///< This is a road waypoint
 };
 
 /** Representation of a waypoint. */
 struct Waypoint final : SpecializedStation<Waypoint, true> {
-	uint16_t town_cn;            ///< The N-1th waypoint for this town (consecutive number)
-	uint16_t waypoint_flags;     ///< Waypoint flags, see WaypointFlags
-
-	TileArea road_waypoint_area; ///< Tile area the road waypoint part covers
+	uint16_t town_cn = 0;          ///< The N-1th waypoint for this town (consecutive number)
+	uint16_t waypoint_flags{};     ///< Waypoint flags, see WaypointFlags
+	TileArea road_waypoint_area{}; ///< Tile area the road waypoint part covers
 
 	/**
 	 * Create a waypoint at the given tile.
@@ -63,7 +62,7 @@ struct Waypoint final : SpecializedStation<Waypoint, true> {
 	 */
 	inline bool IsSingleTile() const
 	{
-		return (this->facilities & FACIL_TRAIN) != 0 && this->train_station.w == 1 && this->train_station.h == 1;
+		return this->facilities.Test(StationFacility::Train) && this->train_station.w == 1 && this->train_station.h == 1;
 	}
 
 	/**

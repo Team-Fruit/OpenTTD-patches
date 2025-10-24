@@ -10,12 +10,10 @@
 #ifndef SCREENSHOT_H
 #define SCREENSHOT_H
 
-void InitializeScreenshotFormats();
-
-const char *GetCurrentScreenshotExtension();
+std::string_view GetCurrentScreenshotExtension();
 
 /** Type of requested screenshot */
-enum ScreenshotType {
+enum ScreenshotType : uint8_t {
 	SC_VIEWPORT,    ///< Screenshot of viewport.
 	SC_CRASHLOG,    ///< Raw screenshot from blitter buffer.
 	SC_ZOOMEDIN,    ///< Fully zoomed in screenshot of the visible area.
@@ -29,18 +27,13 @@ enum ScreenshotType {
 	SC_SMALLMAP,    ///< Smallmap window screenshot.
 };
 
-class SmallMapWindow;
-
-void SetupScreenshotViewport(ScreenshotType t, struct Viewport *vp, uint32_t width = 0, uint32_t height = 0);
 bool MakeHeightmapScreenshot(const char *filename);
-bool MakeSmallMapScreenshot(unsigned int width, unsigned int height, SmallMapWindow *window);
+bool MakeSmallMapScreenshot(unsigned int width, unsigned int height, class SmallMapWindow *window);
 void MakeScreenshotWithConfirm(ScreenshotType t);
-bool MakeScreenshot(ScreenshotType t, std::string name, uint32_t width = 0, uint32_t height = 0);
-bool MakeMinimapWorldScreenshot(const char *name);
-bool MakeTopographyScreenshot(const char *name);
-bool MakeIndustryScreenshot(const char *name);
-void SetScreenshotAuxiliaryText(const char *key, const char *value);
-inline void ClearScreenshotAuxiliaryText() { SetScreenshotAuxiliaryText(nullptr, nullptr); }
+bool MakeScreenshot(ScreenshotType t, std::string_view name, uint32_t width = 0, uint32_t height = 0);
+bool MakeMinimapWorldScreenshot(std::string_view name);
+bool MakeTopographyScreenshot(std::string_view name);
+bool MakeIndustryScreenshot(std::string_view name);
 
 extern std::string _screenshot_format_name;
 extern std::string _full_screenshot_path;

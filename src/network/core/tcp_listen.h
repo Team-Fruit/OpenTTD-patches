@@ -14,8 +14,10 @@
 
 #include "tcp.h"
 #include "../network.h"
-#include "../../core/pool_type.hpp"
+#include "../network_func.h"
+#include "../network_internal.h"
 #include "../../debug.h"
+
 #include "table/strings.h"
 
 /**

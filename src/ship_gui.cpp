@@ -43,7 +43,7 @@ void DrawShipImage(const Vehicle *v, const Rect &r, VehicleID selection, EngineI
 	int x_offs = UnScaleGUI(rect.left);
 	int x = rtl ? r.right - width - x_offs : r.left - x_offs;
 	/* This magic -1 offset is related to the sprite_y_offsets in build_vehicle_gui.cpp */
-	int y = ScaleSpriteTrad(-1) + CenterBounds(r.top, r.bottom, 0);
+	int y = ScaleSpriteTrad(-1) + CentreBounds(r.top, r.bottom, 0);
 
 	seq.Draw(x, y, GetVehiclePalette(v), false);
 	if (v->cargo_cap > 0) DrawCargoIconOverlay(x, y, v->cargo_type);
@@ -52,7 +52,7 @@ void DrawShipImage(const Vehicle *v, const Rect &r, VehicleID selection, EngineI
 		x += x_offs;
 		y += UnScaleGUI(rect.top);
 		Rect hr = {x, y, x + width - 1, y + UnScaleGUI(rect.Height()) - 1};
-		DrawFrameRect(hr.Expand(WidgetDimensions::scaled.bevel), COLOUR_WHITE, FR_BORDERONLY);
+		DrawFrameRect(hr.Expand(WidgetDimensions::scaled.bevel), COLOUR_WHITE, FrameFlag::BorderOnly);
 	}
 }
 
@@ -66,10 +66,7 @@ void DrawShipDetails(const Vehicle *v, const Rect &r)
 {
 	int y = r.top;
 
-	SetDParam(0, PackEngineNameDParam(v->engine_type, EngineNameContext::VehicleDetails));
-	SetDParam(1, v->build_year);
-	SetDParam(2, v->value);
-	DrawString(r.left, r.right, y, STR_VEHICLE_INFO_BUILT_VALUE);
+	DrawString(r.left, r.right, y, GetString(STR_VEHICLE_INFO_BUILT_VALUE, PackEngineNameDParam(v->engine_type, EngineNameContext::VehicleDetails), v->build_year, v->value));
 	y += GetCharacterHeight(FS_NORMAL);
 
 	Money feeder_share = 0;
@@ -92,12 +89,10 @@ void DrawShipDetails(const Vehicle *v, const Rect &r)
 		AppendStringInPlace(capacity, STR_VEHICLE_DETAILS_TRAIN_ARTICULATED_RV_CAPACITY);
 
 		bool first = true;
-		for (CargoID i = 0; i < NUM_CARGO; i++) {
+		for (CargoType i = 0; i < NUM_CARGO; i++) {
 			if (max_cargo[i] > 0) {
 				if (!first) capacity.append(", ");
-				SetDParam(0, i);
-				SetDParam(1, max_cargo[i]);
-				AppendStringInPlace(capacity, STR_JUST_CARGO);
+				AppendStringInPlace(capacity, STR_JUST_CARGO, i, max_cargo[i]);
 
 				if (subtype_text[i] != 0) {
 					AppendStringInPlace(capacity, subtype_text[i]);
@@ -113,44 +108,33 @@ void DrawShipDetails(const Vehicle *v, const Rect &r)
 		for (const Vehicle *u = v; u != nullptr; u = u->Next()) {
 			if (u->cargo_cap == 0) continue;
 
-			StringID str = STR_VEHICLE_DETAILS_CARGO_EMPTY;
 			if (u->cargo.StoredCount() > 0) {
-				SetDParam(0, u->cargo_type);
-				SetDParam(1, u->cargo.StoredCount());
-				SetDParam(2, u->cargo.GetFirstStation());
-				str = STR_VEHICLE_DETAILS_CARGO_FROM;
+				DrawString(r.left, r.right, y, GetString(STR_VEHICLE_DETAILS_CARGO_FROM, u->cargo_type, u->cargo.StoredCount(), u->cargo.GetFirstStation()));
 				feeder_share += u->cargo.GetFeederShare();
+			} else {
+				DrawString(r.left, r.right, y, STR_VEHICLE_DETAILS_CARGO_EMPTY);
 			}
-			DrawString(r.left, r.right, y, str);
 			y += GetCharacterHeight(FS_NORMAL);
 		}
 		y += WidgetDimensions::scaled.vsep_normal;
 	} else {
-		SetDParam(0, v->cargo_type);
-		SetDParam(1, v->cargo_cap);
-		SetDParam(4, GetCargoSubtypeText(v));
-		DrawString(r.left, r.right, y, STR_VEHICLE_INFO_CAPACITY);
+		DrawString(r.left, r.right, y, GetString(STR_VEHICLE_INFO_CAPACITY, v->cargo_type, v->cargo_cap, GetCargoSubtypeText(v)));
 		y += GetCharacterHeight(FS_NORMAL) + WidgetDimensions::scaled.vsep_normal;
 
-		StringID str = STR_VEHICLE_DETAILS_CARGO_EMPTY;
 		if (v->cargo.StoredCount() > 0) {
-			SetDParam(0, v->cargo_type);
-			SetDParam(1, v->cargo.StoredCount());
-			SetDParam(2, v->cargo.GetFirstStation());
-			str = STR_VEHICLE_DETAILS_CARGO_FROM;
+			DrawString(r.left, r.right, y, GetString(STR_VEHICLE_DETAILS_CARGO_FROM, v->cargo_type, v->cargo.StoredCount(), v->cargo.GetFirstStation()));
 			feeder_share += v->cargo.GetFeederShare();
+		} else {
+			DrawString(r.left, r.right, y, STR_VEHICLE_DETAILS_CARGO_EMPTY);
 		}
-		DrawString(r.left, r.right, y, str);
 		y += GetCharacterHeight(FS_NORMAL) + WidgetDimensions::scaled.vsep_normal;
 	}
 
 	/* Draw Transfer credits text */
-	SetDParam(0, feeder_share);
-	DrawString(r.left, r.right, y, STR_VEHICLE_INFO_FEEDER_CARGO_VALUE);
+	DrawString(r.left, r.right, y, GetString(STR_VEHICLE_INFO_FEEDER_CARGO_VALUE, feeder_share));
 	y += GetCharacterHeight(FS_NORMAL) + WidgetDimensions::scaled.vsep_normal;
 
 	if (Ship::From(v)->critical_breakdown_count > 0) {
-		SetDParam(0, Ship::From(v)->GetDisplayEffectiveMaxSpeed());
-		DrawString(r.left, r.right, y, STR_NEED_REPAIR);
+		DrawString(r.left, r.right, y, GetString(STR_NEED_REPAIR, Ship::From(v)->GetDisplayEffectiveMaxSpeed()));
 	}
 }

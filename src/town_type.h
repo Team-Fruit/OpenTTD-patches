@@ -11,10 +11,11 @@
 #define TOWN_TYPE_H
 
 #include "core/enum_type.hpp"
+#include "core/pool_id_type.hpp"
 #include <vector>
 
-typedef uint16_t TownID;
-static const TownID INVALID_TOWN = 0xFFFF;
+struct TownIDTag : public PoolIDTraits<uint16_t, 64000, 0xFFFF> {};
+using TownID = PoolID<TownIDTag>;
 
 struct Town;
 
@@ -29,7 +30,6 @@ enum TownSize : uint8_t {
 
 	TSZ_END,    ///< Number of available town sizes.
 };
-template <> struct EnumPropsT<TownSize> : MakeEnumPropsT<TownSize, uint8_t, TSZ_SMALL, TSZ_END, TSZ_END, 2> {};
 DECLARE_ENUM_AS_ADDABLE(TownSize)
 
 /* These refer to the maximums, so Appalling is -1000 to -400
@@ -93,8 +93,15 @@ enum TownLayout : uint8_t {
 
 	NUM_TLS,             ///< Number of town layouts
 };
-template <> struct EnumPropsT<TownLayout> : MakeEnumPropsT<TownLayout, uint8_t, TL_BEGIN, NUM_TLS, NUM_TLS, 3> {};
 DECLARE_ENUM_AS_ADDABLE(TownLayout)
+
+/** Options for growing towns. */
+enum class TownExpandMode : uint8_t {
+	Buildings, ///< Allow town to place buildings.
+	Roads, ///< Allow town to place roads.
+};
+
+using TownExpandModes = EnumBitSet<TownExpandMode, uint8_t>;
 
 /** Town founding setting values. It needs to be 8bits, because we save and load it as such */
 enum TownFounding : uint8_t {
@@ -118,12 +125,10 @@ static const uint MAX_LENGTH_TOWN_NAME_CHARS = 32; ///< The maximum length of a 
 /** Store the maximum and actually transported cargo amount for the current and the last month. */
 template <typename Tstorage>
 struct TransportedCargoStat {
-	Tstorage old_max;  ///< Maximum amount last month
-	Tstorage new_max;  ///< Maximum amount this month
-	Tstorage old_act;  ///< Actually transported last month
-	Tstorage new_act;  ///< Actually transported this month
-
-	TransportedCargoStat() : old_max(0), new_max(0), old_act(0), new_act(0) {}
+	Tstorage old_max = 0; ///< Maximum amount last month
+	Tstorage new_max = 0; ///< Maximum amount this month
+	Tstorage old_act = 0; ///< Actually transported last month
+	Tstorage new_act = 0; ///< Actually transported this month
 
 	/** Update stats for a new month. */
 	void NewMonth()

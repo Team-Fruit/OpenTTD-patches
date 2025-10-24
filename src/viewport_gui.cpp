@@ -32,7 +32,7 @@
 static constexpr NWidgetPart _nested_extra_viewport_widgets[] = {
 	NWidget(NWID_HORIZONTAL),
 		NWidget(WWT_CLOSEBOX, COLOUR_GREY),
-		NWidget(WWT_CAPTION, COLOUR_GREY, WID_EV_CAPTION), SetDataTip(STR_EXTRA_VIEWPORT_TITLE, STR_TOOLTIP_WINDOW_TITLE_DRAG_THIS),
+		NWidget(WWT_CAPTION, COLOUR_GREY, WID_EV_CAPTION),
 		NWidget(WWT_SHADEBOX, COLOUR_GREY),
 		NWidget(WWT_DEFSIZEBOX, COLOUR_GREY),
 		NWidget(WWT_STICKYBOX, COLOUR_GREY),
@@ -41,13 +41,13 @@ static constexpr NWidgetPart _nested_extra_viewport_widgets[] = {
 		NWidget(NWID_VIEWPORT, INVALID_COLOUR, WID_EV_VIEWPORT), SetPadding(2, 2, 2, 2), SetResize(1, 1), SetFill(1, 1),
 	EndContainer(),
 	NWidget(NWID_HORIZONTAL),
-		NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_EV_ZOOM_IN), SetDataTip(SPR_IMG_ZOOMIN, STR_TOOLBAR_TOOLTIP_ZOOM_THE_VIEW_IN),
-		NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_EV_ZOOM_OUT), SetDataTip(SPR_IMG_ZOOMOUT, STR_TOOLBAR_TOOLTIP_ZOOM_THE_VIEW_OUT),
-		NWidget(NWID_HORIZONTAL, NC_EQUALSIZE),
+		NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_EV_ZOOM_IN), SetSpriteTip(SPR_IMG_ZOOMIN, STR_TOOLBAR_TOOLTIP_ZOOM_THE_VIEW_IN),
+		NWidget(WWT_PUSHIMGBTN, COLOUR_GREY, WID_EV_ZOOM_OUT), SetSpriteTip(SPR_IMG_ZOOMOUT, STR_TOOLBAR_TOOLTIP_ZOOM_THE_VIEW_OUT),
+		NWidget(NWID_HORIZONTAL, NWidContainerFlag::EqualSize),
 			NWidget(WWT_PUSHTXTBTN, COLOUR_GREY, WID_EV_MAIN_TO_VIEW), SetFill(1, 1), SetResize(1, 0),
-										SetDataTip(STR_EXTRA_VIEW_MOVE_MAIN_TO_VIEW, STR_EXTRA_VIEW_MOVE_MAIN_TO_VIEW_TOOLTIP),
+										SetStringTip(STR_EXTRA_VIEW_MOVE_MAIN_TO_VIEW, STR_EXTRA_VIEW_MOVE_MAIN_TO_VIEW_TOOLTIP),
 			NWidget(WWT_PUSHTXTBTN, COLOUR_GREY, WID_EV_VIEW_TO_MAIN), SetFill(1, 1), SetResize(1, 0),
-										SetDataTip(STR_EXTRA_VIEW_MOVE_VIEW_TO_MAIN, STR_EXTRA_VIEW_MOVE_VIEW_TO_MAIN_TOOLTIP),
+										SetStringTip(STR_EXTRA_VIEW_MOVE_VIEW_TO_MAIN, STR_EXTRA_VIEW_MOVE_VIEW_TO_MAIN_TOOLTIP),
 		EndContainer(),
 	EndContainer(),
 	NWidget(NWID_HORIZONTAL),
@@ -85,13 +85,15 @@ public:
 		this->viewport->map_type = (ViewportMapType) _settings_client.gui.default_viewport_map_mode;
 	}
 
-	void SetStringParameters(WidgetID widget) const override
+	std::string GetWidgetString(WidgetID widget, StringID stringid) const override
 	{
 		switch (widget) {
 			case WID_EV_CAPTION:
 				/* set the number in the title bar */
-				SetDParam(0, this->window_number + 1);
-				break;
+				return GetString(STR_EXTRA_VIEWPORT_TITLE, this->window_number + 1);
+
+			default:
+				return this->Window::GetWidgetString(widget, stringid);
 		}
 	}
 
@@ -109,7 +111,7 @@ public:
 				/* set this view to same location. Based on the center, adjusting for zoom */
 				w->viewport->dest_scrollpos_x =  x - (w->viewport->virtual_width -  this->viewport->virtual_width) / 2;
 				w->viewport->dest_scrollpos_y =  y - (w->viewport->virtual_height - this->viewport->virtual_height) / 2;
-				w->viewport->follow_vehicle   = INVALID_VEHICLE;
+				w->viewport->follow_vehicle   = VehicleID::Invalid();
 				break;
 			}
 
@@ -163,7 +165,7 @@ public:
 			/* Show tooltip with last month production or town name */
 			const Point p = GetTileBelowCursor();
 			const TileIndex tile = TileVirtXY(p.x, p.y);
-			if (tile < MapSize()) ShowTooltipForTile(this, tile);
+			if (tile < Map::Size()) ShowTooltipForTile(this, tile);
 		}
 	}
 
@@ -183,7 +185,7 @@ public:
 static WindowDesc _extra_viewport_desc(__FILE__, __LINE__,
 	WDP_AUTO, "extra_viewport", 300, 268,
 	WC_EXTRA_VIEWPORT, WC_NONE,
-	0,
+	{},
 	_nested_extra_viewport_widgets
 );
 
@@ -246,17 +248,19 @@ void ShowTownNameTooltip(Window *w, const TileIndex tile)
 	TownID town_id = GetTownIndex(tile);
 	const Town *town = Town::Get(town_id);
 
+	StringID tooltip_prefix;
+	std::array<StringParameter, 2> params;
 	if (_settings_client.gui.population_in_label) {
-		SetDParam(0, STR_TOWN_NAME_POP_TOOLTIP);
-		SetDParam(1, town_id);
-		SetDParam(2, town->cache.population);
+		tooltip_prefix = STR_TOWN_NAME_POP_TOOLTIP;
+		params[0] = town_id;
+		params[1] = town->cache.population;
 	} else {
-		SetDParam(0, STR_TOWN_NAME_TOOLTIP);
-		SetDParam(1, town_id);
+		tooltip_prefix = STR_TOWN_NAME_TOOLTIP;
+		params[0] = town_id;
 	}
 
-	StringID tooltip_string;
-	if (_game_mode == GM_NORMAL && _local_company < MAX_COMPANIES && HasBit(town->have_ratings, _local_company)) {
+	EncodedString tooltip_string;
+	if (_game_mode == GM_NORMAL && _local_company < MAX_COMPANIES && town->have_ratings.Test(_local_company)) {
 		const int local_authority_rating_thresholds[] = { RATING_APPALLING, RATING_VERYPOOR, RATING_POOR, RATING_MEDIOCRE, RATING_GOOD, RATING_VERYGOOD,
 													RATING_EXCELLENT, RATING_OUTSTANDING };
 		constexpr size_t threshold_count = lengthof(local_authority_rating_thresholds);
@@ -264,12 +268,12 @@ void ShowTownNameTooltip(Window *w, const TileIndex tile)
 		int local_rating = town->ratings[_local_company];
 		StringID rating_string = STR_CARGO_RATING_APPALLING;
 		for (size_t i = 0; i < threshold_count && local_rating > local_authority_rating_thresholds[i]; ++i) ++rating_string;
-		SetDParam(3, rating_string);
-		tooltip_string = STR_TOWN_NAME_RATING_TOOLTIP;
+
+		tooltip_string = GetEncodedString(STR_TOWN_NAME_RATING_TOOLTIP, tooltip_prefix, params[0], params[1], rating_string);
 	} else {
-		tooltip_string = STR_JUST_STRING2;
+		tooltip_string = GetEncodedString(tooltip_prefix, params[0], params[1]);
 	}
-	GuiShowTooltips(w, tooltip_string, TCC_HOVER_VIEWPORT);
+	GuiShowTooltips(w, std::move(tooltip_string), TCC_HOVER_VIEWPORT);
 }
 
 void ShowWaypointViewportTooltip(Window *w, const TileIndex tile)
@@ -277,8 +281,7 @@ void ShowWaypointViewportTooltip(Window *w, const TileIndex tile)
 	if (_settings_client.gui.waypoint_viewport_tooltip_name == WTNM_OFF ||
 			(_settings_client.gui.waypoint_viewport_tooltip_name == WTNM_ON_IF_HIDDEN && HasBit(_display_opt, DO_SHOW_WAYPOINT_NAMES))) return;
 
-	SetDParam(0, GetStationIndex(tile));
-	GuiShowTooltips(w, STR_WAYPOINT_NAME, TCC_HOVER_VIEWPORT);
+	GuiShowTooltips(w, GetEncodedString(STR_WAYPOINT_NAME, GetStationIndex(tile)), TCC_HOVER_VIEWPORT);
 }
 
 void ShowStationViewportTooltip(Window *w, const TileIndex tile)
@@ -288,13 +291,11 @@ void ShowStationViewportTooltip(Window *w, const TileIndex tile)
 
 	if (station == nullptr) return;
 
-	std::string msg;
+	format_buffer msg;
 
 	if ( _settings_client.gui.station_viewport_tooltip_name == STNM_ALWAYS_ON ||
 			(_settings_client.gui.station_viewport_tooltip_name == STNM_ON_IF_HIDDEN && !HasBit(_display_opt, DO_SHOW_STATION_NAMES))) {
-		SetDParam(0, station_id);
-		SetDParam(1, station->facilities);
-		msg = GetString(STR_STATION_VIEW_NAME_TOOLTIP);
+		AppendStringInPlace(msg, STR_STATION_VIEW_NAME_TOOLTIP, station_id, station->facilities);
 	}
 
 	if (_settings_client.gui.station_viewport_tooltip_cargo) {
@@ -302,19 +303,14 @@ void ShowStationViewportTooltip(Window *w, const TileIndex tile)
 			const GoodsEntry *goods_entry = &station->goods[cs->Index()];
 			if (!goods_entry->HasRating()) continue;
 
-			if (!msg.empty()) msg += '\n';
+			if (!msg.empty()) msg.push_back('\n');
 
-			SetDParam(0, cs->name);
-			SetDParam(1, ToPercent8(goods_entry->rating));
-			SetDParam(2, cs->Index());
-			SetDParam(3, goods_entry->CargoTotalCount());
-			msg += GetString(STR_STATION_VIEW_CARGO_LINE_TOOLTIP);
+			AppendStringInPlace(msg, STR_STATION_VIEW_CARGO_LINE_TOOLTIP, cs->name, ToPercent8(goods_entry->rating), cs->Index(), goods_entry->CargoTotalCount());
 		}
 	}
 
 	if (!msg.empty()) {
-		_temp_special_strings[0] = std::move(msg);
-		GuiShowTooltips(w, SPECSTR_TEMP_START, TCC_HOVER_VIEWPORT);
+		GuiShowTooltips(w, GetEncodedString(STR_JUST_RAW_STRING, msg), TCC_HOVER_VIEWPORT);
 	}
 }
 

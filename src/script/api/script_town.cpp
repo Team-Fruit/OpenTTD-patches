@@ -13,11 +13,13 @@
 #include "script_error.hpp"
 #include "script_controller.hpp"
 #include "../../town.h"
+#include "../../town_cmd.h"
 #include "../../townname_func.h"
 #include "../../string_func.h"
 #include "../../strings_func.h"
 #include "../../station_base.h"
 #include "../../landscape.h"
+
 #include "table/strings.h"
 
 #include "../../safeguards.h"
@@ -36,8 +38,7 @@
 {
 	if (!IsValidTown(town_id)) return std::nullopt;
 
-	::SetDParam(0, town_id);
-	return GetString(STR_TOWN_NAME);
+	return ::StrMakeValid(::GetString(STR_TOWN_NAME, town_id), {});
 }
 
 /* static */ bool ScriptTown::SetName(TownID town_id, Text *name)
@@ -52,7 +53,7 @@
 		EnforcePreconditionCustomError(false, ::Utf8StringLength(text) < MAX_LENGTH_TOWN_NAME_CHARS, ScriptError::ERR_PRECONDITION_STRING_TOO_LONG);
 	}
 
-	return ScriptObject::DoCommand(0, town_id, 0, CMD_RENAME_TOWN, text);
+	return ScriptObject::Command<CMD_RENAME_TOWN>::Do(town_id, text);
 }
 
 /* static */ bool ScriptTown::SetText(TownID town_id, Text *text)
@@ -62,7 +63,7 @@
 	EnforceDeityMode(false);
 	EnforcePrecondition(false, IsValidTown(town_id));
 
-	return ScriptObject::DoCommand(::Town::Get(town_id)->xy, town_id, 0, CMD_TOWN_SET_TEXT, text != nullptr ? text->GetEncodedText().c_str() : "");
+	return ScriptObject::Command<CMD_TOWN_SET_TEXT>::Do(town_id, text != nullptr ? text->GetEncodedText() : EncodedString{});
 }
 
 /* static */ SQInteger ScriptTown::GetPopulation(TownID town_id)
@@ -86,33 +87,33 @@
 	return t->xy;
 }
 
-/* static */ SQInteger ScriptTown::GetLastMonthProduction(TownID town_id, CargoID cargo_id)
+/* static */ SQInteger ScriptTown::GetLastMonthProduction(TownID town_id, CargoType cargo_type)
 {
 	if (!IsValidTown(town_id)) return -1;
-	if (!ScriptCargo::IsValidCargo(cargo_id)) return -1;
+	if (!ScriptCargo::IsValidCargo(cargo_type)) return -1;
 
 	const Town *t = ::Town::Get(town_id);
 
-	return t->supplied[cargo_id].old_max;
+	return t->supplied[cargo_type].old_max;
 }
 
-/* static */ SQInteger ScriptTown::GetLastMonthSupplied(TownID town_id, CargoID cargo_id)
+/* static */ SQInteger ScriptTown::GetLastMonthSupplied(TownID town_id, CargoType cargo_type)
 {
 	if (!IsValidTown(town_id)) return -1;
-	if (!ScriptCargo::IsValidCargo(cargo_id)) return -1;
+	if (!ScriptCargo::IsValidCargo(cargo_type)) return -1;
 
 	const Town *t = ::Town::Get(town_id);
 
-	return t->supplied[cargo_id].old_act;
+	return t->supplied[cargo_type].old_act;
 }
 
-/* static */ SQInteger ScriptTown::GetLastMonthTransportedPercentage(TownID town_id, CargoID cargo_id)
+/* static */ SQInteger ScriptTown::GetLastMonthTransportedPercentage(TownID town_id, CargoType cargo_type)
 {
 	if (!IsValidTown(town_id)) return -1;
-	if (!ScriptCargo::IsValidCargo(cargo_id)) return -1;
+	if (!ScriptCargo::IsValidCargo(cargo_type)) return -1;
 
 	const Town *t = ::Town::Get(town_id);
-	return ::ToPercent8(t->GetPercentTransported(cargo_id));
+	return ::ToPercent8(t->GetPercentTransported(cargo_type));
 }
 
 /* static */ SQInteger ScriptTown::GetLastMonthReceived(TownID town_id, ScriptCargo::TownEffect towneffect_id)
@@ -133,7 +134,7 @@
 
 	goal = Clamp<SQInteger>(goal, 0, UINT32_MAX);
 
-	return ScriptObject::DoCommand(::Town::Get(town_id)->xy, town_id | (towneffect_id << 16), goal, CMD_TOWN_CARGO_GOAL);
+	return ScriptObject::Command<CMD_TOWN_CARGO_GOAL>::Do(town_id, (::TownAcceptanceEffect)towneffect_id, goal);
 }
 
 /* static */ SQInteger ScriptTown::GetCargoGoal(TownID town_id, ScriptCargo::TownEffect towneffect_id)
@@ -177,7 +178,7 @@
 			break;
 	}
 
-	return ScriptObject::DoCommand(::Town::Get(town_id)->xy, town_id, growth_rate, CMD_TOWN_GROWTH_RATE);
+	return ScriptObject::Command<CMD_TOWN_GROWTH_RATE>::Do(town_id, growth_rate);
 }
 
 /* static */ SQInteger ScriptTown::GetGrowthRate(TownID town_id)
@@ -214,7 +215,7 @@
 	EnforceCompanyModeValid(false);
 	if (!IsValidTown(town_id)) return false;
 
-	return ::HasBit(::Town::Get(town_id)->statues, ScriptObject::GetCompany());
+	return ::Town::Get(town_id)->statues.Test(ScriptObject::GetCompany());
 }
 
 /* static */ bool ScriptTown::IsCity(TownID town_id)
@@ -243,7 +244,7 @@
 	EnforceCompanyModeValid(ScriptCompany::COMPANY_INVALID);
 	if (!IsValidTown(town_id)) return ScriptCompany::COMPANY_INVALID;
 
-	return (ScriptCompany::CompanyID)(int8_t)::Town::Get(town_id)->exclusivity;
+	return ScriptCompany::ToScriptCompanyID(::Town::Get(town_id)->exclusivity);
 }
 
 /* static */ SQInteger ScriptTown::GetExclusiveRightsDuration(TownID town_id)
@@ -258,7 +259,7 @@
 	EnforceCompanyModeValid(false);
 	if (!IsValidTown(town_id)) return false;
 
-	return HasBit(::GetMaskOfTownActions(nullptr, ScriptObject::GetCompany(), ::Town::Get(town_id)), town_action);
+	return ::GetMaskOfTownActions(ScriptObject::GetCompany(), ::Town::Get(town_id)).Test(::TownAction(town_action));
 }
 
 /* static */ bool ScriptTown::PerformTownAction(TownID town_id, TownAction town_action)
@@ -267,7 +268,7 @@
 	EnforcePrecondition(false, IsValidTown(town_id));
 	EnforcePrecondition(false, IsActionAvailable(town_id, town_action));
 
-	return ScriptObject::DoCommand(::Town::Get(town_id)->xy, town_id, town_action, CMD_DO_TOWN_ACTION);
+	return ScriptObject::Command<CMD_DO_TOWN_ACTION>::Do(town_id, ::TownAction(town_action));
 }
 
 /* static */ bool ScriptTown::ExpandTown(TownID town_id, SQInteger houses)
@@ -278,7 +279,7 @@
 
 	houses = std::min<SQInteger>(houses, UINT32_MAX);
 
-	return ScriptObject::DoCommand(::Town::Get(town_id)->xy, town_id, houses, CMD_EXPAND_TOWN);
+	return ScriptObject::Command<CMD_EXPAND_TOWN>::Do(town_id, houses, {TownExpandMode::Buildings, TownExpandMode::Roads});
 }
 
 /* static */ bool ScriptTown::FoundTown(TileIndex tile, TownSize size, bool city, RoadLayout layout, Text *name)
@@ -311,7 +312,7 @@
 		return false;
 	}
 
-	return ScriptObject::DoCommand(tile, size | (city ? 1 << 2 : 0) | layout << 3, townnameparts, CMD_FOUND_TOWN, text.c_str());
+	return ScriptObject::Command<CMD_FOUND_TOWN>::Do(tile, (::TownSize)size, city, (::TownLayout)layout, false, townnameparts, text);
 }
 
 /* static */ ScriptTown::TownRating ScriptTown::GetRating(TownID town_id, ScriptCompany::CompanyID company_id)
@@ -320,22 +321,23 @@
 	ScriptCompany::CompanyID company = ScriptCompany::ResolveCompanyID(company_id);
 	if (company == ScriptCompany::COMPANY_INVALID) return TOWN_RATING_INVALID;
 
+	::CompanyID c = ScriptCompany::FromScriptCompanyID(company);
 	const Town *t = ::Town::Get(town_id);
-	if (!HasBit(t->have_ratings, company)) {
+	if (!t->have_ratings.Test(c)) {
 		return TOWN_RATING_NONE;
-	} else if (t->ratings[company] <= RATING_APPALLING) {
+	} else if (t->ratings[c] <= RATING_APPALLING) {
 		return TOWN_RATING_APPALLING;
-	} else if (t->ratings[company] <= RATING_VERYPOOR) {
+	} else if (t->ratings[c] <= RATING_VERYPOOR) {
 		return TOWN_RATING_VERY_POOR;
-	} else if (t->ratings[company] <= RATING_POOR) {
+	} else if (t->ratings[c] <= RATING_POOR) {
 		return TOWN_RATING_POOR;
-	} else if (t->ratings[company] <= RATING_MEDIOCRE) {
+	} else if (t->ratings[c] <= RATING_MEDIOCRE) {
 		return TOWN_RATING_MEDIOCRE;
-	} else if (t->ratings[company] <= RATING_GOOD) {
+	} else if (t->ratings[c] <= RATING_GOOD) {
 		return TOWN_RATING_GOOD;
-	} else if (t->ratings[company] <= RATING_VERYGOOD) {
+	} else if (t->ratings[c] <= RATING_VERYGOOD) {
 		return TOWN_RATING_VERY_GOOD;
-	} else if (t->ratings[company] <= RATING_EXCELLENT) {
+	} else if (t->ratings[c] <= RATING_EXCELLENT) {
 		return TOWN_RATING_EXCELLENT;
 	} else {
 		return TOWN_RATING_OUTSTANDING;
@@ -349,21 +351,22 @@
 	if (company == ScriptCompany::COMPANY_INVALID) return TOWN_RATING_INVALID;
 
 	const Town *t = ::Town::Get(town_id);
-	return t->ratings[company];
+	return t->ratings[ScriptCompany::FromScriptCompanyID(company)];
 }
 
-/* static */ bool ScriptTown::ChangeRating(TownID town_id, ScriptCompany::CompanyID company_id, SQInteger delta)
+/* static */ bool ScriptTown::ChangeRating(TownID town_id, ScriptCompany::CompanyID company, SQInteger delta)
 {
 	EnforceDeityMode(false);
 	EnforcePrecondition(false, IsValidTown(town_id));
-	ScriptCompany::CompanyID company = ScriptCompany::ResolveCompanyID(company_id);
+	company = ScriptCompany::ResolveCompanyID(company);
 	EnforcePrecondition(false, company != ScriptCompany::COMPANY_INVALID);
 
+	::CompanyID c = ScriptCompany::FromScriptCompanyID(company);
 	const Town *t = ::Town::Get(town_id);
-	int16_t new_rating = Clamp(t->ratings[company] + delta, RATING_MINIMUM, RATING_MAXIMUM);
-	if (new_rating == t->ratings[company]) return false;
+	int16_t new_rating = Clamp(t->ratings[c] + delta, RATING_MINIMUM, RATING_MAXIMUM);
+	if (new_rating == t->ratings[c]) return false;
 
-	return ScriptObject::DoCommand(0, town_id | (company_id << 16), new_rating, CMD_TOWN_RATING);
+	return ScriptObject::Command<CMD_TOWN_RATING>::Do(town_id, c, new_rating);
 }
 
 /* static */ SQInteger ScriptTown::GetAllowedNoise(TownID town_id)
@@ -377,7 +380,7 @@
 
 	int num = 0;
 	for (const Station *st : Station::Iterate()) {
-		if (st->town == t && (st->facilities & FACIL_AIRPORT) && st->airport.type != AT_OILRIG) num++;
+		if (st->town == t && st->facilities.Test(StationFacility::Airport) && st->airport.type != AT_OILRIG) num++;
 	}
 	return std::max(0, 2 - num);
 }

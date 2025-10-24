@@ -363,7 +363,6 @@ STR_SCENEDIT_FILE_MENU_QUIT                                     :Hætta
 
 
 # Settings menu
-###length 16
 STR_SETTINGS_MENU_GAME_OPTIONS                                  :Stillingar
 STR_SETTINGS_MENU_NEWGRF_SETTINGS                               :NewGRF stillingar
 STR_SETTINGS_MENU_TRANSPARENCY_OPTIONS                          :Gegnsæisstillingar
@@ -718,7 +717,6 @@ STR_MESSAGE_HISTORY_TOOLTIP                                     :{BLACK}Listi yf
 STR_MESSAGE_NEWS_FORMAT                                         :{STRING}  -  {STRING}
 
 STR_NEWS_MESSAGE_CAPTION                                        :{WHITE}Skilaboð
-STR_NEWS_CUSTOM_ITEM                                            :{BIG_FONT}{BLACK}{STRING}
 
 STR_NEWS_FIRST_TRAIN_ARRIVAL                                    :{BIG_FONT}{BLACK}Bæjarbúar fagna . . .{}Fyrsta lest kemur við á {STATION}!
 STR_NEWS_FIRST_BUS_ARRIVAL                                      :{BIG_FONT}{BLACK}Bæjarbúar fagna . . .{}Fyrsti strætisvagn kemur við á {STATION}!
@@ -827,7 +825,7 @@ STR_GAME_OPTIONS_CURRENCY_UNITS_FRAME                           :{BLACK}Gjaldmi�
 STR_GAME_OPTIONS_CURRENCY_UNITS_DROPDOWN_TOOLTIP                :{BLACK}Val á gjaldmiðli
 
 
-###length 44
+###length 45
 STR_GAME_OPTIONS_CURRENCY_GBP                                   :Sterlingspund
 STR_GAME_OPTIONS_CURRENCY_USD                                   :Bandaríkjadalur
 STR_GAME_OPTIONS_CURRENCY_EUR                                   :Evra
@@ -1098,6 +1096,7 @@ STR_CONFIG_SETTING_AUTOSLOPE_HELPTEXT                           :Leyfa mótun á
 
 STR_CONFIG_SETTING_CATCHMENT                                    :Raunverulegri stærð svæðis sem stöðvar ná yfir: {STRING}
 STR_CONFIG_SETTING_CATCHMENT_HELPTEXT                           :Mismunandi stærð á söfnunarsvæðum fyrir mismunandi stöðvar og flugvelli
+
 
 
 STR_CONFIG_SETTING_EXTRADYNAMITE                                :Leyfa meiri eyðingu vega, brúa, gangna o.s.frv. í eigu bæjar: {STRING}
@@ -1578,6 +1577,8 @@ STR_CONFIG_SETTING_STARTING_YEAR                                :Upphafsár: {ST
 
 ###setting-zero-is-special
 
+###length 2
+
 ###length 3
 
 STR_CONFIG_SETTING_FEEDER_PAYMENT_SHARE                         :Hlutfall hagnaðar sem greiðist til tengiþjónustu: {STRING}
@@ -1622,6 +1623,8 @@ STR_CONFIG_SETTING_TOWN_FOUNDING_HELPTEXT                       :Ef þessi still
 STR_CONFIG_SETTING_TOWN_FOUNDING_FORBIDDEN                      :bannað
 STR_CONFIG_SETTING_TOWN_FOUNDING_ALLOWED                        :leyft
 STR_CONFIG_SETTING_TOWN_FOUNDING_ALLOWED_CUSTOM_LAYOUT          :Leyft, sérsniðið bæjarskipulag
+
+###length 3
 
 ###length 2
 
@@ -1828,12 +1831,7 @@ STR_LIVERY_FREIGHT_TRAM                                         :Farmsporvagn
 STR_FACE_CAPTION                                                :{WHITE}Andlitsval
 STR_FACE_CANCEL_TOOLTIP                                         :{BLACK}Hætta við andlitsval
 STR_FACE_OK_TOOLTIP                                             :{BLACK}Samþykkja andlitsval
-STR_FACE_RANDOM                                                 :{BLACK}Nýtt raðnúmer
 
-STR_FACE_MALE_BUTTON                                            :{BLACK}Karlmaður
-STR_FACE_MALE_TOOLTIP                                           :{BLACK}Velja karlmannsandlit
-STR_FACE_FEMALE_BUTTON                                          :{BLACK}Kvenmaður
-STR_FACE_FEMALE_TOOLTIP                                         :{BLACK}Velja kvenmannsandlit
 STR_FACE_NEW_FACE_BUTTON                                        :{BLACK}Nýtt Andlit
 STR_FACE_NEW_FACE_TOOLTIP                                       :{BLACK}Mynda andlit af handahófi
 STR_FACE_ADVANCED                                               :{BLACK}Ítarlegt
@@ -1851,36 +1849,20 @@ STR_FACE_FACECODE_ERR                                           :{WHITE}Gat ekki
 STR_FACE_SAVE                                                   :{BLACK}Vista
 STR_FACE_SAVE_TOOLTIP                                           :{BLACK}Vista uppáhalds andlit
 STR_FACE_SAVE_DONE                                              :{WHITE}Þetta andlit mun verða vistað sem þitt uppahald í OpenTTD stilliskrá
-STR_FACE_EUROPEAN                                               :{BLACK}Evrópskt
-STR_FACE_EUROPEAN_TOOLTIP                                       :{BLACK}Velja evrópskt andlit
-STR_FACE_AFRICAN                                                :{BLACK}Afrískt
-STR_FACE_AFRICAN_TOOLTIP                                        :{BLACK}Velja blökkuandlit
 STR_FACE_YES                                                    :Já
 STR_FACE_NO                                                     :Nei
-STR_FACE_MOUSTACHE_EARRING_TOOLTIP                              :{BLACK}Virkja yfirvaraskegg eða eyrnalokk
 STR_FACE_HAIR                                                   :Hár:
-STR_FACE_HAIR_TOOLTIP                                           :{BLACK}Breyta hári
 STR_FACE_EYEBROWS                                               :Augabrúnir:
-STR_FACE_EYEBROWS_TOOLTIP                                       :{BLACK}Breyta augabrúnum
 STR_FACE_EYECOLOUR                                              :Augnlitur:
-STR_FACE_EYECOLOUR_TOOLTIP                                      :{BLACK}Breyta augnlit
 STR_FACE_GLASSES                                                :Gleraugu:
-STR_FACE_GLASSES_TOOLTIP                                        :{BLACK}Velja/afvelja gleraugu
-STR_FACE_GLASSES_TOOLTIP_2                                      :{BLACK}Breyta gleraugum
 STR_FACE_NOSE                                                   :Nef:
-STR_FACE_NOSE_TOOLTIP                                           :{BLACK}Breyta nefi
 STR_FACE_LIPS                                                   :Varir:
 STR_FACE_MOUSTACHE                                              :Yfirvaraskegg:
-STR_FACE_LIPS_MOUSTACHE_TOOLTIP                                 :{BLACK}Breyta vörum eða yfirvaraskeggi
 STR_FACE_CHIN                                                   :Vangar:
-STR_FACE_CHIN_TOOLTIP                                           :{BLACK}Breyta vöngum
 STR_FACE_JACKET                                                 :Jakki:
-STR_FACE_JACKET_TOOLTIP                                         :{BLACK}Breyta jakka
 STR_FACE_COLLAR                                                 :Kragi:
-STR_FACE_COLLAR_TOOLTIP                                         :{BLACK}Breyta kraga
 STR_FACE_TIE                                                    :Bindi:
 STR_FACE_EARRING                                                :Eyrnalokkur:
-STR_FACE_TIE_EARRING_TOOLTIP                                    :{BLACK}Breyta bindi eða eyrnalokk
 
 # Matches ServerGameType
 ###length 3
@@ -2047,7 +2029,7 @@ STR_NETWORK_ERROR_CLIENT_TIMEOUT_MAP                            :að niðurhala 
 STR_NETWORK_ERROR_CLIENT_TIMEOUT_JOIN                           :úrvinnsla kortsins tók of langan tíma
 
 # Network related errors
-STR_NETWORK_SERVER_MESSAGE                                      :*** {1:STRING}
+STR_NETWORK_SERVER_MESSAGE                                      :*** {STRING}
 
 ###length 12
 STR_NETWORK_SERVER_MESSAGE_GAME_PAUSED                          :Leikur í pásu ({STRING})
@@ -2063,11 +2045,10 @@ STR_NETWORK_SERVER_MESSAGE_GAME_REASON_GAME_SCRIPT              :forskrift
 
 STR_NETWORK_MESSAGE_CLIENT_LEAVING                              :yfirgefur
 STR_NETWORK_MESSAGE_CLIENT_JOINED                               :*** {STRING} tengdist leiknum
-STR_NETWORK_MESSAGE_CLIENT_JOINED_ID                            :*** {STRING} hefur tengst leiknum (Notandi #{2:NUM})
-STR_NETWORK_MESSAGE_CLIENT_COMPANY_JOIN                         :*** {STRING} hefur gengið í lið með fyrirtæki #{2:NUM}
+STR_NETWORK_MESSAGE_CLIENT_JOINED_ID                            :*** {STRING} hefur tengst leiknum (Notandi #{NUM})
 STR_NETWORK_MESSAGE_CLIENT_COMPANY_SPECTATE                     :*** {STRING} horfir á
-STR_NETWORK_MESSAGE_CLIENT_COMPANY_NEW                          :*** {STRING} stofnaði nýtt fyrirtæki (#{2:NUM})
-STR_NETWORK_MESSAGE_CLIENT_LEFT                                 :*** {STRING} yfirgefur leikinn ({2:STRING})
+STR_NETWORK_MESSAGE_CLIENT_COMPANY_NEW                          :*** {STRING} stofnaði nýtt fyrirtæki (#{NUM})
+STR_NETWORK_MESSAGE_CLIENT_LEFT                                 :*** {STRING} yfirgefur leikinn ({STRING})
 STR_NETWORK_MESSAGE_NAME_CHANGE                                 :*** {STRING} heitir nú {STRING}
 STR_NETWORK_MESSAGE_SERVER_SHUTDOWN                             :{WHITE}Þjónninn sleit tengingunni
 STR_NETWORK_MESSAGE_SERVER_REBOOT                               :{WHITE}Verið er að endurræsa þjóninn...{}Vinsamlega bíðið...
@@ -2224,6 +2205,7 @@ STR_STATION_BUILD_PLATFORM_LENGTH                               :{BLACK}Lengd le
 STR_STATION_BUILD_PLATFORM_LENGTH_TOOLTIP                       :{BLACK}Veldu lengd lestarstöðvar
 STR_STATION_BUILD_DRAG_DROP                                     :{BLACK}Draga & Sleppa
 STR_STATION_BUILD_DRAG_DROP_TOOLTIP                             :{BLACK}Byggja lestarstöð með 'draga og sleppa' aðferðinni
+
 
 
 
@@ -2410,6 +2392,7 @@ STR_FOUND_TOWN_INITIAL_SIZE_TOOLTIP                             :{BLACK}Velja st
 STR_FOUND_TOWN_CITY                                             :{BLACK}Borg
 STR_FOUND_TOWN_CITY_TOOLTIP                                     :{BLACK}Borgir vaxa hraðar en venjulegir bæir{}Möguleiki á aukinni upphafsstærð í stillingum
 
+
 STR_FOUND_TOWN_ROAD_LAYOUT                                      :{YELLOW}Vegaskipulag bæja
 STR_FOUND_TOWN_SELECT_LAYOUT_TOOLTIP                            :{BLACK}Veldu það skipulag sem þessi bær notar fyrir sína vegi
 STR_FOUND_TOWN_SELECT_LAYOUT_ORIGINAL                           :{BLACK}Upphaflegt
@@ -2474,7 +2457,6 @@ STR_LAI_CLEAR_DESCRIPTION_ROUGH_LAND                            :Hrjúft land
 STR_LAI_CLEAR_DESCRIPTION_BARE_LAND                             :Bert land
 STR_LAI_CLEAR_DESCRIPTION_GRASS                                 :Gras
 STR_LAI_CLEAR_DESCRIPTION_FIELDS                                :Akur
-STR_LAI_CLEAR_DESCRIPTION_SNOW_COVERED_LAND                     :Snjóþekið land
 STR_LAI_CLEAR_DESCRIPTION_DESERT                                :Eyðimörk
 
 STR_LAI_RAIL_DESCRIPTION_TRACK                                  :Járnbrautarspor spor
@@ -2840,7 +2822,6 @@ STR_NEWGRF_INVALID_INDUSTRYTYPE                                 :<invalid indust
 STR_NEWGRF_SCAN_CAPTION                                         :{WHITE}Skanna NewGRF
 STR_NEWGRF_SCAN_MESSAGE                                         :{BLACK}Skanna NewGRF. Tíminn fer eftir fjölda...
 STR_NEWGRF_SCAN_STATUS                                          :{BLACK}{NUM} NewGRF af sirka {NUM} skönnuð
-STR_NEWGRF_SCAN_ARCHIVES                                        :Skanna eftir skjalasöfnum
 
 # Sign list window
 STR_SIGN_LIST_CAPTION                                           :{WHITE}Merkjalisti - {COMMA} Merki
@@ -3484,8 +3465,8 @@ STR_VEHICLE_INFO_RELIABILITY_BREAKDOWNS                         :{BLACK}Áreiða
 
 STR_VEHICLE_INFO_BUILT_VALUE                                    :{LTBLUE}{ENGINE} {BLACK}Framleiðsluár: {LTBLUE}{NUM}{BLACK} Verðgildi: {LTBLUE}{CURRENCY_LONG}
 STR_VEHICLE_INFO_NO_CAPACITY                                    :{BLACK}Burðargeta: {LTBLUE}Engin{STRING}
-STR_VEHICLE_INFO_CAPACITY                                       :{BLACK}Burðargeta: {LTBLUE}{CARGO_LONG}{3:STRING}
-STR_VEHICLE_INFO_CAPACITY_MULT                                  :{BLACK}Burðargeta: {LTBLUE}{CARGO_LONG}{3:STRING} (x{4:NUM})
+STR_VEHICLE_INFO_CAPACITY                                       :{BLACK}Burðargeta: {LTBLUE}{CARGO_LONG}{STRING}
+STR_VEHICLE_INFO_CAPACITY_MULT                                  :{BLACK}Burðargeta: {LTBLUE}{CARGO_LONG}{STRING} (x{NUM})
 STR_VEHICLE_INFO_CAPACITY_CAPACITY                              :{BLACK}Burðargeta: {LTBLUE}{CARGO_LONG}, {CARGO_LONG}{STRING}
 
 STR_VEHICLE_INFO_FEEDER_CARGO_VALUE                             :{BLACK}Flytja inneign: {LTBLUE}{CURRENCY_LONG}
@@ -3650,15 +3631,12 @@ STR_ORDER_GO_NON_STOP_TO_WAYPOINT                               :Ekki stöðva �
 STR_ORDER_SERVICE_AT                                            :Skoða í
 STR_ORDER_SERVICE_NON_STOP_AT                                   :Þjónusta hraðleið á
 
-STR_ORDER_NEAREST_DEPOT                                         :næsta
-STR_ORDER_NEAREST_HANGAR                                        :næsta flugskýli
 ###length 3
 STR_ORDER_TRAIN_DEPOT                                           :lestaskýli
 STR_ORDER_ROAD_VEHICLE_DEPOT                                    :bifreiðaskýli
 STR_ORDER_SHIP_DEPOT                                            :skipaskýli
 ###next-name-looks-similar
 
-STR_ORDER_GO_TO_NEAREST_DEPOT_FORMAT                            :{STRING} {STRING} {STRING}
 STR_ORDER_GO_TO_DEPOT_FORMAT                                    :{STRING} {DEPOT}
 
 STR_ORDER_REFIT_ORDER                                           :(Breyta í {STRING})
@@ -3666,7 +3644,7 @@ STR_ORDER_REFIT_STOP_ORDER                                      :(Breyta í {STR
 STR_ORDER_STOP_ORDER                                            :(Stopp)
 
 
-STR_ORDER_GO_TO_STATION                                         :{STRING} {STATION} {STRING}
+STR_ORDER_GO_TO_STATION                                         :{STRING} {STATION}
 
 STR_ORDER_IMPLICIT                                              :(Undanskilin)
 
@@ -3724,7 +3702,7 @@ STR_TIMETABLE_TOOLTIP                                           :{BLACK}Áætlun
 STR_TIMETABLE_NO_TRAVEL                                         :Engin ferðalög
 STR_TIMETABLE_NOT_TIMETABLEABLE                                 :Ferðalag (sjálfvirkt; áætlað eftir næstu handvirku skipun)
 STR_TIMETABLE_TRAVEL_NOT_TIMETABLED                             :Ferðalag (ekki sett í áætlun)
-STR_TIMETABLE_TRAVEL_NOT_TIMETABLED_SPEED                       :Ferðast með hámarkshraða {2:VELOCITY} (ekki áætlað)
+STR_TIMETABLE_TRAVEL_NOT_TIMETABLED_SPEED                       :Ferðast með hámarkshraða {VELOCITY} (ekki áætlað)
 STR_TIMETABLE_TRAVEL_FOR                                        :Ferðast í {STRING}
 STR_TIMETABLE_TRAVEL_FOR_SPEED                                  :Ferðast í {STRING} með hámarkshraða {VELOCITY}
 STR_TIMETABLE_STAY_FOR                                          :og bíða í {STRING}
@@ -3737,7 +3715,6 @@ STR_TIMETABLE_STATUS_ON_TIME                                    :{BLACK}Þetta f
 STR_TIMETABLE_STATUS_LATE                                       :{BLACK}Þetta farartæki er {STRING} of seint
 STR_TIMETABLE_STATUS_EARLY                                      :{BLACK}Þetta farartæki er {STRING} of fljótt
 STR_TIMETABLE_STATUS_NOT_STARTED                                :{BLACK}Þessi tímaáætlun er ekki hafin
-
 
 
 STR_TIMETABLE_CHANGE_TIME                                       :{BLACK}Breyta tíma
@@ -3910,7 +3887,6 @@ STR_ERROR_SCREENSHOT_FAILED                                     :{WHITE}Ekki tó
 
 # Error message titles
 STR_ERROR_MESSAGE_CAPTION                                       :{YELLOW}Skilaboð
-STR_ERROR_MESSAGE_CAPTION_OTHER_COMPANY                         :{YELLOW}Skilaboð frá {STRING}
 
 # Generic construction errors
 STR_ERROR_OFF_EDGE_OF_MAP                                       :{WHITE}Brún kortsins
@@ -3929,7 +3905,6 @@ STR_ERROR_TERRAFORM_LIMIT_REACHED                               :{WHITE}... takm
 STR_ERROR_CLEARING_LIMIT_REACHED                                :{WHITE}... ekki hægt að hreinsa fleiri reiti
 STR_ERROR_TREE_PLANT_LIMIT_REACHED                              :{WHITE}... ekki hægt að planta fleiri trjám
 STR_ERROR_NAME_MUST_BE_UNIQUE                                   :{WHITE}Nafnið verður að vera sérstætt
-STR_ERROR_GENERIC_OBJECT_IN_THE_WAY                             :{WHITE}{1:STRING} er fyrir
 STR_ERROR_NOT_ALLOWED_WHILE_PAUSED                              :{WHITE}Ekki leyft á meðan leikurinn er á bið
 
 # Local authority errors
@@ -4215,6 +4190,10 @@ STR_ERROR_CAN_T_SELL_TRAIN                                      :{WHITE}Get ekki
 STR_ERROR_CAN_T_SELL_ROAD_VEHICLE                               :{WHITE}Get ekki selt bifreið...
 STR_ERROR_CAN_T_SELL_SHIP                                       :{WHITE}Get ekki selt skip...
 STR_ERROR_CAN_T_SELL_AIRCRAFT                                   :{WHITE}Get ekki selt flugvélina...
+
+###length VEHICLE_TYPES
+
+###length VEHICLE_TYPES
 
 STR_ERROR_TOO_MANY_VEHICLES_IN_GAME                             :{WHITE}Of mörg farartæki í leiknum
 STR_ERROR_CAN_T_CHANGE_SERVICING                                :{WHITE}Get ekki breytt viðgerðarmillibili...
@@ -4707,18 +4686,7 @@ STR_SAVEGAME_NAME_SPECTATOR                                     :Áhorfandi, {1:
 
 # Viewport strings
 STR_VIEWPORT_TOWN_POP                                           :{WHITE}{TOWN} ({COMMA})
-STR_VIEWPORT_TOWN                                               :{WHITE}{TOWN}
-STR_VIEWPORT_TOWN_TINY_BLACK                                    :{TINY_FONT}{BLACK}{TOWN}
-STR_VIEWPORT_TOWN_TINY_WHITE                                    :{TINY_FONT}{WHITE}{TOWN}
-
-STR_VIEWPORT_SIGN_SMALL_BLACK                                   :{TINY_FONT}{BLACK}{SIGN}
-STR_VIEWPORT_SIGN_SMALL_WHITE                                   :{TINY_FONT}{WHITE}{SIGN}
-
 STR_VIEWPORT_STATION                                            :{STATION} {STATION_FEATURES}
-STR_VIEWPORT_STATION_TINY                                       :{TINY_FONT}{STATION}
-
-STR_VIEWPORT_WAYPOINT                                           :{WAYPOINT}
-STR_VIEWPORT_WAYPOINT_TINY                                      :{TINY_FONT}{WAYPOINT}
 
 # Simple strings to get specific types of data
 STR_COMPANY_NAME                                                :{COMPANY}
@@ -4769,3 +4737,4 @@ STR_PLANE                                                       :{BLACK}{PLANE}
 STR_SHIP                                                        :{BLACK}{SHIP}
 
 STR_TOOLBAR_RAILTYPE_VELOCITY                                   :{STRING} ({VELOCITY})
+

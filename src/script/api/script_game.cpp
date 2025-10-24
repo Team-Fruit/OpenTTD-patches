@@ -12,23 +12,24 @@
 #include "script_error.hpp"
 #include "../../command_type.h"
 #include "../../settings_type.h"
+#include "../../misc_cmd.h"
 #include "../../network/network.h"
 
 #include "../../safeguards.h"
 
 /* static */ bool ScriptGame::Pause()
 {
-	return ScriptObject::DoCommand(0, PM_PAUSED_GAME_SCRIPT, 1, CMD_PAUSE);
+	return ScriptObject::Command<CMD_PAUSE>::Do(PauseMode::GameScript, true);
 }
 
 /* static */ bool ScriptGame::Unpause()
 {
-	return ScriptObject::DoCommand(0, PM_PAUSED_GAME_SCRIPT, 0, CMD_PAUSE);
+	return ScriptObject::Command<CMD_PAUSE>::Do(PauseMode::GameScript, false);
 }
 
 /* static */ bool ScriptGame::IsPaused()
 {
-	return !!_pause_mode;
+	return _pause_mode.Any();
 }
 
 /* static */ ScriptGame::LandscapeType ScriptGame::GetLandscape()

@@ -14,20 +14,19 @@
 #include "core/pool_type.hpp"
 #include "company_type.h"
 #include "company_func.h"
-#include "command_func.h"
 #include "map_func.h"
 #include "date_func.h"
 #include "viewport_func.h"
 #include <string>
 #include <vector>
 
-typedef Pool<Plan, PlanID, 16, 64000> PlanPool;
-typedef std::vector<TileIndex> TileVector;
-typedef std::vector<PlanLine> PlanLineVector;
+using PlanPool = Pool<Plan, PlanID, 16>;
 extern PlanPool _plan_pool;
 
+static constexpr size_t MAX_PLAN_PAYLOAD_SIZE = 32000;
+
 struct BasePlanLine {
-	TileVector tiles;
+	std::vector<TileIndex> tiles;
 	Rect viewport_extents;
 
 	BasePlanLine()
@@ -76,7 +75,7 @@ struct BasePlanLine {
 			}
 		}
 
-		if (this->tiles.size() * sizeof(TileIndex) >= MAX_CMD_TEXT_LENGTH) return false;
+		if (this->tiles.size() * sizeof(TileIndex) >= MAX_PLAN_PAYLOAD_SIZE) return false;
 
 		this->tiles.push_back(tile);
 		_plan_update_counter++;
@@ -143,28 +142,19 @@ struct PlanLine : public BasePlanLine {
 	}
 };
 
-struct Plan : PlanPool::PoolItem<&_plan_pool> {
+struct Plan : PlanPool::PoolItem<&_plan_pool> { // todo
 	Owner owner;
-	Colours colour;
+	Colours colour = COLOUR_WHITE;
 	CalTime::Date creation_date;
-	PlanLineVector lines;
+	std::vector<PlanLine> lines{};
 	BasePlanLine temp_line{};
-	std::string name;
-	TileIndex last_tile;
-	bool visible;
-	bool visible_by_all;
-	bool show_lines;
+	std::string name{};
+	TileIndex last_tile = INVALID_TILE;
+	bool visible = false;
+	bool visible_by_all = false;
+	bool show_lines = false;
 
-	Plan(Owner owner = INVALID_OWNER)
-	{
-		this->owner = owner;
-		this->creation_date = CalTime::CurDate();
-		this->visible = false;
-		this->visible_by_all = false;
-		this->show_lines = false;
-		this->colour = COLOUR_WHITE;
-		this->last_tile = INVALID_TILE;
-	}
+	Plan(Owner owner = INVALID_OWNER) : owner(owner), creation_date(CalTime::CurDate()) {}
 
 	void SetFocus(bool focused)
 	{
@@ -216,17 +206,6 @@ struct Plan : PlanPool::PoolItem<&_plan_pool> {
 	bool HasName() const
 	{
 		return !this->name.empty();
-	}
-
-	bool ToggleVisibilityByAll()
-	{
-		if (this->owner == _local_company) DoCommandP(0, this->index, !this->visible_by_all, CMD_CHANGE_PLAN_VISIBILITY);
-		return this->visible_by_all;
-	}
-
-	void SetPlanColour(Colours colour)
-	{
-		if (this->owner == _local_company) DoCommandP(0, this->index, colour, CMD_CHANGE_PLAN_COLOUR);
 	}
 
 	const std::string &GetName() const

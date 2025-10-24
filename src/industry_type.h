@@ -10,7 +10,11 @@
 #ifndef INDUSTRY_TYPE_H
 #define INDUSTRY_TYPE_H
 
-typedef uint16_t IndustryID;
+#include "core/pool_id_type.hpp"
+
+struct IndustryIDTag : public PoolIDTraits<uint16_t, 64000, 0xFFFF> {};
+using IndustryID = PoolID<IndustryIDTag>;
+
 typedef uint16_t IndustryGfx;
 typedef uint8_t IndustryType;
 struct Industry;
@@ -18,7 +22,23 @@ struct Industry;
 struct IndustrySpec;
 struct IndustryTileSpec;
 
-static const IndustryID INVALID_INDUSTRY = 0xFFFF;
+/** Available industry random triggers. */
+enum class IndustryRandomTrigger : uint8_t {
+	TileLoop, ///< The tile of the industry has been triggered during the tileloop.
+	IndustryTick, ///< The industry has been triggered via its tick.
+	CargoReceived, ///< Cargo has been delivered.
+};
+using IndustryRandomTriggers = EnumBitSet<IndustryRandomTrigger, uint8_t>;
+
+/** Animation triggers of the industries. */
+enum class IndustryAnimationTrigger : uint8_t {
+	ConstructionStageChanged, ///< Trigger whenever the construction stage changes.
+	TileLoop, ///< Trigger in the periodic tile loop.
+	IndustryTick, ///< Trigger every tick.
+	CargoReceived, ///< Trigger when cargo is received .
+	CargoDistributed, ///< Trigger when cargo is distributed.
+};
+using IndustryAnimationTriggers = EnumBitSet<IndustryAnimationTrigger, uint8_t>;
 
 static const IndustryType NUM_INDUSTRYTYPES_PER_GRF = 128;            ///< maximum number of industry types per NewGRF; limited to 128 because bit 7 has a special meaning in some variables/callbacks (see MapNewGRFIndustryType).
 

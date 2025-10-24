@@ -27,8 +27,7 @@
  */
 static bool CheckAPIVersion(const std::string &api_version)
 {
-	static constexpr std::initializer_list<const char*> versions{ "0.7", "1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "12", "13", "14", "15" };
-	return std::find_if(versions.begin(), versions.end(), [&](const char *v) { return api_version == v; }) != versions.end();
+	return std::ranges::find(AIInfo::ApiVersions, api_version) != std::end(AIInfo::ApiVersions);
 }
 
 #if defined(_WIN32)
@@ -44,17 +43,17 @@ template <> const char *GetClassName<AIInfo, ScriptType::AI>() { return "AIInfo"
 	SQAIInfo.AddConstructor<void (AIInfo::*)(), 1>(engine, "x");
 	SQAIInfo.DefSQAdvancedMethod(engine, &AIInfo::AddSetting, "AddSetting");
 	SQAIInfo.DefSQAdvancedMethod(engine, &AIInfo::AddLabels, "AddLabels");
-	SQAIInfo.DefSQConst(engine, SCRIPTCONFIG_NONE, "CONFIG_NONE");
-	SQAIInfo.DefSQConst(engine, SCRIPTCONFIG_NONE, "CONFIG_RANDOM"); // Deprecated, mapped to NONE.
-	SQAIInfo.DefSQConst(engine, SCRIPTCONFIG_BOOLEAN, "CONFIG_BOOLEAN");
-	SQAIInfo.DefSQConst(engine, SCRIPTCONFIG_INGAME, "CONFIG_INGAME");
-	SQAIInfo.DefSQConst(engine, SCRIPTCONFIG_DEVELOPER, "CONFIG_DEVELOPER");
+	SQAIInfo.DefSQConst(engine, ScriptConfigFlags{}.base(), "CONFIG_NONE");
+	SQAIInfo.DefSQConst(engine, ScriptConfigFlags{}.base(), "CONFIG_RANDOM"); // Deprecated, mapped to NONE.
+	SQAIInfo.DefSQConst(engine, ScriptConfigFlags{ScriptConfigFlag::Boolean}.base(), "CONFIG_BOOLEAN");
+	SQAIInfo.DefSQConst(engine, ScriptConfigFlags{ScriptConfigFlag::InGame}.base(), "CONFIG_INGAME");
+	SQAIInfo.DefSQConst(engine, ScriptConfigFlags{ScriptConfigFlag::Developer}.base(), "CONFIG_DEVELOPER");
 
 	/* Pre 1.2 had an AI prefix */
-	SQAIInfo.DefSQConst(engine, SCRIPTCONFIG_NONE, "AICONFIG_NONE");
-	SQAIInfo.DefSQConst(engine, SCRIPTCONFIG_NONE, "AICONFIG_RANDOM"); // Deprecated, mapped to NONE.
-	SQAIInfo.DefSQConst(engine, SCRIPTCONFIG_BOOLEAN, "AICONFIG_BOOLEAN");
-	SQAIInfo.DefSQConst(engine, SCRIPTCONFIG_INGAME, "AICONFIG_INGAME");
+	SQAIInfo.DefSQConst(engine, ScriptConfigFlags{}.base(), "AICONFIG_NONE");
+	SQAIInfo.DefSQConst(engine, ScriptConfigFlags{}.base(), "AICONFIG_RANDOM"); // Deprecated, mapped to NONE.
+	SQAIInfo.DefSQConst(engine, ScriptConfigFlags{ScriptConfigFlag::Boolean}.base(), "AICONFIG_BOOLEAN");
+	SQAIInfo.DefSQConst(engine, ScriptConfigFlags{ScriptConfigFlag::InGame}.base(), "AICONFIG_INGAME");
 
 	SQAIInfo.PostRegister(engine);
 	engine->AddMethod("RegisterAI", &AIInfo::Constructor, 2, "tx");
@@ -73,6 +72,7 @@ template <> const char *GetClassName<AIInfo, ScriptType::AI>() { return "AIInfo"
 
 	if (info->engine->MethodExists(info->SQ_instance, "MinVersionToLoad")) {
 		if (!info->engine->CallIntegerMethod(info->SQ_instance, "MinVersionToLoad", &info->min_loadable_version, MAX_GET_OPS)) return SQ_ERROR;
+		if (info->min_loadable_version < 0) return SQ_ERROR;
 	} else {
 		info->min_loadable_version = info->GetVersion();
 	}
@@ -106,7 +106,7 @@ template <> const char *GetClassName<AIInfo, ScriptType::AI>() { return "AIInfo"
 	SQUserPointer instance;
 	sq_getinstanceup(vm, 2, &instance, nullptr);
 	AIInfo *info = (AIInfo *)instance;
-	info->api_version = fmt::format("{}.{}", GB(_openttd_newgrf_version, 28, 4), GB(_openttd_newgrf_version, 24, 4));
+	info->api_version = *std::rbegin(AIInfo::ApiVersions);
 
 	SQInteger res = ScriptInfo::Constructor(vm, info);
 	if (res != 0) return res;

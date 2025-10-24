@@ -16,12 +16,12 @@
 /**
  * Ground types. Valid densities in comments after the enum.
  */
-enum ClearGround {
+enum ClearGround : uint8_t {
 	CLEAR_GRASS  = 0, ///< 0-3
 	CLEAR_ROUGH  = 1, ///< 3
 	CLEAR_ROCKS  = 2, ///< 3
 	CLEAR_FIELDS = 3, ///< 3
-	CLEAR_SNOW   = 4, ///< 0-3
+	CLEAR_SNOW   = 4, ///< 0-3 (Not stored in map.)
 	CLEAR_DESERT = 5, ///< 1,3
 };
 
@@ -39,18 +39,6 @@ inline bool IsSnowTile(TileIndex t)
 }
 
 /**
- * Get the type of clear tile but never return CLEAR_SNOW.
- * @param t the tile to get the clear ground type of
- * @pre IsTileType(t, MP_CLEAR)
- * @return the ground type
- */
-inline ClearGround GetRawClearGround(TileIndex t)
-{
-	dbg_assert_tile(IsTileType(t, MP_CLEAR), t);
-	return (ClearGround)GB(_m[t].m5, 2, 3);
-}
-
-/**
  * Get the type of clear tile.
  * @param t the tile to get the clear ground type of
  * @pre IsTileType(t, MP_CLEAR)
@@ -58,8 +46,8 @@ inline ClearGround GetRawClearGround(TileIndex t)
  */
 inline ClearGround GetClearGround(TileIndex t)
 {
-	if (IsSnowTile(t)) return CLEAR_SNOW;
-	return GetRawClearGround(t);
+	dbg_assert_tile(IsTileType(t, MP_CLEAR), t);
+	return (ClearGround)GB(_m[t].m5, 2, 3);
 }
 
 /**
@@ -207,7 +195,7 @@ inline IndustryID GetIndustryIndexOfField(TileIndex t)
 inline void SetIndustryIndexOfField(TileIndex t, IndustryID i)
 {
 	dbg_assert_tile(GetClearGround(t) == CLEAR_FIELDS, t);
-	_m[t].m2 = i;
+	_m[t].m2 = i.base();
 }
 
 
@@ -282,7 +270,7 @@ inline void MakeField(TileIndex t, uint field_type, IndustryID industry)
 	SetTileType(t, MP_CLEAR);
 	_m[t].m1 = 0;
 	SetTileOwner(t, OWNER_NONE);
-	_m[t].m2 = industry;
+	_m[t].m2 = industry.base();
 	_m[t].m3 = field_type;
 	_m[t].m4 = 0 << 5 | 0 << 2;
 	SetClearGroundDensity(t, CLEAR_FIELDS, 3);
@@ -295,13 +283,13 @@ inline void MakeField(TileIndex t, uint field_type, IndustryID industry)
  * Make a snow tile.
  * @param t the tile to make snowy
  * @param density The density of snowiness.
- * @pre GetClearGround(t) != CLEAR_SNOW
+ * @pre !IsSnowTile(t)
  */
 inline void MakeSnow(TileIndex t, uint density = 0)
 {
-	dbg_assert_tile(GetClearGround(t) != CLEAR_SNOW, t);
+	dbg_assert_tile(!IsSnowTile(t), t);
 	SetBit(_m[t].m3, 4);
-	if (GetRawClearGround(t) == CLEAR_FIELDS) {
+	if (GetClearGround(t) == CLEAR_FIELDS) {
 		SetClearGroundDensity(t, CLEAR_GRASS, density);
 	} else {
 		SetClearDensity(t, density);
@@ -311,11 +299,11 @@ inline void MakeSnow(TileIndex t, uint density = 0)
 /**
  * Clear the snow from a tile and return it to its previous type.
  * @param t the tile to clear of snow
- * @pre GetClearGround(t) == CLEAR_SNOW
+ * @pre IsSnowTile(t)
  */
 inline void ClearSnow(TileIndex t)
 {
-	dbg_assert_tile(GetClearGround(t) == CLEAR_SNOW, t);
+	dbg_assert_tile(IsSnowTile(t), t);
 	ClrBit(_m[t].m3, 4);
 	SetClearDensity(t, 3);
 }

@@ -10,9 +10,12 @@
 #ifndef SCRIPT_OBJECT_HPP
 #define SCRIPT_OBJECT_HPP
 
+#include "../../command_type.h"
+#include "../../company_type.h"
 #include "../../road_type.h"
 #include "../../rail_type.h"
 #include "../../core/random_func.hpp"
+#include "../../core/typed_container.hpp"
 
 #include "script_types.hpp"
 #include "script_log_types.hpp"
@@ -82,6 +85,22 @@ protected:
 		static ScriptInstance *active;  ///< The global current active instance.
 	};
 
+	/**
+	 * Save this object.
+	 * Must push 2 elements on the stack:
+	 *  - the name (classname without "Script") of the object (OT_STRING)
+	 *  - the data for the object (any supported types)
+	 * @return True iff saving this type is supported.
+	 */
+	virtual bool SaveObject(HSQUIRRELVM) { return false; }
+
+	/**
+	 * Load this object.
+	 * The data for the object must be pushed on the stack before the call.
+	 * @return True iff loading this type is supported.
+	 */
+	virtual bool LoadObject(HSQUIRRELVM) { return false; }
+
 public:
 	/**
 	 * Store the latest result of a DoCommand per company.
@@ -107,41 +126,67 @@ public:
 	 */
 	static void InitializeRandomizers();
 
+private:
+	static bool DoCommandImplementation(Commands cmd, TileIndex tile, CommandPayloadBase &&payload, Script_SuspendCallbackProc *callback, DoCommandIntlFlag intl_flags);
+
 protected:
-	/**
-	 * Executes a raw DoCommand for the script.
-	 */
-	static bool DoCommandEx(TileIndex tile, uint32_t p1, uint32_t p2, uint64_t p3, uint cmd, const char *text = nullptr, const struct CommandAuxiliaryBase *aux_data = nullptr, Script_SuspendCallbackProc *callback = nullptr);
-
-	static bool DoCommandEx(TileIndex tile, uint32_t p1, uint32_t p2, uint64_t p3, uint cmd, const std::string &text, const struct CommandAuxiliaryBase *aux_data = nullptr, Script_SuspendCallbackProc *callback = nullptr)
+	template <Commands cmd>
+	static bool DoCommand(TileIndex tile, typename CommandTraits<cmd>::PayloadType &&payload, Script_SuspendCallbackProc *callback = nullptr)
 	{
-		return ScriptObject::DoCommandEx(tile, p1, p2, p3, cmd, text.c_str(), aux_data, callback);
+		if constexpr (CommandTraits<cmd>::flags.Test(CommandFlag::ClientID)) {
+			SetCommandPayloadClientID(payload, (ClientID)UINT32_MAX);
+		}
+		return ScriptObject::DoCommandImplementation(cmd, tile, std::move(payload), callback, DCIF_TYPE_CHECKED);
 	}
 
-	static bool DoCommand(TileIndex tile, uint32_t p1, uint32_t p2, uint cmd, const char *text = nullptr, Script_SuspendCallbackProc *callback = nullptr)
-	{
-		return ScriptObject::DoCommandEx(tile, p1, p2, 0, cmd, text, nullptr, callback);
-	}
+	template <Commands TCmd, typename T> struct ScriptDoCommandHelper;
+	template <Commands TCmd, typename T> struct ScriptDoCommandHelperNoTile;
 
-	static bool DoCommand(TileIndex tile, uint32_t p1, uint32_t p2, uint cmd, const std::string &text, Script_SuspendCallbackProc *callback = nullptr)
-	{
-		return ScriptObject::DoCommandEx(tile, p1, p2, 0, cmd, text.c_str(), nullptr, callback);
-	}
+	template <Commands Tcmd, typename... Targs>
+	struct ScriptDoCommandHelper<Tcmd, std::tuple<Targs...>> {
+		using PayloadType = CmdPayload<Tcmd>;
 
-	static bool DoCommandAux(TileIndex tile, const struct CommandAuxiliaryBase *aux_data, uint cmd, Script_SuspendCallbackProc *callback = nullptr)
-	{
-		return ScriptObject::DoCommandEx(tile, 0, 0, 0, cmd, nullptr, aux_data, callback);
-	}
+		static bool Do(Script_SuspendCallbackProc *callback, TileIndex tile, Targs... args)
+		{
+			return ScriptObject::DoCommand<Tcmd>(tile, PayloadType::Make(std::forward<Targs>(args)...), callback);
+		}
+
+		static bool Do(TileIndex tile, Targs... args)
+		{
+			return ScriptObject::DoCommand<Tcmd>(tile, PayloadType::Make(std::forward<Targs>(args)...), nullptr);
+		}
+	};
+
+	template <Commands Tcmd, typename... Targs>
+	struct ScriptDoCommandHelperNoTile<Tcmd, std::tuple<Targs...>> {
+		using PayloadType = CmdPayload<Tcmd>;
+
+		static bool Do(Script_SuspendCallbackProc *callback, Targs... args)
+		{
+			return ScriptObject::DoCommand<Tcmd>(TileIndex{0}, PayloadType::Make(std::forward<Targs>(args)...), callback);
+		}
+
+		static bool Do(Targs... args)
+		{
+			return ScriptObject::DoCommand<Tcmd>(TileIndex{0}, PayloadType::Make(std::forward<Targs>(args)...), nullptr);
+		}
+	};
+
+	/* Note that output_no_tile is used here instead of input_no_tile, because a tile index used only for error messages is not useful */
+	template <Commands Tcmd>
+	struct Command : public std::conditional_t<::CommandTraits<Tcmd>::output_no_tile,
+			ScriptDoCommandHelperNoTile<Tcmd, typename ::CmdPayload<Tcmd>::Tuple>,
+			ScriptDoCommandHelper<Tcmd, typename ::CmdPayload<Tcmd>::Tuple>> {};
 
 	/**
 	 * Store the latest command executed by the script.
 	 */
-	static void SetLastCommand(TileIndex tile, uint32_t p1, uint32_t p2, uint64_t p3, uint cmd);
+	static void SetLastCommand(Commands cmd, TileIndex tile, CallbackParameter cb_param);
 
 	/**
 	 * Check if it's the latest command executed by the script.
 	 */
-	static bool CheckLastCommand(TileIndex tile, uint32_t p1, uint32_t p2, uint64_t p3, uint cmd);
+	static bool CheckLastCommand(Commands cmd, TileIndex tile, CallbackParameter cb_param);
 
 	/**
 	 * Sets the DoCommand costs counter to a value.
@@ -234,36 +279,6 @@ protected:
 	static bool GetLastCommandRes();
 
 	/**
-	 * Get the latest stored new_vehicle_id.
-	 */
-	static VehicleID GetNewVehicleID();
-
-	/**
-	 * Get the latest stored new_sign_id.
-	 */
-	static SignID GetNewSignID();
-
-	/**
-	 * Get the latest stored new_group_id.
-	 */
-	static GroupID GetNewGroupID();
-
-	/**
-	 * Get the latest stored new_goal_id.
-	 */
-	static GoalID GetNewGoalID();
-
-	/**
-	 * Get the latest stored new_story_page_id.
-	 */
-	static StoryPageID GetNewStoryPageID();
-
-	/**
-	 * Get the latest stored new_story_page_id.
-	 */
-	static StoryPageID GetNewStoryPageElementID();
-
-	/**
 	 * Store a allow_do_command per company.
 	 * @param allow The new allow.
 	 */
@@ -283,21 +298,21 @@ protected:
 	 *  information about.
 	 * @param company The new company.
 	 */
-	static void SetCompany(CompanyID company);
+	static void SetCompany(::CompanyID company);
 
 	/**
 	 * Get the current company we are executing commands for or
 	 *  requesting information about.
 	 * @return The current company.
 	 */
-	static CompanyID GetCompany();
+	static ::CompanyID GetCompany();
 
 	/**
 	 * Get the root company, the company that the script really
 	 *  runs under / for.
 	 * @return The root company.
 	 */
-	static CompanyID GetRootCompany();
+	static ::CompanyID GetRootCompany();
 
 	/**
 	 * Set the cost of the last command.
@@ -312,12 +327,21 @@ protected:
 	/**
 	 * Set the result data of the last command.
 	 */
-	static void SetLastCommandResultData(uint32_t last_result);
+	static void SetLastCommandResultData(CommandResultData last_result);
 
 	/**
-	 * Get the result data of the last command.
+	 * Clear the result data of the last command.
 	 */
-	static uint32_t GetLastCommandResultData();
+	static void ClearLastCommandResultData();
+
+	/**
+	 * Get the result data of the last command, or a default value if there wasn't any.
+	 */
+	template <typename T>
+	static T GetLastCommandResultData(T default_value)
+	{
+		return ScriptObject::GetLastCommandResultDataRaw().GetOrDefault<T>(default_value);
+	}
 
 	/**
 	 * Set a variable that can be used by callback functions to pass information.
@@ -335,62 +359,24 @@ protected:
 	static bool CanSuspend();
 
 	/**
-	 * Get the pointer to store event data in.
+	 * Get the reference to the event queue.
 	 */
-	static void *&GetEventPointer();
+	static struct ScriptEventQueue &GetEventQueue();
 
 	/**
-	 * Get the pointer to store log message in.
+	 * Get the reference to the log message storage.
 	 */
 	static ScriptLogTypes::LogData &GetLogData();
-
-	/**
-	 * Get an allocated string with all control codes stripped off.
-	 */
-	static std::string GetString(StringID string);
 
 	static bool IsNewUniqueLogMessage(const std::string &msg);
 
 	static void RegisterUniqueLogMessage(std::string &&msg);
 
 private:
-	/**
-	 * Store a new_vehicle_id per company.
-	 * @param vehicle_id The new VehicleID.
-	 */
-	static void SetNewVehicleID(VehicleID vehicle_id);
+	static CommandResultData GetLastCommandResultDataRaw();
 
-	/**
-	 * Store a new_sign_id per company.
-	 * @param sign_id The new SignID.
-	 */
-	static void SetNewSignID(SignID sign_id);
-
-	/**
-	 * Store a new_group_id per company.
-	 * @param group_id The new GroupID.
-	 */
-	static void SetNewGroupID(GroupID group_id);
-
-	/**
-	 * Store a new_goal_id per company.
-	 * @param goal_id The new GoalID.
-	 */
-	static void SetNewGoalID(GoalID goal_id);
-
-	/**
-	 * Store a new_story_page_id per company.
-	 * @param story_page_id The new StoryPageID.
-	 */
-	static void SetNewStoryPageID(StoryPageID story_page_id);
-
-	/**
-	 * Store a new_story_page_id per company.
-	 * @param story_page_id The new StoryPageID.
-	 */
-	static void SetNewStoryPageElementID(StoryPageElementID story_page_element_id);
-
-	static Randomizer random_states[OWNER_END]; ///< Random states for each of the scripts (game script uses OWNER_DEITY)
+	using RandomizerArray = TypedIndexContainer<std::array<Randomizer, OWNER_END.base()>, Owner>;
+	static RandomizerArray random_states; ///< Random states for each of the scripts (game script uses OWNER_DEITY)
 };
 
 /**
@@ -435,6 +421,14 @@ public:
 	~ScriptObjectRef()
 	{
 		if (this->data != nullptr) this->data->Release();
+	}
+
+	/**
+	 * Transfer ownership to the caller.
+	 */
+	[[nodiscard]] T *release()
+	{
+		return std::exchange(this->data, nullptr);
 	}
 
 	/**

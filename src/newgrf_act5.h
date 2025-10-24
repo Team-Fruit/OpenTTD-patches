@@ -10,8 +10,10 @@
 #ifndef NEWGRF_ACT5_H
 #define NEWGRF_ACT5_H
 
+#include "gfx_type.h"
+
 /** The type of action 5 type. */
-enum Action5BlockType {
+enum Action5BlockType : uint8_t {
 	A5BLOCK_FIXED,                ///< Only allow replacing a whole block of sprites. (TTDP compatible)
 	A5BLOCK_ALLOW_OFFSET,         ///< Allow replacing any subset by specifiing an offset.
 	A5BLOCK_INVALID,              ///< unknown/not-implemented type

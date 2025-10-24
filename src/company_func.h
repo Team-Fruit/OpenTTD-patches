@@ -14,11 +14,11 @@
 #include "company_type.h"
 #include "gfx_type.h"
 #include "vehicle_type.h"
+#include "core/typed_container.hpp"
 
 bool CheckTakeoverVehicleLimit(CompanyID cbig, CompanyID small);
 void ChangeOwnershipOfCompanyItems(Owner old_owner, Owner new_owner);
-static const int OWNED_BY_OWNER_IN_PARAMETERS_OFFSET = 2; ///< The index in the parameters for the owner information.
-void SetDParamsForOwnedBy(Owner owner, TileIndex tile);
+std::array<StringParameter, 2> GetParamsForOwnedBy(Owner owner, TileIndex tile);
 void SetLocalCompany(CompanyID new_company);
 void ShowBuyCompanyDialog(CompanyID company, bool hostile_takeover);
 void CompanyAdminUpdate(const Company *company);
@@ -31,15 +31,16 @@ Money GetAvailableMoneyForCommand();
 bool CheckCompanyHasMoney(CommandCost &cost);
 void SubtractMoneyFromCompany(const CommandCost &cost);
 void SubtractMoneyFromCompanyFract(CompanyID company, const CommandCost &cost);
-CommandCost CheckOwnership(Owner owner, TileIndex tile = 0);
+CommandCost CheckOwnership(Owner owner, TileIndex tile = {});
 CommandCost CheckTileOwnership(TileIndex tile);
 
 extern CompanyID _local_company;
 extern CompanyID _current_company;
 extern CompanyID _loaded_local_company;
 
-extern Colours _company_colours[MAX_COMPANIES];
-extern CompanyManagerFace _company_manager_face;
+extern TypedIndexContainer<std::array<Colours, MAX_COMPANIES>, CompanyID> _company_colours;
+extern std::string _company_manager_face;
+PaletteID GetCompanyPalette(CompanyID company);
 
 /**
  * Is the current company the local company?
@@ -74,6 +75,6 @@ enum DoStartupNewCompanyFlag {
 };
 DECLARE_ENUM_AS_BIT_SET(DoStartupNewCompanyFlag)
 
-Company *DoStartupNewCompany(DoStartupNewCompanyFlag flags, CompanyID company = INVALID_COMPANY);
+Company *DoStartupNewCompany(DoStartupNewCompanyFlag flags, CompanyID company = CompanyID::Invalid());
 
 #endif /* COMPANY_FUNC_H */

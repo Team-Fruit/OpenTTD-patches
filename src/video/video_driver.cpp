@@ -22,6 +22,8 @@
 #include "../window_func.h"
 #include "video_driver.hpp"
 
+#include "../safeguards.h"
+
 bool _video_hw_accel; ///< Whether to consider hardware accelerated video drivers on startup.
 bool _video_vsync; ///< Whether we should use vsync (only if active video driver supports HW acceleration).
 
@@ -147,8 +149,11 @@ void VideoDriver::Tick()
 
 			this->InputLoop();
 
+			const bool fast_forward_key_active = this->fast_forward_key_pressed && !_networking && _game_mode != GM_MENU &&
+					!FocusedWindowSuppressesTabToFastForward();
+
 			/* Check if the fast-forward button is still pressed. */
-			if (fast_forward_key_pressed && !_networking && _game_mode != GM_MENU) {
+			if (fast_forward_key_active) {
 				ChangeGameSpeed(true);
 				this->fast_forward_via_key = true;
 			} else if (this->fast_forward_via_key) {

@@ -96,7 +96,7 @@ struct LinkGraphNodeStructHandler final : public TypedSaveLoadStructHandler<Link
 
 	void Load(LinkGraph *lg) const override
 	{
-		uint num_nodes = static_cast<uint>(SlGetStructListLength(UINT16_MAX));
+		NodeID num_nodes = static_cast<NodeID>(SlGetStructListLength(UINT16_MAX));
 		lg->Init(num_nodes);
 
 		for (NodeID from = 0; from < num_nodes; ++from) {
@@ -327,7 +327,7 @@ static void Load_LGRP()
 			/* Impossible as they have been present in previous game. */
 			NOT_REACHED();
 		}
-		LinkGraph *lg = new (index) LinkGraph();
+		LinkGraph *lg = new (LinkGraphID(index)) LinkGraph();
 		SlObjectLoadFiltered(lg, slt);
 		if (!is_table) {
 			lg->Init(_num_nodes);
@@ -353,7 +353,7 @@ static void Load_LGRJ()
 			/* Impossible as they have been present in previous game. */
 			NOT_REACHED();
 		}
-		LinkGraphJob *lgj = new (index) LinkGraphJob();
+		LinkGraphJob *lgj = new (LinkGraphJobID(index)) LinkGraphJob();
 		SlObjectLoadFiltered(lgj, slt);
 		if (SlXvIsFeatureMissing(XSLFI_LINKGRAPH_DAY_SCALE)) {
 			extern void GetLinkGraphJobDayLengthScaleAfterLoad(LinkGraphJob *lgj);

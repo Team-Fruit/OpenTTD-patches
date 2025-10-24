@@ -66,7 +66,7 @@ void WriteScopeLog(struct format_target &buffer);
 #endif /* DISABLE_SCOPE_INFO */
 
 template <typename TAG, typename T>
-struct GeneralFmtDumper : public fmt_formattable {
+struct GeneralFmtDumper {
 	T value;
 	GeneralFmtDumper(T value) : value(value) {}
 
@@ -76,7 +76,6 @@ struct GeneralFmtDumper : public fmt_formattable {
 
 struct DumpTileInfoTag{};
 
-using CompanyInfoDumper = GeneralFmtDumper<struct Company, int>;
 using VehicleInfoDumper = GeneralFmtDumper<struct Vehicle, const struct Vehicle *>;
 using StationInfoDumper = GeneralFmtDumper<struct BaseStation, const struct BaseStation *>;
 using TileInfoDumper = GeneralFmtDumper<DumpTileInfoTag, TileIndex>;

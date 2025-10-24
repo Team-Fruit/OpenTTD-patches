@@ -11,12 +11,9 @@
 #define STDAFX_H
 
 #if defined(_WIN32)
-	/* MinGW defaults to Windows 7 if none of these are set, and they must be set before any MinGW header is included */
-#	define NTDDI_VERSION NTDDI_WINXP // Windows XP
-#	define _WIN32_WINNT 0x501        // Windows XP
-#	define _WIN32_WINDOWS 0x501      // Windows XP
-#	define WINVER 0x0501             // Windows XP
-#	define _WIN32_IE_ 0x0600         // 6.0 (XP+)
+	/* Minimum supported version is Windows 7. */
+#	define NTDDI_VERSION NTDDI_WIN7
+#	define _WIN32_WINNT 0x0601 // _WIN32_WINNT_WIN7
 #endif
 
 #ifdef _MSC_VER
@@ -33,7 +30,6 @@
  * We need INT64_MAX, which for most systems comes from stdint.h.
  * For OSX the inclusion is already done in osx_stdafx.h. */
 #	define __STDC_LIMIT_MACROS
-#	define __STDC_FORMAT_MACROS
 #	include <stdint.h>
 #endif /* __APPLE__ */
 
@@ -64,14 +60,6 @@
 /* Stuff for GCC */
 #if defined(__GNUC__) || (defined(__clang__) && !defined(_MSC_VER))
 #	define CDECL
-#	define __int64 long long
-	/* Warn about functions using 'printf' format syntax. First argument determines which parameter
-	 * is the format string, second argument is start of values passed to printf. */
-#	if defined(__MINGW32__) && defined(__USE_MINGW_ANSI_STDIO)
-#		define WARN_FORMAT(string, args) __attribute__ ((format (__MINGW_PRINTF_FORMAT, string, args)))
-#	else
-#		define WARN_FORMAT(string, args) __attribute__ ((format (printf, string, args)))
-#	endif
 	#define WARN_TIME_FORMAT(string) __attribute__ ((format (strftime, string, 0)))
 #endif /* __GNUC__ || __clang__ */
 
@@ -86,7 +74,7 @@
 #endif
 
 #if defined(_MSC_VER)
-	// See https://learn.microsoft.com/en-us/cpp/cpp/empty-bases?view=msvc-170
+	/* See https://learn.microsoft.com/en-us/cpp/cpp/empty-bases?view=msvc-170 */
 #	define EMPTY_BASES __declspec(empty_bases)
 #else
 #	define EMPTY_BASES
@@ -116,11 +104,9 @@
 #	pragma warning(disable: 6011)   // code analyzer: Dereferencing NULL pointer 'pfGetAddrInfo': Lines: 995, 996, 998, 999, 1001
 #	pragma warning(disable: 6326)   // code analyzer: potential comparison of a constant with another constant
 #	pragma warning(disable: 6031)   // code analyzer: Return value ignored: 'ReadFile'
-#	pragma warning(disable: 6255)   // code analyzer: _alloca indicates failure by raising a stack overflow exception. Consider using _malloca instead
 #	pragma warning(disable: 6246)   // code analyzer: Local declaration of 'statspec' hides declaration of the same name in outer scope. For additional information, see previous declaration at ...
 
 #	define CDECL _cdecl
-#	define WARN_FORMAT(string, args)
 #	define WARN_TIME_FORMAT(string)
 
 #	if defined(_WIN32) && !defined(_WIN64)
@@ -207,40 +193,9 @@
 #endif
 #define PACK(type_dec) PACK_N(type_dec, 1)
 
-/* MSVCRT of course has to have a different syntax for long long *sigh* */
-#if defined(_MSC_VER) || (defined(__MINGW32__) && !defined(__USE_MINGW_ANSI_STDIO))
-#   define OTTD_PRINTF64 "%I64d"
-#   define OTTD_PRINTF64U "%I64u"
-#   define OTTD_PRINTFHEX64_SUFFIX "I64X"
-#   define PRINTF_SIZE "%Iu"
-#   define PRINTF_SIZEX "%IX"
-#   define PRINTF_SIZEX_SUFFIX "IX"
-#else
-#if defined(PRId64)
-#   define OTTD_PRINTF64 "%" PRId64
-#else
-#   define OTTD_PRINTF64 "%lld"
-#endif
-#if defined(PRIu64)
-#   define OTTD_PRINTF64U "%" PRIu64
-#else
-#   define OTTD_PRINTF64U "%llu"
-#endif
-#if defined(PRIX64)
-#   define OTTD_PRINTFHEX64_SUFFIX PRIX64
-#else
-#   define OTTD_PRINTFHEX64_SUFFIX "llX"
-#endif
-#   define PRINTF_SIZE "%zu"
-#   define PRINTF_SIZEX "%zX"
-#   define PRINTF_SIZEX_SUFFIX "zX"
-#endif
-#define OTTD_PRINTFHEX64 "%" OTTD_PRINTFHEX64_SUFFIX
-#define OTTD_PRINTFHEX64PAD "%016" OTTD_PRINTFHEX64_SUFFIX
-
 /*
  * When making a (pure) debug build, the compiler will by default disable
- * inlining of functions. This has a detremental effect on the performance of
+ * inlining of functions. This has a detrimental effect on the performance of
  * debug builds, especially when more and more trivial (wrapper) functions get
  * added to the code base.
  * Take for example the savegame called "Wentbourne", when running this game
@@ -349,7 +304,7 @@ char (&ArraySizeHelper(T (&array)[N]))[N];
  * @param variable The variable to get the size of.
  * @return the size of the variable
  */
-#define cpp_sizeof(base, variable) (sizeof(((base*)8)->variable))
+#define cpp_sizeof(base, variable) (sizeof(std::declval<base>().variable))
 
 
 /* take care of some name clashes on MacOS */
@@ -370,6 +325,25 @@ char (&ArraySizeHelper(T (&array)[N]))[N];
 #	define GNU_TARGET(x)
 #endif /* __GNUC__ || __clang__ */
 
+#if !defined(__has_builtin)
+#	define WITH_BUILTIN_ASSUME 0
+#elif __has_builtin(__builtin_assume)
+#	define WITH_BUILTIN_ASSUME 1
+#else
+#	define WITH_BUILTIN_ASSUME 0
+#endif
+
+inline void builtin_assume(bool condition)
+{
+#if WITH_BUILTIN_ASSUME
+	__builtin_assume(condition);
+#elif defined(_MSC_VER)
+	__assume(condition);
+#elif defined(__GNUC__) || defined(__clang__)
+	if (!condition) __builtin_unreachable();
+#endif
+}
+
 #if defined(__GNUC__) || defined(__clang__)
 __attribute__((aligned(1))) typedef uint16_t unaligned_uint16;
 __attribute__((aligned(1))) typedef uint32_t unaligned_uint32;
@@ -383,9 +357,6 @@ typedef uint64_t unaligned_uint64;
 /* Upstream: For the FMT library we only want to use the headers, not link to some library. */
 //#define FMT_HEADER_ONLY
 
-/* This is an inheritable tag, to enable looking for a fmt_format_value method, which takes a struct format_target & */
-struct fmt_formattable{};
-
 /* JSON: Don't include IO stream headers/support */
 #define JSON_NO_IO
 
@@ -395,7 +366,6 @@ struct fmt_formattable{};
 [[noreturn]] void assert_str_error(int line, const char *file, const char *expr, std::string_view str);
 [[noreturn]] void assert_str_error(int line, const char *file, const char *expr, const char *str);
 [[noreturn]] void assert_str_error(int line, const char *file, const char *expr);
-[[noreturn]] void assert_tile_error(int line, const char *file, const char *expr, uint32_t tile);
 [[noreturn]] void not_reached_error(int line, const char *file);
 #define NOT_REACHED() not_reached_error(__LINE__, __FILE__);
 
@@ -444,12 +414,6 @@ inline void free(const void *ptr)
 	free(const_cast<void *>(ptr));
 }
 
-/**
- * The largest value that can be entered in a variable
- * @param type the type of the variable
- */
-#define MAX_UVALUE(type) (static_cast<type>(~static_cast<type>(0)))
-
 #if defined(_MSC_VER) && !defined(_DEBUG)
 #	define IGNORE_UNINITIALIZED_WARNING_START __pragma(warning(push)) __pragma(warning(disable:4700))
 #	define IGNORE_UNINITIALIZED_WARNING_STOP __pragma(warning(pop))
@@ -485,8 +449,6 @@ inline void free(const void *ptr)
 	#define INCLUDE_FOR_PREFETCH_NTA "stdafx.h"
 	#define PREFETCH_NTA(address)
 #endif
-
-#define SINGLE_ARG(...) __VA_ARGS__
 
 #if defined(DEDICATED)
 inline constexpr bool IsHeadless() { return true; }

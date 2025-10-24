@@ -11,11 +11,13 @@
 #include "clear_map.h"
 #include "command_func.h"
 #include "landscape.h"
+#include "landscape_cmd.h"
 #include "genworld.h"
 #include "viewport_func.h"
 #include "core/random_func.hpp"
 #include "newgrf_generic.h"
 #include "newgrf_newlandscape.h"
+#include "tree_func.h"
 
 #include "table/strings.h"
 #include "table/sprites.h"
@@ -25,9 +27,9 @@
 
 bool _allow_rocks_desert = false;
 
-static CommandCost ClearTile_Clear(TileIndex tile, DoCommandFlag flags)
+static CommandCost ClearTile_Clear(TileIndex tile, DoCommandFlags flags)
 {
-	static const Price clear_price_table[] = {
+	static constexpr Price clear_price_table[] = {
 		PR_CLEAR_GRASS,
 		PR_CLEAR_ROUGH,
 		PR_CLEAR_ROCKS,
@@ -37,11 +39,17 @@ static CommandCost ClearTile_Clear(TileIndex tile, DoCommandFlag flags)
 	};
 	CommandCost price(EXPENSES_CONSTRUCTION);
 
-	if (!IsClearGround(tile, CLEAR_GRASS) || GetClearDensity(tile) != 0) {
-		price.AddCost(_price[clear_price_table[GetClearGround(tile)]]);
+	ClearGround ground = GetClearGround(tile);
+	uint8_t density = GetClearDensity(tile);
+	if (IsSnowTile(tile)) {
+		price.AddCost(_price[clear_price_table[ground]]);
+		/* Add a little more for removing snow. */
+		price.AddCost(std::abs(_price[PR_CLEAR_ROUGH] - _price[PR_CLEAR_GRASS]));
+	} else if (ground != CLEAR_GRASS || density != 0) {
+		price.AddCost(_price[clear_price_table[ground]]);
 	}
 
-	if (flags & DC_EXEC) DoClearSquare(tile);
+	if (flags.Test(DoCommandFlag::Execute)) DoClearSquare(tile);
 
 	return price;
 }
@@ -72,12 +80,12 @@ void DrawHillyLandTile(const TileInfo *ti)
 
 SpriteID GetSpriteIDForRocks(const Slope slope, const uint tile_hash)
 {
-	return ((HasGrfMiscBit(GMB_SECOND_ROCKY_TILE_SET) && (tile_hash & 1)) ? SPR_FLAT_ROCKY_LAND_2 : SPR_FLAT_ROCKY_LAND_1) + SlopeToSpriteOffset(slope);
+	return ((HasGrfMiscBit(GrfMiscBit::SecondRockyTileSet) && (tile_hash & 1)) ? SPR_FLAT_ROCKY_LAND_2 : SPR_FLAT_ROCKY_LAND_1) + SlopeToSpriteOffset(slope);
 }
 
 inline SpriteID GetSpriteIDForRocksUsingOffset(const uint slope_to_sprite_offset, const uint x, const uint y)
 {
-	return ((HasGrfMiscBit(GMB_SECOND_ROCKY_TILE_SET) && (TileHash(x, y) & 1)) ? SPR_FLAT_ROCKY_LAND_2 : SPR_FLAT_ROCKY_LAND_1) + slope_to_sprite_offset;
+	return ((HasGrfMiscBit(GrfMiscBit::SecondRockyTileSet) && (TileHash(x, y) & 1)) ? SPR_FLAT_ROCKY_LAND_2 : SPR_FLAT_ROCKY_LAND_1) + slope_to_sprite_offset;
 }
 
 bool DrawCustomSpriteIDForRocks(const TileInfo *ti, uint8_t slope_to_sprite_offset, bool require_snow_flag)
@@ -155,7 +163,10 @@ static void DrawClearLandFence(const TileInfo *ti)
 
 static void DrawTile_Clear(TileInfo *ti, DrawTileProcParams params)
 {
-	switch (GetClearGround(ti->tile)) {
+	ClearGround real_ground = GetClearGround(ti->tile);
+	ClearGround ground = IsSnowTile(ti->tile) ? CLEAR_SNOW : real_ground;
+
+	switch (ground) {
 		case CLEAR_GRASS:
 			if (!params.no_ground_tiles) DrawClearLandTile(ti, GetClearDensity(ti->tile));
 			break;
@@ -182,16 +193,30 @@ static void DrawTile_Clear(TileInfo *ti, DrawTileProcParams params)
 		case CLEAR_SNOW:
 			if (!params.no_ground_tiles) {
 				uint8_t slope_to_sprite_offset = SlopeToSpriteOffset(ti->tileh);
-				if (GetRawClearGround(ti->tile) == CLEAR_ROCKS && !_new_landscape_rocks_grfs.empty()) {
+				if (real_ground == CLEAR_ROCKS && !_new_landscape_rocks_grfs.empty()) {
 					if (DrawCustomSpriteIDForRocks(ti, slope_to_sprite_offset, true)) break;
 				}
-				DrawGroundSprite(GetSpriteIDForSnowDesertUsingOffset(slope_to_sprite_offset, GetClearDensity(ti->tile)), PAL_NONE);
+				uint8_t density = GetClearDensity(ti->tile);
+				DrawGroundSprite(_clear_land_sprites_snow_desert[density] + slope_to_sprite_offset, PAL_NONE);
+				if (real_ground == CLEAR_ROCKS) {
+					/* There 4 levels of snowy overlay rocks, each with 19 sprites. */
+					++density;
+					DrawGroundSprite(SPR_OVERLAY_ROCKS_BASE + (density * 19) + slope_to_sprite_offset, PAL_NONE);
+				}
 			}
 			break;
 
 		case CLEAR_DESERT:
 			if (!params.no_ground_tiles) DrawGroundSprite(GetSpriteIDForSnowDesert(ti->tileh, GetClearDensity(ti->tile)), PAL_NONE);
 			break;
+	}
+
+	if (unlikely(_tree_placer_preview_active) && ground != CLEAR_FIELDS && ground != CLEAR_ROCKS && !IsInvisibilitySet(TO_TREES)) {
+		auto it = _tree_placer_memory.find(ti->tile);
+		if (it != _tree_placer_memory.end()) {
+			extern void DrawClearTileSimulatedTreeTileOverlay(TileInfo *ti, bool secondary_ground, TreeType tree_type, uint8_t count);
+			DrawClearTileSimulatedTreeTileOverlay(ti, ground == CLEAR_SNOW || ground == CLEAR_DESERT, it->second.tree_type, it->second.count);
+		}
 	}
 
 	DrawBridgeMiddle(ti);
@@ -245,7 +270,8 @@ static void TileLoopClearAlps(TileIndex tile)
 		/* Below the snow line, do nothing if no snow. */
 		/* At or above the snow line, make snow tile if needed. */
 		if (k >= 0) {
-			MakeSnow(tile);
+			/* Snow density is started at 0 so that it can gradually reach the required density. */
+			MakeSnow(tile, 0);
 			MarkTileDirtyByTile(tile);
 		}
 		return;
@@ -313,9 +339,12 @@ static void TileLoop_Clear(TileIndex tile)
 	AmbientSoundEffect(tile);
 
 	switch (_settings_game.game_creation.landscape) {
-		case LT_TROPIC: TileLoopClearDesert(tile); break;
-		case LT_ARCTIC: TileLoopClearAlps(tile);   break;
+		case LandscapeType::Tropic: TileLoopClearDesert(tile); break;
+		case LandscapeType::Arctic: TileLoopClearAlps(tile);   break;
+		default: break;
 	}
+
+	if (IsSnowTile(tile)) return;
 
 	switch (GetClearGround(tile)) {
 		case CLEAR_GRASS:
@@ -346,7 +375,7 @@ static void TileLoop_Clear(TileIndex tile)
 				SetClearCounter(tile, 0);
 			}
 
-			if (GetIndustryIndexOfField(tile) == INVALID_INDUSTRY && GetFieldType(tile) >= 7) {
+			if (GetIndustryIndexOfField(tile) == IndustryID::Invalid() && GetFieldType(tile) >= 7) {
 				/* This farmfield is no longer farmfield, so make it grass again */
 				MakeClear(tile, CLEAR_GRASS, 2);
 			} else {
@@ -369,8 +398,8 @@ void GenerateClearTile()
 	TileIndex tile;
 
 	/* add rough tiles */
-	i = ScaleByMapSize(GB(Random(), 0, 10) + 0x400);
-	gi = ScaleByMapSize(GB(Random(), 0, 7) + 0x80);
+	i = Map::ScaleBySize(GB(Random(), 0, 10) + 0x400);
+	gi = Map::ScaleBySize(GB(Random(), 0, 7) + 0x80);
 
 	SetGeneratingWorldProgress(GWP_ROUGH_ROCKY, gi + i);
 	do {
@@ -412,23 +441,25 @@ static TrackStatus GetTileTrackStatus_Clear(TileIndex, TransportType, uint, Diag
 	return 0;
 }
 
-static const StringID _clear_land_str[] = {
-	STR_LAI_CLEAR_DESCRIPTION_GRASS,
-	STR_LAI_CLEAR_DESCRIPTION_ROUGH_LAND,
-	STR_LAI_CLEAR_DESCRIPTION_ROCKS,
-	STR_LAI_CLEAR_DESCRIPTION_FIELDS,
-	STR_LAI_CLEAR_DESCRIPTION_SNOW_COVERED_LAND,
-	STR_LAI_CLEAR_DESCRIPTION_DESERT
-};
-
-static void GetTileDesc_Clear(TileIndex tile, TileDesc *td)
+static void GetTileDesc_Clear(TileIndex tile, TileDesc &td)
 {
-	if (IsClearGround(tile, CLEAR_GRASS) && GetClearDensity(tile) == 0) {
-		td->str = STR_LAI_CLEAR_DESCRIPTION_BARE_LAND;
+	/* Each pair holds a normal and a snowy ClearGround description. */
+	static constexpr std::pair<StringID, StringID> clear_land_str[] = {
+		{STR_LAI_CLEAR_DESCRIPTION_GRASS,      STR_LAI_CLEAR_DESCRIPTION_SNOWY_GRASS},
+		{STR_LAI_CLEAR_DESCRIPTION_ROUGH_LAND, STR_LAI_CLEAR_DESCRIPTION_SNOWY_ROUGH_LAND},
+		{STR_LAI_CLEAR_DESCRIPTION_ROCKS,      STR_LAI_CLEAR_DESCRIPTION_SNOWY_ROCKS},
+		{STR_LAI_CLEAR_DESCRIPTION_FIELDS,     STR_EMPTY},
+		{STR_EMPTY,                            STR_EMPTY}, // CLEAR_SNOW does not appear in the map.
+		{STR_LAI_CLEAR_DESCRIPTION_DESERT,     STR_EMPTY},
+	};
+
+	if (!IsSnowTile(tile) && IsClearGround(tile, CLEAR_GRASS) && GetClearDensity(tile) == 0) {
+		td.str = STR_LAI_CLEAR_DESCRIPTION_BARE_LAND;
 	} else {
-		td->str = _clear_land_str[GetClearGround(tile)];
+		const auto &[name, snowy_name] = clear_land_str[GetClearGround(tile)];
+		td.str = IsSnowTile(tile) ? snowy_name : name;
 	}
-	td->owner[0] = GetTileOwner(tile);
+	td.owner[0] = GetTileOwner(tile);
 }
 
 static void ChangeTileOwner_Clear(TileIndex, Owner, Owner)
@@ -436,9 +467,9 @@ static void ChangeTileOwner_Clear(TileIndex, Owner, Owner)
 	return;
 }
 
-static CommandCost TerraformTile_Clear(TileIndex tile, DoCommandFlag flags, int, Slope)
+static CommandCost TerraformTile_Clear(TileIndex tile, DoCommandFlags flags, int, Slope)
 {
-	return DoCommand(tile, 0, 0, flags, CMD_LANDSCAPE_CLEAR);
+	return Command<CMD_LANDSCAPE_CLEAR>::Do(flags, tile);
 }
 
 extern const TileTypeProcs _tile_type_clear_procs = {

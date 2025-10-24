@@ -39,7 +39,7 @@ void RebuildTownCaches(bool cargo_update_required)
 		town->cache.num_houses = 0;
 	}
 
-	for (TileIndex t = 0; t < MapSize(); t++) {
+	for (TileIndex t(0); t < Map::Size(); t++) {
 		if (!IsTileType(t, MP_HOUSE)) continue;
 
 		HouseID house_id = GetTranslatedHouseID(GetCleanHouseType(t));
@@ -68,7 +68,7 @@ static void CheckMultiTileHouseTypes(bool &cargo_update_required, bool translate
 	};
 
 	/* Check for cases when a NewGRF has set a wrong house substitute type. */
-	for (TileIndex t = 0; t < MapSize(); t++) {
+	for (TileIndex t(0); t < Map::Size(); t++) {
 		if (!IsTileType(t, MP_HOUSE)) continue;
 
 		HouseID house_type = get_clean_house_type(t);
@@ -76,13 +76,13 @@ static void CheckMultiTileHouseTypes(bool &cargo_update_required, bool translate
 		if (t == north_tile) {
 			const HouseSpec *hs = HouseSpec::Get(house_type);
 			bool valid_house = true;
-			if (hs->building_flags & TILE_SIZE_2x1) {
+			if (hs->building_flags.Test(BuildingFlag::Size2x1)) {
 				TileIndex tile = t + TileDiffXY(1, 0);
 				if (!IsTileType(tile, MP_HOUSE) || get_clean_house_type(tile) != house_type + 1) valid_house = false;
-			} else if (hs->building_flags & TILE_SIZE_1x2) {
+			} else if (hs->building_flags.Test(BuildingFlag::Size1x2)) {
 				TileIndex tile = t + TileDiffXY(0, 1);
 				if (!IsTileType(tile, MP_HOUSE) || get_clean_house_type(tile) != house_type + 1) valid_house = false;
-			} else if (hs->building_flags & TILE_SIZE_2x2) {
+			} else if (hs->building_flags.Test(BuildingFlag::Size2x2)) {
 				TileIndex tile = t + TileDiffXY(0, 1);
 				if (!IsTileType(tile, MP_HOUSE) || get_clean_house_type(tile) != house_type + 1) valid_house = false;
 				tile = t + TileDiffXY(1, 0);
@@ -116,7 +116,7 @@ static void CheckMultiTileHouseTypes(bool &cargo_update_required, bool translate
  */
 void UpdateHousesAndTowns(bool cargo_update_required)
 {
-	for (TileIndex t = 0; t < MapSize(); t++) {
+	for (TileIndex t(0); t < Map::Size(); t++) {
 		if (!IsTileType(t, MP_HOUSE)) continue;
 
 		HouseID house_id = GetCleanHouseType(t);
@@ -375,16 +375,16 @@ static void Load_TOWN()
 
 	int index;
 	while ((index = SlIterateArray()) != -1) {
-		Town *t = new (index) Town();
+		Town *t = new (TownID(index)) Town();
 		SlObjectLoadFiltered(t, slt);
 
-		if (t->townnamegrfid == 0 && !IsInsideMM(t->townnametype, SPECSTR_TOWNNAME_START, SPECSTR_TOWNNAME_LAST + 1) && GetStringTab(t->townnametype) != TEXT_TAB_OLD_CUSTOM) {
+		if (t->townnamegrfid == 0 && !IsInsideMM(t->townnametype, SPECSTR_TOWNNAME_START, SPECSTR_TOWNNAME_END) && GetStringTab(t->townnametype) != TEXT_TAB_OLD_CUSTOM) {
 			SlErrorCorrupt("Invalid town name generator");
 		}
 
 		if (SlIsTableChunk()) continue;
 
-		for (CargoID i = 0; i < num_cargo; i++) {
+		for (CargoType i = 0; i < num_cargo; i++) {
 			SlObjectLoadFiltered(&t->supplied[i], supplied_desc);
 		}
 		for (int i = TAE_BEGIN; i < NUM_TAE; i++) {

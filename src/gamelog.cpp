@@ -103,9 +103,9 @@ void GamelogReset()
 static void PrintGrfInfo(format_target &buffer, uint grfid, const MD5Hash *md5sum, const GRFConfig *gc)
 {
 	if (md5sum != nullptr) {
-		buffer.format("GRF ID {:08X}, checksum {}", BSWAP32(grfid), *md5sum);
+		buffer.format("GRF ID {:08X}, checksum {}", std::byteswap(grfid), *md5sum);
 	} else {
-		buffer.format("GRF ID {:08X}", BSWAP32(grfid));
+		buffer.format("GRF ID {:08X}", std::byteswap(grfid));
 	}
 
 	if (gc != nullptr) {
@@ -177,7 +177,7 @@ void GamelogPrint(format_target &buffer)
 					break;
 
 				case GLCT_REVISION:
-					/* The game was loaded in a diffferent version than before. */
+					/* The game was loaded in a different version than before. */
 					buffer.format("Revision text changed to {}, savegame version {}, ",
 						lc->revision.text, lc->revision.slver);
 
@@ -278,7 +278,7 @@ void GamelogPrint(format_target &buffer)
 					/* The order of NewGRFs got changed, which might cause some other NewGRFs to behave differently. */
 					auto gm = grf_names.find(lc->grfrem.grfid);
 					buffer.format("GRF order changed: {:08X} moved {} places {}",
-						BSWAP32(lc->grfmove.grfid), abs(lc->grfmove.offset), lc->grfmove.offset >= 0 ? "down" : "up" );
+						std::byteswap(lc->grfmove.grfid), abs(lc->grfmove.offset), lc->grfmove.offset >= 0 ? "down" : "up" );
 					PrintGrfInfo(buffer, lc->grfmove.grfid, nullptr, gm != grf_names.end() ? gm->second.gc : nullptr);
 					if (gm == grf_names.end()) buffer.append(". Gamelog inconsistency: GrfID was never added!");
 					break;
@@ -287,9 +287,9 @@ void GamelogPrint(format_target &buffer)
 				case GLCT_GRFBUG: {
 					/* A specific bug in a NewGRF, that could cause wide spread problems, has been noted during the execution of the game. */
 					auto gm = grf_names.find(lc->grfrem.grfid);
-					assert (lc->grfbug.bug == GBUG_VEH_LENGTH);
+					assert (lc->grfbug.bug == GRFBug::VehLength);
 
-					buffer.format("Rail vehicle changes length outside a depot: GRF ID {:08X}, internal ID 0x{:X}", BSWAP32(lc->grfbug.grfid), lc->grfbug.data);
+					buffer.format("Rail vehicle changes length outside a depot: GRF ID {:08X}, internal ID 0x{:X}", std::byteswap(lc->grfbug.grfid), lc->grfbug.data);
 					PrintGrfInfo(buffer, lc->grfbug.grfid, nullptr, gm != grf_names.end() ? gm->second.gc : nullptr);
 					if (gm == grf_names.end()) buffer.append(". Gamelog inconsistency: GrfID was never added!");
 					break;
@@ -493,7 +493,7 @@ void GamelogTestMode()
  * @param bug type of bug, @see enum GRFBugs
  * @param data additional data
  */
-static void GamelogGRFBug(uint32_t grfid, uint8_t bug, uint64_t data)
+static void GamelogGRFBug(uint32_t grfid, GRFBug bug, uint64_t data)
 {
 	assert(_gamelog_action_type == GLAT_GRFBUG);
 
@@ -519,14 +519,14 @@ bool GamelogGRFBugReverse(uint32_t grfid, uint16_t internal_id)
 	for (LoggedAction &la : _gamelog_actions) {
 		for (LoggedChange &lc : la.changes) {
 			if (lc.ct == GLCT_GRFBUG && lc.grfbug.grfid == grfid &&
-					lc.grfbug.bug == GBUG_VEH_LENGTH && lc.grfbug.data == internal_id) {
+					lc.grfbug.bug == GRFBug::VehLength && lc.grfbug.data == internal_id) {
 				return false;
 			}
 		}
 	}
 
 	GamelogStartAction(GLAT_GRFBUG);
-	GamelogGRFBug(grfid, GBUG_VEH_LENGTH, internal_id);
+	GamelogGRFBug(grfid, GRFBug::VehLength, internal_id);
 	GamelogStopAction();
 
 	return true;
@@ -538,9 +538,9 @@ bool GamelogGRFBugReverse(uint32_t grfid, uint16_t internal_id)
  * @param g grf to determine
  * @return true iff GRF is not static and is loaded
  */
-static inline bool IsLoggableGrfConfig(const GRFConfig *g)
+static inline bool IsLoggableGrfConfig(const GRFConfig &g)
 {
-	return !HasBit(g->flags, GCF_STATIC) && g->status != GCS_NOT_FOUND;
+	return !g.flags.Test(GRFConfigFlag::Static) && g.status != GCS_NOT_FOUND;
 }
 
 /**
@@ -561,7 +561,7 @@ void GamelogGRFRemove(uint32_t grfid)
  * Logs adding of a GRF
  * @param newg added GRF
  */
-void GamelogGRFAdd(const GRFConfig *newg)
+void GamelogGRFAdd(const GRFConfig &newg)
 {
 	assert(_gamelog_action_type == GLAT_LOAD || _gamelog_action_type == GLAT_START || _gamelog_action_type == GLAT_GRF);
 
@@ -570,7 +570,7 @@ void GamelogGRFAdd(const GRFConfig *newg)
 	LoggedChange *lc = GamelogChange(GLCT_GRFADD);
 	if (lc == nullptr) return;
 
-	lc->grfadd = newg->ident;
+	lc->grfadd = newg.ident;
 }
 
 /**
@@ -578,14 +578,14 @@ void GamelogGRFAdd(const GRFConfig *newg)
  * (the same ID, but different MD5 hash)
  * @param newg new (updated) GRF
  */
-void GamelogGRFCompatible(const GRFIdentifier *newg)
+void GamelogGRFCompatible(const GRFIdentifier &newg)
 {
 	assert(_gamelog_action_type == GLAT_LOAD || _gamelog_action_type == GLAT_GRF);
 
 	LoggedChange *lc = GamelogChange(GLCT_GRFCOMPAT);
 	if (lc == nullptr) return;
 
-	lc->grfcompat = *newg;
+	lc->grfcompat = newg;
 }
 
 /**
@@ -622,39 +622,26 @@ static void GamelogGRFParameters(uint32_t grfid)
 /**
  * Logs adding of list of GRFs.
  * Useful when old savegame is loaded or when new game is started
- * @param newg head of GRF linked list
+ * @param newg the GRFConfigList.
  */
-void GamelogGRFAddList(const GRFConfig *newg)
+void GamelogGRFAddList(const GRFConfigList &newg)
 {
 	assert(_gamelog_action_type == GLAT_START || _gamelog_action_type == GLAT_LOAD);
 
-	for (; newg != nullptr; newg = newg->next) {
-		GamelogGRFAdd(newg);
+	for (const auto &gc : newg) {
+		GamelogGRFAdd(*gc);
 	}
 }
 
-/** List of GRFs using array of pointers instead of linked list */
-struct GRFList {
-	uint n;
-	const GRFConfig *grf[];
-};
-
 /**
  * Generates GRFList
- * @param grfc head of GRF linked list
+ * @param grfc the GRFConfigList.
  */
-static GRFList *GenerateGRFList(const GRFConfig *grfc)
+static std::vector<const GRFConfig *> GenerateGRFList(const GRFConfigList &grfc)
 {
-	uint n = 0;
-	for (const GRFConfig *g = grfc; g != nullptr; g = g->next) {
-		if (IsLoggableGrfConfig(g)) n++;
-	}
-
-	GRFList *list = (GRFList*)MallocT<uint8_t>(sizeof(GRFList) + n * sizeof(GRFConfig*));
-
-	list->n = 0;
-	for (const GRFConfig *g = grfc; g != nullptr; g = g->next) {
-		if (IsLoggableGrfConfig(g)) list->grf[list->n++] = g;
+	std::vector<const GRFConfig *> list;
+	for (const auto &g : grfc) {
+		if (IsLoggableGrfConfig(*g)) list.push_back(g.get());
 	}
 
 	return list;
@@ -665,68 +652,69 @@ static GRFList *GenerateGRFList(const GRFConfig *grfc)
  * @param oldc original GRF list
  * @param newc new GRF list
  */
-void GamelogGRFUpdate(const GRFConfig *oldc, const GRFConfig *newc)
+void GamelogGRFUpdate(const GRFConfigList &oldc, const GRFConfigList &newc)
 {
-	GRFList *ol = GenerateGRFList(oldc);
-	GRFList *nl = GenerateGRFList(newc);
+	std::vector<const GRFConfig *> ol = GenerateGRFList(oldc);
+	std::vector<const GRFConfig *> nl = GenerateGRFList(newc);
 
-	uint o = 0, n = 0;
+	size_t o = 0;
+	size_t n = 0;
 
-	while (o < ol->n && n < nl->n) {
-		const GRFConfig *og = ol->grf[o];
-		const GRFConfig *ng = nl->grf[n];
+	while (o < ol.size() && n < nl.size()) {
+		const GRFConfig *og = ol[o];
+		const GRFConfig *ng = nl[n];
 
 		if (og->ident.grfid != ng->ident.grfid) {
-			uint oi, ni;
-			for (oi = 0; oi < ol->n; oi++) {
-				if (ol->grf[oi]->ident.grfid == nl->grf[n]->ident.grfid) break;
+			size_t oi, ni;
+			for (oi = 0; oi < ol.size(); oi++) {
+				if (ol[oi]->ident.grfid == nl[n]->ident.grfid) break;
 			}
 			if (oi < o) {
 				/* GRF was moved, this change has been logged already */
 				n++;
 				continue;
 			}
-			if (oi == ol->n) {
+			if (oi == ol.size()) {
 				/* GRF couldn't be found in the OLD list, GRF was ADDED */
-				GamelogGRFAdd(nl->grf[n++]);
+				GamelogGRFAdd(*nl[n++]);
 				continue;
 			}
-			for (ni = 0; ni < nl->n; ni++) {
-				if (nl->grf[ni]->ident.grfid == ol->grf[o]->ident.grfid) break;
+			for (ni = 0; ni < nl.size(); ni++) {
+				if (nl[ni]->ident.grfid == ol[o]->ident.grfid) break;
 			}
 			if (ni < n) {
 				/* GRF was moved, this change has been logged already */
 				o++;
 				continue;
 			}
-			if (ni == nl->n) {
+			if (ni == nl.size()) {
 				/* GRF couldn't be found in the NEW list, GRF was REMOVED */
-				GamelogGRFRemove(ol->grf[o++]->ident.grfid);
+				GamelogGRFRemove(ol[o++]->ident.grfid);
 				continue;
 			}
 
 			/* o < oi < ol->n
 			 * n < ni < nl->n */
-			assert(ni > n && ni < nl->n);
-			assert(oi > o && oi < ol->n);
+			assert(ni > n && ni < nl.size());
+			assert(oi > o && oi < ol.size());
 
 			ni -= n; // number of GRFs it was moved downwards
 			oi -= o; // number of GRFs it was moved upwards
 
 			if (ni >= oi) { // prefer the one that is moved further
 				/* GRF was moved down */
-				GamelogGRFMove(ol->grf[o++]->ident.grfid, ni);
+				GamelogGRFMove(ol[o++]->ident.grfid, (int)ni);
 			} else {
-				GamelogGRFMove(nl->grf[n++]->ident.grfid, -(int)oi);
+				GamelogGRFMove(nl[n++]->ident.grfid, -(int)oi);
 			}
 		} else {
 			if (og->ident.md5sum != ng->ident.md5sum) {
 				/* md5sum changed, probably loading 'compatible' GRF */
-				GamelogGRFCompatible(&nl->grf[n]->ident);
+				GamelogGRFCompatible(nl[n]->ident);
 			}
 
 			if (og->param != ng->param) {
-				GamelogGRFParameters(ol->grf[o]->ident.grfid);
+				GamelogGRFParameters(ol[o]->ident.grfid);
 			}
 
 			o++;
@@ -734,11 +722,8 @@ void GamelogGRFUpdate(const GRFConfig *oldc, const GRFConfig *newc)
 		}
 	}
 
-	while (o < ol->n) GamelogGRFRemove(ol->grf[o++]->ident.grfid); // remaining GRFs were removed ...
-	while (n < nl->n) GamelogGRFAdd   (nl->grf[n++]);              // ... or added
-
-	free(ol);
-	free(nl);
+	while (o < ol.size()) GamelogGRFRemove(ol[o++]->ident.grfid); // remaining GRFs were removed ...
+	while (n < nl.size()) GamelogGRFAdd(*nl[n++]);                // ... or added
 }
 
 /**

@@ -54,7 +54,7 @@ static const SpriteID SPR_LARGE_SMALL_WINDOW = 682;
 
 /** Extra graphic spritenumbers */
 static const SpriteID SPR_OPENTTD_BASE   = 4896;
-static const uint16_t OPENTTD_SPRITE_COUNT = 191;
+static const uint16_t OPENTTD_SPRITE_COUNT = 192;
 
 /* Halftile-selection sprites */
 static const SpriteID SPR_HALFTILE_SELECTION_FLAT = SPR_OPENTTD_BASE;
@@ -172,6 +172,8 @@ static const SpriteID SPR_JOIN                       = SPR_OPENTTD_BASE + 188;
 static const SpriteID SPR_PLAYER_SELF                = SPR_OPENTTD_BASE + 189;
 static const SpriteID SPR_PLAYER_HOST                = SPR_OPENTTD_BASE + 190;
 
+static const SpriteID SPR_EXTRA_MENU                 = SPR_OPENTTD_BASE + 191;
+
 static const SpriteID SPR_IMG_CARGOFLOW              = SPR_OPENTTD_BASE + 174;
 
 static const SpriteID SPR_SIGNALS_BASE  = SPR_OPENTTD_BASE + OPENTTD_SPRITE_COUNT;
@@ -202,13 +204,13 @@ static const SpriteID SPR_TRACKS_FOR_SLOPES_MAGLEV_BASE = SPR_TRACKS_FOR_SLOPES_
 static const uint16_t TRACKS_FOR_SLOPES_SPRITE_COUNT = 12;
 
 static const SpriteID SPR_SLOPES_BASE              = SPR_TRACKS_FOR_SLOPES_BASE + TRACKS_FOR_SLOPES_SPRITE_COUNT;
-static const SpriteID SPR_SLOPES_INCLINED_OFFSET   = 15;
-static const SpriteID SPR_SLOPES_VIRTUAL_BASE      = SPR_SLOPES_BASE - SPR_SLOPES_INCLINED_OFFSET; // The original foundations (see SPR_FOUNDATION_BASE below) are mapped before the additional foundations.
-static const SpriteID SPR_TRKFOUND_BLOCK_SIZE      = 22; // The normal track foundation sprites are organized in blocks of 22.
+static const uint16_t SLOPES_INCLINED_OFFSET = 15;
+static const SpriteID SPR_SLOPES_VIRTUAL_BASE      = SPR_SLOPES_BASE - SLOPES_INCLINED_OFFSET; // The original foundations (see SPR_FOUNDATION_BASE below) are mapped before the additional foundations.
+static const uint16_t TRKFOUND_BLOCK_SIZE = 22; // The normal track foundation sprites are organized in blocks of 22.
 static const uint16_t NORMAL_FOUNDATION_SPRITE_COUNT = 74;
 /** Halftile foundations */
 static const SpriteID SPR_HALFTILE_FOUNDATION_BASE = SPR_SLOPES_BASE + NORMAL_FOUNDATION_SPRITE_COUNT;
-static const SpriteID SPR_HALFTILE_BLOCK_SIZE      = 4;  // The half tile foundation sprites are organized in blocks of 4.
+static const uint16_t HALFTILE_BLOCK_SIZE = 4; // The half tile foundation sprites are organized in blocks of 4.
 static const uint16_t NORMAL_AND_HALFTILE_FOUNDATION_SPRITE_COUNT = 90;
 
 static const SpriteID SPR_AUTORAIL_BASE = SPR_HALFTILE_FOUNDATION_BASE + NORMAL_AND_HALFTILE_FOUNDATION_SPRITE_COUNT;
@@ -222,11 +224,11 @@ static const uint16_t TWOCCMAP_SPRITE_COUNT = 256;
 
 /** shore tiles - action 05-0D */
 static const SpriteID SPR_SHORE_BASE                  = SPR_2CCMAP_BASE + TWOCCMAP_SPRITE_COUNT;
-static const SpriteID SPR_SHORE_SPRITE_COUNT          = 18;
+static const uint16_t SHORE_SPRITE_COUNT = 18;
 static const SpriteID SPR_ORIGINALSHORE_START         = 4062;
 static const SpriteID SPR_ORIGINALSHORE_END           = 4069;
 
-static const SpriteID SPR_AIRPORTX_BASE     = SPR_SHORE_BASE + SPR_SHORE_SPRITE_COUNT; // The sprites used for other airport angles
+static const SpriteID SPR_AIRPORTX_BASE     = SPR_SHORE_BASE + SHORE_SPRITE_COUNT; // The sprites used for other airport angles
 static const SpriteID SPR_NEWAIRPORT_TARMAC = SPR_AIRPORTX_BASE;
 static const SpriteID SPR_NSRUNWAY1         = SPR_AIRPORTX_BASE + 1;
 static const SpriteID SPR_NSRUNWAY2         = SPR_AIRPORTX_BASE + 2;
@@ -255,9 +257,9 @@ static const SpriteID SPR_AIRPORT_PREVIEW_COMMUTER         = SPR_AIRPORT_PREVIEW
 static const SpriteID SPR_AIRPORT_PREVIEW_HELIDEPOT        = SPR_AIRPORT_PREVIEW_BASE + 6;
 static const SpriteID SPR_AIRPORT_PREVIEW_INTERCONTINENTAL = SPR_AIRPORT_PREVIEW_BASE + 7;
 static const SpriteID SPR_AIRPORT_PREVIEW_HELISTATION      = SPR_AIRPORT_PREVIEW_BASE + 8;
-static const SpriteID SPR_AIRPORT_PREVIEW_COUNT            = 9;
+static const uint16_t AIRPORT_PREVIEW_SPRITE_COUNT = 9;
 
-static const SpriteID SPR_ROADSTOP_BASE     = SPR_AIRPORT_PREVIEW_BASE + SPR_AIRPORT_PREVIEW_COUNT; // The sprites used for drive-through road stops
+static const SpriteID SPR_ROADSTOP_BASE     = SPR_AIRPORT_PREVIEW_BASE + AIRPORT_PREVIEW_SPRITE_COUNT; // The sprites used for drive-through road stops
 static const SpriteID SPR_BUS_STOP_DT_Y_W   = SPR_ROADSTOP_BASE;
 static const SpriteID SPR_BUS_STOP_DT_Y_E   = SPR_ROADSTOP_BASE + 1;
 static const SpriteID SPR_BUS_STOP_DT_X_W   = SPR_ROADSTOP_BASE + 2;
@@ -272,7 +274,7 @@ static const uint16_t ROADSTOP_SPRITE_COUNT = 8;
 static const SpriteID SPR_TRAMWAY_BASE                 = SPR_ROADSTOP_BASE + ROADSTOP_SPRITE_COUNT;
 static const SpriteID SPR_TRAMWAY_OVERLAY              = SPR_TRAMWAY_BASE + 4;
 static const SpriteID SPR_TRAMWAY_TRAM                 = SPR_TRAMWAY_BASE + 27;
-static const SpriteID SPR_TRAMWAY_SLOPED_OFFSET        = 11;
+static const uint16_t TRAMWAY_SLOPED_OFFSET = 11;
 static const SpriteID SPR_TRAMWAY_BUS_STOP_DT_Y_W      = SPR_TRAMWAY_BASE + 25;
 static const SpriteID SPR_TRAMWAY_BUS_STOP_DT_Y_E      = SPR_TRAMWAY_BASE + 23;
 static const SpriteID SPR_TRAMWAY_BUS_STOP_DT_X_W      = SPR_TRAMWAY_BASE + 24;
@@ -291,8 +293,8 @@ static const uint16_t TRAMWAY_SPRITE_COUNT = 119;
 
 /** One way road sprites */
 static const SpriteID SPR_ONEWAY_BASE           = SPR_TRAMWAY_BASE + TRAMWAY_SPRITE_COUNT;
-static const SpriteID SPR_ONEWAY_SLOPE_N_OFFSET = 6;
-static const SpriteID SPR_ONEWAY_SLOPE_S_OFFSET = 12;
+static const uint16_t ONEWAY_SLOPE_N_OFFSET = 6;
+static const uint16_t ONEWAY_SLOPE_S_OFFSET = 12;
 static const uint16_t ONEWAY_SPRITE_COUNT = 18;
 
 /** Tunnel sprites with grass only for custom railtype tunnel. */
@@ -315,8 +317,12 @@ static const SpriteID SPR_ROAD_WAYPOINT_X_W   = SPR_ROAD_WAYPOINTS_BASE + 2;
 static const SpriteID SPR_ROAD_WAYPOINT_X_E   = SPR_ROAD_WAYPOINTS_BASE + 3;
 static const uint16_t ROAD_WAYPOINTS_SPRITE_COUNT = 4;
 
+/** Overlay rocks sprites. */
+static constexpr SpriteID SPR_OVERLAY_ROCKS_BASE = SPR_ROAD_WAYPOINTS_BASE + ROAD_WAYPOINTS_SPRITE_COUNT;
+static constexpr uint16_t OVERLAY_ROCKS_SPRITE_COUNT = 19 * 5; /* Rock overlays: plain, snow 1, snow 2, snow 3 and full snow. */
+
 /* Programmable pre-signal sprites */
-static const SpriteID SPR_PROGSIGNAL_BASE = SPR_ROAD_WAYPOINTS_BASE + ROAD_WAYPOINTS_SPRITE_COUNT;
+static const SpriteID SPR_PROGSIGNAL_BASE = SPR_OVERLAY_ROCKS_BASE + OVERLAY_ROCKS_SPRITE_COUNT;
 static const uint16_t PROGSIGNAL_SPRITE_COUNT = 32;
 static const SpriteID SPR_DUP_PROGSIGNAL_BASE = SPR_PROGSIGNAL_BASE + PROGSIGNAL_SPRITE_COUNT;
 
@@ -352,7 +358,7 @@ static const uint16_t TRACERESTRICT_SPRITE_COUNT = 3;
 
 /* Misc GUI sprites */
 static const SpriteID SPR_MISC_GUI_BASE = SPR_TRACERESTRICT_BASE + TRACERESTRICT_SPRITE_COUNT;
-static const uint16_t MISC_GUI_SPRITE_COUNT = 1;
+static const uint16_t MISC_GUI_SPRITE_COUNT = 2;
 
 /* Duplicated signal sprites */
 static const SpriteID SPR_DUP_ORIGINAL_SIGNALS_BASE = SPR_MISC_GUI_BASE + MISC_GUI_SPRITE_COUNT;
@@ -412,9 +418,9 @@ static const SpriteID SPR_STATUE_COMPANY          = 2632;
 static const SpriteID SPR_BOUGHT_LAND             = 4790;
 
 /* sprites for rail and rail stations*/
-static const SpriteID SPR_RAIL_SNOW_OFFSET        = 26;
-static const SpriteID SPR_MONO_SNOW_OFFSET        = 26;
-static const SpriteID SPR_MGLV_SNOW_OFFSET        = 26;
+static const uint16_t SPR_RAIL_SNOW_OFFSET        = 26;
+static const uint16_t SPR_MONO_SNOW_OFFSET        = 26;
+static const uint16_t SPR_MGLV_SNOW_OFFSET        = 26;
 
 static const SpriteID SPR_ORIGINAL_SIGNALS_BASE   = 1275;
 
@@ -1663,5 +1669,7 @@ static const PaletteID PALETTE_CHURCH_RED          = 1438; ///< Recolour sprite 
 static const PaletteID PALETTE_CHURCH_CREAM        = 1439; ///< Recolour sprite for white churches
 
 static const PaletteID PALETTE_ALL_BLACK           = SPR_PALETTE_BASE; ///< Exchange any color by black, needed for painting fictive tiles outside map
+
+static const PaletteID PALETTE_WHITE_TINT          = SPR_MISC_GUI_BASE + 1;
 
 #endif /* SPRITES_H */

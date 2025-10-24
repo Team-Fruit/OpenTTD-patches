@@ -19,7 +19,7 @@
 enum ZoningEvaluationMode : uint8_t {
 	ZEM_NOTHING = 0,   ///< No zoning action selected
 	ZEM_AUTHORITY,     ///< Check the local authority's opinion.
-	ZEM_CAN_BUILD,     ///< Check wither or not the player can build.
+	ZEM_CAN_BUILD,     ///< Check whether or not the player can build.
 	ZEM_STA_CATCH,     ///< Check catchment area for stations
 	ZEM_STA_CATCH_WIN, ///< Check catchment area for stations with their station windows open
 	ZEM_BUL_UNSER,     ///< Check for unserved buildings
@@ -41,9 +41,9 @@ enum ZoningEvaluationMode : uint8_t {
  * Zoning evaluation modes
  */
 enum ZoningModeMask {
-	ZMM_NOTHING = 0,   ///< No zoning mask
-	ZMM_INNER,         ///< Inner
-	ZMM_OUTER,         ///< Outer
+	ZMM_NOTHING = 0,     ///< No zoning mask
+	ZMM_INNER   = 1 << 0, ///< Inner
+	ZMM_OUTER   = 1 << 1, ///< Outer
 	ZMM_ALL = ZMM_INNER | ZMM_OUTER,
 };
 DECLARE_ENUM_AS_BIT_SET(ZoningModeMask)

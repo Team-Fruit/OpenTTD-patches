@@ -815,6 +815,20 @@ struct hash<Enum, typename std::enable_if<std::is_enum<Enum>::value>::type> {
     }
 };
 
+/* StrongType support */
+
+template<typename T>
+concept enable_hash_as_base = T::hash_as_base || false;
+
+template <typename T>
+struct hash<T, typename std::enable_if<enable_hash_as_base<T>>::type> {
+    size_t operator()(T value) const noexcept {
+        return hash<typename T::BaseType>{}(value.base());
+    }
+};
+
+/* StrongType support ends */
+
 #define ROBIN_HOOD_HASH_INT(T)                           \
     template <>                                          \
     struct hash<T> {                                     \

@@ -16,7 +16,7 @@
  * that the behaviour is usually Unix/BSD-like with occasional variation.
  */
 
-#include "stdafx.h"
+#include "../../stdafx.h"
 #include "os_abstraction.h"
 #include "../../string_func.h"
 
@@ -31,8 +31,9 @@
 /**
  * Construct the network error with the given error code.
  * @param error The error code.
+ * @param message The error message. Leave empty to determine this automatically based on the error number.
  */
-NetworkError::NetworkError(int error) : error(error)
+NetworkError::NetworkError(int error, std::string_view message) : error(error), message(message)
 {
 }
 
@@ -81,7 +82,7 @@ bool NetworkError::IsConnectInProgress() const
  * Get the string representation of the error message.
  * @return The string representation that will get overwritten by next calls.
  */
-const char *NetworkError::AsString() const
+std::string_view NetworkError::AsString() const
 {
 	if (this->message.empty()) {
 #if defined(_WIN32)
@@ -96,7 +97,7 @@ const char *NetworkError::AsString() const
 		this->message.assign(StrErrorDumper().Get(this->error));
 #endif
 	}
-	return this->message.c_str();
+	return this->message;
 }
 
 /**
@@ -225,7 +226,7 @@ NetworkError GetSocketError(SOCKET d)
 {
 	int err;
 	socklen_t len = sizeof(err);
-	getsockopt(d, SOL_SOCKET, SO_ERROR, (char *)&err, &len);
+	if (getsockopt(d, SOL_SOCKET, SO_ERROR, (char *)&err, &len) != 0) return NetworkError(-1, "Could not get error for socket");
 
 	return NetworkError(err);
 }

@@ -10,15 +10,16 @@
 #ifndef FILEIO_FUNC_H
 #define FILEIO_FUNC_H
 
+#include "core/alloc_type.hpp"
 #include "core/enum_type.hpp"
 #include "fileio_type.h"
 #include <string>
 #include <optional>
 #include <vector>
 
-std::optional<FileHandle> FioFOpenFile(const std::string &filename, const char *mode, Subdirectory subdir, size_t *filesize = nullptr, std::string *output_filename = nullptr);
-bool FioCheckFileExists(const std::string &filename, Subdirectory subdir);
-std::string FioFindFullPath(Subdirectory subdir, const std::string &filename);
+std::optional<FileHandle> FioFOpenFile(std::string_view filename, const char *mode, Subdirectory subdir, size_t *filesize = nullptr, std::string *output_filename = nullptr);
+bool FioCheckFileExists(std::string_view filename, Subdirectory subdir);
+std::string FioFindFullPath(Subdirectory subdir, std::string_view filename);
 std::string FioGetDirectory(Searchpath sp, Subdirectory subdir);
 std::string FioFindDirectory(Subdirectory subdir);
 void FioCreateDirectory(const std::string &name);
@@ -30,7 +31,8 @@ const char *FiosGetScreenshotDir();
 void SanitizeFilename(std::string &filename);
 void AppendPathSeparator(std::string &buf);
 void DeterminePaths(const char *exe, bool only_local_path);
-std::unique_ptr<char[]> ReadFileToMem(const std::string &filename, size_t &lenp, size_t maxsize);
+std::optional<UniqueBuffer<uint8_t>> ReadFileToBuffer(const std::string &filename, size_t maxsize);
+std::optional<UniqueBuffer<uint8_t>> ReadFileToBuffer(FileHandle &fh, size_t maxsize);
 bool FileExists(const std::string &filename);
 bool ExtractTar(const std::string &tar_filename, Subdirectory subdir);
 
@@ -65,25 +67,24 @@ class TarScanner : FileScanner {
 	uint DoScan(Subdirectory sd);
 public:
 	/** The mode of tar scanning. */
-	enum Mode {
-		NONE     = 0,      ///< Scan nothing.
-		BASESET  = 1 << 0, ///< Scan for base sets.
-		NEWGRF   = 1 << 1, ///< Scan for non-base sets.
-		AI       = 1 << 2, ///< Scan for AIs and its libraries.
-		SCENARIO = 1 << 3, ///< Scan for scenarios and heightmaps.
-		GAME     = 1 << 4, ///< Scan for game scripts.
-		ALL      = BASESET | NEWGRF | AI | SCENARIO | GAME, ///< Scan for everything.
+	enum class Mode : uint8_t {
+		Baseset, ///< Scan for base sets.
+		NewGRF, ///< Scan for non-base sets.
+		AI, ///< Scan for AIs and its libraries.
+		Scenario, ///< Scan for scenarios and heightmaps.
+		Game, ///< Scan for game scripts.
 	};
+	using Modes = EnumBitSet<Mode, uint8_t>;
+
+	static constexpr Modes MODES_ALL = {Mode::Baseset, Mode::NewGRF, Mode::AI, Mode::Scenario, Mode::Game}; ///< Scan for everything.
 
 	bool AddFile(const std::string &filename, size_t basepath_length, const std::string &tar_filename = {}) override;
 
 	bool AddFile(Subdirectory sd, const std::string &filename);
 
 	/** Do the scan for Tars. */
-	static uint DoScan(TarScanner::Mode mode);
+	static uint DoScan(TarScanner::Modes modes);
 };
-
-DECLARE_ENUM_AS_BIT_SET(TarScanner::Mode)
 
 /* Implementation of opendir/readdir/closedir for Windows */
 #if defined(_WIN32)

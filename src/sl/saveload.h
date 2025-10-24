@@ -15,7 +15,7 @@
 #include "../fios.h"
 #include "../strings_type.h"
 #include "../scope.h"
-#include "../core/ring_buffer.hpp"
+#include "../3rdparty/cpp-ring-buffer/ring_buffer.hpp"
 #include "../core/tinystring_type.hpp"
 #include "../core/strong_typedef_type.hpp"
 
@@ -35,13 +35,11 @@ enum SaveOrLoadResult {
 /** Deals with the type of the savegame, independent of extension */
 struct FileToSaveLoad {
 	SaveLoadOperation file_op;       ///< File operation to perform.
-	DetailedFileType detail_ftype;   ///< Concrete file type (PNG, BMP, old save, etc).
-	AbstractFileType abstract_ftype; ///< Abstract type of file (scenario, heightmap, etc).
+	FiosType ftype;                  ///< File type.
 	std::string name;                ///< Name of the file.
 	std::string title;               ///< Internal name of the game.
 
-	void SetMode(FiosType ft);
-	void SetMode(SaveLoadOperation fop, AbstractFileType aft, DetailedFileType dft);
+	void SetMode(const FiosType &ft, SaveLoadOperation fop = SLO_LOAD);
 	void Set(const FiosItem &item);
 };
 
@@ -67,8 +65,8 @@ extern FileToSaveLoad _file_to_saveload;
 
 std::string GenerateDefaultSaveName();
 void SetSaveLoadError(StringID str);
-StringID GetSaveLoadErrorType();
-StringID GetSaveLoadErrorMessage();
+EncodedString GetSaveLoadErrorType();
+EncodedString GetSaveLoadErrorMessage();
 SaveOrLoadResult SaveOrLoad(const std::string &filename, SaveLoadOperation fop, DetailedFileType dft, Subdirectory sb, bool threaded = true, SaveModeFlags flags = SMF_NONE);
 void WaitTillSaved();
 void ProcessAsyncSaveFinish();
@@ -331,11 +329,11 @@ struct sl_is_instance : public std::false_type {};
 template <class...Ts, template <class, class...> class U>
 struct sl_is_instance<U<Ts...>, U> : public std::true_type {};
 
-template<template<class, std::size_t> class T, class U>
+template <template <class, std::size_t> class T, class U>
 struct sl_is_derived_from_array
 {
 private:
-	template<class V, std::size_t N>
+	template <class V, std::size_t N>
 	static decltype(static_cast<T<V, N>>(std::declval<U>()), std::true_type{}) test(const T<V, N>&);
 	static std::false_type test(...);
 
@@ -387,7 +385,7 @@ inline constexpr bool SlCheckPrimitiveTypeVar(VarType type)
 	if (GetVarMemType(type) == SLE_VAR_CNAME) {
 		return std::is_same_v<T, char *> || std::is_same_v<T, const char *> || std::is_same_v<T, TinyString>;
 	}
-	if (!std::is_integral_v<T> && !std::is_enum_v<T> && !sl_is_instance<T, OverflowSafeInt>{} && !std::is_base_of_v<StrongTypedefBase, T>) return false;
+	if (!std::is_integral_v<T> && !std::is_enum_v<T> && !SlIsPrimitiveType<T>) return false;
 	return sizeof(T) == SlVarSize(type);
 }
 
@@ -432,15 +430,12 @@ inline constexpr bool SlCheckVar(SaveLoadType cmd, VarType type, size_t length)
 			return sizeof(T) == sizeof(void *);
 
 		case SL_STR:
-			/* These should be pointer sized, or fixed array. */
-			if (GetVarMemType(type) == SLE_VAR_STRB) {
-				return sizeof(T) == length;
-			}
+			/* These should be pointer sized. */
 			return std::is_same_v<T, char *> || std::is_same_v<T, const char *> || std::is_same_v<T, TinyString>;
 
 		case SL_STDSTR:
 			/* These should be all pointers to std::string. */
-			return std::is_same_v<typename std::remove_reference<T>::type, std::string>;
+			return std::is_same_v<typename std::remove_reference<T>::type, std::string> || std::is_same_v<typename std::remove_reference<T>::type, class EncodedString>;
 
 		case SL_ARR:
 			/* Partial load of array is permitted. */
@@ -453,7 +448,7 @@ inline constexpr bool SlCheckVar(SaveLoadType cmd, VarType type, size_t length)
 			return false;
 
 		case SL_REFRING:
-			if constexpr (sl_is_instance<T, ring_buffer>{}) {
+			if constexpr (sl_is_instance<T, jgr::ring_buffer>{}) {
 				return std::is_pointer_v<typename T::value_type> || sl_is_instance<typename T::value_type, std::unique_ptr>{};
 			}
 			return false;
@@ -465,13 +460,19 @@ inline constexpr bool SlCheckVar(SaveLoadType cmd, VarType type, size_t length)
 			return false;
 
 		case SL_RING:
-			if constexpr (sl_is_instance<T, ring_buffer>{}) {
+			if constexpr (sl_is_instance<T, jgr::ring_buffer>{}) {
 				return SlCheckPrimitiveTypeVar<typename T::value_type>(type);
 			}
 			return false;
 
 		case SL_VARVEC:
 			if constexpr (sl_is_instance<T, std::vector>{}) {
+				return SlCheckPrimitiveTypeVar<typename T::value_type>(type);
+			}
+			return false;
+
+		case SL_CUSTOMLIST:
+			if constexpr (requires { std::declval<typename T::value_type>(); }) {
 				return SlCheckPrimitiveTypeVar<typename T::value_type>(type);
 			}
 			return false;
@@ -488,6 +489,54 @@ inline constexpr void *SlVarWrapper(void* ptr)
 	return ptr;
 }
 
+template <typename T>
+size_t SaveLoadCustomContainerHandler(void *list, SaveLoadCustomContainerOp op, VarType conv, size_t count)
+{
+	extern int64_t SlLoadValue(VarType conv);
+	extern void SlSaveValue(int64_t x, VarType conv);
+
+	T *l = reinterpret_cast<T *>(list);
+
+	switch (op) {
+		case SaveLoadCustomContainerOp::GetLength:
+			return l->size();
+
+		case SaveLoadCustomContainerOp::Load:
+			if (count == 0) {
+				l->clear();
+				return 0;
+			}
+			l->resize(count);
+			for (typename T::value_type &val : *l) {
+				val = static_cast<typename T::value_type>(SlLoadValue(conv));
+			}
+			return 0;
+
+		case SaveLoadCustomContainerOp::Save:
+			for (const typename T::value_type &val : *l) {
+				if constexpr (SlIsPrimitiveType<typename T::value_type>) {
+					SlSaveValue(val.base(), conv);
+				} else {
+					SlSaveValue(val, conv);
+				}
+			}
+			return 0;
+
+		default:
+			NOT_REACHED();
+	}
+}
+
+template <typename T, SaveLoadType cmd>
+inline constexpr SaveLoadCustomHandlers SlHandlerUnionValue()
+{
+	if constexpr (cmd == SL_CUSTOMLIST) {
+		return { .container_functor = &SaveLoadCustomContainerHandler<T> };
+	}
+
+	return { nullptr };
+}
+
 /**
  * Storage of simple variables, references (pointers), and arrays.
  * @param cmd      Load/save type. @see SaveLoadType
@@ -499,7 +548,7 @@ inline constexpr void *SlVarWrapper(void* ptr)
  * @param extver   SlXvFeatureTest to test (along with from and to) which savegames have the field
  * @note In general, it is better to use one of the SLE_* macros below.
  */
-#define SLE_GENERAL_X(cmd, base, variable, type, length, from, to, extver) SaveLoad {false, cmd, type, length, from, to, SLTAG_DEFAULT, { SlVarWrapper<decltype(base::variable), cmd, type, length>((void*)cpp_offsetof(base, variable)) }, extver}
+#define SLE_GENERAL_X(cmd, base, variable, type, length, from, to, extver) SaveLoad {false, cmd, type, length, from, to, SLTAG_DEFAULT, { SlVarWrapper<decltype(base::variable), cmd, type, length>((void*)cpp_offsetof(base, variable)) }, { .custom = SlHandlerUnionValue<decltype(base::variable), cmd>() }, extver}
 #define SLE_GENERAL(cmd, base, variable, type, length, from, to) SLE_GENERAL_X(cmd, base, variable, type, length, from, to, SlXvFeatureTest())
 
 /**
@@ -613,6 +662,18 @@ inline constexpr void *SlVarWrapper(void* ptr)
 #define SLE_CONDVARVEC(base, variable, type, from, to) SLE_CONDVARVEC_X(base, variable, type, from, to, SlXvFeatureTest())
 
 /**
+ * Storage of a variable custom container type in some savegame versions.
+ * @param base     Name of the class or struct containing the list.
+ * @param variable Name of the variable in the class or struct referenced by \a base.
+ * @param type     Storage of the data in memory and in the savegame.
+ * @param from     First savegame version that has the list.
+ * @param to       Last savegame version that has the list.
+ * @param extver   SlXvFeatureTest to test (along with from and to) which savegames have the field
+ */
+#define SLE_CONDCUSTOMLIST_X(base, variable, type, from, to, extver) SLE_GENERAL_X(SL_CUSTOMLIST, base, variable, type, 0, from, to, extver)
+#define SLE_CONDCUSTOMLIST(base, variable, type, from, to) SLE_CONDCUSTOMLIST_X(base, variable, type, from, to, SlXvFeatureTest())
+
+/**
  * Storage of a ring of #SL_VAR elements in some savegame versions.
  * @param base     Name of the class or struct containing the list.
  * @param variable Name of the variable in the class or struct referenced by \a base.
@@ -699,6 +760,14 @@ inline constexpr void *SlVarWrapper(void* ptr)
 #define SLE_VARVEC(base, variable, type) SLE_CONDVARVEC(base, variable, type, SL_MIN_VERSION, SL_MAX_VERSION)
 
 /**
+ * Storage of a variable custom container type in every savegame version.
+ * @param base     Name of the class or struct containing the list.
+ * @param variable Name of the variable in the class or struct referenced by \a base.
+ * @param type     Storage of the data in memory and in the savegame.
+ */
+#define SLE_CUSTOMLIST(base, variable, type) SLE_CONDCUSTOMLIST(base, variable, type, SL_MIN_VERSION, SL_MAX_VERSION)
+
+/**
  * Empty space in every savegame version.
  * @param length Length of the empty space.
  */
@@ -718,7 +787,7 @@ inline constexpr void *SlVarWrapper(void* ptr)
 #define SLE_WRITEBYTE(base, variable) SLE_GENERAL(SL_WRITEBYTE, base, variable, 0, 0, SL_MIN_VERSION, SL_MAX_VERSION)
 
 /** SaveLoad include, for non-table use with SlFilterObject/SlFilterNamedSaveLoadTable. */
-#define SLE_INCLUDE(inc_functor) SaveLoad { false, SL_INCLUDE, 0, 0, SL_MIN_VERSION, SL_MAX_VERSION, SLTAG_DEFAULT, { .include_functor = inc_functor }, SlXvFeatureTest()}
+#define SLE_INCLUDE(inc_functor) SaveLoad { false, SL_INCLUDE, 0, 0, SL_MIN_VERSION, SL_MAX_VERSION, SLTAG_DEFAULT, { .include_functor = inc_functor }, { nullptr }, SlXvFeatureTest()}
 
 /**
  * Storage of global simple variables, references (pointers), and arrays.
@@ -730,7 +799,7 @@ inline constexpr void *SlVarWrapper(void* ptr)
  * @param extver   SlXvFeatureTest to test (along with from and to) which savegames have the field
  * @note In general, it is better to use one of the SLEG_* macros below.
  */
-#define SLEG_GENERAL_X(cmd, variable, type, length, from, to, extver) SaveLoad {true, cmd, type, length, from, to, SLTAG_DEFAULT, { SlVarWrapper<decltype(variable), cmd, type, length>((void*)&variable) }, extver}
+#define SLEG_GENERAL_X(cmd, variable, type, length, from, to, extver) SaveLoad {true, cmd, type, length, from, to, SLTAG_DEFAULT, { SlVarWrapper<decltype(variable), cmd, type, length>((void*)&variable) }, { .custom = SlHandlerUnionValue<decltype(variable), cmd>() }, extver}
 #define SLEG_GENERAL(cmd, variable, type, length, from, to) SLEG_GENERAL_X(cmd, variable, type, length, from, to, SlXvFeatureTest())
 
 /**
@@ -895,7 +964,7 @@ inline constexpr void *SlVarWrapper(void* ptr)
  * @param from   First savegame version that has the empty space.
  * @param to     Last savegame version that has the empty space.
  */
-#define SLEG_CONDNULL(length, from, to) SaveLoad {true, SL_ARR, SLE_FILE_U8 | SLE_VAR_NULL, length, from, to, SLTAG_DEFAULT, { nullptr }, SlXvFeatureTest()}
+#define SLEG_CONDNULL(length, from, to) SaveLoad {true, SL_ARR, SLE_FILE_U8 | SLE_VAR_NULL, length, from, to, SLTAG_DEFAULT, { nullptr }, { nullptr }, SlXvFeatureTest()}
 
 /**
  * Checks whether the savegame is below \a major.\a minor.
@@ -976,6 +1045,10 @@ int64_t ReadValue(const void *ptr, VarType conv);
 void WriteValue(void *ptr, VarType conv, int64_t val);
 
 void SlSetArrayIndex(uint index);
+
+template <typename T> requires std::is_base_of_v<struct PoolIDBase, T>
+static void SlSetArrayIndex(const T &index) { SlSetArrayIndex(index.base()); }
+
 int SlIterateArray();
 
 size_t SlGetFieldLength();

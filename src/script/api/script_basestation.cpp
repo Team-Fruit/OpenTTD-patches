@@ -11,8 +11,11 @@
 #include "script_basestation.hpp"
 #include "script_error.hpp"
 #include "../../station_base.h"
+#include "../../station_cmd.h"
 #include "../../string_func.h"
 #include "../../strings_func.h"
+#include "../../waypoint_cmd.h"
+
 #include "table/strings.h"
 
 #include "../../safeguards.h"
@@ -28,8 +31,7 @@
 {
 	if (!IsValidBaseStation(station_id)) return std::nullopt;
 
-	::SetDParam(0, station_id);
-	return GetString(::Station::IsValidID(station_id) ? STR_STATION_NAME : STR_WAYPOINT_NAME);
+	return ::StrMakeValid(::GetString(::Station::IsValidID(station_id) ? STR_STATION_NAME : STR_WAYPOINT_NAME, station_id), {});
 }
 
 /* static */ bool ScriptBaseStation::SetName(StationID station_id, Text *name)
@@ -43,7 +45,11 @@
 	EnforcePreconditionEncodedText(false, text);
 	EnforcePreconditionCustomError(false, ::Utf8StringLength(text) < MAX_LENGTH_STATION_NAME_CHARS, ScriptError::ERR_PRECONDITION_STRING_TOO_LONG);
 
-	return ScriptObject::DoCommand(0, station_id, 0, ::Station::IsValidID(station_id) ? CMD_RENAME_STATION : CMD_RENAME_WAYPOINT, text);
+	if (::Station::IsValidID(station_id)) {
+		return ScriptObject::Command<CMD_RENAME_STATION>::Do(station_id, false, text);
+	} else {
+		return ScriptObject::Command<CMD_RENAME_WAYPOINT>::Do(station_id, text);
+	}
 }
 
 /* static */ TileIndex ScriptBaseStation::GetLocation(StationID station_id)

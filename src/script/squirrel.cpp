@@ -18,6 +18,7 @@
 #include <../squirrel/sqpcheader.h>
 #include <../squirrel/sqvm.h>
 #include "../core/alloc_func.hpp"
+#include "../core/string_consumer.hpp"
 
 #include <map>
 
@@ -29,32 +30,14 @@
  * So no #include "../safeguards.h" here as is required, but after the allocator's implementation.
  */
 
-/*
- * If changing the call paths into the scripting engine, define this symbol to enable full debugging of allocations.
- * This lets you track whether the allocator context is being switched correctly in all call paths.
-#define SCRIPT_DEBUG_ALLOCATIONS
- */
+static const size_t SAFE_LIMIT = 0x8000000; ///< 128 MiB, a safe choice for almost any situation
 
-struct ScriptAllocator {
-	size_t allocated_size;   ///< Sum of allocated data size
-	size_t allocation_limit; ///< Maximum this allocator may use before allocations fail
-	/**
-	 * Whether the error has already been thrown, so to not throw secondary errors in
-	 * the handling of the allocation error. This as the handling of the error will
-	 * throw a Squirrel error so the Squirrel stack can be dumped, however that gets
-	 * allocated by this allocator and then you might end up in an infinite loop.
-	 */
-	bool error_thrown;
+/* NB: Indented to reduce upstream diff */
 
-	static const size_t SAFE_LIMIT = 0x8000000; ///< 128 MiB, a safe choice for almost any situation
-
-#ifdef SCRIPT_DEBUG_ALLOCATIONS
-	std::map<void *, size_t> allocations;
-#endif
-
-	void CheckLimit() const
+	void ScriptAllocator::CheckLimitFailed()
 	{
-		if (this->allocated_size > this->allocation_limit) throw Script_FatalError("Maximum memory allocation exceeded");
+		this->error_thrown = true;
+		throw Script_FatalError("Maximum memory allocation exceeded");
 	}
 
 	/**
@@ -66,7 +49,7 @@ struct ScriptAllocator {
 	 * @param requested_size The requested size that was requested to be allocated.
 	 * @param p              The pointer to the allocated object, or null if allocation failed.
 	 */
-	void CheckAllocation(size_t requested_size, void *p)
+	void ScriptAllocator::CheckAllocation(size_t requested_size, void *p)
 	{
 		if (this->allocated_size + requested_size > this->allocation_limit && !this->error_thrown) {
 			/* Do not allow allocating more than the allocation limit, except when an error is
@@ -94,7 +77,7 @@ struct ScriptAllocator {
 		}
 	}
 
-	void *Malloc(SQUnsignedInteger size)
+	void *ScriptAllocator::Malloc(SQUnsignedInteger size)
 	{
 		void *p = malloc(size);
 
@@ -111,7 +94,7 @@ struct ScriptAllocator {
 		return p;
 	}
 
-	void *Realloc(void *p, SQUnsignedInteger oldsize, SQUnsignedInteger size)
+	void *ScriptAllocator::Realloc(void *p, SQUnsignedInteger oldsize, SQUnsignedInteger size)
 	{
 		if (p == nullptr) {
 			return this->Malloc(size);
@@ -149,7 +132,7 @@ struct ScriptAllocator {
 		return new_p;
 	}
 
-	void Free(void *p, SQUnsignedInteger size)
+	void ScriptAllocator::Free(void *p, SQUnsignedInteger size)
 	{
 		if (p == nullptr) return;
 		free(p);
@@ -161,7 +144,7 @@ struct ScriptAllocator {
 #endif
 	}
 
-	ScriptAllocator()
+	ScriptAllocator::ScriptAllocator()
 	{
 		this->allocated_size = 0;
 		this->allocation_limit = static_cast<size_t>(_settings_game.script.script_max_memory_megabytes) << 20;
@@ -169,13 +152,12 @@ struct ScriptAllocator {
 		this->error_thrown = false;
 	}
 
-	~ScriptAllocator()
+	ScriptAllocator::~ScriptAllocator()
 	{
 #ifdef SCRIPT_DEBUG_ALLOCATIONS
 		assert(this->allocations.empty());
 #endif
 	}
-};
 
 /**
  * In the memory allocator for Squirrel we want to directly use malloc/realloc, so when the OS
@@ -196,15 +178,12 @@ void sq_vm_free(void *p, SQUnsignedInteger size) { _squirrel_allocator->Free(p, 
 
 size_t Squirrel::GetAllocatedMemory() const noexcept
 {
-	assert(this->allocator != nullptr);
-	return this->allocator->allocated_size;
+	return this->allocator.allocated_size;
 }
 
 void Squirrel::SetMemoryAllocationLimit(size_t limit) noexcept
 {
-	if (this->allocator != nullptr) {
-		this->allocator->allocation_limit = limit;
-	}
+	this->allocator.allocation_limit = limit;
 }
 
 
@@ -385,7 +364,7 @@ bool Squirrel::Resume(int suspend)
 
 	this->crashed = !sq_resumecatch(this->vm, suspend);
 	this->overdrawn_ops = -this->vm->_ops_till_suspend;
-	this->allocator->CheckLimit();
+	this->allocator.CheckLimit();
 	return this->vm->_suspended != 0;
 }
 
@@ -406,7 +385,7 @@ bool Squirrel::CallMethod(HSQOBJECT instance, const char *method_name, HSQOBJECT
 {
 	assert(!this->crashed);
 	ScriptAllocatorScope alloc_scope(this);
-	this->allocator->CheckLimit();
+	this->allocator.CheckLimit();
 
 	/* Store the stack-location for the return value. We need to
 	 * restore this after saving or the stack will be corrupted
@@ -517,8 +496,25 @@ bool Squirrel::CreateClassInstance(const std::string &class_name, void *real_ins
 	return Squirrel::CreateClassInstanceVM(this->vm, class_name, real_instance, instance, nullptr);
 }
 
+/* static */ SQUserPointer Squirrel::GetRealInstance(HSQUIRRELVM vm, int index, const char *tag)
+{
+	if (index < 0) index += sq_gettop(vm) + 1;
+	Squirrel *engine = static_cast<Squirrel *>(sq_getforeignptr(vm));
+	std::string class_name = fmt::format("{}{}", engine->GetAPIName(), tag);
+	sq_pushroottable(vm);
+	sq_pushstring(vm, class_name);
+	sq_get(vm, -2);
+	sq_push(vm, index);
+	if (sq_instanceof(vm) == SQTrue) {
+		sq_pop(vm, 3);
+		SQUserPointer ptr = nullptr;
+		if (SQ_SUCCEEDED(sq_getinstanceup(vm, index, &ptr, nullptr))) return ptr;
+	}
+	throw sq_throwerror(vm, fmt::format("parameter {} has an invalid type ; expected: '{}'", index - 1, class_name));
+}
+
 Squirrel::Squirrel(const char *APIName) :
-	APIName(APIName), allocator(new ScriptAllocator())
+	APIName(APIName)
 {
 	this->Initialize();
 }
@@ -558,69 +554,73 @@ private:
 	FileHandle file;
 	size_t size;
 	size_t pos;
+	std::string buffer;
+	StringConsumer consumer;
+
+	size_t ReadInternal(std::span<char> buf)
+	{
+		size_t count = buf.size();
+		if (this->pos + count > this->size) {
+			count = this->size - this->pos;
+		}
+		if (count > 0) count = fread(buf.data(), 1, count, this->file);
+		this->pos += count;
+		return count;
+	}
 
 public:
-	SQFile(FileHandle file, size_t size) : file(std::move(file)), size(size), pos(0) {}
+	SQFile(FileHandle file, size_t size) : file(std::move(file)), size(size), pos(0), consumer(buffer) {}
 
-	size_t Read(void *buf, size_t elemsize, size_t count)
+	StringConsumer &GetConsumer(size_t min_size = 64)
 	{
-		assert(elemsize != 0);
-		if (this->pos + (elemsize * count) > this->size) {
-			count = (this->size - this->pos) / elemsize;
+		if (this->consumer.GetBytesLeft() < min_size && this->pos < this->size) {
+			this->buffer.erase(0, this->consumer.GetBytesRead());
+
+			size_t buffer_size = this->buffer.size();
+			size_t read_size = Align(min_size - buffer_size, 4096); // read pages of 4096 bytes
+			/* TODO C++23: use std::string::resize_and_overwrite() */
+			this->buffer.resize(buffer_size + read_size);
+			auto dest = std::span(this->buffer.data(), this->buffer.size()).subspan(buffer_size);
+			buffer_size += this->ReadInternal(dest);
+			this->buffer.resize(buffer_size);
+
+			this->consumer = StringConsumer(this->buffer);
 		}
-		if (count == 0) return 0;
-		size_t ret = fread(buf, elemsize, count, this->file);
-		this->pos += ret * elemsize;
-		return ret;
+		return this->consumer;
+	}
+
+	size_t Read(void *buf, size_t max_size)
+	{
+		std::span<char> dest(reinterpret_cast<char *>(buf), max_size);
+
+		auto view = this->consumer.Read(max_size);
+		std::copy(view.data(), view.data() + view.size(), dest.data());
+		size_t result_size = view.size();
+
+		if (result_size < max_size) {
+			assert(!this->consumer.AnyBytesLeft());
+			result_size += this->ReadInternal(dest.subspan(result_size));
+		}
+
+		return result_size;
 	}
 };
 
 static char32_t _io_file_lexfeed_ASCII(SQUserPointer file)
 {
-	unsigned char c;
-	if (((SQFile *)file)->Read(&c, sizeof(c), 1) > 0) return c;
-	return 0;
+	StringConsumer &consumer = reinterpret_cast<SQFile *>(file)->GetConsumer();
+	return consumer.TryReadUint8().value_or(0); // read as unsigned, otherwise integer promotion breaks it
 }
 
 static char32_t _io_file_lexfeed_UTF8(SQUserPointer file)
 {
-	char buffer[5];
-
-	/* Read the first character, and get the length based on UTF-8 specs. If invalid, bail out. */
-	if (((SQFile *)file)->Read(buffer, sizeof(buffer[0]), 1) != 1) return 0;
-	uint len = Utf8EncodedCharLen(buffer[0]);
-	if (len == 0) return -1;
-
-	/* Read the remaining bits. */
-	if (len > 1 && ((SQFile *)file)->Read(buffer + 1, sizeof(buffer[0]), len - 1) != len - 1) return 0;
-
-	/* Convert the character, and when definitely invalid, bail out as well. */
-	char32_t c;
-	if (Utf8Decode(&c, buffer) != len) return -1;
-
-	return c;
-}
-
-static char32_t _io_file_lexfeed_UCS2_no_swap(SQUserPointer file)
-{
-	unsigned short c;
-	if (((SQFile *)file)->Read(&c, sizeof(c), 1) > 0) return (char32_t)c;
-	return 0;
-}
-
-static char32_t _io_file_lexfeed_UCS2_swap(SQUserPointer file)
-{
-	unsigned short c;
-	if (((SQFile *)file)->Read(&c, sizeof(c), 1) > 0) {
-		c = ((c >> 8) & 0x00FF)| ((c << 8) & 0xFF00);
-		return (char32_t)c;
-	}
-	return 0;
+	StringConsumer &consumer = reinterpret_cast<SQFile *>(file)->GetConsumer();
+	return consumer.AnyBytesLeft() ? consumer.ReadUtf8(-1) : 0;
 }
 
 static SQInteger _io_file_read(SQUserPointer file, SQUserPointer buf, SQInteger size)
 {
-	SQInteger ret = ((SQFile *)file)->Read(buf, 1, size);
+	SQInteger ret = reinterpret_cast<SQFile *>(file)->Read(buf, size);
 	if (ret == 0) return -1;
 	return ret;
 }
@@ -662,17 +662,6 @@ SQRESULT Squirrel::LoadFile(HSQUIRRELVM vm, const std::string &filename, SQBool 
 			}
 			return sq_throwerror(vm, "Couldn't read bytecode");
 		}
-		case 0xFFFE:
-			/* Either this file is encoded as big-endian and we're on a little-endian
-			 * machine, or this file is encoded as little-endian and we're on a big-endian
-			 * machine. Either way, swap the bytes of every word we read. */
-			func = _io_file_lexfeed_UCS2_swap;
-			size -= 2; // Skip BOM
-			break;
-		case 0xFEFF:
-			func = _io_file_lexfeed_UCS2_no_swap;
-			size -= 2; // Skip BOM
-			break;
 		case 0xBBEF:   // UTF-8
 		case 0xEFBB: { // UTF-8 on big-endian machine
 			/* Similarly, check the file is actually big enough to finish checking BOM */
@@ -751,10 +740,10 @@ void Squirrel::Uninitialize()
 	sq_pop(this->vm, 1);
 	sq_close(this->vm);
 
-	assert(this->allocator->allocated_size == 0);
+	assert(this->allocator.allocated_size == 0);
 
 	/* Reset memory allocation errors. */
-	this->allocator->error_thrown = false;
+	this->allocator.error_thrown = false;
 }
 
 void Squirrel::Reset()

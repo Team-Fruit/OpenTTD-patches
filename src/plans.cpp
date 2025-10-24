@@ -16,7 +16,6 @@ PlanPool _plan_pool("Plan");
 INSTANTIATE_POOL_METHODS(Plan)
 
 Plan *_current_plan = nullptr;
-Plan *_new_plan = nullptr;
 uint64_t _plan_update_counter = 0;
 uint64_t _last_plan_visibility_check = 0;
 bool _last_plan_visibility_check_result = false;
@@ -53,14 +52,14 @@ void BasePlanLine::UpdateVisualExtents()
 
 bool Plan::ValidateNewLine()
 {
-	extern bool AddPlanLine(PlanID plan, TileVector tiles);
+	extern bool AddPlanLine(PlanID plan, std::vector<TileIndex> tiles);
 
 	bool ret = false;
 	if (this->temp_line.tiles.size() > 1) {
 		this->temp_line.MarkDirty();
 		this->last_tile = this->temp_line.tiles.back();
 		this->SetVisibility(true, false);
-		TileVector tiles = std::move(this->temp_line.tiles);
+		std::vector<TileIndex> tiles = std::move(this->temp_line.tiles);
 		this->temp_line.Clear();
 		ret = AddPlanLine(this->index, std::move(tiles));
 	}

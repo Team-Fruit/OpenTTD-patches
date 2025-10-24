@@ -46,7 +46,7 @@ public:
 
 		for (size_t j = 0; j < len; j++) {
 			Industry::AcceptedCargo &a = i->accepted[j];
-			SlObject(&a, this->GetDescription());
+			SlObject(&a, this->GetLoadDescription());
 		}
 	}
 };
@@ -66,11 +66,22 @@ public:
 
 	void Load(Industry::ProducedCargo *p) const override
 	{
-		size_t len = SlGetStructListLength(p->history.size());
+		size_t len = SlGetStructListLength(UINT32_MAX);
+		if (len > p->history.size()) {
+			/* Truncate larger history */
+			for (auto &h : p->history) {
+				SlObject(&h, this->GetLoadDescription());
+			}
+			Industry::ProducedHistory tmp{};
+			for (size_t i = 0; i < len - p->history.size(); i++) {
+				SlObject(&tmp, this->GetDescription());
+			}
+			return;
+		}
 
 		for (auto &h : p->history) {
 			if (--len > p->history.size()) break; // unsigned so wraps after hitting zero.
-			SlObject(&h, this->GetDescription());
+			SlObject(&h, this->GetLoadDescription());
 		}
 	}
 };
@@ -99,7 +110,7 @@ public:
 
 		for (size_t j = 0; j < len; j++) {
 			Industry::ProducedCargo &p = i->produced[j];
-			SlObject(&p, this->GetDescription());
+			SlObject(&p, this->GetLoadDescription());
 		}
 	}
 };
@@ -186,14 +197,14 @@ struct INDYChunkHandler : ChunkHandler {
 		_old_industry_produced.Reset();
 
 		while ((index = SlIterateArray()) != -1) {
-			Industry *i = new (index) Industry();
+			Industry *i = new (IndustryID(index)) Industry();
 			SlObject(i, slt);
 
 			/* Before savegame version 161, persistent storages were not stored in a pool. */
 			if (IsSavegameVersionBefore(SLV_161) && !IsSavegameVersionBefore(SLV_76)) {
 				/* Store the old persistent storage. The GRFID will be added later. */
 				assert(PersistentStorage::CanAllocateItem());
-				i->psa = new PersistentStorage(0, 0, 0);
+				i->psa = new PersistentStorage(0, 0, {});
 				std::copy(std::begin(_old_ind_persistent_storage.storage), std::end(_old_ind_persistent_storage.storage), std::begin(i->psa->storage));
 			}
 			if (IsSavegameVersionBefore(SLV_INDUSTRY_CARGO_REORGANISE)) {

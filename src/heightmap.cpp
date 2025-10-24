@@ -10,6 +10,7 @@
 #include "stdafx.h"
 #include "heightmap.h"
 #include "clear_map.h"
+#include "strings_func.h"
 #include "void_map.h"
 #include "error.h"
 #include "sl/saveload.h"
@@ -17,6 +18,7 @@
 #include "gfx_func.h"
 #include "fios.h"
 #include "fileio_func.h"
+#include "core/random_func.hpp"
 
 #include "table/strings.h"
 
@@ -141,19 +143,19 @@ static bool ReadHeightmapPNG(const char *filename, uint *x, uint *y, std::vector
 
 	auto fp = FioFOpenFile(filename, "rb", HEIGHTMAP_DIR);
 	if (!fp.has_value()) {
-		ShowErrorMessage(STR_ERROR_PNGMAP, STR_ERROR_PNGMAP_FILE_NOT_FOUND, WL_ERROR);
+		ShowErrorMessage(GetEncodedString(STR_ERROR_PNGMAP), GetEncodedString(STR_ERROR_PNGMAP_FILE_NOT_FOUND), WL_ERROR);
 		return false;
 	}
 
 	png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
 	if (png_ptr == nullptr) {
-		ShowErrorMessage(STR_ERROR_PNGMAP, STR_ERROR_PNGMAP_MISC, WL_ERROR);
+		ShowErrorMessage(GetEncodedString(STR_ERROR_PNGMAP), GetEncodedString(STR_ERROR_PNGMAP_MISC), WL_ERROR);
 		return false;
 	}
 
 	info_ptr = png_create_info_struct(png_ptr);
 	if (info_ptr == nullptr || setjmp(png_jmpbuf(png_ptr))) {
-		ShowErrorMessage(STR_ERROR_PNGMAP, STR_ERROR_PNGMAP_MISC, WL_ERROR);
+		ShowErrorMessage(GetEncodedString(STR_ERROR_PNGMAP), GetEncodedString(STR_ERROR_PNGMAP_MISC), WL_ERROR);
 		png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
 		return false;
 	}
@@ -168,7 +170,7 @@ static bool ReadHeightmapPNG(const char *filename, uint *x, uint *y, std::vector
 	/* Maps of wrong colour-depth are not used.
 	 * (this should have been taken care of by stripping alpha and 16-bit samples on load) */
 	if ((png_get_channels(png_ptr, info_ptr) != 1) && (png_get_channels(png_ptr, info_ptr) != 3) && (png_get_bit_depth(png_ptr, info_ptr) != 8)) {
-		ShowErrorMessage(STR_ERROR_PNGMAP, STR_ERROR_PNGMAP_IMAGE_TYPE, WL_ERROR);
+		ShowErrorMessage(GetEncodedString(STR_ERROR_PNGMAP), GetEncodedString(STR_ERROR_PNGMAP_IMAGE_TYPE), WL_ERROR);
 		png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
 		return false;
 	}
@@ -177,7 +179,7 @@ static bool ReadHeightmapPNG(const char *filename, uint *x, uint *y, std::vector
 	uint height = png_get_image_height(png_ptr, info_ptr);
 
 	if (!IsValidHeightmapDimension(width, height)) {
-		ShowErrorMessage(STR_ERROR_PNGMAP, STR_ERROR_HEIGHTMAP_TOO_LARGE, WL_ERROR);
+		ShowErrorMessage(GetEncodedString(STR_ERROR_PNGMAP), GetEncodedString(STR_ERROR_HEIGHTMAP_TOO_LARGE), WL_ERROR);
 		png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
 		return false;
 	}
@@ -259,7 +261,7 @@ static bool ReadHeightmapBMP(const char *filename, uint *x, uint *y, std::vector
 {
 	auto f = FioFOpenFile(filename, "rb", HEIGHTMAP_DIR);
 	if (!f.has_value()) {
-		ShowErrorMessage(STR_ERROR_BMPMAP, STR_ERROR_PNGMAP_FILE_NOT_FOUND, WL_ERROR);
+		ShowErrorMessage(GetEncodedString(STR_ERROR_BMPMAP), GetEncodedString(STR_ERROR_PNGMAP_FILE_NOT_FOUND), WL_ERROR);
 		return false;
 	}
 
@@ -268,18 +270,18 @@ static bool ReadHeightmapBMP(const char *filename, uint *x, uint *y, std::vector
 	BmpData data{};
 
 	if (!BmpReadHeader(file, info, data)) {
-		ShowErrorMessage(STR_ERROR_BMPMAP, STR_ERROR_BMPMAP_IMAGE_TYPE, WL_ERROR);
+		ShowErrorMessage(GetEncodedString(STR_ERROR_BMPMAP), GetEncodedString(STR_ERROR_BMPMAP_IMAGE_TYPE), WL_ERROR);
 		return false;
 	}
 
 	if (!IsValidHeightmapDimension(info.width, info.height)) {
-		ShowErrorMessage(STR_ERROR_BMPMAP, STR_ERROR_HEIGHTMAP_TOO_LARGE, WL_ERROR);
+		ShowErrorMessage(GetEncodedString(STR_ERROR_BMPMAP), GetEncodedString(STR_ERROR_HEIGHTMAP_TOO_LARGE), WL_ERROR);
 		return false;
 	}
 
 	if (map != nullptr) {
 		if (!BmpReadBitmap(file, info, data)) {
-			ShowErrorMessage(STR_ERROR_BMPMAP, STR_ERROR_BMPMAP_IMAGE_TYPE, WL_ERROR);
+			ShowErrorMessage(GetEncodedString(STR_ERROR_BMPMAP), GetEncodedString(STR_ERROR_BMPMAP_IMAGE_TYPE), WL_ERROR);
 			return false;
 		}
 
@@ -318,12 +320,12 @@ static void GrayscaleToMapHeights(uint img_width, uint img_height, std::span<con
 	switch (_settings_game.game_creation.heightmap_rotation) {
 		default: NOT_REACHED();
 		case HM_COUNTER_CLOCKWISE:
-			width   = MapSizeX();
-			height  = MapSizeY();
+			width   = Map::SizeX();
+			height  = Map::SizeY();
 			break;
 		case HM_CLOCKWISE:
-			width   = MapSizeY();
-			height  = MapSizeX();
+			width   = Map::SizeY();
+			height  = Map::SizeX();
 			break;
 	}
 
@@ -338,8 +340,8 @@ static void GrayscaleToMapHeights(uint img_width, uint img_height, std::span<con
 	}
 
 	if (_settings_game.construction.freeform_edges) {
-		for (uint x = 0; x < MapSizeX(); x++) MakeVoid(TileXY(x, 0));
-		for (uint y = 0; y < MapSizeY(); y++) MakeVoid(TileXY(0, y));
+		for (uint x = 0; x < Map::SizeX(); x++) MakeVoid(TileXY(x, 0));
+		for (uint y = 0; y < Map::SizeY(); y++) MakeVoid(TileXY(0, y));
 	}
 
 	/* Form the landscape */
@@ -400,30 +402,37 @@ void FixSlopes()
 {
 	uint width, height;
 	int row, col;
-	uint8_t current_tile;
+	uint8_t current_height;
+	uint8_t max_height = _settings_game.construction.map_height_limit;
 
 	/* Adjust height difference to maximum one horizontal/vertical change. */
-	width   = MapSizeX();
-	height  = MapSizeY();
+	width   = Map::SizeX();
+	height  = Map::SizeY();
 
 	/* Top and left edge */
 	for (row = 0; (uint)row < height; row++) {
 		for (col = 0; (uint)col < width; col++) {
-			current_tile = MAX_TILE_HEIGHT;
+			current_height = MAX_TILE_HEIGHT;
 			if (col != 0) {
 				/* Find lowest tile; either the top or left one */
-				current_tile = TileHeight(TileXY(col - 1, row)); // top edge
+				current_height = TileHeight(TileXY(col - 1, row)); // top edge
 			}
 			if (row != 0) {
-				if (TileHeight(TileXY(col, row - 1)) < current_tile) {
-					current_tile = TileHeight(TileXY(col, row - 1)); // left edge
+				if (TileHeight(TileXY(col, row - 1)) < current_height) {
+					current_height = TileHeight(TileXY(col, row - 1)); // left edge
 				}
 			}
 
 			/* Does the height differ more than one? */
-			if (TileHeight(TileXY(col, row)) >= (uint)current_tile + 2) {
+			TileIndex tile = TileXY(col, row);
+			if (TileHeight(tile) >= (uint)current_height + 2) {
 				/* Then change the height to be no more than one */
-				SetTileHeight(TileXY(col, row), current_tile + 1);
+				SetTileHeight(tile, current_height + 1);
+				/* Height was changed so now there's a chance, more likely at higher altitude, of the
+				 * tile turning into rock. */
+				if (IsInnerTile(tile) && RandomRange(max_height) <= current_height) {
+					MakeClear(tile, CLEAR_ROCKS, 3);
+				}
 			}
 		}
 	}
@@ -431,22 +440,28 @@ void FixSlopes()
 	/* Bottom and right edge */
 	for (row = height - 1; row >= 0; row--) {
 		for (col = width - 1; col >= 0; col--) {
-			current_tile = MAX_TILE_HEIGHT;
+			current_height = MAX_TILE_HEIGHT;
 			if ((uint)col != width - 1) {
 				/* Find lowest tile; either the bottom and right one */
-				current_tile = TileHeight(TileXY(col + 1, row)); // bottom edge
+				current_height = TileHeight(TileXY(col + 1, row)); // bottom edge
 			}
 
 			if ((uint)row != height - 1) {
-				if (TileHeight(TileXY(col, row + 1)) < current_tile) {
-					current_tile = TileHeight(TileXY(col, row + 1)); // right edge
+				if (TileHeight(TileXY(col, row + 1)) < current_height) {
+					current_height = TileHeight(TileXY(col, row + 1)); // right edge
 				}
 			}
 
 			/* Does the height differ more than one? */
-			if (TileHeight(TileXY(col, row)) >= (uint)current_tile + 2) {
+			TileIndex tile = TileXY(col, row);
+			if (TileHeight(tile) >= (uint)current_height + 2) {
 				/* Then change the height to be no more than one */
-				SetTileHeight(TileXY(col, row), current_tile + 1);
+				SetTileHeight(tile, current_height + 1);
+				/* Height was changed so now there's a chance, more likely at higher altitude, of the
+				 * tile turning into rock. */
+				if (IsInnerTile(tile) && RandomRange(max_height) <= current_height) {
+					MakeClear(tile, CLEAR_ROCKS, 3);
+				}
 			}
 		}
 	}
@@ -526,8 +541,8 @@ bool LoadHeightmap(DetailedFileType dft, const char *filename)
 void FlatEmptyWorld(uint8_t tile_height)
 {
 	int edge_distance = _settings_game.construction.freeform_edges ? 0 : 2;
-	for (uint row = edge_distance; row < MapSizeY() - edge_distance; row++) {
-		for (uint col = edge_distance; col < MapSizeX() - edge_distance; col++) {
+	for (uint row = edge_distance; row < Map::SizeY() - edge_distance; row++) {
+		for (uint col = edge_distance; col < Map::SizeX() - edge_distance; col++) {
 			SetTileHeight(TileXY(col, row), tile_height);
 		}
 	}

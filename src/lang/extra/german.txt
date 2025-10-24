@@ -26,7 +26,7 @@ STR_ORDER_CONDITIONAL_TIME_DATE_VALUE                           :Aktuelle(s) Zei
 STR_ORDER_CONDITIONAL_TIMETABLE_STATE                           :Fahrplanstatus
 STR_ORDER_CONDITIONAL_DISPATCH_SLOT                             :Abfahrztszeitfenster
 
-STR_ORDER_STOP_LOCATION_THROUGH                                 :[durchgehendes Laden]
+STR_ORDER_STOP_LOCATION_THROUGH                                 :{SPACE}[durchgehendes Laden]
 
 STR_CONFIG_SETTING_TOWN_GROWTH_EXTREME_SLOW                     :Extrem langsam
 STR_CONFIG_SETTING_TOWN_GROWTH_VERY_SLOW                        :Sehr langsam
@@ -508,11 +508,6 @@ STR_CONFIG_SETTING_REROUTE_RV_ON_LAYOUT_CHANGE_NO               :Nein
 STR_CONFIG_SETTING_REROUTE_RV_ON_LAYOUT_CHANGE_REMOVE_ONLY      :Nur bei Abriss
 STR_CONFIG_SETTING_REROUTE_RV_ON_LAYOUT_CHANGE_YES              :Ja
 
-STR_CONFIG_SETTING_ENABLE_ROAD_CUSTOM_BRIDGE_HEADS              :Aktiviere verbesserte Brückenköpfe für Straßen: {STRING}
-STR_CONFIG_SETTING_ENABLE_ROAD_CUSTOM_BRIDGE_HEADS_HELPTEXT     :Erlaube verbesserte, nichtreguläre Auf- und Abfahrten an Straßenbrücken. Dies erlaubt Abzweigungen und Kreuzungen auf flachen Brückenköpfen.
-STR_CONFIG_SETTING_ENABLE_RAIL_CUSTOM_BRIDGE_HEADS              :Aktiviere verbesserte Brückenköpfe für Zuggleise: {STRING}
-STR_CONFIG_SETTING_ENABLE_RAIL_CUSTOM_BRIDGE_HEADS_HELPTEXT     :Erlaube verbesserte, nichtreguläre Auf- und Abfahrten an Zugbrücken. Dies erlaubt Abzweigungen und Kreuzungen auf flachen Brückenköpfen.
-
 STR_CONFIG_SETTING_ALLOW_GRF_OBJECTS_UNDER_BRIDGES              :Erlaube alle NewGRF-Objekte unter Brücken: {STRING}
 STR_CONFIG_SETTING_ALLOW_GRF_OBJECTS_UNDER_BRIDGES_HELPTEXT     :Erlaube den Bau aller NewGRF-Objekte unter Brücken, selbst wenn dies nicht durch das GRF aktiviert wird.{}Dies kann zu Grafikfehlern führen.
 
@@ -580,8 +575,8 @@ STR_CHEAT_INFLATION_INCOME                                      :{LTBLUE}Ändere
 STR_CHEAT_INFLATION_INCOME_QUERY_CAPT                           :{WHITE}Ändert den Faktor der Inflation des Einkommens
 STR_CHEAT_TOWN_RATING                                           :{LTBLUE}Bewertung durch die Stadtverwaltung auf Hervorragend fixieren: {ORANGE}{STRING}
 
-STR_NETWORK_MESSAGE_GIVE_MONEY_RECEIVE                          :*** {STRING} gab der eigenen Firma {2:CURRENCY_LONG}
-STR_NETWORK_MESSAGE_GAVE_MONEY_AWAY                             :*** Die eigene Firma übergab {1:STRING} {2:CURRENCY_LONG}
+STR_NETWORK_MESSAGE_GIVE_MONEY_RECEIVE                          :*** {STRING} gab der eigenen Firma {CURRENCY_LONG}
+STR_NETWORK_MESSAGE_GAVE_MONEY_AWAY                             :*** Die eigene Firma übergab {STRING} {CURRENCY_LONG}
 STR_NETWORK_MESSAGE_MONEY_GIVE_SRC_DESCRIPTION                  :{STRING} ({COMPANY})
 
 STR_TRANSPARENT_LOADING_TOOLTIP                                 :{BLACK}Transparenz für Ladestandsanzeige einstellen. Strg+Klick, um Umschalten zu verhindern bzw. wieder zu erlauben
@@ -956,15 +951,15 @@ STR_PROGSIG_CONDVAR_NUM_GREEN                                   :grüne Signale
 
 STR_PROGSIG_CONDITION_VALUE_CAPT                                :{WHITE}Bedingungswert
 
-STR_ERROR_CAN_T_INSERT_INSTRUCTION                              :{WHITE}Kann Anweisungen nicht einfügen
-STR_ERROR_CAN_T_MODIFY_INSTRUCTION                              :{WHITE}Kann Anweisungen nicht ändern
-STR_ERROR_CAN_T_REMOVE_INSTRUCTION                              :{WHITE}Kann Anweisungen nicht entfernen
-STR_ERROR_CAN_T_GOTO_UNDEFINED_SIGNAL                           :{WHITE}Kann nicht zu undefiniertem Signal gehen
-STR_ERROR_NOT_AN_EXIT_SIGNAL                                    :{WHITE}Kein Ausfahrsignal
-STR_ERROR_NOT_AN_PROG_SIGNAL                                    :{WHITE}Kein programmierbares Signal
-STR_ERROR_CANNOT_USE_SELF                                       :{WHITE}Kann kein Programm von sich selbst kopieren
-STR_ERROR_CAN_T_DEPEND_UPON_BIDIRECTIONAL_SIGNALS               :{WHITE}Kann nicht bedingt von einem bidirektionalen Signal abhängen
-STR_ERROR_INVALID_SIGNAL                                        :{WHITE}Ungültiges Signal
+STR_PROGSIG_ERROR_CAN_T_INSERT_INSTRUCTION                      :{WHITE}Kann Anweisungen nicht einfügen
+STR_PROGSIG_ERROR_CAN_T_MODIFY_INSTRUCTION                      :{WHITE}Kann Anweisungen nicht ändern
+STR_PROGSIG_ERROR_CAN_T_REMOVE_INSTRUCTION                      :{WHITE}Kann Anweisungen nicht entfernen
+STR_PROGSIG_ERROR_CAN_T_GOTO_UNDEFINED_SIGNAL                   :{WHITE}Kann nicht zu undefiniertem Signal gehen
+STR_PROGSIG_ERROR_NOT_AN_EXIT_SIGNAL                            :{WHITE}Kein Ausfahrsignal
+STR_PROGSIG_ERROR_NOT_AN_PROG_SIGNAL                            :{WHITE}Kein programmierbares Signal
+STR_PROGSIG_ERROR_CANNOT_USE_SELF                               :{WHITE}Kann kein Programm von sich selbst kopieren
+STR_PROGSIG_ERROR_CAN_T_DEPEND_UPON_BIDIRECTIONAL_SIGNALS       :{WHITE}Kann nicht bedingt von einem bidirektionalen Signal abhängen
+STR_PROGSIG_ERROR_INVALID_SIGNAL                                :{WHITE}Ungültiges Signal
 
 STR_WATERWAYS_TOOLBAR_CREATE_RIVER_IN_GAME_TOOLTIP              :{BLACK}Flüsse platzieren
 
@@ -1072,10 +1067,10 @@ STR_DEPARTURES_TOC                                              :{ORANGE}{COMPAN
 STR_DEPARTURES_GROUP                                            :{ORANGE}{GROUP}
 STR_DEPARTURES_VEH                                              :{ORANGE}{VEHICLE}
 STR_DEPARTURES_CALLING_AT                                       :{ORANGE}Hält in:
-STR_DEPARTURES_CALLING_AT_STATION                               :{STRING}, {STRING}
-STR_DEPARTURES_CALLING_AT_LAST_STATION                          :{STRING} und {STRING}
-STR_DEPARTURES_CALLING_AT_LIST                                  :{ORANGE}{STRING}.
-STR_DEPARTURES_CALLING_AT_LIST_SMART_TERMINUS                   :{ORANGE}{STRING}. Diese Fahrt verkehrt über {STRING}.
+STR_DEPARTURES_CALLING_AT_STATION                               :, {STRING}
+STR_DEPARTURES_CALLING_AT_LAST_STATION                          : und {STRING}
+STR_DEPARTURES_CALLING_AT_LIST_SUFFIX                           :.
+STR_DEPARTURES_CALLING_AT_LIST_SUFFIX_SMART_TERMINUS            :. Diese Fahrt verkehrt über {STRING}.
 
 STR_DEPARTURES_TYPE_TRAIN                                       :{ORANGE}{TRAIN}
 STR_DEPARTURES_TYPE_TRAIN_SILVER                                :{SILVER}{TRAIN}
@@ -1326,24 +1321,24 @@ STR_ORDERS_NEW_GROUP_TOOLTIP                                    :{BLACK}Erstelle
 
 STR_ORDER_GO_TO_WAYPOINT_REVERSE                                :Fahre über und wende bei {WAYPOINT}
 STR_ORDER_GO_NON_STOP_TO_WAYPOINT_REVERSE                       :Fahre ohne Zwischenhalt über und wende bei {WAYPOINT}
-STR_ORDER_SELL_ORDER                                            :(Verkaufe Fahrzeug)
-STR_ORDER_CARGO_TYPE_LOAD                                       :(Laden nach Frachttyp)
-STR_ORDER_UNLOAD_CARGO_TYPE_LOAD                                :(Entladen und laden nach Frachttyp)
-STR_ORDER_TRANSFER_CARGO_TYPE_LOAD                              :(Umladen und laden nach Frachttyp)
-STR_ORDER_NO_UNLOAD_CARGO_TYPE_LOAD                             :(Nicht entladen, aber laden nach Frachttyp)
-STR_ORDER_CARGO_TYPE_UNLOAD                                     :(Entladen nach Frachttyp)
-STR_ORDER_CARGO_TYPE_UNLOAD_FULL_LOAD                           :(Entladen nach Frachttyp und auf volle Ladung warten)
-STR_ORDER_CARGO_TYPE_UNLOAD_FULL_LOAD_ANY                       :(Entladen nach Frachttyp und beladen mit beliebiger Fracht)
-STR_ORDER_CARGO_TYPE_UNLOAD_NO_LOAD                             :(Entladen nach Frachttyp und leer verlassen)
-STR_ORDER_CARGO_TYPE_UNLOAD_CARGO_TYPE_LOAD                     :(Entladen nach Frachttyp und laden nach Frachttyp)
-STR_ORDER_CARGO_TYPE_LOAD_REFIT                                 :(Laden nach Frachttyp mit Umrüstung auf {STRING})
-STR_ORDER_UNLOAD_CARGO_TYPE_LOAD_REFIT                          :(Entladen und laden nach Frachttyp mit Umrüstung auf {STRING})
-STR_ORDER_TRANSFER_CARGO_TYPE_LOAD_REFIT                        :(Umladen und laden nach Frachttyp mit Umrüstung auf {STRING})
-STR_ORDER_NO_UNLOAD_CARGO_TYPE_LOAD_REFIT                       :(Nicht entladen und laden nach Frachttyp mit Umrüstung auf {STRING})
-STR_ORDER_CARGO_TYPE_UNLOAD_REFIT                               :(Entladen nach Frachttyp und laden mit Umrüstung auf {STRING})
-STR_ORDER_CARGO_TYPE_UNLOAD_FULL_LOAD_REFIT                     :(Entladen nach Frachttyp und warten auf volle Zuladung mit Umrüstung auf {STRING})
-STR_ORDER_CARGO_TYPE_UNLOAD_FULL_LOAD_ANY_REFIT                 :(Entladen nach Frachttyp und warten auf volle Zuladung einer Frachtart mit Umrüstung auf {STRING})
-STR_ORDER_CARGO_TYPE_UNLOAD_CARGO_TYPE_LOAD_REFIT               :(Entladen nach Frachttyp und laden nach Frachttyp mit Umrüstung auf {STRING})
+STR_ORDER_SELL_ORDER                                            :{SPACE}(Verkaufe Fahrzeug)
+STR_ORDER_CARGO_TYPE_LOAD                                       :{SPACE}(Laden nach Frachttyp)
+STR_ORDER_UNLOAD_CARGO_TYPE_LOAD                                :{SPACE}(Entladen und laden nach Frachttyp)
+STR_ORDER_TRANSFER_CARGO_TYPE_LOAD                              :{SPACE}(Umladen und laden nach Frachttyp)
+STR_ORDER_NO_UNLOAD_CARGO_TYPE_LOAD                             :{SPACE}(Nicht entladen, aber laden nach Frachttyp)
+STR_ORDER_CARGO_TYPE_UNLOAD                                     :{SPACE}(Entladen nach Frachttyp)
+STR_ORDER_CARGO_TYPE_UNLOAD_FULL_LOAD                           :{SPACE}(Entladen nach Frachttyp und auf volle Ladung warten)
+STR_ORDER_CARGO_TYPE_UNLOAD_FULL_LOAD_ANY                       :{SPACE}(Entladen nach Frachttyp und beladen mit beliebiger Fracht)
+STR_ORDER_CARGO_TYPE_UNLOAD_NO_LOAD                             :{SPACE}(Entladen nach Frachttyp und leer verlassen)
+STR_ORDER_CARGO_TYPE_UNLOAD_CARGO_TYPE_LOAD                     :{SPACE}(Entladen nach Frachttyp und laden nach Frachttyp)
+STR_ORDER_CARGO_TYPE_LOAD_REFIT                                 :{SPACE}(Laden nach Frachttyp mit Umrüstung auf {STRING})
+STR_ORDER_UNLOAD_CARGO_TYPE_LOAD_REFIT                          :{SPACE}(Entladen und laden nach Frachttyp mit Umrüstung auf {STRING})
+STR_ORDER_TRANSFER_CARGO_TYPE_LOAD_REFIT                        :{SPACE}(Umladen und laden nach Frachttyp mit Umrüstung auf {STRING})
+STR_ORDER_NO_UNLOAD_CARGO_TYPE_LOAD_REFIT                       :{SPACE}(Nicht entladen und laden nach Frachttyp mit Umrüstung auf {STRING})
+STR_ORDER_CARGO_TYPE_UNLOAD_REFIT                               :{SPACE}(Entladen nach Frachttyp und laden mit Umrüstung auf {STRING})
+STR_ORDER_CARGO_TYPE_UNLOAD_FULL_LOAD_REFIT                     :{SPACE}(Entladen nach Frachttyp und warten auf volle Zuladung mit Umrüstung auf {STRING})
+STR_ORDER_CARGO_TYPE_UNLOAD_FULL_LOAD_ANY_REFIT                 :{SPACE}(Entladen nach Frachttyp und warten auf volle Zuladung einer Frachtart mit Umrüstung auf {STRING})
+STR_ORDER_CARGO_TYPE_UNLOAD_CARGO_TYPE_LOAD_REFIT               :{SPACE}(Entladen nach Frachttyp und laden nach Frachttyp mit Umrüstung auf {STRING})
 
 STR_ORDER_RV_DIR_NE                                             :[Nordost-Richtung]
 STR_ORDER_RV_DIR_SE                                             :[Südost-Richtung]
@@ -1389,9 +1384,9 @@ STR_TIMETABLE_SCHEDULED_DISPATCH_ORDER_SCHEDULE_INDEX           :{NUM}{NBSP}-{NB
 
 STR_TIMETABLE_LOCK_ORDER_TIME_TOOLTIP                           :{BLACK}Sperrt/entsperrt den Zeitrahmen für den markierten Auftrag (Strg+Klick setzt den Sperrzustand für alle Aufträge).{}Wenn gesperrt, wird der Zeitrahmen nicht durch Erfassen/Automatisieren geändert.
 
-STR_TIMETABLE_LEAVE_EARLY_ORDER                                 :[verlasse früh]
-STR_TIMETABLE_LEAVE_EARLY_ORDER_FULL_ANY                        :[verlasse früh, wenn eine Fracht voll beladen]
-STR_TIMETABLE_LEAVE_EARLY_ORDER_FULL_ALL                        :[verlasse früh, wenn jede Fracht voll beladen]
+STR_TIMETABLE_LEAVE_EARLY_ORDER                                 :{SPACE}[verlasse früh]
+STR_TIMETABLE_LEAVE_EARLY_ORDER_FULL_ANY                        :{SPACE}[verlasse früh, wenn eine Fracht voll beladen]
+STR_TIMETABLE_LEAVE_EARLY_ORDER_FULL_ALL                        :{SPACE}[verlasse früh, wenn jede Fracht voll beladen]
 STR_TIMETABLE_LEAVE_NORMAL                                      :Verlasse wie geplant
 STR_TIMETABLE_LEAVE_EARLY                                       :Verlasse früh
 STR_TIMETABLE_LEAVE_EARLY_FULL_ANY                              :Verlasse früh, wenn eine voll
@@ -1462,7 +1457,7 @@ STR_PLANS_COLOUR                                                :{BLACK}Farbe
 STR_PLANS_COLOUR_TOOLTIP                                        :{BLACK}Setzt die Farbe des Plans.
 STR_PLANS_DELETE                                                :{BLACK}Entfernen
 STR_PLANS_DELETE_TOOLTIP                                        :{BLACK}Entferne den ausgewählten Eintrag aus der Liste
-STR_PLANS_LIST_ITEM_PLAN_PRIVATE                                :[Privat]: {STRING}
+STR_PLANS_LIST_ITEM_PLAN_PRIVATE                                :[Privat]:{SPACE}
 STR_PLANS_LIST_ITEM_PLAN                                        :Plan #{NUM}: {NUM} Strecke{P "" n} ({DATE_SHORT})
 STR_PLANS_LIST_ITEM_NAMED_PLAN                                  :{STRING}: {NUM} Strecke{P "" n} ({DATE_SHORT})
 STR_PLANS_LIST_ITEM_LINE                                        : -- Strecke #{NUM}: {NUM} Segment{P "" e}
@@ -1490,7 +1485,6 @@ STR_ERROR_BUILDING_IS_TOO_MODERN                                :{WHITE}... Geb�
 STR_ERROR_ONLY_ONE_BUILDING_ALLOWED_PER_TOWN                    :{WHITE}... nur ein Gebäude dieses Typs ist in einer Stadt erlaubt
 STR_ERROR_TOO_MANY_DOCKS                                        :{WHITE}Zu viele Docks
 STR_ERROR_UNSUITABLE_SIGNAL_TYPE                                :{WHITE}... ungeeignete Signalart
-STR_ERROR_SIGNAL_CHANGES                                        :{WHITE}Anzahl der Auswertungen von programmierbaren Signalen übersteigt das Limit
 
 STR_ERROR_BRIDGE_TOO_LOW_FOR_STATION                            :{WHITE}Die Brücke ist zu niedrig für die Haltestelle
 STR_ERROR_BRIDGE_PILLARS_OBSTRUCT_STATION                       :{WHITE}Die Brückenpfeiler behindern die Haltestelle
@@ -1727,3 +1721,5 @@ STR_COMPANY_PASSWORD_MAKE_DEFAULT_TOOLTIP                       :{BLACK}Benutze 
 STR_COMPANY_VIEW_PASSWORD                                       :{BLACK}Passwort
 STR_COMPANY_VIEW_PASSWORD_TOOLTIP                               :{BLACK}Die Firma durch ein Passwort schützen, sodass nur ausgewählte Spieler beitreten können
 STR_COMPANY_VIEW_SET_PASSWORD                                   :{BLACK}Firmenpasswort setzen
+
+# JSON messages

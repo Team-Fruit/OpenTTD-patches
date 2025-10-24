@@ -234,7 +234,7 @@ constexpr To ClampTo(From value)
  * @return The absolute difference between the given scalars
  */
 template <typename T>
-constexpr T Delta(const T a, const T b)
+constexpr auto Delta(const T a, const T b)
 {
 	return (a < b) ? b - a : a - b;
 }
@@ -275,19 +275,6 @@ constexpr bool IsInsideMM(const T x, const size_t min, const size_t max) noexcep
 	} else {
 		return static_cast<size_t>(x - min) < (max - min);
 	}
-}
-
-/**
- * Type safe swap operation
- * @param a variable to swap with b
- * @param b variable to swap with a
- */
-template <typename T>
-constexpr void Swap(T &a, T &b)
-{
-	T t = a;
-	a = b;
-	b = t;
 }
 
 /**
@@ -417,7 +404,7 @@ constexpr uint64_t PowerOfTen(int power)
 /**
  * Unsigned saturating add.
  */
-template<typename T, std::enable_if_t<std::is_unsigned_v<T>, int> = 0>
+template <typename T, std::enable_if_t<std::is_unsigned_v<T>, int> = 0>
 constexpr inline T SaturatingAdd(T a, T b)
 {
 #ifdef WITH_OVERFLOW_BUILTINS
@@ -436,7 +423,7 @@ constexpr inline T SaturatingAdd(T a, T b)
 /**
  * Return number of base 10 digits required for an unsigned value.
  */
-template<typename T, std::enable_if_t<std::is_unsigned_v<T>, int> = 0>
+template <typename T, std::enable_if_t<std::is_unsigned_v<T>, int> = 0>
 constexpr inline uint GetBase10DigitsRequired(T x)
 {
 	if (sizeof(T) <= sizeof(uint32_t) || x <= UINT32_MAX) {
@@ -450,7 +437,7 @@ constexpr inline uint GetBase10DigitsRequired(T x)
 
 
 uint32_t IntSqrt(uint32_t num);
-uint32_t IntSqrt64(uint64_t num);
+uint64_t IntSqrt64(uint64_t num);
 uint32_t IntCbrt(uint64_t num);
 
 uint16_t RXCompressUint(uint32_t num);

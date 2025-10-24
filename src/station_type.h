@@ -10,13 +10,18 @@
 #ifndef STATION_TYPE_H
 #define STATION_TYPE_H
 
+#include "core/pool_id_type.hpp"
 #include "core/smallstack_type.hpp"
 #include "tilearea_type.h"
 #include "3rdparty/cpp-btree/btree_set.h"
 
-typedef uint16_t StationID;
-typedef uint16_t RoadStopID;
-typedef uint16_t DockID;
+struct StationIDTag : public PoolIDTraits<uint16_t, 64000, 0xFFFF> {};
+using StationID = PoolID<StationIDTag>;
+static constexpr StationID NEW_STATION{0xFFFD};
+static constexpr StationID ADJACENT_STATION{0xFFFE};
+
+struct RoadStopIDTag : public PoolIDTraits<uint16_t, 64000, 0xFFFF> {};
+using RoadStopID = PoolID<RoadStopIDTag>;
 
 struct BaseStation;
 struct Station;
@@ -24,44 +29,44 @@ struct RoadStop;
 struct StationSpec;
 struct Waypoint;
 
-static const StationID NEW_STATION = 0xFFFE;
-static const StationID INVALID_STATION = 0xFFFF;
-
 static const uint MAX_STATION_CARGO_HISTORY_DAYS = 24;
 
-typedef SmallStack<StationID, StationID, INVALID_STATION, 8, 0xFFFD> StationIDStack;
+using StationIDStack = SmallStack<StationID, StationID::BaseType, StationID::Invalid().base(), 8, StationID::End().base()>;
 
 /** Station types */
-enum StationType : uint8_t {
-	STATION_RAIL,
-	STATION_AIRPORT,
-	STATION_TRUCK,
-	STATION_BUS,
-	STATION_OILRIG,
-	STATION_DOCK,
-	STATION_BUOY,
-	STATION_WAYPOINT,
-	STATION_ROADWAYPOINT,
-	STATION_END,
+enum class StationType : uint8_t {
+	Rail,
+	Airport,
+	Truck,
+	Bus,
+	Oilrig,
+	Dock,
+	Buoy,
+	RailWaypoint,
+	RoadWaypoint,
+	End,
 };
 
 /** Types of RoadStops */
-enum RoadStopType : uint8_t {
-	ROADSTOP_BUS,    ///< A standard stop for buses
-	ROADSTOP_TRUCK,  ///< A standard stop for trucks
+enum class RoadStopType : uint8_t {
+	Bus,   ///< A standard stop for buses
+	Truck, ///< A standard stop for trucks
+	End,   ///< End of valid types
 };
 
 /** The facilities a station might be having */
-enum StationFacility : uint8_t {
-	FACIL_NONE       = 0,      ///< The station has no facilities at all
-	FACIL_TRAIN      = 1 << 0, ///< Station with train station
-	FACIL_TRUCK_STOP = 1 << 1, ///< Station with truck stops
-	FACIL_BUS_STOP   = 1 << 2, ///< Station with bus stops
-	FACIL_AIRPORT    = 1 << 3, ///< Station with an airport
-	FACIL_DOCK       = 1 << 4, ///< Station with a dock
-	FACIL_WAYPOINT   = 1 << 7, ///< Station is a waypoint
+enum class StationFacility : uint8_t {
+	Train     = 0, ///< Station with train station
+	TruckStop = 1, ///< Station with truck stops
+	BusStop   = 2, ///< Station with bus stops
+	Airport   = 3, ///< Station with an airport
+	Dock      = 4, ///< Station with a dock
+	Waypoint  = 7, ///< Station is a waypoint
 };
-DECLARE_ENUM_AS_BIT_SET(StationFacility)
+using StationFacilities = EnumBitSet<StationFacility, uint8_t>;
+
+/** Fake 'facility' to allow toggling display of recently-removed station signs. */
+static constexpr StationFacility STATION_FACILITY_GHOST{6};
 
 /** The vehicles that may have visited a station */
 enum StationHadVehicleOfType : uint8_t {
@@ -75,6 +80,43 @@ enum StationHadVehicleOfType : uint8_t {
 	HVOT_WAYPOINT = 1 << 6, ///< Station is a waypoint (NewGRF only!)
 };
 DECLARE_ENUM_AS_BIT_SET(StationHadVehicleOfType)
+
+/** Randomisation triggers for stations and roadstops */
+enum class StationRandomTrigger : uint8_t {
+	NewCargo, ///< Trigger station on new cargo arrival.
+	CargoTaken, ///< Trigger station when cargo is completely taken.
+	VehicleArrives, ///< Trigger platform when train arrives.
+	VehicleDeparts, ///< Trigger platform when train leaves.
+	VehicleLoads, ///< Trigger platform when train loads/unloads.
+	PathReservation, ///< Trigger platform when train reserves path.
+};
+using StationRandomTriggers = EnumBitSet<StationRandomTrigger, uint8_t>;
+
+/** Animation triggers for stations and roadstops. */
+enum class StationAnimationTrigger : uint8_t {
+	Built, ///< Trigger tile when built.
+	NewCargo, ///< Trigger station on new cargo arrival.
+	CargoTaken, ///< Trigger station when cargo is completely taken.
+	VehicleArrives, ///< Trigger platform when train arrives.
+	VehicleDeparts, ///< Trigger platform when train leaves.
+	VehicleLoads, ///< Trigger platform when train loads/unloads.
+	AcceptanceTick, ///< Trigger station every 250 ticks.
+	TileLoop, ///< Trigger in the periodic tile loop.
+	PathReservation, ///< Trigger platform when train reserves path.
+	End
+};
+using StationAnimationTriggers = EnumBitSet<StationAnimationTrigger, uint16_t>;
+
+/** Animation triggers for airport tiles */
+enum class AirportAnimationTrigger : uint8_t {
+	Built, ///< Triggered when the airport is built (for all tiles at the same time).
+	TileLoop, ///< Triggered in the periodic tile loop.
+	NewCargo, ///< Triggered when new cargo arrives at the station (for all tiles at the same time).
+	CargoTaken, ///< Triggered when a cargo type is completely removed from the station (for all tiles at the same time).
+	AcceptanceTick, ///< Triggered every 250 ticks (for all tiles at the same time).
+	AirplaneTouchdown, ///< Triggered when an airplane (not a helicopter) touches down at the airport (for single tile).
+};
+using AirportAnimationTriggers = EnumBitSet<AirportAnimationTrigger, uint8_t>;
 
 /* The different catchment area sizes. */
 static constexpr uint CA_NONE = 0; ///< Catchment when the station has no facilities

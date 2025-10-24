@@ -11,6 +11,7 @@
 #define NETWORK_TYPE_H
 
 #include "../core/enum_type.hpp"
+#include "../core/pool_id_type.hpp"
 #include <vector>
 #include <string>
 
@@ -18,16 +19,9 @@
 static const uint MAX_CLIENTS = 255;
 
 /**
- * The number of slots; must be at least 1 more than MAX_CLIENTS. It must
- * furthermore be less than or equal to 256 as client indices (sent over
- * the network) are 8 bits. It needs 1 more for the dedicated server.
- */
-static const uint MAX_CLIENT_SLOTS = 256;
-
-/**
  * Vehicletypes in the order they are send in info packets.
  */
-enum NetworkVehicleType {
+enum NetworkVehicleType : uint8_t {
 	NETWORK_VEH_TRAIN = 0,
 	NETWORK_VEH_LORRY,
 	NETWORK_VEH_BUS,
@@ -54,16 +48,13 @@ enum ClientID : uint32_t {
 	CLIENT_ID_FIRST   = 2, ///< The first client ID
 };
 
-/** Indices into the client tables */
-typedef uint8_t ClientIndex;
+/** Indices into the client related pools */
+struct ClientPoolIDTag : public PoolIDTraits<uint16_t, MAX_CLIENTS + 1 /* dedicated server. */, 0xFFFF> {};
+using ClientPoolID = PoolID<ClientPoolIDTag>;
 
 /** Indices into the admin tables. */
-typedef uint8_t AdminIndex;
-
-/** Maximum number of allowed admins. */
-static const AdminIndex MAX_ADMINS = 16;
-/** An invalid admin marker. */
-static const AdminIndex INVALID_ADMIN_ID = UINT8_MAX;
+struct AdminIDTag : public PoolIDTraits<uint8_t, 16, 0xFF> {};
+using AdminID = PoolID<AdminIDTag>;
 
 /** Simple calculated statistics of a company */
 struct NetworkCompanyStats {
@@ -101,7 +92,7 @@ DECLARE_ENUM_AS_ADDABLE(DestType)
  * Actions that can be used for NetworkTextMessage.
  * @warning The values of the enum items are part of the admin network API. Only append at the end.
  */
-enum NetworkAction {
+enum NetworkAction : uint8_t {
 	NETWORK_ACTION_JOIN,
 	NETWORK_ACTION_LEAVE,
 	NETWORK_ACTION_SERVER_MESSAGE,
@@ -121,7 +112,7 @@ enum NetworkAction {
  * The error codes we send around in the protocols.
  * @warning The values of the enum items are part of the admin network API. Only append at the end.
  */
-enum NetworkErrorCode {
+enum NetworkErrorCode : uint8_t {
 	NETWORK_ERROR_GENERAL, // Try to use this one like never
 
 	/* Signals from clients */

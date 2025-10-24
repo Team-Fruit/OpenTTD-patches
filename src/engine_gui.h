@@ -12,6 +12,7 @@
 
 #include "engine_type.h"
 #include "group_type.h"
+#include "newgrf_badge_gui.h"
 #include "sortlist_type.h"
 #include "gfx_type.h"
 #include "vehicle_type.h"
@@ -23,10 +24,10 @@ struct BuildVehicleWindowBase;
 
 struct GUIEngineListSortCache {
 	const BuildVehicleWindowBase *parent = nullptr;
-	CargoID current_cargo = INVALID_CARGO;
+	CargoType current_cargo = INVALID_CARGO;
 	mutable btree::btree_map<EngineID, uint> capacities;
 
-	void UpdateCargoFilter(const BuildVehicleWindowBase *parent, CargoID cargo_filter_criteria);
+	void UpdateCargoFilter(const BuildVehicleWindowBase *parent, CargoType cargo_filter_criteria);
 	uint GetArticulatedCapacity(EngineID eng, bool dual_headed = false) const;
 };
 
@@ -47,14 +48,14 @@ struct GUIEngineListItem {
 	GUIEngineListItem(EngineID engine_id, EngineID variant_id, EngineDisplayFlags flags, uint8_t indent) : engine_id(engine_id), variant_id(variant_id), flags(flags), indent(indent), level_mask(0) {}
 };
 
-typedef GUIList<GUIEngineListItem, GUIEngineListSortCache, CargoID> GUIEngineList;
+typedef GUIList<GUIEngineListItem, GUIEngineListSortCache, CargoType> GUIEngineList;
 
 typedef bool EngList_SortTypeFunction(const GUIEngineListItem&, const GUIEngineListItem&, const GUIEngineListSortCache &); ///< argument type for #EngList_Sort.
 void EngList_Sort(GUIEngineList &el, EngList_SortTypeFunction compare);
 void EngList_SortPartial(GUIEngineList &el, EngList_SortTypeFunction compare, size_t begin, size_t num_items);
 
 StringID GetEngineCategoryName(EngineID engine);
-StringID GetEngineInfoString(EngineID engine);
+std::string GetEngineInfoString(EngineID engine);
 
 void DrawVehicleEngine(int left, int right, int preferred_x, int y, EngineID engine, PaletteID pal, EngineImageType image_type);
 void DrawTrainEngine(int left, int right, int preferred_x, int y, EngineID engine, PaletteID pal, EngineImageType image_type);
@@ -72,7 +73,7 @@ extern EngList_SortTypeFunction * const _engine_sort_functions[][13];
 /* Functions in build_vehicle_gui.cpp */
 uint GetEngineListHeight(VehicleType type);
 void DisplayVehicleSortDropDown(Window *w, VehicleType vehicle_type, int selected, WidgetID button);
-void DrawEngineList(VehicleType type, const Rect &r, const GUIEngineList &eng_list, const class Scrollbar &sb, EngineID selected_id, bool show_count, GroupID selected_group);
-void GUIEngineListAddChildren(GUIEngineList &dst, const GUIEngineList &src, EngineID parent = INVALID_ENGINE, uint8_t indent = 0);
+void DrawEngineList(VehicleType type, const Rect &r, const GUIEngineList &eng_list, const class Scrollbar &sb, EngineID selected_id, bool show_count, GroupID selected_group, const GUIBadgeClasses &badge_classes);
+void GUIEngineListAddChildren(GUIEngineList &dst, const GUIEngineList &src, EngineID parent = EngineID::Invalid(), uint8_t indent = 0);
 
 #endif /* ENGINE_GUI_H */

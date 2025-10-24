@@ -15,7 +15,7 @@
  * - [v]snprintf: returns the length of the string as it would be written
  *   when the output is large enough, so it can be more than the size of
  *   the buffer and than can underflow size_t (uint-ish) which makes all
- *   subsequent snprintf alikes write outside of the buffer. Use
+ *   subsequent snprintf-like functions write outside of the buffer. Use
  *   [v]seprintf instead; it will return the number of bytes actually
  *   added so no [v]seprintf will cause outside of bounds writes.
  * - [v]sprintf: does not bounds checking: use [v]seprintf instead.
@@ -28,6 +28,7 @@
 #include <iterator>
 
 #include "core/bitmath_func.hpp"
+#include "core/utf8.hpp"
 #include "string_type.h"
 
 char *strecpy(char *dst, const char *src, const char *last, bool quiet_mode = false) NOACCESS(3);
@@ -37,35 +38,59 @@ void strecpy(std::span<char> dst, std::string_view src);
 
 std::string FormatArrayAsHex(std::span<const uint8_t> data, bool upper_case = true);
 
-char *StrMakeValidInPlace(char *str, const char *last, StringValidationSettings settings = SVS_REPLACE_WITH_QUESTION_MARK) NOACCESS(2);
-[[nodiscard]] std::string StrMakeValid(std::string_view str, StringValidationSettings settings = SVS_REPLACE_WITH_QUESTION_MARK);
-void StrMakeValidInPlace(char *str, StringValidationSettings settings = SVS_REPLACE_WITH_QUESTION_MARK);
+template <typename T>
+inline T &BackInserterContainer(std::back_insert_iterator<T> iter)
+{
+	using BaseIter = std::back_insert_iterator<T>;
+	struct accessor : BaseIter {
+		constexpr accessor(BaseIter iter) : BaseIter(iter) {}
+		using BaseIter::container;
+	};
+	return *accessor(iter).container;
+}
 
-inline void StrMakeValidInPlace(std::string &str, StringValidationSettings settings = SVS_REPLACE_WITH_QUESTION_MARK)
+char *StrMakeValidInPlaceIntl(char *str, const char *end, StringValidationSettings settings = StringValidationSetting::ReplaceWithQuestionMark) NOACCESS(2);
+[[nodiscard]] std::string StrMakeValid(std::string_view str, StringValidationSettings settings = StringValidationSetting::ReplaceWithQuestionMark);
+void StrMakeValidInPlace(char *str, StringValidationSettings settings = StringValidationSetting::ReplaceWithQuestionMark);
+void AppendStrMakeValidInPlace(struct format_target &buf, std::string_view str, StringValidationSettings settings = StringValidationSetting::ReplaceWithQuestionMark);
+void AppendStrMakeValidInPlace(std::string &output, std::string_view str, StringValidationSettings settings = StringValidationSetting::ReplaceWithQuestionMark);
+
+inline void StrMakeValidInPlace(std::string &str, StringValidationSettings settings = StringValidationSetting::ReplaceWithQuestionMark)
 {
 	if (str.empty()) return;
 	char *buf = str.data();
-	str.resize(StrMakeValidInPlace(buf, buf + str.size(), settings) - buf);
+	str.resize(StrMakeValidInPlaceIntl(buf, buf + str.size(), settings) - buf);
 }
 
-const char *str_fix_scc_encoded(char *str, const char *last) NOACCESS(2);
-void str_strip_colours(char *str);
-const char *strip_leading_colours(const char *str);
-
-inline const char *strip_leading_colours(const std::string &str)
+[[nodiscard]] inline std::string StrMakeValid(std::string &&str, StringValidationSettings settings = StringValidationSetting::ReplaceWithQuestionMark)
 {
-	return strip_leading_colours(str.c_str());
+	StrMakeValidInPlace(str, settings);
+	return std::move(str);
 }
+
+[[nodiscard]] inline std::string StrMakeValid(const char *str, StringValidationSettings settings = StringValidationSetting::ReplaceWithQuestionMark)
+{
+	return StrMakeValid(std::string_view(str), settings);
+}
+
+inline void StrMakeValidInPlace(char *str, const char *end, StringValidationSettings settings = StringValidationSetting::ReplaceWithQuestionMark)
+{
+	*StrMakeValidInPlaceIntl(str, end, settings) = '\0';
+}
+
+void str_strip_colours(char *str);
+std::string_view strip_leading_colours(std::string_view str);
 
 
 std::string str_strip_all_scc(const char *str);
-char *str_replace_wchar(char *str, const char *last, char32_t find, char32_t replace);
+void str_replace_wchar(struct format_target &buf, std::string_view str, char32_t find, char32_t replace);
+std::string str_replace_wchar(std::string_view str, char32_t find, char32_t replace);
 bool strtolower(char *str);
 bool strtolower(std::string &str, std::string::size_type offs = 0);
 
 [[nodiscard]] bool StrValid(std::span<const char> str);
 void StrTrimInPlace(std::string &str);
-std::string_view StrTrimView(std::string_view str);
+[[nodiscard]] std::string_view StrTrimView(std::string_view str);
 
 const char *StrLastPathSegment(const char *path);
 
@@ -79,6 +104,7 @@ inline const char *StrLastPathSegment(const std::string &path)
 
 [[nodiscard]] int StrCompareIgnoreCase(const std::string_view str1, const std::string_view str2);
 [[nodiscard]] bool StrEqualsIgnoreCase(const std::string_view str1, const std::string_view str2);
+[[nodiscard]] bool StrContainsIgnoreCase(const std::string_view str, const std::string_view value);
 [[nodiscard]] int StrNaturalCompare(std::string_view s1, std::string_view s2, bool ignore_garbage_at_front = false);
 [[nodiscard]] bool StrNaturalContains(const std::string_view str, const std::string_view value);
 [[nodiscard]] bool StrNaturalContainsIgnoreCase(const std::string_view str, const std::string_view value);
@@ -118,93 +144,7 @@ inline size_t ttd_strnlen(const char *str, size_t maxlen)
 
 bool IsValidChar(char32_t key, CharSetFilter afilter);
 
-size_t Utf8Decode(char32_t *c, const char *s);
-size_t Utf8Encode(char *buf, char32_t c);
-size_t Utf8Encode(std::ostreambuf_iterator<char> &buf, char32_t c);
-size_t Utf8Encode(std::back_insert_iterator<std::string> &buf, char32_t c);
-size_t Utf8TrimString(char *s, size_t maxlen);
-
-
-inline char32_t Utf8Consume(const char **s)
-{
-	char32_t c;
-	*s += Utf8Decode(&c, *s);
-	return c;
-}
-
-template <class Titr>
-inline char32_t Utf8Consume(Titr &s)
-{
-	char32_t c;
-	s += Utf8Decode(&c, &*s);
-	return c;
-}
-
-/**
- * Return the length of a UTF-8 encoded character.
- * @param c Unicode character.
- * @return Length of UTF-8 encoding for character.
- */
-inline int8_t Utf8CharLen(char32_t c)
-{
-	if (c < 0x80)       return 1;
-	if (c < 0x800)      return 2;
-	if (c < 0x10000)    return 3;
-	if (c < 0x110000)   return 4;
-
-	/* Invalid valid, we encode as a '?' */
-	return 1;
-}
-
-
-/**
- * Return the length of an UTF-8 encoded value based on a single char. This
- * char should be the first byte of the UTF-8 encoding. If not, or encoding
- * is invalid, return value is 0
- * @param c char to query length of
- * @return requested size
- */
-inline int8_t Utf8EncodedCharLen(char c)
-{
-	if (GB(c, 3, 5) == 0x1E) return 4;
-	if (GB(c, 4, 4) == 0x0E) return 3;
-	if (GB(c, 5, 3) == 0x06) return 2;
-	if (GB(c, 7, 1) == 0x00) return 1;
-
-	/* Invalid UTF8 start encoding */
-	return 0;
-}
-
-
-/* Check if the given character is part of a UTF8 sequence */
-inline bool IsUtf8Part(char c)
-{
-	return GB(c, 6, 2) == 2;
-}
-
-/**
- * Retrieve the previous UNICODE character in an UTF-8 encoded string.
- * @param s char pointer pointing to (the first char of) the next character
- * @return a pointer in 's' to the previous UNICODE character's first byte
- * @note The function should not be used to determine the length of the previous
- * encoded char because it might be an invalid/corrupt start-sequence
- */
-inline char *Utf8PrevChar(char *s)
-{
-	char *ret = s;
-	while (IsUtf8Part(*--ret)) {}
-	return ret;
-}
-
-inline const char *Utf8PrevChar(const char *s)
-{
-	const char *ret = s;
-	while (IsUtf8Part(*--ret)) {}
-	return ret;
-}
-
-size_t Utf8StringLength(const char *s);
-size_t Utf8StringLength(const std::string &str);
+size_t Utf8StringLength(std::string_view str);
 
 /**
  * Is the given character a lead surrogate code point?
@@ -298,14 +238,6 @@ inline bool IsWhitespace(char32_t c)
 #if defined(__NetBSD__) || defined(__FreeBSD__)
 #include <sys/param.h>
 #endif
-
-/* strcasestr is available for _GNU_SOURCE, BSD and some Apple */
-#if defined(_GNU_SOURCE) || (defined(__BSD_VISIBLE) && __BSD_VISIBLE) || (defined(__APPLE__) && (!defined(_POSIX_C_SOURCE) || defined(_DARWIN_C_SOURCE))) || defined(_NETBSD_SOURCE)
-#	undef DEFINE_STRCASESTR
-#else
-#	define DEFINE_STRCASESTR
-char *strcasestr(const char *haystack, const char *needle);
-#endif /* strcasestr is available */
 
 /**
  * The use of a struct is so that when used as an argument to seprintf/etc, the buffer lives

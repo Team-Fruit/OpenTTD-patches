@@ -17,38 +17,37 @@
 #include "date_type.h"
 #include "object_type.h"
 #include "newgrf_animation_type.h"
+#include "newgrf_badge_type.h"
 #include "newgrf_class.h"
 #include "newgrf_commons.h"
 #include <vector>
 
 /** Various object behaviours. */
-enum ObjectFlags : uint16_t {
-	OBJECT_FLAG_NONE               =       0, ///< Just nothing.
-	OBJECT_FLAG_ONLY_IN_SCENEDIT   = 1 <<  0, ///< Object can only be constructed in the scenario editor.
-	OBJECT_FLAG_CANNOT_REMOVE      = 1 <<  1, ///< Object can not be removed.
-	OBJECT_FLAG_AUTOREMOVE         = 1 <<  2, ///< Object get automatically removed (like "owned land").
-	OBJECT_FLAG_BUILT_ON_WATER     = 1 <<  3, ///< Object can be built on water (not required).
-	OBJECT_FLAG_CLEAR_INCOME       = 1 <<  4, ///< When object is cleared a positive income is generated instead of a cost.
-	OBJECT_FLAG_HAS_NO_FOUNDATION  = 1 <<  5, ///< Do not display foundations when on a slope.
-	OBJECT_FLAG_ANIMATION          = 1 <<  6, ///< Object has animated tiles.
-	OBJECT_FLAG_ONLY_IN_GAME       = 1 <<  7, ///< Object can only be built in game.
-	OBJECT_FLAG_2CC_COLOUR         = 1 <<  8, ///< Object wants 2CC colour mapping.
-	OBJECT_FLAG_NOT_ON_LAND        = 1 <<  9, ///< Object can not be on land, implicitly sets #OBJECT_FLAG_BUILT_ON_WATER.
-	OBJECT_FLAG_DRAW_WATER         = 1 << 10, ///< Object wants to be drawn on water.
-	OBJECT_FLAG_ALLOW_UNDER_BRIDGE = 1 << 11, ///< Object can built under a bridge.
-	OBJECT_FLAG_ANIM_RANDOM_BITS   = 1 << 12, ///< Object wants random bits in "next animation frame" callback.
-	OBJECT_FLAG_SCALE_BY_WATER     = 1 << 13, ///< Object count is roughly scaled by water amount at edges.
+enum class ObjectFlag : uint8_t {
+	OnlyInScenedit   =  0, ///< Object can only be constructed in the scenario editor.
+	CannotRemove     =  1, ///< Object can not be removed.
+	Autoremove       =  2, ///< Object get automatically removed (like "owned land").
+	BuiltOnWater     =  3, ///< Object can be built on water (not required).
+	ClearIncome      =  4, ///< When object is cleared a positive income is generated instead of a cost.
+	HasNoFoundation  =  5, ///< Do not display foundations when on a slope.
+	Animation        =  6, ///< Object has animated tiles.
+	OnlyInGame       =  7, ///< Object can only be built in game.
+	Uses2CC          =  8, ///< Object wants 2CC colour mapping.
+	NotOnLand        =  9, ///< Object can not be on land, implicitly sets #ObjectFlag::BuiltOnWater.
+	DrawWater        = 10, ///< Object wants to be drawn on water.
+	AllowUnderBridge = 11, ///< Object can built under a bridge.
+	AnimRandomBits   = 12, ///< Object wants random bits in "next animation frame" callback.
+	ScaleByWater     = 13, ///< Object count is roughly scaled by water amount at edges.
 };
-DECLARE_ENUM_AS_BIT_SET(ObjectFlags)
+using ObjectFlags = EnumBitSet<ObjectFlag, uint16_t>;
 
-enum ObjectCtrlFlags {
-	OBJECT_CTRL_FLAG_NONE               =       0, ///< Just nothing.
-	OBJECT_CTRL_FLAG_USE_LAND_GROUND    = 1 <<  0, ///< Use land for ground sprite.
-	OBJECT_CTRL_FLAG_EDGE_FOUNDATION    = 1 <<  1, ///< Use edge foundation mode.
-	OBJECT_CTRL_FLAG_FLOOD_RESISTANT    = 1 <<  2, ///< Object is flood-resistant.
-	OBJECT_CTRL_FLAG_VPORT_MAP_TYPE     = 1 <<  3, ///< Viewport map type is set.
+enum class ObjectCtrlFlag : uint8_t {
+	UseLandGround      = 0, ///< Use land for ground sprite.
+	EdgeFoundation     = 1, ///< Use edge foundation mode.
+	FloodResistant     = 2, ///< Object is flood-resistant.
+	ViewportMapTypeSet = 3, ///< Viewport map type is set.
 };
-DECLARE_ENUM_AS_BIT_SET(ObjectCtrlFlags)
+using ObjectCtrlFlags = EnumBitSet<ObjectCtrlFlag, uint8_t>;
 
 enum ObjectEdgeFoundationFlags {
 	/* Bits 0 and 1 use for edge DiagDirection */
@@ -69,7 +68,7 @@ enum ObjectClassID : uint16_t {
 	INVALID_OBJECT_CLASS = UINT16_MAX, ///< Class for the less fortunate.
 };
 /** Allow incrementing of ObjectClassID variables */
-DECLARE_POSTFIX_INCREMENT(ObjectClassID)
+DECLARE_INCREMENT_DECREMENT_OPERATORS(ObjectClassID)
 
 enum ObjectViewportMapType {
 	OVMT_DEFAULT = 0,
@@ -91,11 +90,12 @@ enum ObjectViewportMapType {
  */
 struct ObjectSpec : NewGRFSpecBase<ObjectClassID> {
 	/* 2 because of the "normal" and "buy" sprite stacks. */
-	GRFFilePropsBase<2> grf_prop;   ///< Properties related the the grf file
-	AnimationInfo animation;        ///< Information about the animation.
+	FixedGRFFileProps<2> grf_prop;  ///< Properties related the the grf file
+	/* Animation speed default differs from other features */
+	AnimationInfo<ObjectAnimationTriggers> animation{0, AnimationStatus::NoAnimation, 0, {}};  ///< Information about the animation.
 	StringID name;                  ///< The name for this object.
 
-	uint8_t climate;                ///< In which climates is this object available?
+	LandscapeTypes climate; ///< In which climates is this object available?
 	uint8_t size;                   ///< The size of this objects; low nibble for X, high nibble for Y.
 	uint8_t build_cost_multiplier;  ///< Build cost multiplier per tile.
 	uint8_t clear_cost_multiplier;  ///< Clear cost multiplier per tile.
@@ -104,12 +104,13 @@ struct ObjectSpec : NewGRFSpecBase<ObjectClassID> {
 	ObjectFlags flags;              ///< Flags/settings related to the object.
 	ObjectCtrlFlags ctrl_flags;     ///< Extra control flags.
 	uint8_t edge_foundation[4];     ///< Edge foundation flags
-	uint16_t callback_mask;         ///< Bitmask of requested/allowed callbacks.
+	ObjectCallbackMasks callback_mask; ///< Bitmask of requested/allowed callbacks.
 	uint8_t height;                 ///< The height of this structure, in heightlevels; max MAX_TILE_HEIGHT.
 	uint8_t views;                  ///< The number of views.
 	uint8_t generate_amount;        ///< Number of objects which are attempted to be generated per 256^2 map during world generation.
 	ObjectViewportMapType vport_map_type; ///< Viewport map type
 	uint16_t vport_map_subtype;     ///< Viewport map subtype
+	std::vector<BadgeID> badges;
 
 	/**
 	 * Test if this object is enabled.
@@ -210,7 +211,7 @@ void DrawNewObjectTile(TileInfo *ti, const ObjectSpec *spec, int building_z_offs
 void DrawNewObjectTileInGUI(int x, int y, const ObjectSpec *spec, uint8_t view);
 void AnimateNewObjectTile(TileIndex tile);
 uint8_t GetNewObjectTileAnimationSpeed(TileIndex tile);
-void TriggerObjectTileAnimation(Object *o, TileIndex tile, ObjectAnimationTrigger trigger, const ObjectSpec *spec);
-void TriggerObjectAnimation(Object *o, ObjectAnimationTrigger trigger, const ObjectSpec *spec);
+bool TriggerObjectTileAnimation(Object *o, TileIndex tile, ObjectAnimationTrigger trigger, const ObjectSpec *spec);
+bool TriggerObjectAnimation(Object *o, ObjectAnimationTrigger trigger, const ObjectSpec *spec);
 
 #endif /* NEWGRF_OBJECT_H */

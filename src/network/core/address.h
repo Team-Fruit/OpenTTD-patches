@@ -119,7 +119,7 @@ public:
 	}
 
 	bool IsFamily(int family);
-	bool IsInNetmask(const char *netmask);
+	bool IsInNetmask(std::string_view netmask);
 
 	/**
 	 * Compare the address of this class with the address of another.
@@ -154,35 +154,26 @@ public:
 	{
 		return const_cast<NetworkAddress*>(this)->CompareTo(address) == 0;
 	}
-	/**
-	 * Compare the address of this class with the address of another.
-	 * @param address the other address.
-	 * @return true if both do not match.
-	 */
-	bool operator != (NetworkAddress address) const
-	{
-		return const_cast<NetworkAddress*>(this)->CompareTo(address) != 0;
-	}
 
 	/**
 	 * Compare the address of this class with the address of another.
 	 * @param address the other address.
 	 */
-	bool operator < (NetworkAddress &address)
+	auto operator <=>(NetworkAddress &address)
 	{
-		return this->CompareTo(address) < 0;
+		return this->CompareTo(address) <=> 0;
 	}
 
 	void Listen(int socktype, SocketList *sockets);
 
-	static const char *SocketTypeAsString(int socktype);
-	static const char *AddressFamilyAsString(int family);
+	static std::string_view SocketTypeAsString(int socktype);
+	static std::string_view AddressFamilyAsString(int family);
 	static NetworkAddress GetPeerAddress(SOCKET sock);
 	static NetworkAddress GetSockAddress(SOCKET sock);
 	static const std::string GetPeerName(SOCKET sock);
 };
 
-struct FormatNetworkAddress : public fmt_formattable {
+struct FormatNetworkAddress {
 	NetworkAddress *addr;
 	bool with_family;
 
@@ -197,7 +188,7 @@ struct FormatNetworkAddress : public fmt_formattable {
  *
  * Sorting will prefer entries at the top of this list above ones at the bottom.
  */
-enum ServerAddressType {
+enum ServerAddressType : uint8_t {
 	SERVER_ADDRESS_DIRECT,      ///< Server-address is based on an hostname:port.
 	SERVER_ADDRESS_INVITE_CODE, ///< Server-address is based on an invite code.
 };
@@ -217,13 +208,13 @@ private:
 	 * @param type The type of the ServerAdress.
 	 * @param connection_string The connection_string that belongs to this ServerAddress type.
 	 */
-	ServerAddress(ServerAddressType type, const std::string &connection_string) : type(type), connection_string(connection_string) {}
+	ServerAddress(ServerAddressType type, std::string &&connection_string) : type(type), connection_string(std::move(connection_string)) {}
 
 public:
 	ServerAddressType type;        ///< The type of this ServerAddress.
 	std::string connection_string; ///< The connection string for this ServerAddress.
 
-	static ServerAddress Parse(const std::string &connection_string, uint16_t default_port, CompanyID *company_id = nullptr);
+	static ServerAddress Parse(std::string_view connection_string, uint16_t default_port, CompanyID *company_id = nullptr);
 };
 
 #endif /* NETWORK_CORE_ADDRESS_H */

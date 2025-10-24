@@ -38,10 +38,12 @@ enum OrderWidgets : WidgetID {
 	WID_O_COND_CARGO,                ///< Choose condition cargo.
 	WID_O_COND_AUX_CARGO,            ///< Choose condition cargo.
 	WID_O_COND_SLOT,                 ///< Choose condition slot.
+	WID_O_COND_SLOT_GROUP,           ///< Choose condition slot group.
 	WID_O_COND_COUNTER,              ///< Choose condition counter.
 	WID_O_COND_TIME_DATE,            ///< Choose time/date value.
 	WID_O_COND_TIMETABLE,            ///< Choose timetable value.
 	WID_O_COND_SCHED_SELECT,         ///< Choose scheduled dispatch schedule.
+	WID_O_COND_SCHED_VALUE,          ///< Choose scheduled dispatch value.
 	WID_O_COND_AUX_VIA,              ///< Condition via button.
 	WID_O_COND_SCHED_TEST,           ///< Choose scheduled dispatch test.
 	WID_O_COND_AUX_STATION,          ///< Condition station button.
@@ -73,7 +75,7 @@ enum OrderWidgets : WidgetID {
 };
 
 /** Widgets of the #CargoTypeOrdersWindow class. */
-enum CargoTypeOrdersWidgets {
+enum CargoTypeOrdersWidgets : WidgetID {
 	WID_CTO_CAPTION,                                                            ///< Caption of the window.
 	WID_CTO_HEADER,                                                             ///< Window header.
 	WID_CTO_CLOSEBTN,                                                           ///< Close button.

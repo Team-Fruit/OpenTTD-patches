@@ -33,7 +33,7 @@ static void Load_SIGN()
 {
 	int index;
 	while ((index = SlIterateArray()) != -1) {
-		Sign *si = new (index) Sign();
+		Sign *si = new (SignID(index)) Sign();
 		SlObject(si, _sign_desc);
 		/* Before version 6.1, signs didn't have owner.
 		 * Before version 83, invalid signs were determined by si->str == 0.
@@ -46,7 +46,7 @@ static void Load_SIGN()
 		}
 
 		/* Signs placed in scenario editor shall now be OWNER_DEITY */
-		if (IsSavegameVersionBefore(SLV_171) && si->owner == OWNER_NONE && _file_to_saveload.abstract_ftype == FT_SCENARIO) {
+		if (IsSavegameVersionBefore(SLV_171) && si->owner == OWNER_NONE && _file_to_saveload.ftype.abstract == FT_SCENARIO) {
 			si->owner = OWNER_DEITY;
 		}
 	}
