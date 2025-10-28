@@ -4470,7 +4470,7 @@ static bool ConDumpInfo(std::span<std::string_view> argv)
 	return false;
 }
 
-void CcCreateTown(const CommandCost &result, TileIndex tile)
+void CcCreateTownCmd(const CommandCost &result, TileIndex tile)
 {
 	if (result.Succeeded()) {
 		auto town_id = result.GetResultData<TownID>();
@@ -4481,7 +4481,7 @@ void CcCreateTown(const CommandCost &result, TileIndex tile)
 	}
 	StringID error = result.GetErrorMessage();
 	if (error == INVALID_STRING_ID) {
-		IConsolePrint(CC_ERROR, "ERROR: Command execution failed");
+		IConsolePrint(CC_ERROR, "ERROR: Command execution failed (generic error, or no specific error given)");
 	} else if (error == STR_ERROR_NAME_MUST_BE_UNIQUE || error == STR_ERROR_TOO_MANY_TOWNS) {
 		IConsolePrint(CC_ERROR, "ERROR: Couldn't create a town: {}", GetString(error));
 	} else {
@@ -4492,26 +4492,87 @@ void CcCreateTown(const CommandCost &result, TileIndex tile)
 
 static bool ConCreateTown(std::span<std::string_view> argv)
 {
-	if (argv.empty()) {
+	if (argv.size() <= 3) {
 		IConsolePrint(CC_HELP, "Create a town");
-		IConsolePrint(CC_HELP, "Usage: create_town x y name");
+		IConsolePrint(CC_HELP, "Usage: createtown <x> <y> <name> [orig|br|2x2|3x3|rand]");
+		return true;
+	}
+
+	if (_game_mode != GameMode::Editor && _current_company != OWNER_DEITY && _settings_game.economy.found_town == TownFounding::Forbidden) {
+		IConsolePrint(CC_ERROR, "You are not ready for place Town!");
+		IConsolePrint(CC_ERROR, "Switch game mode to editor or Enable found town on setting");
 		return true;
 	}
 	if (argv.size() != 4) return false;
 
-	auto x = ParseInteger<uint32_t>(argv[1], 0);
-	auto y = ParseInteger<uint32_t>(argv[2], 0);
+	auto x = ParseInteger(argv[1]);
+	auto y = ParseInteger(argv[2]);
+	TileIndex tile;
 	if (x.has_value() && y.has_value()) {
 		if (*x >= Map::SizeX() || *y >= Map::SizeY()) {
 			IConsolePrint(CC_ERROR, "Tile does not exist");
 			return true;
 		}
 
-		TileIndex tile = TileXY(*x, *y);
+		tile = TileXY(*x, *y);
+		uint32_t townnameparts = 0;
 		ScrollMainWindowToTile(tile);
+		TownLayout layout;
 
-		Command<Commands::FoundTown>::Post(CommandCallback::CreateTown, tile,
-				TownSize::Medium, false, TownLayout::BetterRoads, false, 0, std::string(argv[3]));
+		if (_game_mode != GameMode::Editor && _current_company != OWNER_DEITY && _settings_game.economy.found_town != TownFounding::CustomLayout) {
+			layout = _settings_game.economy.town_layout;
+			IConsolePrint(CC_WARNING, "Placing town with CustomLayout is not allowed on setting. fallback to configured layout");
+		} else if (argv.size() == 5) {
+			std::string layouttext = std::string(argv[4]);
+			std::string ltcomp;
+
+			std::transform(layouttext.begin(), layouttext.end(), layouttext.begin(), ::tolower);
+
+			switch (*layouttext.cbegin()) {
+				case 'o':
+					ltcomp = "orig";
+					if (std::ranges::equal(ltcomp, layouttext)) {
+						layout = TownLayout::Original;
+						break;
+					}
+				case 'b':
+					ltcomp = "br";
+					if (std::ranges::equal(ltcomp, layouttext)) {
+						layout = TownLayout::BetterRoads;
+						break;
+					}
+				case '2':
+					ltcomp = "2x2";
+					if (std::ranges::equal(ltcomp, layouttext)) {
+						layout = TownLayout::Grid2x2;
+						break;
+					}
+				case '3':
+					ltcomp = "3x3";
+					if (std::ranges::equal(ltcomp, layouttext)) {
+						layout = TownLayout::Grid3x3;
+						break;
+					}
+				case 'r':
+					ltcomp = "rand";
+					if (std::ranges::equal(ltcomp, layouttext)) {
+						layout = TownLayout::Random;
+						break;
+					}
+				default:
+					IConsolePrint(CC_ERROR, "ERROR: Given layout is unrecognized: '{}'", layouttext);
+					IConsolePrint(CC_HELP, "Acceptable layout is one of followings: orig, br, 2x2, 3x3, rand");
+					return true;
+			}
+		} else {
+			layout = TownLayout::BetterRoads;
+		}
+
+		Command<Commands::FoundTown>::Post(CommandCallback::CreateTownCmd, tile, TownSize::Medium, false, layout, false, townnameparts, std::string(argv[3]));
+		return true;
+	} else {
+		if (!x.has_value()) IConsolePrint(CC_ERROR, "Unacceptable Coord-X input (parse to int failed): '{}'", argv[1]);
+		if (!y.has_value()) IConsolePrint(CC_ERROR, "Unacceptable Coord-Y input (parse to int failed): '{}'", argv[2]);
 		return true;
 	}
 
@@ -5431,7 +5492,7 @@ void IConsoleStdLibRegister()
 
 	IConsole::CmdRegister("find_non_realistic_braking_signal", ConFindNonRealisticBrakingSignal);
 	IConsole::CmdRegister("find_missing_object",     ConFindMissingObject);
-	IConsole::CmdRegister("create_town", ConCreateTown);
+	IConsole::CmdRegister("create_town",             ConCreateTown);
 
 	IConsole::CmdRegister("getfulldate",             ConGetFullDate,      nullptr, true);
 	IConsole::CmdRegister("dump_command_log",        ConDumpCommandLog,   nullptr, true);

@@ -838,6 +838,9 @@ enum class CommandCallback : uint8_t {
 	FoundTown,
 	FoundRandomTown,
 
+	/* console_cmds.cpp */
+	CreateTownCmd,
+
 	/* vehicle_gui.cpp */
 	BuildPrimaryVehicle,
 	StartStopVehicle,
@@ -866,9 +869,6 @@ enum class CommandCallback : uint8_t {
 	/* tracerestrict_gui.cpp */
 	CreateTraceRestrictSlot,
 	CreateTraceRestrictCounter,
-
-	/* console_cmds.cpp */
-	CreateTown,
 
 	End, ///< Must ALWAYS be on the end of this list
 };
