@@ -787,6 +787,9 @@ enum class CommandCallback : uint8_t {
 	FoundTown,
 	FoundRandomTown,
 
+	/* console_cmds.cpp */
+	CreateTownCmd,
+
 	/* vehicle_gui.cpp */
 	BuildPrimaryVehicle,
 	StartStopVehicle,

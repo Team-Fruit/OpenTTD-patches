@@ -56,6 +56,7 @@
 #include "economy_func.h"
 #include "town.h"
 #include "town_type.h"
+#include "town_cmd.h"
 #include "industry.h"
 #include "string_func_extra.h"
 #include "linkgraph/linkgraphjob.h"
@@ -4365,7 +4366,7 @@ static bool ConDumpInfo(std::span<std::string_view> argv)
 	return false;
 }
 
-void CcCreateTown(const CommandCost &result, TileIndex tile, uint32_t p1, uint32_t p2, uint64_t p3, uint32_t cmd)
+void CcCreateTownCmd(const CommandCost &result, TileIndex tile)
 {
 	if (result.Succeeded()) {
 		IConsolePrint(TC_GREEN, "Successfully Created town '{}' at {:#x}(X: {}, Y: {})", Town::Get(GetTownIndex(tile))->name.c_str(), tile, TileX(tile), TileY(tile));
@@ -4373,7 +4374,7 @@ void CcCreateTown(const CommandCost &result, TileIndex tile, uint32_t p1, uint32
 	}
 	switch (result.GetErrorMessage()) {
 		case INVALID_STRING_ID:
-			IConsolePrint(CC_ERROR, "ERROR: Command execution failed");
+			IConsolePrint(CC_ERROR, "ERROR: Command execution failed (generic error, or no specific error given)");
 			break;
 		case STR_ERROR_NAME_MUST_BE_UNIQUE:
 		case STR_ERROR_TOO_MANY_TOWNS:
@@ -4388,27 +4389,88 @@ void CcCreateTown(const CommandCost &result, TileIndex tile, uint32_t p1, uint32
 	SetRedErrorSquare(tile);
 }
 
-DEF_CONSOLE_CMD(ConCreateTown)
+static bool ConCreateTown(std::span<std::string_view> argv)
 {
-	if (argc < 3) {
+	if (argv.size() <= 3) {
 		IConsolePrint(CC_HELP, "Create a town");
-		IConsolePrint(CC_HELP, "Usage: createtown x y name");
+		IConsolePrint(CC_HELP, "Usage: createtown <x> <y> <name> [orig|br|2x2|3x3|rand]");
 		return true;
 	}
 
-	uint32_t x, y;
+	if (_game_mode != GM_EDITOR && _current_company != OWNER_DEITY && _settings_game.economy.found_town == TF_FORBIDDEN) {
+		IConsolePrint(CC_ERROR, "You are not ready for place Town!");
+		IConsolePrint(CC_ERROR, "Switch game mode to editor or Enable found town on setting");
+		return true;
+	}
+
+	auto x = ParseInteger(argv[1]);
+	auto y = ParseInteger(argv[2]);
 	TileIndex tile;
-	if (GetArgumentInteger(&x, argv[1]) && GetArgumentInteger(&y, argv[2])) {
-		if (x >= MapSizeX() || y >= MapSizeY()) {
+	if (x.has_value() && y.has_value()) {
+		if (*x >= Map::SizeX() || *y >= Map::SizeY()) {
 			IConsolePrint(CC_ERROR, "Tile does not exist");
 			return true;
 		}
 
-		tile = TileXY(x, y);
+		tile = TileXY(*x, *y);
 		uint32_t townnameparts = 0;
 		ScrollMainWindowToTile(tile);
+		TownLayout layout;
 
-		DoCommandP(tile, TSZ_MEDIUM | 0 | TL_BETTER_ROADS << 3, townnameparts, CMD_FOUND_TOWN, CcCreateTown, argv[3]);
+		if (_game_mode != GM_EDITOR && _current_company != OWNER_DEITY && _settings_game.economy.found_town != TF_CUSTOM_LAYOUT) {
+			layout = _settings_game.economy.town_layout;
+			IConsolePrint(CC_WARNING, "Placing town with CustomLayout is not allowed on setting. fallback to configured layout");
+		} else if (argv.size() == 5) {
+			std::string layouttext = std::string(argv[4]);
+			std::string ltcomp;
+
+			std::transform(layouttext.begin(), layouttext.end(), layouttext.begin(), ::tolower);
+
+			switch (*layouttext.cbegin()) {
+				case 'o':
+					ltcomp = "orig";
+					if (std::ranges::equal(ltcomp, layouttext)) {
+						layout = TL_ORIGINAL;
+						break;
+					}
+				case 'b':
+					ltcomp = "br";
+					if (std::ranges::equal(ltcomp, layouttext)) {
+						layout = TL_BETTER_ROADS;
+						break;
+					}
+				case '2':
+					ltcomp = "2x2";
+					if (std::ranges::equal(ltcomp, layouttext)) {
+						layout = TL_2X2_GRID;
+						break;
+					}
+				case '3':
+					ltcomp = "3x3";
+					if (std::ranges::equal(ltcomp, layouttext)) {
+						layout = TL_3X3_GRID;
+						break;
+					}
+				case 'r':
+					ltcomp = "rand";
+					if (std::ranges::equal(ltcomp, layouttext)) {
+						layout = TL_RANDOM;
+						break;
+					}
+				default:
+					IConsolePrint(CC_ERROR, "ERROR: Given layout is unrecognized: '{}'", layouttext);
+					IConsolePrint(CC_HELP, "Acceptable layout is one of followings: orig, br, 2x2, 3x3, rand");
+					return true;
+			}
+		} else {
+			layout = TL_BETTER_ROADS;
+		}
+
+		Command<CMD_FOUND_TOWN>::Post(CommandCallback::CreateTownCmd, tile, TSZ_MEDIUM, false, layout, false, townnameparts, std::string(argv[3]));
+		return true;
+	} else {
+		if (!x.has_value()) IConsolePrint(CC_ERROR, "Unacceptable Coord-X input (parse to int failed): '{}'", argv[1]);
+		if (!y.has_value()) IConsolePrint(CC_ERROR, "Unacceptable Coord-Y input (parse to int failed): '{}'", argv[2]);
 		return true;
 	}
 
@@ -4584,7 +4646,7 @@ void IConsoleStdLibRegister()
 
 	IConsole::CmdRegister("find_non_realistic_braking_signal", ConFindNonRealisticBrakingSignal);
 	IConsole::CmdRegister("find_missing_object",     ConFindMissingObject);
-	IConsole::CmdRegister("create_town", ConCreateTown);
+	IConsole::CmdRegister("create_town",             ConCreateTown);
 
 	IConsole::CmdRegister("getfulldate",             ConGetFullDate,      nullptr, true);
 	IConsole::CmdRegister("dump_command_log",        ConDumpCommandLog,   nullptr, true);

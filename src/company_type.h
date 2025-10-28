@@ -17,9 +17,9 @@ struct CompanyIDTag : public PoolIDTraits<uint8_t, 0xF, 0xFF> {};
 using CompanyID = PoolID<CompanyIDTag>;
 
 /* 'Fake' companies used for networks */
-static constexpr CompanyID COMPANY_INACTIVE_CLIENT{253}; ///< The client is joining
-static constexpr CompanyID COMPANY_NEW_COMPANY{254}; ///< The client wants a new company
-static constexpr CompanyID COMPANY_SPECTATOR{255}; ///< The client is spectating
+static constexpr CompanyID COMPANY_INACTIVE_CLIENT{0xFD}; ///< The client is joining
+static constexpr CompanyID COMPANY_NEW_COMPANY{0xFE}; ///< The client wants a new company
+static constexpr CompanyID COMPANY_SPECTATOR{0xFF}; ///< The client is spectating
 
 using Owner = CompanyID;
 static constexpr Owner OWNER_BEGIN = Owner::Begin(); ///< First owner
