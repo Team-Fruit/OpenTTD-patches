@@ -1340,6 +1340,7 @@ STR_LAI_TUNNEL_DESCRIPTION_RAILROAD_CHUNNEL                     :鉄道トンネ
 STR_LAI_TUNNEL_DESCRIPTION_RAILROAD_SIGNAL                      :信号付き鉄道トンネル
 STR_LAI_TUNNEL_DESCRIPTION_RAILROAD_SIGNAL_CHUNNEL              :信号付き鉄道トンネル (海底)
 STR_LAI_TUNNEL_DESCRIPTION_ROAD_CHUNNEL                         :道路トンネル (海底)
+STR_LAI_RAIL_DESCRIPTION_DIAGONAL_TUNNEL                        :鉄道トンネル(斜め)
 STR_LAI_BRIDGE_DESCRIPTION_RAILROAD_SIGNAL                      :信号付き鉄道橋
 
 STR_SAVELOAD_UNKNOWN_ID                                         :{YELLOW}このファイルはおそらく別のゲームのものです。
@@ -2122,6 +2123,9 @@ STR_ERROR_TUNNEL_TOO_MANY                                       :{WHITE}トン�
 STR_ERROR_NO_DRILLING_ABOVE_CHUNNEL                             :{WHITE}海底トンネルを海上油田の下に建設することはできません。
 STR_ERROR_ANOTHER_TUNNEL_IN_THE_WAY_FOR_CHUNNEL                 :{WHITE}他のトンネルの下を通るためには3タイル必要です。
 STR_ERROR_CHUNNEL_ONLY_OVER_SEA                                 :{WHITE}海底トンネルは海を横断する場合にのみ利用可能です。
+STR_ERROR_SITE_UNSUITABLE_FOR_DIAGONAL_TUNNEL                   :{WHITE}斜面が斜めトンネルの入り口に不適当です
+STR_ERROR_DIAGONAL_TUNNEL_EMERGES                               :{WHITE}適切な出口に達する前にトンネルが地上に出てしまいます
+STR_ERROR_NOT_POSSIBLE_ON_DIAGONAL_TUNNEL_PORTAL                :{WHITE}斜めトンネルの入り口では実行できません
 STR_ERROR_PURCHASE_LAND_LIMIT_REACHED                           :{WHITE}土地の範囲購入の上限に達しました
 STR_ERROR_CANT_PURCHASE_OTHER_COMPANY_DEPOT                     :{WHITE}車庫は他社によって所有されていて、輸送機器の購入が許可されていません。
 STR_ERROR_DEPOT_HAS_WRONG_RAIL_TYPE                             :{WHITE}列車庫はこのレールで列車を購入できません
