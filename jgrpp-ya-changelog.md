@@ -2,6 +2,10 @@
 
 * * *
 
+### v0.73.3+5 (2026-10-20)
+* Add ns2091's patch-set from commit d785424bd6e795da0e32ded84c1e833504a94f98 to commit f27f02f40dc7e443477166f5a47707b7c7717e5b
+* Bump sjcl's patch-set to commit c3833d807a55f23548af9d970a585bdc240632a2
+
 ### v0.73.3+4 (2026-10-18)
 * Group waiting passengers by destination, source and boarding service in station windows, including current and retained Hyperpath alternatives and retry services
 * Allow passengers to board buses queued at drive-through road stops
