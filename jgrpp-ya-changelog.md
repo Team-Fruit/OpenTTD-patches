@@ -2,6 +2,9 @@
 
 * * *
 
+### v0.73.3+6 (2026-10-24)
+* Bump sjcl's patch-set to commit 2d64e1bfc3408cb688c328d5161ad89a7cfb0bc2
+
 ### v0.73.3+5 (2026-10-20)
 * Add ns2091's patch-set from commit d785424bd6e795da0e32ded84c1e833504a94f98 to commit f27f02f40dc7e443477166f5a47707b7c7717e5b
 * Bump sjcl's patch-set to commit c3833d807a55f23548af9d970a585bdc240632a2
