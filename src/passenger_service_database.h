@@ -174,7 +174,6 @@ public:
 	bool PreparePrecomputed(); ///< Initial trees or replacement graph barrier: one slice, without advancing StateTicks.
 	bool IsPreparingPrecomputed() const;
 	PassengerPrecomputedProgress GetPrecomputedProgress() const; ///< O(NUM_CARGO), no diagnostic copies or worker reads.
-	PassengerParallelBuildDiagnostic GetPrecomputedParallelDiagnostic(CargoType cargo, bool retained = false) const { return (retained ? this->retained_precomputed : this->precomputed)[cargo].GetParallelDiagnostic(); }
 	struct PreparationDiagnostic {
 		std::array<uint64_t, 8> phase_nanoseconds{}; ///< Time inside slices, including result waits; indexed by progress Phase.
 		std::array<uint64_t, 8> phase_wall_nanoseconds{}; ///< Also includes GUI/network intervals between active slices.
@@ -266,7 +265,7 @@ public:
 		result.retained_destinations = old.destinations; result.retained_bytes = old.bytes; result.retained_envelope = old.envelope;
 		return result;
 	}
-	PassengerParallelBuildDiagnostic GetPrecomputedParallelDiagnostic(CargoType cargo) const { return this->precomputed[cargo].GetParallelDiagnostic(); } ///< Current generation only.
+	PassengerParallelBuildDiagnostic GetPrecomputedParallelDiagnostic(CargoType cargo, bool retained = false) const { return (retained ? this->retained_precomputed : this->precomputed)[cargo].GetParallelDiagnostic(); }
 	PassengerHyperpathMemoryDiagnostic InspectPrecomputedMemory(CargoType cargo, bool retained = false) const
 	{ return (retained ? this->retained_precomputed[cargo] : this->precomputed[cargo]).InspectMemory(); }
 	uint64_t GetPublishedRevision() const { return this->published_revision; }
