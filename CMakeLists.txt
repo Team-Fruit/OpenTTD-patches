@@ -385,7 +385,7 @@ set_ipo()
 set_target_properties(openttd PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
 process_compile_flags()
 
-include(ProfileGuidedOptimization)
+include(pgo/ProfileGuidedOptimization)
 configure_pgo()
 
 include(LinkPackage)
