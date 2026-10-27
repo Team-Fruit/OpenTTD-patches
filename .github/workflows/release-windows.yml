@@ -98,6 +98,7 @@ jobs:
         ./os/windows/Build.ps1 -Architecture '${{ matrix.arch }}' -CMakeArguments @(
           '-DCMAKE_TOOLCHAIN_FILE=${{ steps.vcpkg.outputs.vcpkg-cmake }}',
           '-DOPTION_USE_NSIS=OFF',
+          '-DOPTION_LTO=ON',
           "-DHOST_BINARY_DIR=$env:GITHUB_WORKSPACE/build-host",
           "-DOPTION_SURVEY_KEY=$env:OPENTTD_SURVEY_KEY"
         )

@@ -69,6 +69,15 @@ macro(compile_flags)
             add_compile_options(
                 -Wno-multichar
             )
+            if(OPTION_LTO AND NOT OPTION_NO_LTO)
+                include(CheckCXXCompilerFlag)
+                check_cxx_compiler_flag("-flto" LTO_FOUND)
+
+                if(LTO_FOUND)
+                    # Enable LTO.
+                    add_compile_options("$<$<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>,$<CONFIG:RelWithDebInfo>>:-flto>")
+                endif()
+            endif()
         endif()
         if(CMAKE_SIZEOF_VOID_P EQUAL 8)
             add_compile_options(
@@ -192,16 +201,16 @@ macro(compile_flags)
             endif()
         endif(OPTION_COMPRESS_DEBUG)
 
-        if(OPTION_LTO)
+        if(OPTION_LTO AND NOT OPTION_NO_LTO)
             include(CheckCXXCompilerFlag)
             check_cxx_compiler_flag("-flto" LTO_FOUND)
 
             if(LTO_FOUND)
                 # Enable LTO.
-                add_compile_options(-flto)
+                add_compile_options("$<$<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>,$<CONFIG:RelWithDebInfo>>:-flto>")
                 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto")
             endif()
-        endif(OPTION_LTO)
+        endif(OPTION_LTO AND NOT OPTION_NO_LTO)
 
         if (OPTION_NO_WARN_UNINIT)
             add_compile_options(-Wno-maybe-uninitialized -Wno-uninitialized)

@@ -93,6 +93,7 @@ jobs:
           -DCMAKE_TOOLCHAIN_FILE=${{ steps.vcpkg.outputs.vcpkg-cmake }} \
           -DHOST_BINARY_DIR=${GITHUB_WORKSPACE}/build-host \
           -DCMAKE_BUILD_TYPE=Release \
+          -DOPTION_LTO=ON \
           -DOPTION_TRIM_PATH_PREFIX=ON \
           -DOPTION_SURVEY_KEY=${{ inputs.survey_key }} \
           # EOF
@@ -115,6 +116,7 @@ jobs:
           -DCMAKE_TOOLCHAIN_FILE=${{ steps.vcpkg.outputs.vcpkg-cmake }} \
           -DHOST_BINARY_DIR=${GITHUB_WORKSPACE}/build-host \
           -DCMAKE_BUILD_TYPE=Release \
+          -DOPTION_LTO=ON \
           -DOPTION_TRIM_PATH_PREFIX=ON \
           -DOPTION_SURVEY_KEY=${{ inputs.survey_key }} \
           -DCPACK_BUNDLE_APPLE_CERT_APP=${{ secrets.APPLE_DEVELOPER_CERTIFICATE_ID }} \
